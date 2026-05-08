@@ -123,6 +123,255 @@ def map_specialization(spec_str):
     return mapping.get(spec_str, spec_str.lower())
 
 
+def parse_fwd_instance(instance_id, instance, problem_name):
+    """Parse a single forward (or bwd_data) instance string. Returns dict or None if skipped."""
+    if "#" in instance or ";" in instance:
+        return None
+
+    instance = instance.strip()
+    if not instance:
+        return None
+
+    device_op_name = instance.split("<")[0]
+    start = instance.index('<') + 1
+    end = instance.rindex('>')
+    params_str = instance[start:end]
+    args = parse_instance_string(params_str)
+
+    is_v3_instance = "_V3" in device_op_name or "CShuffleV3" in device_op_name
+
+    # Standard (non-V3) instance: 49 args
+    #   0-13: spatial/layout/dtype/elementwise_op params
+    #   14: ConvForwardSpecialization, 15: GemmSpec
+    #   16: NumGemmKPrefetchStage, 17: BlockSize
+    #   18: MPerBlock, 19: NPerBlock, 20: KPerBlock
+    #   21: AK1, 22: BK1, 23: MPerXDL, 24: NPerXDL
+    #   25: MXdlPerWave, 26: NXdlPerWave
+    #   27-32: A block transfer (Seq,Seq,Seq,dim,vec,dst_vec)
+    #   33: ABlockLdsExtraM
+    #   34-39: B block transfer
+    #   40: BBlockLdsExtraN
+    #   41-42: CShuffleM/NXdlPerWavePerShuffle
+    #   43: CDEBlockTransferClusterLengths (Seq)
+    #   44: CDEBlockTransferScalarPerVector
+    #   45-46: AComputeType, BComputeType
+    #   47: LoopScheduler, 48: NumGroupsToMerge
+    #
+    # V3 instance: 50 args — no NumGemmKPrefetchStage, adds scheduler+pipeline_version+flag at end
+    #   0-13: same as standard
+    #   14: ConvForwardSpecialization, 15: GemmSpec
+    #   16: BlockSize (shifted by -1)
+    #   17: MPerBlock, 18: NPerBlock, 19: KPerBlock
+    #   20: AK1, 21: BK1, 22: MPerXDL, 23: NPerXDL
+    #   24: MXdlPerWave, 25: NXdlPerWave
+    #   26-31: A block transfer
+    #   32: ABlockLdsExtraM
+    #   33-38: B block transfer
+    #   39: BBlockLdsExtraN
+    #   40-41: CShuffleM/NXdlPerWavePerShuffle
+    #   42: CDEBlockTransferClusterLengths (Seq)
+    #   43: CDEBlockTransferScalarPerVector
+    #   44: BlockGemmPipelineScheduler, 45: BlkGemmPipelineVersion
+    #   46-47: AComputeType, BComputeType
+    #   48: DirectLoadFlag (bool), 49: NumGroupsToMerge
+
+    spec = args[14]
+
+    if is_v3_instance:
+        offset = 0  # V3: no NumGemmKPrefetchStage, indices shift by -1 starting at BlockSize
+        block_size = int(args[16])
+        m_per_block = int(args[17])
+        n_per_block = int(args[18])
+        k_per_block = int(args[19])
+        ak1 = int(args[20])
+        m_per_xdl = int(args[22])
+        n_per_xdl = int(args[23])
+        m_xdl_per_wave = int(args[24])
+        n_xdl_per_wave = int(args[25])
+        a_scalar_per_vector = int(args[30])
+        b_scalar_per_vector = int(args[37])
+        c_scalar_per_vector = int(args[43])
+        block_gemm_pipeline_scheduler = args[44]
+        blk_gemm_pipeline_version = args[45]
+        direct_load = args[48].lower() == "true" if len(args) > 48 else False
+        num_groups_to_merge = int(args[49]) if len(args) > 49 else 1
+    else:
+        block_size = int(args[17])
+        m_per_block = int(args[18])
+        n_per_block = int(args[19])
+        k_per_block = int(args[20])
+        ak1 = int(args[21])
+        m_per_xdl = int(args[23])
+        n_per_xdl = int(args[24])
+        m_xdl_per_wave = int(args[25])
+        n_xdl_per_wave = int(args[26])
+        a_scalar_per_vector = int(args[31])
+        b_scalar_per_vector = int(args[38])
+        c_scalar_per_vector = int(args[44])
+        block_gemm_pipeline_scheduler = "Intrawave"
+        blk_gemm_pipeline_version = "v1"
+        direct_load = False
+        num_groups_to_merge = int(args[48]) if len(args) > 48 else 1
+
+    # Derive warp config
+    m_warp = int(m_per_block / (m_per_xdl * m_xdl_per_wave))
+    n_warp = int(n_per_block / (n_per_xdl * n_xdl_per_wave))
+    warp_size = 64
+    k_warp = int(block_size / (warp_size * m_warp * n_warp))
+
+    dtype = get_dtype_str(problem_name)
+    k_per_xdl = max(ak1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
+
+    # Skip rules
+    if not check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector):
+        print(f"Skipping instance {instance_id}: irregular vector sizes "
+              f"(vec {a_scalar_per_vector},{b_scalar_per_vector},{c_scalar_per_vector})")
+        return None
+    if m_per_block > (warp_size * a_scalar_per_vector) or n_per_block > (warp_size * b_scalar_per_vector):
+        print(f"Skipping instance {instance_id}: multi-warp per continuous tile dim "
+              f"(tile {m_per_block}x{n_per_block}, vec {a_scalar_per_vector},{b_scalar_per_vector})")
+        return None
+
+    # Determine pipeline and scheduler
+    scheduler = map_scheduler(block_gemm_pipeline_scheduler)
+    pipeline_version = blk_gemm_pipeline_version.upper()
+    if pipeline_version == "V5":
+        pipeline_version = "V6"
+    if direct_load:
+        if pipeline_version == "V1":
+            pipeline_version = "ASYNC_V1"
+        elif pipeline_version == "V4":
+            pipeline_version = "ASYNC_V4"
+    pipeline = map_pipeline_version(pipeline_version)
+    double_smem_buffer = blk_gemm_pipeline_version == "v4"
+
+    return {
+        "id": instance_id,
+        "tile_m": m_per_block,
+        "tile_n": n_per_block,
+        "tile_k": k_per_block,
+        "warp_m": m_warp,
+        "warp_n": n_warp,
+        "warp_k": k_warp,
+        "warp_tile_m": m_per_xdl,
+        "warp_tile_n": n_per_xdl,
+        "warp_tile_k": k_per_xdl,
+        "vector_size_a": a_scalar_per_vector,
+        "vector_size_b": b_scalar_per_vector,
+        "vector_size_c": c_scalar_per_vector,
+        "pipeline": pipeline,
+        "scheduler": scheduler,
+        "epilogue": "cshuffle",
+        "double_smem_buffer": double_smem_buffer,
+        "num_groups_to_merge": num_groups_to_merge,
+        "block_per_cu": 1,
+        "num_wave_groups": 1,
+        "specialization": map_specialization(spec),
+        "two_stage": False,
+        "explicit_gemm": False,
+        "split_image": False,
+    }
+
+
+def parse_bwd_data_instance(instance_id, instance, problem_name):
+    """Parse a single backward data instance string. Returns dict or None if skipped."""
+    if "#" in instance or ";" in instance:
+        return None
+
+    instance = instance.strip()
+    if not instance:
+        return None
+
+    start = instance.index('<') + 1
+    end = instance.rindex('>')
+    params_str = instance[start:end]
+    args = parse_instance_string(params_str)
+
+    # BwdData instance: DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle
+    # 0: NDimSpatial, 1: ALayout (NHWGK), 2: BLayout (GKYXC), 3: DsLayout, 4: ELayout (NHWGC)
+    # 5: ADataType, 6: BDataType, 7: AccDataType, 8: DsDataType, 9: EDataType
+    # 10-12: AElementwiseOp, BElementwiseOp, CDEElementwiseOp
+    # 13: ConvBwdDataSpecialization
+    # 14-16: three numeric params (NumGemmKPrefetchStage variants)
+    # 17: BlockSize, 18: MPerBlock, 19: NPerBlock, 20: KPerBlock
+    # 21: AK1, 22: BK1, 23: MPerXDL, 24: NPerXDL
+    # 25: MXdlPerWave, 26: NXdlPerWave
+    # 27-32: A block transfer (Seq,Seq,Seq,dim,vec,dst_vec)
+    # 33: ABlockLdsExtraM
+    # 34-39: B block transfer
+    # 40: BBlockLdsExtraN
+    # 41-42: CShuffleM/NXdlPerWavePerShuffle
+    # 43: CDEBlockTransferClusterLengths (Seq)
+    # 44: CDEBlockTransferScalarPerVector
+    # 45: CBlockTransferSrcScalarPerVector (bwd_data specific)
+    # 46: LoopScheduler, 47: AComputeType, 48: BComputeType
+    # 49-50: NumGroupsToMerge, extra flag
+
+    spec = args[13]
+    block_size = int(args[17])
+    m_per_block = int(args[18])
+    n_per_block = int(args[19])
+    k_per_block = int(args[20])
+    ak1 = int(args[21])
+    m_per_xdl = int(args[23])
+    n_per_xdl = int(args[24])
+    m_xdl_per_wave = int(args[25])
+    n_xdl_per_wave = int(args[26])
+    a_scalar_per_vector = int(args[31])
+    b_scalar_per_vector = int(args[38])
+    c_scalar_per_vector = int(args[44])
+    num_groups_to_merge = int(args[49]) if len(args) > 49 else 1
+
+    # Derive warp config
+    m_warp = int(m_per_block / (m_per_xdl * m_xdl_per_wave))
+    n_warp = int(n_per_block / (n_per_xdl * n_xdl_per_wave))
+    warp_size = 64
+    k_warp = int(block_size / (warp_size * m_warp * n_warp))
+
+    dtype = get_dtype_str(problem_name)
+    k_per_xdl = max(ak1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
+
+    # Skip rules
+    if not check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector):
+        print(f"Skipping instance {instance_id}: irregular vector sizes "
+              f"(vec {a_scalar_per_vector},{b_scalar_per_vector},{c_scalar_per_vector})")
+        return None
+    if m_per_block > (warp_size * a_scalar_per_vector) or n_per_block > (warp_size * b_scalar_per_vector):
+        print(f"Skipping instance {instance_id}: multi-warp per continuous tile dim "
+              f"(tile {m_per_block}x{n_per_block}, vec {a_scalar_per_vector},{b_scalar_per_vector})")
+        return None
+
+    pipeline = "compv1"
+    scheduler = "intrawave"
+
+    return {
+        "id": instance_id,
+        "tile_m": m_per_block,
+        "tile_n": n_per_block,
+        "tile_k": k_per_block,
+        "warp_m": m_warp,
+        "warp_n": n_warp,
+        "warp_k": k_warp,
+        "warp_tile_m": m_per_xdl,
+        "warp_tile_n": n_per_xdl,
+        "warp_tile_k": k_per_xdl,
+        "vector_size_a": a_scalar_per_vector,
+        "vector_size_b": b_scalar_per_vector,
+        "vector_size_c": c_scalar_per_vector,
+        "pipeline": pipeline,
+        "scheduler": scheduler,
+        "epilogue": "cshuffle",
+        "double_smem_buffer": False,
+        "num_groups_to_merge": num_groups_to_merge,
+        "block_per_cu": 1,
+        "num_wave_groups": 1,
+        "specialization": map_specialization(spec),
+        "two_stage": False,
+        "explicit_gemm": False,
+        "split_image": False,
+    }
+
+
 def parse_bwd_weight_instance(instance_id, instance, problem_name):
     """Parse a single backward weight instance string. Returns dict or None if skipped."""
     if "#" in instance or ";" in instance:
@@ -301,9 +550,12 @@ def convert_config_file(input_path, variant, layout, datatype, ndim):
 
         if variant == "bwd_weight":
             result = parse_bwd_weight_instance(instance_id, line, problem_name)
+        elif variant == "forward":
+            result = parse_fwd_instance(instance_id, line, problem_name)
+        elif variant == "bwd_data":
+            result = parse_bwd_data_instance(instance_id, line, problem_name)
         else:
-            raise RuntimeError(f"Variant '{variant}' conversion not yet implemented. "
-                             f"Only 'bwd_weight' is supported in this version.")
+            raise RuntimeError(f"Variant '{variant}' conversion not yet implemented.")
 
         if result is not None:
             instances.append(result)
@@ -336,7 +588,7 @@ def convert_config_file(input_path, variant, layout, datatype, ndim):
 
 
 def convert_all(builder_configs_dir, output_dir):
-    """Convert all backward_weight config files."""
+    """Convert all config files for all variants."""
     builder_dir = Path(builder_configs_dir)
     out_dir = Path(output_dir)
 
@@ -349,21 +601,28 @@ def convert_all(builder_configs_dir, output_dir):
         ("ndhwgc_bf16", "ndhwgc", "bf16", 3),
     ]
 
-    for prefix in ["tests", "profiler"]:
-        for config_name, layout, datatype, ndim in configs:
-            input_path = builder_dir / "backward_weight" / prefix / f"{config_name}.conf"
-            if not input_path.exists():
-                print(f"Skipping {input_path} (not found)")
-                continue
+    variants = [
+        ("backward_weight", "bwd_weight"),
+        ("forward", "forward"),
+        ("backward_data", "bwd_data"),
+    ]
 
-            output_path = out_dir / "backward_weight" / prefix / f"{config_name}.json"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+    for variant_dir, variant_name in variants:
+        for prefix in ["tests", "profiler"]:
+            for config_name, layout, datatype, ndim in configs:
+                input_path = builder_dir / variant_dir / prefix / f"{config_name}.conf"
+                if not input_path.exists():
+                    print(f"Skipping {input_path} (not found)")
+                    continue
 
-            result = convert_config_file(input_path, "bwd_weight", layout, datatype, ndim)
+                output_path = out_dir / variant_dir / prefix / f"{config_name}.json"
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(output_path, "w") as f:
-                json.dump(result, f, indent=2)
-            print(f"  -> {output_path}")
+                result = convert_config_file(input_path, variant_name, layout, datatype, ndim)
+
+                with open(output_path, "w") as f:
+                    json.dump(result, f, indent=2)
+                print(f"  -> {output_path}")
 
 
 def main():

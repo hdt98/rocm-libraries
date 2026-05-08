@@ -1,8 +1,8 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Dispatcher-based backward weight profiler header.
-// Drop-in replacement for grouped_convolution_backward_weight_tile_algs.hpp
+// Dispatcher-based backward data profiler header.
+// Drop-in replacement for grouped_convolution_backward_data_tile_algs.hpp
 // that uses the CK Dispatcher registry instead of CK Builder .inc files.
 
 #pragma once
@@ -13,15 +13,14 @@
 
 #include "../../experimental/builder/test/utils/conv_algorithm_type_utils.hpp"
 #include "grouped_convolution_signatures.hpp"
-#include "ck_tile/ref/naive_grouped_conv_bwd_weight_gpu.hpp"
+#include "ck_tile/ref/naive_grouped_conv_bwd_data_gpu.hpp"
 #include "ck_tile/builder/testing/filter_extent.hpp"
-#include "ck_tile/builder/testing/conv/fwd.hpp"
 #include "ck_tile/builder/testing/conv/ck_tile.hpp"
 #include "ck_tile/builder/testing/conv/reference.hpp"
 #include "ck_tile/builder/conv_builder.hpp"
 #include "tile_profiler_utils.hpp"
 
-// Dispatcher headers 
+// Dispatcher headers
 #include "ck_tile/dispatcher/grouped_conv_registry.hpp"
 #include "ck_tile/dispatcher/grouped_conv_problem.hpp"
 
@@ -57,12 +56,11 @@ args_to_problem(const ckt::Args<SIGNATURE>& args, int k_batch = 1)
     problem.C  = conv_param.C_;
     problem.K  = conv_param.K_;
     problem.G  = conv_param.G_;
-    problem.op = ck_tile::dispatcher::GroupedConvOp::BackwardWeight;
+    problem.op = ck_tile::dispatcher::GroupedConvOp::BackwardData;
     problem.split_k = k_batch;
 
     constexpr int ndim = SIGNATURE.spatial_dim;
 
-    // Fill spatial dims (3D array, pad with 1 for 2D)
     if constexpr(ndim == 2)
     {
         problem.input_spatial  = {1, conv_param.input_spatial_lengths_[0],
@@ -116,14 +114,14 @@ void run_cpu_validation(const ckt::Args<SIGNATURE>& args,
                                               ck_tile::bfloat16_t>>;
     const auto conv_param = args.to_ck_tile_conv_param();
 
-    const std::size_t weight_bytes_num = conv_param.template GetWeightByte<DataType>();
-    std::vector<DataType> wei(weight_bytes_num / sizeof(DataType));
-    std::vector<DataType> ref(weight_bytes_num / sizeof(DataType));
+    const std::size_t input_bytes_num = conv_param.template GetInputByte<DataType>();
+    std::vector<DataType> in(input_bytes_num / sizeof(DataType));
+    std::vector<DataType> ref(input_bytes_num / sizeof(DataType));
     HIP_CHECK_ERROR(
-        hipMemcpy(&ref.data()[0], reference.weight, weight_bytes_num, hipMemcpyDeviceToHost));
+        hipMemcpy(&ref.data()[0], reference.input, input_bytes_num, hipMemcpyDeviceToHost));
     HIP_CHECK_ERROR(
-        hipMemcpy(&wei.data()[0], outputs.weight, weight_bytes_num, hipMemcpyDeviceToHost));
-    ck_tile::check_err(wei, ref, "\tError: Incorrect results!");
+        hipMemcpy(&in.data()[0], outputs.input, input_bytes_num, hipMemcpyDeviceToHost));
+    ck_tile::check_err(in, ref, "\tError: Incorrect results!");
 }
 
 inline std::string get_runtime_arch_name()
@@ -132,7 +130,6 @@ inline std::string get_runtime_arch_name()
     int device = 0;
     ck_tile::hip_check_error(hipGetDevice(&device));
     ck_tile::hip_check_error(hipGetDeviceProperties(&props, device));
-    // Extract base arch name (e.g. "gfx950" from "gfx950:sramecc+:xnack-")
     std::string name(props.gcnArchName);
     auto pos = name.find(':');
     if(pos != std::string::npos)
@@ -140,20 +137,22 @@ inline std::string get_runtime_arch_name()
     return name;
 }
 
-/// @brief Dispatcher-based `run_grouped_conv_backward_weight_tile_algs()`.
+/// @brief Dispatcher-based `run_grouped_conv_backward_data_tile_algs()`.
 /// Iterates all registered dispatcher kernels instead of builder-generated .inc files.
 template <auto SIGNATURE>
-std::tuple<bool, float, std::string, int>
-run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
-                                           const std::string& split_k,
-                                           const ckt::Inputs<SIGNATURE>& inputs,
-                                           const ckt::Outputs<SIGNATURE>& outputs,
-                                           const ck_tile::stream_config& s_conf)
+std::tuple<bool, float, std::string, int, int>
+run_grouped_conv_backward_data_tile_algs(const ckt::Args<SIGNATURE>& args,
+                                         const std::string& split_k,
+                                         const index_t instance_index,
+                                         const ckt::Inputs<SIGNATURE>& inputs,
+                                         const ckt::Outputs<SIGNATURE>& outputs,
+                                         const ck_tile::stream_config& s_conf)
 {
     bool dummy_run_executed = false;
     float best_avg_time     = std::numeric_limits<float>::max();
     std::string best_op_name, op_name;
-    int best_split_k = 1;
+    int best_split_k                = 0;
+    ck::index_t best_instance_index = -1;
     bool is_supported;
     float avg_time{0};
     bool all_instances_valid = true;
@@ -165,7 +164,6 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
                                               ck_tile::half_t,
                                               ck_tile::bfloat16_t>>;
 
-    // Compute reference using builder reference implementation
     auto reference = ckt::alloc_outputs(args);
     using ReferenceInstance =
         typename ckb::ConvBuilder<SIGNATURE, ckt::ConvAlgorithm_Reference{}>::Instance;
@@ -174,54 +172,64 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
 
     const auto conv_param = args.to_ck_tile_conv_param();
 
-    // Get max possible value in the output for tolerance calculation
-    const std::size_t weight_bytes_num = conv_param.template GetWeightByte<DataType>();
-    std::vector<DataType> ref(weight_bytes_num / sizeof(DataType));
-    ck_tile::hip_check_error(
-        hipMemcpy(&ref.data()[0], reference.get().weight, weight_bytes_num, hipMemcpyDeviceToHost));
+    // Get max possible value in the output
+    const std::size_t input_bytes_num = conv_param.template GetInputByte<DataType>();
+    std::vector<DataType> ref(input_bytes_num / sizeof(DataType));
+    HIP_CHECK_ERROR(
+        hipMemcpy(&ref.data()[0], reference.get().input, input_bytes_num, hipMemcpyDeviceToHost));
     const float max_accumulated_value = *std::max_element(ref.begin(), ref.end());
-    const index_t num_accums = std::accumulate(std::begin(conv_param.output_spatial_lengths_),
-                                               std::end(conv_param.output_spatial_lengths_),
-                                               static_cast<std::size_t>(1),
-                                               std::multiplies<std::size_t>()) *
-                               conv_param.N_;
-    const auto split_k_values = get_split_k_values(split_k);
 
-    // Register all generated backward weight kernels
+    const index_t num_accums = conv_param.K_;
+
+    // BWD data doesn't support split-K autodeduce value -1
+    auto split_k_values = get_split_k_values(split_k);
+    split_k_values.erase(std::remove(split_k_values.begin(), split_k_values.end(), -1),
+                         split_k_values.end());
+
+    // Register all generated backward data kernels
     static bool kernels_registered = false;
     if(!kernels_registered)
     {
         const auto arch_name = get_runtime_arch_name();
-        ck_tile::dispatcher::register_all_grouped_conv_bwd_weight_kernels(arch_name);
+        ck_tile::dispatcher::register_all_grouped_conv_bwd_data_kernels(arch_name);
         kernels_registered = true;
     }
 
-    // Get backward weight kernels matching data type and spatial dims
+    // Get backward data kernels matching data type and spatial dims
     constexpr const char* dtype_str = get_dtype_string<SIGNATURE>();
     constexpr int ndim = SIGNATURE.spatial_dim;
     auto& registry = ck_tile::dispatcher::GroupedConvRegistry::instance();
     auto all_kernels = registry.filter([](const ck_tile::dispatcher::GroupedConvKernelInstance& k) {
-        return k.key().op == ck_tile::dispatcher::GroupedConvOp::BackwardWeight &&
+        return k.key().op == ck_tile::dispatcher::GroupedConvOp::BackwardData &&
                k.key().dtype_in == dtype_str &&
                k.key().ndim_spatial == ndim;
     });
 
     // Set up thread-local buffer context
+    // For bwd_data: inputs.output = dY, inputs.weight = W, outputs.input = dX
+    // Backend mapping: ctx.input_ptr -> dY, ctx.weight_ptr -> W, ctx.output_ptr -> dX
     auto& ctx       = ck_tile::dispatcher::g_conv_dispatch_buffers;
-    ctx.input_ptr   = inputs.input;
-    ctx.weight_ptr  = inputs.output; // For bwd_weight: "output" gradient = dY
-    ctx.output_ptr  = outputs.weight; // dW being computed
+    ctx.input_ptr   = inputs.output;  // dY (gradient from next layer)
+    ctx.weight_ptr  = inputs.weight;  // W
+    ctx.output_ptr  = outputs.input;  // dX (being computed)
     ctx.warmup      = s_conf.cold_niters_;
     ctx.repeat      = s_conf.nrepeat_;
     ctx.benchmarking = s_conf.time_kernel_;
 
-    // For verification purposes, we use the instance string as the op_name.
-    // This allows us to compare the tile based dispatcher output to the CK builder based output.
     constexpr bool use_instance_string = true;
 
-    // Iterate all kernels × split-K values
+    index_t num_kernel = 0;
     for(const auto* kernel : all_kernels)
     {
+        num_kernel++;
+        // Skip if a specific instance was requested and this isn't it
+        const bool running_specific_instance = (instance_index != -1);
+        const bool current_is_target         = (num_kernel - 1 == instance_index);
+        if(running_specific_instance && !current_is_target)
+        {
+            continue;
+        }
+
         for(auto& k_batch : split_k_values)
         {
             auto problem  = args_to_problem<SIGNATURE>(args, k_batch);
@@ -229,7 +237,6 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
 
             op_name       = kernel->name(use_instance_string);
 
-            // Check support before launching
             is_supported = kernel->is_supported(problem);
             if(!is_supported)
             {
@@ -253,14 +260,14 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
 
             if((s_conf.time_kernel_ || s_conf.flush_cache_) && !dummy_run_executed)
             {
-                // Run first instance twice when profiling to stabilize timing
                 try
                 {
                     avg_time = kernel->run(problem, nullptr);
                 }
                 catch(const std::runtime_error& e)
                 {
-                    std::cerr << "[Exception] " << op_name << " SplitK=" << k_batch << " : " << e.what() << std::endl;
+                    std::cerr << "[Exception] " << op_name << " SplitK=" << k_batch
+                              << " : " << e.what() << std::endl;
                     ck_tile::hip_check_error(hipDeviceSynchronize());
                     ck_tile::hip_check_error(hipGetLastError());
                     is_supported = false;
@@ -271,7 +278,8 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
             if(is_supported)
             {
                 ckt::ValidationReport report;
-                auto&& [rtol, atol] = get_rtol_atol<SIGNATURE>(num_accums, k_batch, max_accumulated_value);
+                auto&& [rtol, atol] =
+                    get_rtol_atol<SIGNATURE>(num_accums, k_batch, max_accumulated_value);
                 ckt::Outputs<SIGNATURE>::reflect(
                     args,
                     [&](std::string_view name,
@@ -281,13 +289,18 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
                     });
 
                 const bool valid = report.get_errors().empty();
-                best_avg_time    = std::min(best_avg_time, avg_time);
-                best_op_name     = best_avg_time < avg_time ? best_op_name : op_name;
-                best_split_k     = best_avg_time < avg_time ? best_split_k : k_batch;
                 if(valid)
                 {
-                    std::cout << "[Valid] Perf: " << std::setw(10) << avg_time << " ms,"
-                                << " " << op_name << ", SplitK " << k_batch << std::endl;
+                    if(avg_time < best_avg_time)
+                    {
+                        best_instance_index = num_kernel - 1;
+                    }
+                    best_avg_time = std::min(best_avg_time, avg_time);
+                    best_op_name  = best_avg_time < avg_time ? best_op_name : op_name;
+                    best_split_k  = best_avg_time < avg_time ? best_split_k : k_batch;
+                    std::cout << "[Valid] Perf: " << std::setw(10) << avg_time << " ms," << " "
+                              << op_name << " (instance " << num_kernel - 1 << "), SplitK "
+                              << k_batch << std::endl;
                 }
                 else
                 {
@@ -295,8 +308,8 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
                     for(const auto& error : report.get_errors())
                     {
                         std::cout << "\tNumber of incorrect values: " << error.wrong_elements
-                                    << " Is all zero:" << error.is_all_zero()
-                                    << " max err: " << error.max_error << std::endl;
+                                  << " Is all zero:" << error.is_all_zero()
+                                  << " max err: " << error.max_error << std::endl;
                         ckt::Args<SIGNATURE> args_k_batch = args;
                         args_k_batch.k_batch              = k_batch;
                         run_cpu_validation<SIGNATURE>(args_k_batch, outputs, reference.get());
@@ -307,7 +320,8 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
         }
     }
 
-    return std::make_tuple(all_instances_valid, best_avg_time, best_op_name, best_split_k);
+    return std::make_tuple(
+        all_instances_valid, best_avg_time, best_op_name, best_split_k, best_instance_index);
 }
 
 } // namespace ck_tile::builder::profiling

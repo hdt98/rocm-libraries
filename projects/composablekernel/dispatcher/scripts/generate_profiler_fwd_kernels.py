@@ -2,16 +2,16 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 #
-# Generates dispatcher-based backward weight kernels for the CK Profiler.
+# Generates dispatcher-based forward kernels for the CK Profiler.
 #
 # This script:
 # 1. Reads JSON config files (from convert_builder_configs.py)
 # 2. Calls unified_grouped_conv_codegen.py --config-file for each JSON
-# 3. Generates include_all_grouped_conv_bwd_weight_kernels.hpp
+# 3. Generates include_all_grouped_conv_fwd_kernels.hpp
 # 4. Generates chunked register_*_chunk_N.cpp files + register_all_grouped_conv_kernels.cpp
 #
 # Usage:
-#   python3 generate_profiler_bwd_weight_kernels.py \
+#   python3 generate_profiler_fwd_kernels.py \
 #     --config-dir <path-to-json-configs> \
 #     --codegen <path-to-unified_grouped_conv_codegen.py> \
 #     --output-dir <generated-kernel-output-dir> \
@@ -46,16 +46,16 @@ def generate_kernels_from_config(codegen_script, config_file, output_dir, arch):
 
 
 def collect_kernel_headers(output_dir):
-    """Collect all generated .hpp kernel headers."""
-    headers = sorted(Path(output_dir).glob("grouped_conv_bwd_weight_*.hpp"))
+    """Collect all generated .hpp forward kernel headers."""
+    headers = sorted(Path(output_dir).glob("grouped_conv_fwd_*.hpp"))
     return headers
 
 
 def generate_include_all_header(headers, output_dir):
-    """Generate include_all_grouped_conv_bwd_weight_kernels.hpp."""
+    """Generate include_all_grouped_conv_fwd_kernels.hpp."""
     lines = [
         "// Auto-generated — do not edit",
-        "// Includes all generated backward weight kernel headers.",
+        "// Includes all generated forward kernel headers.",
         "#pragma once",
         "",
     ]
@@ -63,7 +63,7 @@ def generate_include_all_header(headers, output_dir):
         lines.append(f'#include "{h.name}"')
     lines.append("")
 
-    path = Path(output_dir) / "include_all_grouped_conv_bwd_weight_kernels.hpp"
+    path = Path(output_dir) / "include_all_grouped_conv_fwd_kernels.hpp"
     path.write_text("\n".join(lines))
     print(f"Generated {path} ({len(headers)} includes)")
     return path
@@ -71,7 +71,7 @@ def generate_include_all_header(headers, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate dispatcher-based bwd_weight kernels for CK Profiler."
+        description="Generate dispatcher-based forward kernels for CK Profiler."
     )
     parser.add_argument("--config-dir", required=True)
     parser.add_argument("--codegen", required=True)
@@ -120,11 +120,11 @@ def main():
     generate_include_all_header(headers, output_dir)
     generate_chunked_registration(
         headers, output_dir,
-        variant="bwd_weight",
-        op_enum="GroupedConvOp::BackwardWeight",
-        run_fn_maker="backends::make_conv_bwd_weight_run_fn",
-        is_supported_fn_maker="backends::make_conv_bwd_weight_is_supported_fn",
-        register_fn_name="register_all_grouped_conv_bwd_weight_kernels",
+        variant="fwd",
+        op_enum="GroupedConvOp::Forward",
+        run_fn_maker="backends::make_conv_fwd_run_fn",
+        is_supported_fn_maker="backends::make_conv_fwd_is_supported_fn",
+        register_fn_name="register_all_grouped_conv_fwd_kernels",
     )
 
     print(f"\nDone. {len(headers)} kernels ready in {output_dir}")

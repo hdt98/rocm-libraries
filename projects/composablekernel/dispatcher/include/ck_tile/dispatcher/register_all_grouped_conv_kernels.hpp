@@ -1,8 +1,8 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Forward declaration of registration functions for generated backward weight kernels.
-// The implementation is auto-generated and compiled in the OBJECT library.
+// Forward declarations of registration functions for generated convolution kernels.
+// The implementations are auto-generated and compiled in their respective OBJECT libraries.
 
 #pragma once
 
@@ -17,6 +17,16 @@ void register_all_grouped_conv_bwd_weight_kernels(GroupedConvRegistry& registry,
                                                   const std::string& arch);
 
 void register_all_grouped_conv_bwd_weight_kernels(const std::string& arch);
+
+void register_all_grouped_conv_fwd_kernels(GroupedConvRegistry& registry,
+                                           const std::string& arch);
+
+void register_all_grouped_conv_fwd_kernels(const std::string& arch);
+
+void register_all_grouped_conv_bwd_data_kernels(GroupedConvRegistry& registry,
+                                                const std::string& arch);
+
+void register_all_grouped_conv_bwd_data_kernels(const std::string& arch);
 
 } // namespace dispatcher
 } // namespace ck_tile
