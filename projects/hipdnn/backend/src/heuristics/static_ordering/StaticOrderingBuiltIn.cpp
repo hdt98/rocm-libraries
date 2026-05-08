@@ -38,28 +38,28 @@ namespace hipdnn_backend::heuristics::static_ordering
 namespace
 {
 
-constexpr const char* PLUGIN_NAME    = "BuiltInStaticOrderingHeuristic";
+constexpr const char* PLUGIN_NAME = "BuiltInStaticOrderingHeuristic";
 constexpr const char* PLUGIN_VERSION = "1.0.0";
-constexpr const char* POLICY_NAME    = "SelectionHeuristic::StaticOrdering";
+constexpr const char* POLICY_NAME = "SelectionHeuristic::StaticOrdering";
 
 // File-scope logging callback / level, set via the C-ABI-shaped
 // SetLoggingCallback / SetLogLevel below. The backend supplies its own
 // callback when registering the built-in (see PluginManagerBase::registerPlugin)
 // so log lines from this module flow through the backend logger.
 hipdnnCallback_t g_loggingCallback = nullptr;
-hipdnnSeverity_t g_logLevel        = HIPDNN_SEV_INFO;
+hipdnnSeverity_t g_logLevel = HIPDNN_SEV_INFO;
 
 constexpr size_t LOG_BUFFER_SIZE = 1024;
 
-#define STATIC_ORDERING_LOG(severity, ...)                                                  \
-    do                                                                                      \
-    {                                                                                       \
-        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)                        \
-        {                                                                                   \
-            std::array<char, LOG_BUFFER_SIZE> _buf{};                                       \
+#define STATIC_ORDERING_LOG(severity, ...)                                                   \
+    do                                                                                       \
+    {                                                                                        \
+        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)                         \
+        {                                                                                    \
+            std::array<char, LOG_BUFFER_SIZE> _buf{};                                        \
             std::snprintf(_buf.data(), _buf.size(), "[BuiltInStaticOrdering] " __VA_ARGS__); \
-            g_loggingCallback(severity, _buf.data());                                       \
-        }                                                                                   \
+            g_loggingCallback(severity, _buf.data());                                        \
+        }                                                                                    \
     } while(0)
 
 int64_t policyId()
@@ -73,16 +73,16 @@ int64_t policyId()
 struct Handle
 {
     std::vector<uint8_t> devicePropertiesBuffer;
-    bool                 devicePropertiesSet = false;
+    bool devicePropertiesSet = false;
 };
 
 // Per-policy-descriptor state.
 struct PolicyDescriptor
 {
-    Handle*              handle = nullptr;
+    Handle* handle = nullptr;
     std::vector<int64_t> candidateEngineIds;
     std::vector<int64_t> sortedEngineIds;
-    bool                 finalized = false;
+    bool finalized = false;
 
     explicit PolicyDescriptor(Handle* h)
         : handle(h)
@@ -144,13 +144,14 @@ void getLastErrorString(const char** errorStr)
 
 // ---- Policy enumeration ----------------------------------------------------
 
-hipdnnPluginStatus_t getAllPolicyIds(int64_t* policyIds, uint32_t maxPolicies, uint32_t* numPolicies)
+hipdnnPluginStatus_t
+    getAllPolicyIds(int64_t* policyIds, uint32_t maxPolicies, uint32_t* numPolicies)
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
         numPolicies, STATIC_ORDERING_LOG, "getAllPolicyIds: null num_policies");
 
     constexpr uint32_t TOTAL_POLICIES = 1;
-    *numPolicies                      = TOTAL_POLICIES;
+    *numPolicies = TOTAL_POLICIES;
     if(policyIds == nullptr || maxPolicies == 0)
     {
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
@@ -183,7 +184,7 @@ hipdnnPluginStatus_t handleCreate(hipdnnHeuristicHandle_t* outHandle)
         outHandle, STATIC_ORDERING_LOG, "handleCreate: null output pointer");
     try
     {
-        auto h     = std::make_unique<Handle>();
+        auto h = std::make_unique<Handle>();
         *outHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(h.release());
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
@@ -201,7 +202,7 @@ hipdnnPluginStatus_t handleDestroy(hipdnnHeuristicHandle_t handle)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t handleSetDeviceProperties(hipdnnHeuristicHandle_t        handle,
+hipdnnPluginStatus_t handleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
                                                const hipdnnPluginConstData_t* devicePropsSerialized)
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
@@ -212,7 +213,7 @@ hipdnnPluginStatus_t handleSetDeviceProperties(hipdnnHeuristicHandle_t        ha
                                      "handleSetDeviceProperties: invalid buffer");
     try
     {
-        auto*       h    = reinterpret_cast<Handle*>(handle);
+        auto* h = reinterpret_cast<Handle*>(handle);
         const auto* data = reinterpret_cast<const uint8_t*>(devicePropsSerialized->ptr);
         h->devicePropertiesBuffer.assign(data, data + devicePropsSerialized->size);
         h->devicePropertiesSet = true;
@@ -227,8 +228,8 @@ hipdnnPluginStatus_t handleSetDeviceProperties(hipdnnHeuristicHandle_t        ha
 
 // ---- Policy descriptor lifecycle ------------------------------------------
 
-hipdnnPluginStatus_t policyDescriptorCreate(hipdnnHeuristicHandle_t            pluginHandle,
-                                            int64_t                            id,
+hipdnnPluginStatus_t policyDescriptorCreate(hipdnnHeuristicHandle_t pluginHandle,
+                                            int64_t id,
                                             hipdnnHeuristicPolicyDescriptor_t* outDesc)
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
@@ -243,7 +244,7 @@ hipdnnPluginStatus_t policyDescriptorCreate(hipdnnHeuristicHandle_t            p
     try
     {
         auto desc = std::make_unique<PolicyDescriptor>(reinterpret_cast<Handle*>(pluginHandle));
-        *outDesc  = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(desc.release());
+        *outDesc = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(desc.release());
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -264,8 +265,8 @@ hipdnnPluginStatus_t policyDescriptorDestroy(hipdnnHeuristicPolicyDescriptor_t d
 // ---- Policy inputs ---------------------------------------------------------
 
 hipdnnPluginStatus_t policySetEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
-                                        const int64_t*                    engineIds,
-                                        size_t                            engineIdCount)
+                                        const int64_t* engineIds,
+                                        size_t engineIdCount)
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
         desc, STATIC_ORDERING_LOG, "policySetEngineIds: null descriptor");
@@ -288,7 +289,7 @@ hipdnnPluginStatus_t policySetEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
 }
 
 hipdnnPluginStatus_t policySetSerializedGraph(hipdnnHeuristicPolicyDescriptor_t desc,
-                                              const hipdnnPluginConstData_t*    serializedGraph)
+                                              const hipdnnPluginConstData_t* serializedGraph)
 {
     // StaticOrdering ignores the serialized graph; only validate args.
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
@@ -319,7 +320,7 @@ hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int3
         d->sortedEngineIds = d->candidateEngineIds;
         hipdnn_data_sdk::utilities::sortEngineIds(d->sortedEngineIds);
         d->finalized = true;
-        *outApplied  = 1;
+        *outApplied = 1;
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -330,8 +331,8 @@ hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int3
 }
 
 hipdnnPluginStatus_t policyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
-                                              int64_t*                          engineIds,
-                                              size_t*                           numEngines)
+                                              int64_t* engineIds,
+                                              size_t* numEngines)
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
         desc, STATIC_ORDERING_LOG, "policyGetSortedEngineIds: null descriptor");
@@ -367,24 +368,24 @@ hipdnnPluginStatus_t policyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t 
 hipdnn_backend::plugin::HeuristicPluginFunctionTable populateFunctionTable()
 {
     hipdnn_backend::plugin::HeuristicPluginFunctionTable funcs{};
-    funcs.getName                   = &getName;
-    funcs.getVersion                = &getVersion;
-    funcs.getApiVersion             = &getApiVersion;
-    funcs.getType                   = &getType;
-    funcs.setLoggingCallback        = &setLoggingCallback;
-    funcs.setLogLevel               = &setLogLevel;
-    funcs.getLastErrorString        = &getLastErrorString;
-    funcs.getAllPolicyIds           = &getAllPolicyIds;
-    funcs.getPolicyName             = &getPolicyName;
-    funcs.handleCreate              = &handleCreate;
-    funcs.handleDestroy             = &handleDestroy;
+    funcs.getName = &getName;
+    funcs.getVersion = &getVersion;
+    funcs.getApiVersion = &getApiVersion;
+    funcs.getType = &getType;
+    funcs.setLoggingCallback = &setLoggingCallback;
+    funcs.setLogLevel = &setLogLevel;
+    funcs.getLastErrorString = &getLastErrorString;
+    funcs.getAllPolicyIds = &getAllPolicyIds;
+    funcs.getPolicyName = &getPolicyName;
+    funcs.handleCreate = &handleCreate;
+    funcs.handleDestroy = &handleDestroy;
     funcs.handleSetDeviceProperties = &handleSetDeviceProperties;
-    funcs.policyDescriptorCreate    = &policyDescriptorCreate;
-    funcs.policyDescriptorDestroy   = &policyDescriptorDestroy;
-    funcs.policySetEngineIds        = &policySetEngineIds;
-    funcs.policySetSerializedGraph  = &policySetSerializedGraph;
-    funcs.policyFinalize            = &policyFinalize;
-    funcs.policyGetSortedEngineIds  = &policyGetSortedEngineIds;
+    funcs.policyDescriptorCreate = &policyDescriptorCreate;
+    funcs.policyDescriptorDestroy = &policyDescriptorDestroy;
+    funcs.policySetEngineIds = &policySetEngineIds;
+    funcs.policySetSerializedGraph = &policySetSerializedGraph;
+    funcs.policyFinalize = &policyFinalize;
+    funcs.policyGetSortedEngineIds = &policyGetSortedEngineIds;
     return funcs;
 }
 

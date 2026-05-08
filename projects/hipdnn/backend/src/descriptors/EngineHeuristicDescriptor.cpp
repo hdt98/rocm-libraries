@@ -61,8 +61,7 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     // 3. Environment variable HIPDNN_HEURISTIC_POLICY_ORDER
     // Use the data_sdk getEnv() wrapper rather than std::getenv() so that this
     // reads the live process environment block on Windows.
-    const std::string envStr
-        = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
+    const std::string envStr = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
     if(!envStr.empty())
     {
         // Parse comma-separated policy names and hash to IDs

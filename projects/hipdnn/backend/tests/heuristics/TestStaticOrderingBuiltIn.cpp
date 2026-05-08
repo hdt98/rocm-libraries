@@ -30,9 +30,9 @@
 #include <cstdint>
 #include <vector>
 
+using hipdnn_backend::heuristics::static_ordering::populateFunctionTable;
 using hipdnn_backend::plugin::HeuristicPlugin;
 using hipdnn_backend::plugin::HeuristicPluginFunctionTable;
-using hipdnn_backend::heuristics::static_ordering::populateFunctionTable;
 
 namespace
 {
@@ -71,9 +71,9 @@ protected:
         }
     }
 
-    std::shared_ptr<HeuristicPlugin>  _plugin;
-    hipdnnHeuristicHandle_t           _handle = nullptr;
-    hipdnnHeuristicPolicyDescriptor_t _desc   = nullptr;
+    std::shared_ptr<HeuristicPlugin> _plugin;
+    hipdnnHeuristicHandle_t _handle = nullptr;
+    hipdnnHeuristicPolicyDescriptor_t _desc = nullptr;
 };
 
 // Convenience: grab the raw function table once for direct C-ABI rejection tests.
@@ -114,8 +114,9 @@ TEST(TestStaticOrderingBuiltInRejection, DescriptorCreateRejectsNullHandle)
 
 TEST_F(TestStaticOrderingBuiltIn, DescriptorCreateRejectsNullOutPointer)
 {
-    EXPECT_EQ(staticOrderingAbi().policyDescriptorCreate(_handle, STATIC_ORDERING_POLICY_ID, nullptr),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(
+        staticOrderingAbi().policyDescriptorCreate(_handle, STATIC_ORDERING_POLICY_ID, nullptr),
+        HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 TEST(TestStaticOrderingBuiltInRejection, DescriptorDestroyRejectsNullDescriptor)
@@ -169,7 +170,8 @@ TEST(TestStaticOrderingBuiltInRejection, SetEngineIdsRejectsNullDescriptor)
 
 TEST_F(TestStaticOrderingBuiltIn, SetEngineIdsRejectsNullPointerWithCount)
 {
-    EXPECT_EQ(staticOrderingAbi().policySetEngineIds(_desc, nullptr, 3), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(staticOrderingAbi().policySetEngineIds(_desc, nullptr, 3),
+              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 // ========== SetSerializedGraph ==========
@@ -186,12 +188,14 @@ TEST(TestStaticOrderingBuiltInRejection, SetSerializedGraphRejectsNullDescriptor
 {
     const std::array<uint8_t, 1> buffer{0x00};
     const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
-    EXPECT_EQ(staticOrderingAbi().policySetSerializedGraph(nullptr, &data), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(staticOrderingAbi().policySetSerializedGraph(nullptr, &data),
+              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 TEST_F(TestStaticOrderingBuiltIn, SetSerializedGraphRejectsNullBufferStruct)
 {
-    EXPECT_EQ(staticOrderingAbi().policySetSerializedGraph(_desc, nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(staticOrderingAbi().policySetSerializedGraph(_desc, nullptr),
+              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 // ========== Finalize ==========
@@ -201,7 +205,8 @@ TEST(TestStaticOrderingBuiltInRejection, FinalizeRejectsNullDescriptor)
     // applied is non-const because policyFinalize takes int32_t* — clang-tidy
     // would still flag a never-modified local, so suppress with NOLINT here.
     int32_t applied = -1; // NOLINT(misc-const-correctness)
-    EXPECT_EQ(staticOrderingAbi().policyFinalize(nullptr, &applied), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(staticOrderingAbi().policyFinalize(nullptr, &applied),
+              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 TEST_F(TestStaticOrderingBuiltIn, FinalizeRejectsNullOutApplied)
@@ -265,7 +270,7 @@ TEST_F(TestStaticOrderingBuiltIn, GetSortedClipsToCallerProvidedCapacity)
     ASSERT_TRUE(_plugin->finalize(_desc));
 
     std::array<int64_t, 2> outBuf{0, 0};
-    size_t                 count = outBuf.size();
+    size_t count = outBuf.size();
     EXPECT_EQ(staticOrderingAbi().policyGetSortedEngineIds(_desc, outBuf.data(), &count),
               HIPDNN_PLUGIN_STATUS_SUCCESS);
     EXPECT_EQ(count, outBuf.size());

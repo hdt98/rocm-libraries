@@ -44,7 +44,7 @@ struct TensorDimsStrides
 std::unordered_map<int64_t, TensorDimsStrides> indexTensorsByUid(const Graph* graph)
 {
     std::unordered_map<int64_t, TensorDimsStrides> out;
-    const auto*                                    tensors = graph->tensors();
+    const auto* tensors = graph->tensors();
     if(tensors == nullptr)
     {
         return out;
@@ -64,7 +64,7 @@ std::unordered_map<int64_t, TensorDimsStrides> indexTensorsByUid(const Graph* gr
 /// Walk conv-like nodes; for each, look the override config up and return the
 /// first match (first conv node, first matching rule).
 std::optional<int64_t>
-    matchOverrideConfig(const Graph*                                          graph,
+    matchOverrideConfig(const Graph* graph,
                         const std::unordered_map<int64_t, TensorDimsStrides>& tensorIndex)
 {
     const auto config = EngineOverrideConfig::loadFromEnv();
@@ -83,9 +83,7 @@ std::optional<int64_t>
         return it == tensorIndex.end() ? nullptr : &it->second;
     };
 
-    auto buildView = [&](const TensorDimsStrides* t) {
-        return TensorView{&t->dims, &t->strides};
-    };
+    auto buildView = [&](const TensorDimsStrides* t) { return TensorView{&t->dims, &t->strides}; };
 
     for(const auto* node : *nodes)
     {
@@ -94,27 +92,27 @@ std::optional<int64_t>
             continue;
         }
 
-        const char*              op = nullptr;
-        const TensorDimsStrides* a  = nullptr;
-        const TensorDimsStrides* b  = nullptr;
+        const char* op = nullptr;
+        const TensorDimsStrides* a = nullptr;
+        const TensorDimsStrides* b = nullptr;
 
         if(const auto* fwd = node->attributes_as_ConvolutionFwdAttributes())
         {
             op = "conv_fprop";
-            a  = viewFor(fwd->x_tensor_uid());
-            b  = viewFor(fwd->w_tensor_uid());
+            a = viewFor(fwd->x_tensor_uid());
+            b = viewFor(fwd->w_tensor_uid());
         }
         else if(const auto* bwd = node->attributes_as_ConvolutionBwdAttributes())
         {
             op = "conv_dgrad";
-            a  = viewFor(bwd->dy_tensor_uid());
-            b  = viewFor(bwd->w_tensor_uid());
+            a = viewFor(bwd->dy_tensor_uid());
+            b = viewFor(bwd->w_tensor_uid());
         }
         else if(const auto* wrw = node->attributes_as_ConvolutionWrwAttributes())
         {
             op = "conv_wgrad";
-            a  = viewFor(wrw->x_tensor_uid());
-            b  = viewFor(wrw->dy_tensor_uid());
+            a = viewFor(wrw->x_tensor_uid());
+            b = viewFor(wrw->dy_tensor_uid());
         }
 
         if(op == nullptr || a == nullptr || b == nullptr)
@@ -123,7 +121,7 @@ std::optional<int64_t>
         }
 
         const std::vector<TensorView> views{buildView(a), buildView(b)};
-        auto                          match = config->matchOperation(op, views);
+        auto match = config->matchOperation(op, views);
         if(match.has_value())
         {
             return match;
@@ -137,8 +135,8 @@ std::optional<int64_t>
 std::optional<int64_t> resolveDefaultEngineEnv()
 {
     static constexpr const char* ENV_VAR = "HIPDNN_DEFAULT_ENGINE";
-    const auto                   raw     = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
-    const auto                   trimmed = hipdnn_data_sdk::utilities::trim(raw);
+    const auto raw = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
+    const auto trimmed = hipdnn_data_sdk::utilities::trim(raw);
     if(trimmed.empty())
     {
         return std::nullopt;
@@ -150,7 +148,7 @@ std::optional<int64_t> resolveDefaultEngineEnv()
 
 std::optional<std::vector<int64_t>>
     resolvePreferredEngineOrder(const hipdnnPluginConstData_t& serializedGraph,
-                                const std::vector<int64_t>&    candidateEngineIds)
+                                const std::vector<int64_t>& candidateEngineIds)
 {
     if(candidateEngineIds.empty() || serializedGraph.ptr == nullptr || serializedGraph.size == 0)
     {
@@ -176,22 +174,22 @@ std::optional<std::vector<int64_t>>
     // 2. HIPDNN_ENGINE_OVERRIDE_FILE rule matching a conv node.
     // 3. HIPDNN_DEFAULT_ENGINE env (last-resort hint before the policy loop).
     std::optional<int64_t> preferredEngineId;
-    const char*            preferredSource = nullptr;
+    const char* preferredSource = nullptr;
     if(auto preferredEngineIdOpt = graph->preferred_engine_id(); preferredEngineIdOpt.has_value())
     {
         preferredEngineId = preferredEngineIdOpt;
-        preferredSource   = "graph.preferred_engine_id";
+        preferredSource = "graph.preferred_engine_id";
     }
     else if(auto override = matchOverrideConfig(graph, indexTensorsByUid(graph));
             override.has_value())
     {
         preferredEngineId = override;
-        preferredSource   = "HIPDNN_ENGINE_OVERRIDE_FILE";
+        preferredSource = "HIPDNN_ENGINE_OVERRIDE_FILE";
     }
     else if(auto defaultEngine = resolveDefaultEngineEnv(); defaultEngine.has_value())
     {
         preferredEngineId = defaultEngine;
-        preferredSource   = "HIPDNN_DEFAULT_ENGINE";
+        preferredSource = "HIPDNN_DEFAULT_ENGINE";
     }
 
     if(!preferredEngineId.has_value())
@@ -199,8 +197,7 @@ std::optional<std::vector<int64_t>>
         return std::nullopt;
     }
 
-    auto it = std::find(
-        candidateEngineIds.begin(), candidateEngineIds.end(), *preferredEngineId);
+    auto it = std::find(candidateEngineIds.begin(), candidateEngineIds.end(), *preferredEngineId);
     if(it == candidateEngineIds.end())
     {
         HIPDNN_BACKEND_LOG_INFO(

@@ -56,7 +56,7 @@ TensorPattern makePattern(std::vector<int64_t> dim)
 TensorPattern makePatternWithStride(std::vector<int64_t> dim, std::vector<int64_t> stride)
 {
     TensorPattern p;
-    p.dim    = std::move(dim);
+    p.dim = std::move(dim);
     p.stride = std::move(stride);
     return p;
 }
@@ -73,9 +73,9 @@ EngineOverrideConfig makeConfig(std::vector<OperationRule> rules)
 TEST(TestEngineOverrideConfig, ExactDimMatchSingleRule)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = MIOPEN_ENGINE_NAME;
-    rule.tensors    = {makePattern({1, 3, 224, 224}), makePattern({64, 3, 7, 7})};
+    rule.tensors = {makePattern({1, 3, 224, 224}), makePattern({64, 3, 7, 7})};
 
     const auto config = makeConfig({std::move(rule)});
 
@@ -91,14 +91,14 @@ TEST(TestEngineOverrideConfig, ExactDimMatchSingleRule)
 TEST(TestEngineOverrideConfig, FirstMatchingRuleWins)
 {
     OperationRule rule1;
-    rule1.op         = "conv_fprop";
+    rule1.op = "conv_fprop";
     rule1.engineName = MIOPEN_ENGINE_NAME;
-    rule1.tensors    = {makePattern({1, 3, 224, 224})};
+    rule1.tensors = {makePattern({1, 3, 224, 224})};
 
     OperationRule rule2;
-    rule2.op         = "conv_fprop";
+    rule2.op = "conv_fprop";
     rule2.engineName = HIPBLASLT_ENGINE_NAME;
-    rule2.tensors    = {makePattern({1, 3, 224, 224})};
+    rule2.tensors = {makePattern({1, 3, 224, 224})};
 
     const auto config = makeConfig({std::move(rule1), std::move(rule2)});
 
@@ -114,9 +114,9 @@ TEST(TestEngineOverrideConfig, FirstMatchingRuleWins)
 TEST(TestEngineOverrideConfig, NoRuleMatchesWrongDims)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = MIOPEN_ENGINE_NAME;
-    rule.tensors    = {makePattern({1, 3, 224, 224})};
+    rule.tensors = {makePattern({1, 3, 224, 224})};
 
     const auto config = makeConfig({std::move(rule)});
 
@@ -131,16 +131,16 @@ TEST(TestEngineOverrideConfig, NoRuleMatchesWrongDims)
 TEST(TestEngineOverrideConfig, WildcardInOneDimension)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = HIPBLASLT_ENGINE_NAME;
-    rule.tensors    = {makePattern({-1, 64, 56, 56})};
+    rule.tensors = {makePattern({-1, 64, 56, 56})};
 
     const auto config = makeConfig({std::move(rule)});
 
     for(const int64_t batch : {1, 4, 8, 32})
     {
         const std::vector<TensorData> tensors = {{{batch, 64, 56, 56}, {}}};
-        auto                          result  = config.matchOperation("conv_fprop", viewsOf(tensors));
+        auto result = config.matchOperation("conv_fprop", viewsOf(tensors));
         ASSERT_TRUE(result.has_value()) << "batch=" << batch << " should match";
         EXPECT_EQ(*result, HIPBLASLT_ENGINE_ID);
     }
@@ -154,9 +154,9 @@ TEST(TestEngineOverrideConfig, WildcardInOneDimension)
 TEST(TestEngineOverrideConfig, AllWildcardRuleMatchesAnyShape)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = FUSILLI_ENGINE_NAME;
-    rule.tensors    = {makePattern({-1, -1, -1, -1})};
+    rule.tensors = {makePattern({-1, -1, -1, -1})};
 
     const auto config = makeConfig({std::move(rule)});
 
@@ -164,7 +164,7 @@ TEST(TestEngineOverrideConfig, AllWildcardRuleMatchesAnyShape)
         std::vector<std::vector<int64_t>>{{1, 3, 224, 224}, {8, 64, 56, 56}, {32, 256, 14, 14}})
     {
         const std::vector<TensorData> tensors = {{shape, {}}};
-        auto                          result  = config.matchOperation("conv_fprop", viewsOf(tensors));
+        auto result = config.matchOperation("conv_fprop", viewsOf(tensors));
         ASSERT_TRUE(result.has_value());
         EXPECT_EQ(*result, FUSILLI_ENGINE_ID);
     }
@@ -175,9 +175,9 @@ TEST(TestEngineOverrideConfig, AllWildcardRuleMatchesAnyShape)
 TEST(TestEngineOverrideConfig, WrongOpNameReturnsNullopt)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = MIOPEN_ENGINE_NAME;
-    rule.tensors    = {makePattern({1, 3, 224, 224})};
+    rule.tensors = {makePattern({1, 3, 224, 224})};
 
     const auto config = makeConfig({std::move(rule)});
 
@@ -193,9 +193,9 @@ TEST(TestEngineOverrideConfig, WrongOpNameReturnsNullopt)
 TEST(TestEngineOverrideConfig, WrongTensorCountReturnsNullopt)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = MIOPEN_ENGINE_NAME;
-    rule.tensors    = {makePattern({1, 3, 224, 224}), makePattern({64, 3, 7, 7})};
+    rule.tensors = {makePattern({1, 3, 224, 224}), makePattern({64, 3, 7, 7})};
 
     const auto config = makeConfig({std::move(rule)});
 
@@ -212,19 +212,19 @@ TEST(TestEngineOverrideConfig, WrongTensorCountReturnsNullopt)
 TEST(TestEngineOverrideConfig, WildcardBeforeExactBothMatch)
 {
     OperationRule wildcard;
-    wildcard.op         = "conv_fprop";
+    wildcard.op = "conv_fprop";
     wildcard.engineName = FUSILLI_ENGINE_NAME;
-    wildcard.tensors    = {makePattern({-1, 3, 224, 224})};
+    wildcard.tensors = {makePattern({-1, 3, 224, 224})};
 
     OperationRule exact;
-    exact.op         = "conv_fprop";
+    exact.op = "conv_fprop";
     exact.engineName = HIPBLASLT_ENGINE_NAME;
-    exact.tensors    = {makePattern({1, 3, 224, 224})};
+    exact.tensors = {makePattern({1, 3, 224, 224})};
 
     const auto config = makeConfig({std::move(wildcard), std::move(exact)});
 
     const std::vector<TensorData> tensors = {{{1, 3, 224, 224}, {}}};
-    auto                          result  = config.matchOperation("conv_fprop", viewsOf(tensors));
+    auto result = config.matchOperation("conv_fprop", viewsOf(tensors));
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, FUSILLI_ENGINE_ID);
 }
@@ -232,19 +232,19 @@ TEST(TestEngineOverrideConfig, WildcardBeforeExactBothMatch)
 TEST(TestEngineOverrideConfig, ExactBeforeWildcardBothMatch)
 {
     OperationRule exact;
-    exact.op         = "conv_fprop";
+    exact.op = "conv_fprop";
     exact.engineName = HIPBLASLT_ENGINE_NAME;
-    exact.tensors    = {makePattern({1, 3, 224, 224})};
+    exact.tensors = {makePattern({1, 3, 224, 224})};
 
     OperationRule wildcard;
-    wildcard.op         = "conv_fprop";
+    wildcard.op = "conv_fprop";
     wildcard.engineName = FUSILLI_ENGINE_NAME;
-    wildcard.tensors    = {makePattern({-1, 3, 224, 224})};
+    wildcard.tensors = {makePattern({-1, 3, 224, 224})};
 
     const auto config = makeConfig({std::move(exact), std::move(wildcard)});
 
     const std::vector<TensorData> tensors = {{{1, 3, 224, 224}, {}}};
-    auto                          result  = config.matchOperation("conv_fprop", viewsOf(tensors));
+    auto result = config.matchOperation("conv_fprop", viewsOf(tensors));
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, HIPBLASLT_ENGINE_ID);
 }
@@ -254,14 +254,14 @@ TEST(TestEngineOverrideConfig, ExactBeforeWildcardBothMatch)
 TEST(TestEngineOverrideConfig, ExactStrideMatchSelectsEngine)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = MIOPEN_ENGINE_NAME;
-    rule.tensors    = {makePatternWithStride({1, 3, 224, 224}, {150528, 50176, 224, 1})};
+    rule.tensors = {makePatternWithStride({1, 3, 224, 224}, {150528, 50176, 224, 1})};
 
     const auto config = makeConfig({std::move(rule)});
 
     const std::vector<TensorData> matching = {{{1, 3, 224, 224}, {150528, 50176, 224, 1}}};
-    auto                          result   = config.matchOperation("conv_fprop", viewsOf(matching));
+    auto result = config.matchOperation("conv_fprop", viewsOf(matching));
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, MIOPEN_ENGINE_ID);
 
@@ -273,16 +273,16 @@ TEST(TestEngineOverrideConfig, ExactStrideMatchSelectsEngine)
 TEST(TestEngineOverrideConfig, WildcardStrideElement)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = HIPBLASLT_ENGINE_NAME;
-    rule.tensors    = {makePatternWithStride({1, 3, 224, 224}, {150528, 50176, -1, -1})};
+    rule.tensors = {makePatternWithStride({1, 3, 224, 224}, {150528, 50176, -1, -1})};
 
     const auto config = makeConfig({std::move(rule)});
 
     for(const int64_t s2 : {224, 112, 56})
     {
         const std::vector<TensorData> tensors = {{{1, 3, 224, 224}, {150528, 50176, s2, 1}}};
-        auto                          result  = config.matchOperation("conv_fprop", viewsOf(tensors));
+        auto result = config.matchOperation("conv_fprop", viewsOf(tensors));
         ASSERT_TRUE(result.has_value()) << "stride[2]=" << s2;
         EXPECT_EQ(*result, HIPBLASLT_ENGINE_ID);
     }
@@ -294,9 +294,9 @@ TEST(TestEngineOverrideConfig, WildcardStrideElement)
 TEST(TestEngineOverrideConfig, EmptyStridePatternMatchesAnyStride)
 {
     OperationRule rule;
-    rule.op         = "conv_fprop";
+    rule.op = "conv_fprop";
     rule.engineName = FUSILLI_ENGINE_NAME;
-    rule.tensors    = {makePattern({1, 3, 224, 224})};
+    rule.tensors = {makePattern({1, 3, 224, 224})};
 
     const auto config = makeConfig({std::move(rule)});
 
@@ -304,7 +304,7 @@ TEST(TestEngineOverrideConfig, EmptyStridePatternMatchesAnyStride)
             {150528, 50176, 224, 1}, {1, 3, 672, 150528}, {999, 888, 777, 666}})
     {
         const std::vector<TensorData> tensors = {{{1, 3, 224, 224}, strides}};
-        auto                          result  = config.matchOperation("conv_fprop", viewsOf(tensors));
+        auto result = config.matchOperation("conv_fprop", viewsOf(tensors));
         ASSERT_TRUE(result.has_value());
         EXPECT_EQ(*result, FUSILLI_ENGINE_ID);
     }
@@ -341,12 +341,12 @@ TEST(TestEngineOverrideConfig, LoadFromValidJsonFile)
     ASSERT_TRUE(config.has_value());
 
     const std::vector<TensorData> exact = {{{1, 3, 224, 224}, {}}, {{64, 3, 7, 7}, {}}};
-    auto                          r1    = config->matchOperation("conv_fprop", viewsOf(exact));
+    auto r1 = config->matchOperation("conv_fprop", viewsOf(exact));
     ASSERT_TRUE(r1.has_value());
     EXPECT_EQ(*r1, MIOPEN_ENGINE_ID);
 
     const std::vector<TensorData> other = {{{8, 64, 56, 56}, {}}, {{64, 64, 3, 3}, {}}};
-    auto                          r2    = config->matchOperation("conv_fprop", viewsOf(other));
+    auto r2 = config->matchOperation("conv_fprop", viewsOf(other));
     ASSERT_TRUE(r2.has_value());
     EXPECT_EQ(*r2, FUSILLI_ENGINE_ID);
 }

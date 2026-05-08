@@ -411,8 +411,7 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
     _manager->loadPlugins({emptyNamePlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     // Built-in StaticOrdering is always present; no external plugin should have loaded.
-    EXPECT_EQ(_manager->getPlugins().size(), 1u)
-        << "Empty policy name plugin should be rejected";
+    EXPECT_EQ(_manager->getPlugins().size(), 1u) << "Empty policy name plugin should be rejected";
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsRejected)

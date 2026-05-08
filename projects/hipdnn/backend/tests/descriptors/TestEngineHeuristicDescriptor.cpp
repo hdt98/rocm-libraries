@@ -890,8 +890,7 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderRoundTrip)
 
     // The descriptor stores the caller-supplied list verbatim, including
     // duplicates and unknown policies — nothing is prepended or dedup'd.
-    const int64_t otherId
-        = hipdnn_data_sdk::utilities::policyNameToId("Vendor::Other");
+    const int64_t otherId = hipdnn_data_sdk::utilities::policyNameToId("Vendor::Other");
     const int64_t staticOrderingId
         = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
     const std::vector<int64_t> policyIds = {staticOrderingId, otherId, staticOrderingId};

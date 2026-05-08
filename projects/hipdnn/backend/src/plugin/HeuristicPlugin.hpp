@@ -169,8 +169,8 @@ public:
     // table in a HeuristicPlugin without going through dlopen. Validates the
     // table is complete and the metadata matches the same rules as a loaded
     // plugin (HeuristicPlugin::validatePluginMetadata).
-    static std::shared_ptr<HeuristicPlugin>
-        createBuiltIn(HeuristicPluginFunctionTable funcs, std::string sourceLabel);
+    static std::shared_ptr<HeuristicPlugin> createBuiltIn(HeuristicPluginFunctionTable funcs,
+                                                          std::string sourceLabel);
 
     // Source identifier used in diagnostics (library path for dlopen plugins,
     // "built-in:<name>" for built-ins).

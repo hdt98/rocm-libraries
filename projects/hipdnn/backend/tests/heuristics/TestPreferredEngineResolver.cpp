@@ -36,12 +36,12 @@ using hipdnn_data_sdk::utilities::engineNameToId;
 namespace
 {
 
-const int64_t MIOPEN_ENGINE_ID         = engineNameToId("MIOPEN_ENGINE");
-const int64_t MIOPEN_DETERMINISTIC_ID  = engineNameToId("MIOPEN_ENGINE_DETERMINISTIC");
-const int64_t CUSTOM_ENGINE_ID         = engineNameToId("Plugin1::CustomEngine");
+const int64_t MIOPEN_ENGINE_ID = engineNameToId("MIOPEN_ENGINE");
+const int64_t MIOPEN_DETERMINISTIC_ID = engineNameToId("MIOPEN_ENGINE_DETERMINISTIC");
+const int64_t CUSTOM_ENGINE_ID = engineNameToId("Plugin1::CustomEngine");
 
-constexpr const char* OVERRIDE_ENV        = "HIPDNN_ENGINE_OVERRIDE_FILE";
-constexpr const char* DEFAULT_ENGINE_ENV  = "HIPDNN_DEFAULT_ENGINE";
+constexpr const char* OVERRIDE_ENV = "HIPDNN_ENGINE_OVERRIDE_FILE";
+constexpr const char* DEFAULT_ENGINE_ENV = "HIPDNN_DEFAULT_ENGINE";
 
 /// Build a minimal serialized Graph FlatBuffer with no nodes. Pass a value to
 /// set preferred_engine_id; pass nullopt to leave it unset.
@@ -122,7 +122,10 @@ public:
         std::ofstream(_path) << contents;
     }
 
-    std::string path() const { return _path.string(); }
+    std::string path() const
+    {
+        return _path.string();
+    }
 
 private:
     static std::filesystem::path makeUniqueDir()
@@ -135,7 +138,7 @@ private:
     }
 
     hipdnn_test_sdk::utilities::ScopedDirectory _dir;
-    std::filesystem::path                       _path;
+    std::filesystem::path _path;
 };
 
 constexpr const char* DETERMINISTIC_RULE_JSON = R"({
@@ -169,7 +172,7 @@ TEST(TestPreferredEngineResolver, EmptyCandidatesReturnsNullopt)
 TEST(TestPreferredEngineResolver, NullSerializedGraphReturnsNullopt)
 {
     const hipdnnPluginConstData_t empty{nullptr, 0};
-    const std::vector<int64_t>    candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
+    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
     EXPECT_FALSE(resolvePreferredEngineOrder(empty, candidates).has_value());
 }
 
@@ -177,8 +180,8 @@ TEST(TestPreferredEngineResolver, InvalidGraphBufferReturnsNullopt)
 {
     // Garbage bytes large enough to clear the null check but fail FlatBuffers
     // verification — must be tolerated quietly so the policy loop still runs.
-    const std::vector<uint8_t>    garbage(64, 0xFF);
-    const std::vector<int64_t>    candidates{MIOPEN_ENGINE_ID};
+    const std::vector<uint8_t> garbage(64, 0xFF);
+    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID};
     EXPECT_FALSE(resolvePreferredEngineOrder(toConstData(garbage), candidates).has_value());
 }
 
@@ -186,8 +189,8 @@ TEST(TestPreferredEngineResolver, NoPreferredAndNoEnvOverrideReturnsNullopt)
 {
     // Make sure no override file or default engine leaks in from the environment.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(
-        DEFAULT_ENGINE_ENV, "");
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
+                                                                                 "");
 
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
@@ -199,7 +202,8 @@ TEST(TestPreferredEngineResolver, NoPreferredAndNoEnvOverrideReturnsNullopt)
 TEST(TestPreferredEngineResolver, ExplicitPreferredEngineMovesToFrontPreservingOrder)
 {
     const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    const std::vector<int64_t> candidates{
+        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
 
     const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
     ASSERT_TRUE(result.has_value());
@@ -228,7 +232,8 @@ TEST(TestPreferredEngineResolver, ExplicitPreferredWinsOverOverrideFile)
                                                                           json.path());
 
     const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    const std::vector<int64_t> candidates{
+        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
 
     const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
     ASSERT_TRUE(result.has_value());
@@ -244,7 +249,8 @@ TEST(TestPreferredEngineResolver, OverrideFileMatchedRuleMovesEngineToFront)
                                                                           json.path());
 
     const auto buffer = buildConvFwdGraphBuffer(X_DIMS, X_STRIDES, W_DIMS, W_STRIDES);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    const std::vector<int64_t> candidates{
+        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
 
     const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
     ASSERT_TRUE(result.has_value());
@@ -347,7 +353,8 @@ TEST(TestPreferredEngineResolver, DefaultEngineEnvMovesEngineToFront)
         DEFAULT_ENGINE_ENV, "MIOPEN_ENGINE_DETERMINISTIC");
 
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    const std::vector<int64_t> candidates{
+        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
 
     const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
     ASSERT_TRUE(result.has_value());
@@ -360,8 +367,8 @@ TEST(TestPreferredEngineResolver, DefaultEngineEnvMovesEngineToFront)
 TEST(TestPreferredEngineResolver, DefaultEngineEnvBlankIsTreatedAsUnset)
 {
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(
-        DEFAULT_ENGINE_ENV, "   ");
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
+                                                                                 "   ");
 
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
@@ -388,7 +395,8 @@ TEST(TestPreferredEngineResolver, ExplicitPreferredWinsOverDefaultEngineEnv)
         DEFAULT_ENGINE_ENV, "MIOPEN_ENGINE_DETERMINISTIC");
 
     const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    const std::vector<int64_t> candidates{
+        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
 
     const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
     ASSERT_TRUE(result.has_value());
@@ -402,8 +410,8 @@ TEST(TestPreferredEngineResolver, OverrideFileWinsOverDefaultEngineEnv)
     const TempJsonOverrideFile json(DETERMINISTIC_RULE_JSON);
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV,
                                                                                   json.path());
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(
-        DEFAULT_ENGINE_ENV, "MIOPEN_ENGINE");
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
+                                                                                 "MIOPEN_ENGINE");
 
     const auto buffer = buildConvFwdGraphBuffer(X_DIMS, X_STRIDES, W_DIMS, W_STRIDES);
     const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};

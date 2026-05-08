@@ -38,6 +38,6 @@ namespace hipdnn_backend::heuristics::preferred_engine
  */
 std::optional<std::vector<int64_t>>
     resolvePreferredEngineOrder(const hipdnnPluginConstData_t& serializedGraph,
-                                const std::vector<int64_t>&    candidateEngineIds);
+                                const std::vector<int64_t>& candidateEngineIds);
 
 } // namespace hipdnn_backend::heuristics::preferred_engine

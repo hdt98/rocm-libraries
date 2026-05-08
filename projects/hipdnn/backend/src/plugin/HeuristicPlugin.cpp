@@ -38,8 +38,8 @@ HeuristicPlugin::HeuristicPlugin(HeuristicPluginFunctionTable funcs, std::string
 
 HeuristicPlugin::HeuristicPlugin() = default;
 
-std::shared_ptr<HeuristicPlugin>
-    HeuristicPlugin::createBuiltIn(HeuristicPluginFunctionTable funcs, std::string sourceLabel)
+std::shared_ptr<HeuristicPlugin> HeuristicPlugin::createBuiltIn(HeuristicPluginFunctionTable funcs,
+                                                                std::string sourceLabel)
 {
     return std::shared_ptr<HeuristicPlugin>(new HeuristicPlugin(funcs, std::move(sourceLabel)));
 }
@@ -64,9 +64,8 @@ void HeuristicPlugin::resolveSymbols()
         {                                                                                       \
             throw HipdnnException(                                                              \
                 HIPDNN_STATUS_PLUGIN_ERROR,                                                     \
-                std::string("ERROR: HEURISTIC PLUGIN ABI INCOMPLETE\n")                         \
-                    + "Plugin: " + _sourceLabel + "\n"                                          \
-                    + "Missing required symbol: " symbolName "\n"                               \
+                std::string("ERROR: HEURISTIC PLUGIN ABI INCOMPLETE\n") + "Plugin: "            \
+                    + _sourceLabel + "\n" + "Missing required symbol: " symbolName "\n"         \
                     + "This plugin does not implement the complete heuristic plugin C ABI.\n"   \
                     + "See plugin_sdk/include/hipdnn_plugin_sdk/HeuristicsPluginApi.h for the " \
                       "full API.\n"                                                             \
@@ -93,7 +92,8 @@ void HeuristicPlugin::resolveSymbols()
     // Required handle lifecycle symbols
     GET_REQUIRED_SYMBOL(_funcs.handleCreate, "hipdnnHeuristicHandleCreate");
     GET_REQUIRED_SYMBOL(_funcs.handleDestroy, "hipdnnHeuristicHandleDestroy");
-    GET_REQUIRED_SYMBOL(_funcs.handleSetDeviceProperties, "hipdnnHeuristicHandleSetDeviceProperties");
+    GET_REQUIRED_SYMBOL(_funcs.handleSetDeviceProperties,
+                        "hipdnnHeuristicHandleSetDeviceProperties");
 
     // Required policy descriptor lifecycle symbols
     GET_REQUIRED_SYMBOL(_funcs.policyDescriptorCreate, "hipdnnHeuristicPolicyDescriptorCreate");
