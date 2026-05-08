@@ -95,9 +95,6 @@ public:
 
     void setupMockHeuristicPlugin() const
     {
-        // Mock policy IDs for both well-known policies
-        const int64_t configPolicyId
-            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config");
         const int64_t staticOrderingPolicyId
             = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
 
@@ -109,13 +106,6 @@ public:
         EXPECT_CALL(*_mockHeuristicPluginResourceManager, getPluginForPolicyId(_))
             .WillRepeatedly(Return(nullptr));
         EXPECT_CALL(*_mockHeuristicPluginResourceManager, getHeuristicHandleForPolicyId(_))
-            .WillRepeatedly(Return(nullptr));
-
-        // Set up expectations for resource manager - Config policy returns nullptr (skips)
-        EXPECT_CALL(*_mockHeuristicPluginResourceManager, getPluginForPolicyId(configPolicyId))
-            .WillRepeatedly(Return(nullptr));
-        EXPECT_CALL(*_mockHeuristicPluginResourceManager,
-                    getHeuristicHandleForPolicyId(configPolicyId))
             .WillRepeatedly(Return(nullptr));
 
         // StaticOrdering policy succeeds
@@ -743,6 +733,10 @@ TEST_F(TestEngineHeuristicDescriptor, SetPolicyOrderNullPointer)
 
 TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderWhenNotSet)
 {
+    // Make sure no env-var override leaks in from the surrounding shell.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter envGuard(
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "");
+
     auto heur = getEngineHeuristicDescriptor();
     setGraph();
     setHeuristicMode();
@@ -751,18 +745,17 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderWhenNotSet)
     ASSERT_NO_THROW(heur->finalize());
 
     // With no descriptor-level override and no env var, resolveHeuristicPolicyOrder
-    // falls through to the built-in default: Config + StaticOrdering.
+    // returns the built-in default: just StaticOrdering.
     int64_t count = 999;
     ASSERT_NO_THROW(heur->getAttribute(
         HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
-    ASSERT_EQ(count, 2);
+    ASSERT_EQ(count, 1);
 
-    std::vector<int64_t> buffer(2);
+    std::vector<int64_t> buffer(1);
     ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 2, &count, buffer.data()));
-    ASSERT_EQ(count, 2);
-    EXPECT_EQ(buffer[0], hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"));
-    EXPECT_EQ(buffer[1],
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, &count, buffer.data()));
+    ASSERT_EQ(count, 1);
+    EXPECT_EQ(buffer[0],
               hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"));
 }
 
@@ -770,6 +763,7 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderCountOnly)
 {
     auto heur = getEngineHeuristicDescriptor();
 
+    // Caller-provided policy list is preserved verbatim; nothing is prepended.
     const std::vector<int64_t> policyIds = {
         hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
     };
@@ -864,10 +858,11 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderBufferTooSmall)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<int64_t> policyIds = {
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
-    };
+    // The caller-supplied list is stored verbatim; no dedup, no prepend.
+    const int64_t firstId
+        = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
+    const int64_t secondId = hipdnn_data_sdk::utilities::policyNameToId("Vendor::Other");
+    const std::vector<int64_t> policyIds = {firstId, secondId};
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
                                        HIPDNN_TYPE_INT64,
@@ -886,18 +881,21 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderBufferTooSmall)
     ASSERT_NO_THROW(heur->getAttribute(
         HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, &count, buffer.data()));
     ASSERT_EQ(count, 1);
-    ASSERT_EQ(buffer[0], policyIds[0]);
+    ASSERT_EQ(buffer[0], firstId);
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderRoundTrip)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<int64_t> policyIds = {
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
-    };
+    // The descriptor stores the caller-supplied list verbatim, including
+    // duplicates and unknown policies — nothing is prepended or dedup'd.
+    const int64_t otherId
+        = hipdnn_data_sdk::utilities::policyNameToId("Vendor::Other");
+    const int64_t staticOrderingId
+        = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
+    const std::vector<int64_t> policyIds = {staticOrderingId, otherId, staticOrderingId};
+    const std::vector<int64_t>& expected = policyIds;
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
                                        HIPDNN_TYPE_INT64,
@@ -910,7 +908,7 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderRoundTrip)
         .WillRepeatedly(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
 
-    std::vector<int64_t> getBuffer(policyIds.size());
+    std::vector<int64_t> getBuffer(expected.size());
     int64_t count = 0;
     ASSERT_NO_THROW(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
                                        HIPDNN_TYPE_INT64,
@@ -918,10 +916,10 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderRoundTrip)
                                        &count,
                                        getBuffer.data()));
 
-    ASSERT_EQ(count, static_cast<int64_t>(policyIds.size()));
-    for(size_t i = 0; i < policyIds.size(); ++i)
+    ASSERT_EQ(count, static_cast<int64_t>(expected.size()));
+    for(size_t i = 0; i < expected.size(); ++i)
     {
-        ASSERT_EQ(getBuffer[i], policyIds[i]);
+        ASSERT_EQ(getBuffer[i], expected[i]);
     }
 }
 
@@ -1073,7 +1071,7 @@ TEST_F(TestEngineHeuristicDescriptor, MultipleSetPolicyOrderCalls)
 
     // Second set should override
     const std::vector<int64_t> secondPolicyIds = {
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("Vendor::Other"),
         hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
     };
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
@@ -1106,13 +1104,13 @@ TEST_F(TestEngineHeuristicDescriptor, MultipleSetPolicyOrderCalls)
 
 TEST_F(TestEngineHeuristicDescriptor, EnvironmentVariablePolicyOrderIsRespected)
 {
-    // The mock setup in setupMockHeuristicPlugin() makes Config return a null
-    // handle (skipped) and StaticOrdering succeed. With no descriptor-level
-    // override, the default order [Config, StaticOrdering] therefore succeeds
-    // via StaticOrdering. Restricting the env-var order to Config alone should
+    // The mock setup in setupMockHeuristicPlugin() makes the catch-all return a
+    // null handle for any unknown policy and StaticOrdering succeed. With no
+    // descriptor-level override, the default order [StaticOrdering] therefore
+    // succeeds. Restricting the env-var order to a policy nothing maps to should
     // make finalize() throw, proving the env var supersedes the default.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
-        "HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::Config");
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "Vendor::Unregistered");
 
     auto heur = getEngineHeuristicDescriptor();
     setGraph();
@@ -1126,11 +1124,11 @@ TEST_F(TestEngineHeuristicDescriptor, EnvironmentVariablePolicyOrderIsRespected)
 
 TEST_F(TestEngineHeuristicDescriptor, DescriptorPolicyOrderTakesPrecedenceOverEnvironment)
 {
-    // Same mock setup. Env var lists only Config (which would throw on its own),
-    // but the descriptor-level attribute lists only StaticOrdering. The descriptor
-    // attribute is highest priority, so finalize() must succeed.
+    // Same mock setup. Env var lists an unregistered policy (which would throw
+    // on its own), but the descriptor-level attribute lists only StaticOrdering.
+    // The descriptor attribute is highest priority, so finalize() must succeed.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
-        "HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::Config");
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "Vendor::Unregistered");
 
     auto heur = getEngineHeuristicDescriptor();
 

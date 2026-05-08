@@ -403,11 +403,11 @@ private:
         HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::getEngineConfigs(
             engineConfigs, engineIds, engineHeuristicDesc, defaultEngineId.has_value()));
 
-        // The heuristic chain is responsible for honoring graph-level
-        // preferences such as preferred_engine_id via the SelectionHeuristic::Config
-        // policy, which moves the preferred engine to the front of the result list.
-        // The frontend trusts that ordering and selects index 0 unless
-        // HIPDNN_DEFAULT_ENGINE pins a specific engine ID.
+        // The backend's preferred-engine precursor honors graph-level
+        // preferences (Graph.preferred_engine_id, HIPDNN_ENGINE_OVERRIDE_FILE)
+        // ahead of the heuristic policy loop, moving the preferred engine to
+        // the front of the result list. The frontend trusts that ordering and
+        // selects index 0 unless HIPDNN_DEFAULT_ENGINE pins a specific engine ID.
         size_t selectedIndex = 0;
         if(defaultEngineId)
         {

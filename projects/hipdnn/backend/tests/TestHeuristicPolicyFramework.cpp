@@ -52,8 +52,8 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyCountReturnsNonZero)
     const hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(_handle, &numPolicies);
 
     EXPECT_EQ(status, HIPDNN_STATUS_SUCCESS);
-    // At minimum, Config and StaticOrdering should be loaded
-    EXPECT_GE(numPolicies, 2u);
+    // At minimum, the StaticOrdering built-in should be loaded.
+    EXPECT_GE(numPolicies, 1u);
 }
 
 TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
@@ -132,9 +132,9 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
 
 // Policy order resolution (descriptor / env / default), policy decline behavior,
 // and "no policy succeeds" failure paths are covered with mocked plugin managers
-// in TestEngineHeuristicDescriptorAdditional.cpp. The StaticOrdering "never
-// declines" contract is enforced by the plugin's Finalize implementation and
-// exercised in plugins/heuristics/static_ordering/tests/TestStaticOrderingPlugin.cpp.
+// in descriptors/TestEngineHeuristicDescriptor.cpp. The StaticOrdering "never
+// declines" contract is enforced by the built-in's Finalize implementation and
+// exercised in heuristics/TestStaticOrderingBuiltIn.cpp.
 
 // ========== Integration Tests ==========
 
@@ -145,26 +145,19 @@ TEST_F(TestHeuristicPolicyFramework, HeuristicResourceManagerLoadsDefaultPolicie
 
     auto policyInfos = heurRm->getHeuristicPolicyInfos();
 
-    // Should have at least Config and StaticOrdering
-    EXPECT_GE(policyInfos.size(), 2u);
+    // The StaticOrdering built-in is registered at construction time and is the
+    // canonical fallback policy.
+    EXPECT_GE(policyInfos.size(), 1u);
 
-    // Check for expected policy names
-    bool hasConfig = false;
     bool hasStaticOrdering = false;
-
     for(const auto& info : policyInfos)
     {
-        if(info.policyName.find("Config") != std::string::npos)
-        {
-            hasConfig = true;
-        }
         if(info.policyName.find("StaticOrdering") != std::string::npos)
         {
             hasStaticOrdering = true;
         }
     }
 
-    EXPECT_TRUE(hasConfig) << "Config policy should be loaded";
     EXPECT_TRUE(hasStaticOrdering) << "StaticOrdering policy should be loaded";
 }
 

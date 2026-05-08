@@ -15,6 +15,7 @@
 
 // Heuristics framework
 #include "heuristics/SelectionHeuristic.hpp"
+#include "heuristics/preferred_engine/PreferredEngineResolver.hpp"
 #include "logging/Logging.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
@@ -40,7 +41,10 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     // Policy order resolution.
     // Priority: descriptor attr > handle > env > default
     // Storage and ABI are policy IDs (FNV-1a of the policy name); names are
-    // hashed at the point they enter the system.
+    // hashed at the point they enter the system. First-party preferred-engine
+    // overrides (Graph.preferred_engine_id, HIPDNN_ENGINE_OVERRIDE_FILE) run
+    // ahead of this list as a backend precursor in finalize(); they are not
+    // a "policy" and do not appear here.
 
     // 1. Descriptor attribute (highest priority)
     if(_policyOrderSet)
@@ -57,7 +61,8 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     // 3. Environment variable HIPDNN_HEURISTIC_POLICY_ORDER
     // Use the data_sdk getEnv() wrapper rather than std::getenv() so that this
     // reads the live process environment block on Windows.
-    const std::string envStr = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
+    const std::string envStr
+        = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
     if(!envStr.empty())
     {
         // Parse comma-separated policy names and hash to IDs
@@ -78,9 +83,10 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
                                  policyIds.size());
         return policyIds;
     }
-    // 4. Default policy list
+    // 4. Default policy list — built-in StaticOrdering as the canonical
+    // fallback. Vendor heuristic plugins may be appended/replaced via env or
+    // descriptor attribute above.
     std::vector<int64_t> policyIds = {
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
         hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
     };
     HIPDNN_BACKEND_LOG_DEBUG("Using default policy order: {} policies", policyIds.size());
@@ -190,6 +196,19 @@ void EngineHeuristicDescriptor::finalize()
 
     // Get serialized graph from GraphDescriptor
     const hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
+
+    // First-party preferred-engine precursor: honor explicit Graph.preferred_engine_id
+    // and HIPDNN_ENGINE_OVERRIDE_FILE before invoking any heuristic policy.
+    // These are library knobs (not vendor heuristics), so they live in the backend
+    // rather than as a plugin and short-circuit the policy loop on a hit.
+    if(auto preferredOrder
+       = heuristics::preferred_engine::resolvePreferredEngineOrder(serializedGraph, candidates);
+       preferredOrder.has_value())
+    {
+        _engineIds = std::move(*preferredOrder);
+        HipdnnBackendDescriptorImpl<EngineHeuristicDescriptor>::finalize();
+        return;
+    }
 
     // Resolve ordered policy IDs
     auto orderedPolicyIds = resolveHeuristicPolicyOrder();

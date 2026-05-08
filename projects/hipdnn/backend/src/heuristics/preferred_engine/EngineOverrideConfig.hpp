@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-namespace hipdnn_heuristic_config
+namespace hipdnn_backend::heuristics::preferred_engine
 {
 
 /// Dimension value meaning "match any value in this slot".
@@ -72,8 +72,8 @@ struct TensorPattern
 /// A single engine-override rule (one operation, one engine, ordered tensor patterns).
 struct OperationRule
 {
-    std::string op;
-    std::string engineName;
+    std::string                op;
+    std::string                engineName;
     std::vector<TensorPattern> tensors;
 
     bool matches(const std::vector<TensorView>& inputs) const
@@ -165,14 +165,13 @@ public:
 
     /// Read HIPDNN_ENGINE_OVERRIDE_FILE and load the referenced config.
     /// Returns nullopt when the variable is unset / empty / the file cannot
-    /// be opened or parsed. Called once per PolicyFinalize (graph-build
-    /// time), so re-parsing is acceptable; this lets env changes take effect
-    /// without process restart and keeps the path testable.
+    /// be opened or parsed. Called once per heuristic finalize so env changes
+    /// take effect without process restart and the path stays testable.
     static std::optional<EngineOverrideConfig> loadFromEnv()
     {
         static constexpr const char* ENV_VAR = "HIPDNN_ENGINE_OVERRIDE_FILE";
-        std::string path = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
-        const auto first = path.find_first_not_of(" \t\r\n");
+        std::string                  path    = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
+        const auto                   first   = path.find_first_not_of(" \t\r\n");
         if(first == std::string::npos)
         {
             return std::nullopt;
@@ -182,7 +181,7 @@ public:
     }
 
     /// Scan rules in declaration order; return the first matching engine ID or nullopt.
-    std::optional<int64_t> matchOperation(const std::string& op,
+    std::optional<int64_t> matchOperation(const std::string&             op,
                                           const std::vector<TensorView>& tensors) const
     {
         const auto opIt = _index.find(op);
@@ -235,20 +234,20 @@ private:
     struct ExactEntry
     {
         int64_t engineId;
-        size_t order;
+        size_t  order;
     };
 
     struct WildcardEntry
     {
         OperationRule rule;
-        int64_t engineId;
-        size_t order;
+        int64_t       engineId;
+        size_t        order;
     };
 
     struct OpBucket
     {
         std::unordered_map<std::vector<int64_t>, ExactEntry, detail::DimKeyHash> exact;
-        std::vector<WildcardEntry> wildcards;
+        std::vector<WildcardEntry>                                               wildcards;
     };
 
     std::unordered_map<std::string, OpBucket> _index;
@@ -259,7 +258,7 @@ private:
         for(const auto& entry : j.at("engine_overrides"))
         {
             OperationRule rule;
-            rule.op = entry.at("op").get<std::string>();
+            rule.op         = entry.at("op").get<std::string>();
             rule.engineName = entry.at("engine_name").get<std::string>();
             for(const auto& t : entry.at("tensors"))
             {
@@ -321,7 +320,7 @@ private:
     void indexRule(OperationRule rule, size_t order)
     {
         const int64_t resolvedId = hipdnn_data_sdk::utilities::engineNameToId(rule.engineName);
-        OpBucket& bucket = _index[rule.op];
+        OpBucket&     bucket     = _index[rule.op];
         if(hasWildcard(rule.tensors))
         {
             bucket.wildcards.push_back(WildcardEntry{std::move(rule), resolvedId, order});
@@ -334,4 +333,4 @@ private:
     }
 };
 
-} // namespace hipdnn_heuristic_config
+} // namespace hipdnn_backend::heuristics::preferred_engine

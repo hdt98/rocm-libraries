@@ -250,6 +250,25 @@ public:
         return _loadedPluginFiles;
     }
 
+protected:
+    // Register a backend-internal plugin (e.g. a built-in heuristic) without going
+    // through dlopen. Runs the same setLoggingCallback/setLogLevel/validateBeforeAdding
+    // path as loadPluginFromFile so built-ins and dlopen-loaded plugins are
+    // indistinguishable downstream. Throws on validation failure — built-in
+    // failures are build bugs, not silent skips.
+    void registerPlugin(std::shared_ptr<Plugin> plugin)
+    {
+        plugin->setLoggingCallback(logging::backendLoggingCallback);
+        hipdnnSeverity_t currentLogLevel{};
+        logging::getGlobalLogLevel(currentLogLevel);
+        plugin->setLogLevel(currentLogLevel);
+
+        validateBeforeAdding(*plugin);
+
+        _plugins.emplace_back(std::move(plugin));
+        actionAfterAdding(*_plugins.back());
+    }
+
 private:
     void clearPlugins()
     {

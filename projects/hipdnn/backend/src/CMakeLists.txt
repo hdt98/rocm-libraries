@@ -53,7 +53,10 @@ add_library(
     logging/GraphLogger.cpp
     logging/Logging.cpp
     FlatbufferUtilities.cpp
+    heuristics/BuiltInHeuristics.cpp
     heuristics/SelectionHeuristic.cpp
+    heuristics/preferred_engine/PreferredEngineResolver.cpp
+    heuristics/static_ordering/StaticOrderingBuiltIn.cpp
     plugin/EnginePlugin.cpp
     plugin/EnginePluginResourceManager.cpp
     plugin/HeuristicPlugin.cpp

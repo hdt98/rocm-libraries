@@ -5,7 +5,10 @@
  * @file IntegrationHeuristicPolicyPlugins.cpp
  * @brief Integration tests for real heuristic policy plugins
  *
- * These tests verify the actual heuristic policy plugins (Config, StaticOrdering):
+ * These tests verify the heuristic policy chain seen at runtime:
+ *   - The StaticOrdering built-in (registered at HeuristicPluginManager
+ *     construction time as a function-table-shaped pseudo-plugin).
+ *   - Any external heuristic .so found in HIPDNN_HEURISTIC_PLUGIN_DIR.
  * - Plugin discovery and loading from installed location
  * - Symbol resolution and ABI validation
  * - Plugin handle creation and lifecycle
@@ -121,8 +124,9 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PluginManagerLoadsFromDefaultPath)
     // Enumerate loaded policies via resource manager
     const auto& policyInfos = resourceMgr->getHeuristicPolicyInfos();
 
-    // At minimum, we expect Config and StaticOrdering
-    EXPECT_GE(policyInfos.size(), 2u) << "Expected at least Config and StaticOrdering plugins";
+    // The StaticOrdering built-in is always registered; vendor plugins (if any)
+    // discovered under the search path raise the count further.
+    EXPECT_GE(policyInfos.size(), 1u) << "Expected at least the StaticOrdering built-in";
 }
 
 TEST_F(IntegrationHeuristicPolicyPlugins, PluginManagerRejectsInvalidPlugins)

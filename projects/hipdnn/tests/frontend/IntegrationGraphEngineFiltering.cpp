@@ -6,7 +6,6 @@
 #include <hip/hip_runtime.h>
 #include <optional>
 
-#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_frontend.hpp>
 #include <hipdnn_test_sdk/utilities/ScopedEnvironmentVariableSetter.hpp>
@@ -70,28 +69,21 @@ protected:
         Tensor<DataType> yTensor;
     };
 
-    // This suite verifies preferred_engine_id behavior, which is implemented
-    // by the Config policy hosted inside the merged DefaultHeuristicsPlugin.
-    // The frontend test main() wires in only test_good_heuristic_plugin
-    // globally, so for this suite load DefaultHeuristicsPlugin as the primary
-    // and chain test_good_heuristic_plugin as the fallback for the cases where
-    // Config returns "not applicable".
+    // This suite verifies preferred_engine_id behavior, which is resolved by
+    // the backend's preferred-engine precursor (see
+    // backend/src/heuristics/preferred_engine/) — a first-party library knob
+    // that runs ahead of the heuristic policy loop. We only need to chain
+    // test_good_heuristic_plugin as the fallback policy for cases where the
+    // precursor declines (no preferred_engine_id and no env override match).
     static void SetUpTestSuite()
     {
-        const auto defaultPluginPath
-            = (std::filesystem::path(".") / "hipdnn_plugins" / "heuristics"
-               / hipdnn_data_sdk::utilities::getLibraryName("hipdnn_heuristic_default"))
-                  .string();
-        const std::array<const char*, 2> heuristicPaths
-            = {defaultPluginPath.c_str(),
-               hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
+        const std::array<const char*, 1> heuristicPaths
+            = {hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
         ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(
                       heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
                   HIPDNN_STATUS_SUCCESS);
-        sPolicyOrderEnv.emplace(
-            "HIPDNN_HEURISTIC_POLICY_ORDER",
-            std::string("SelectionHeuristic::Config,")
-                + hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
+        sPolicyOrderEnv.emplace("HIPDNN_HEURISTIC_POLICY_ORDER",
+                                hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
     }
 
     static void TearDownTestSuite()
