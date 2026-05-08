@@ -67,6 +67,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_max_i32");
+            writes_scc = true;
         }
 
         SMaxI32(const SMaxI32& other)
@@ -95,6 +96,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_max_u32");
+            writes_scc = true;
         }
 
         SMaxU32(const SMaxU32& other)
@@ -123,6 +125,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_min_i32");
+            writes_scc = true;
         }
 
         SMinI32(const SMinI32& other)
@@ -151,6 +154,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_min_u32");
+            writes_scc = true;
         }
 
         SMinU32(const SMinU32& other)
@@ -496,6 +500,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_cselect_b64");
+            reads_scc = true;
         }
 
         SCSelectB64(const SCSelectB64& other)
@@ -669,6 +674,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_or_b64");
+            writes_scc = true;
         }
 
         SOrB64(const SOrB64& other)
@@ -890,6 +896,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_lshl1_add_u32");
+            writes_scc = true;
         }
 
         SLShiftLeft1AddU32(const SLShiftLeft1AddU32& other)
@@ -947,6 +954,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_lshl3_add_u32");
+            writes_scc = true;
         }
 
         SLShiftLeft3AddU32(const SLShiftLeft3AddU32& other)
@@ -975,6 +983,7 @@ namespace rocisa
                                 comment)
         {
             setInst("s_lshl4_add_u32");
+            writes_scc = true;
         }
 
         SLShiftLeft4AddU32(const SLShiftLeft4AddU32& other)
@@ -1110,6 +1119,7 @@ namespace rocisa
                 InstType::INST_B64, dst, {src}, std::nullopt, std::nullopt, std::nullopt, comment)
         {
             setInst("s_cmov_b64");
+            reads_scc = true;
         }
 
         SCMovB64(const SCMovB64& other)
