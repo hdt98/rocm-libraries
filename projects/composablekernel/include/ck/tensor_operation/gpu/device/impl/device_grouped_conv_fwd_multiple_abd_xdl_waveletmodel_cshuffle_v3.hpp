@@ -565,38 +565,6 @@ struct DeviceGroupedConvFwdMultipleABD_WaveletModel_Xdl_CShuffle_V3
     using BGridDesc_BK0_N_BK1 = remove_cvref_t<decltype(MakeBGridDescriptor_BK0_N_BK1<BLayout>(
         dummy_conv_to_gemm_transformer))>;
 
-    struct ActiveWorkgroupsPerCU
-    {
-        template <typename GridwiseGemm>
-        static int GetMaxOccupancy()
-        {
-            // Query occupancy for the conservative variant (main loop + atomic)
-            int max_occupancy = 0;
-            hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
-                &max_occupancy,
-                SelectKernel<GridwiseGemm, true, InMemoryDataOperationEnum::AtomicAdd>(),
-                LaunchBlockSize,
-                0));
-            return std::max(1, max_occupancy);
-        }
-
-        ActiveWorkgroupsPerCU()
-        {
-            max_occupancy_ = 1;
-            if(get_warp_size() == 64)
-            {
-                if constexpr(NXdlPerWave64 > 0)
-                    max_occupancy_ = GetMaxOccupancy<GridwiseGemm64>();
-            }
-            else
-            {
-                if constexpr(NXdlPerWave32 > 0)
-                    max_occupancy_ = GetMaxOccupancy<GridwiseGemm32>();
-            }
-        }
-        int max_occupancy_;
-    };
-
     // Argument
     struct Argument : public BaseArgument
     {
