@@ -28,12 +28,17 @@ cmake                                                                           
   -D CMAKE_BUILD_TYPE=Release                                                                     \
   -D GPU_TARGETS="gfx950"                                                                         \
   -D CK_EXPERIMENTAL_BUILDER=ON                                                                   \
+  -D CK_TILE_DISPATCHER=ON                                                                        \
   -D CMAKE_CXX_STANDARD=20                                                                        \
+  -D BUILD_CK_TILE_ENGINE=OFF                                                                     \
+  -D BUILD_CK_EXAMPLES=OFF                                                                        \
+  -D BUILD_CK_TUTORIALS=OFF                                                                       \
   -G Ninja                                                                                        \
   ..
 ```
 
-in directiory `build-gfx950`.
+in directiory `build-gfx950`. Note that we need to remove the `profiler` directory inside the build directory to re-trigger
+code generation if make changes to the codegen.
 
 To build the CK profiler, run command 
 ```
@@ -45,7 +50,7 @@ When we move to the dispatcher based code generation, you need to add the dispat
 
 ## Testing
 
-I have created a baseline version `ckBuilder_baseline` (located in the directory `build-gfx950/bin`). 
+I have created a baseline version `ckBuilder` (located in the directory `build-gfx950-baseline/bin`). 
 Please do not change this. It is used a reference and the output of the dispatcher based CK Builder should match 
 exactly with the baseline version. 
 
@@ -53,7 +58,7 @@ We can test the builder by running few example cases for the builder
 
 ### Forward direction
 
-Base command `ckProfiler grouped_conv_fwd_tile` (or `ckProfiler_baseline grouped_conv_fwd_tile` for the baseline), must be executed in the 
+Base command `ckProfiler grouped_conv_fwd_tile`, must be executed in the 
 `build-gfx950/bin` directory. Additional arguments that specify the convolution shapes are defined in the table below.
 
 | data_type | layout | indexing_type | verify | init_type | print | time_kernel | nDims | G | N | K | C | Y | X | Hi | Wi | Sx | Sy | Dy | Dx | LPy | Lpx | RPy | RPx |
@@ -64,7 +69,7 @@ Base command `ckProfiler grouped_conv_fwd_tile` (or `ckProfiler_baseline grouped
 
 ### Backward data direction
 
-Base command `ckProfiler grouped_conv_bwd_data_tile` (or `ckProfiler_baseline grouped_conv_bwd_data_tile` for the baseline), must be executed in the 
+Base command `ckProfiler grouped_conv_bwd_data_tile`, must be executed in the 
 `build-gfx950/bin` directory. Additional arguments that specify the convolution shapes are defined in the table below.
 
 | data_type | layout | verify | init_type | print | time_kernel | nDims | G | N | K | C | Y | X | Hi | Wi | Sx | Sy | Dy | Dx | LPy | Lpx | RPy | RPx | split-K |
@@ -74,7 +79,7 @@ Base command `ckProfiler grouped_conv_bwd_data_tile` (or `ckProfiler_baseline gr
 
 ### Backward weight direction
 
-Base command `ckProfiler grouped_conv_bwd_weight_tile` (or `ckProfiler_baseline grouped_conv_weight_data_tile` for the baseline), must be executed in the 
+Base command `ckProfiler grouped_conv_bwd_weight_tile`, must be executed in the 
 `build-gfx950/bin` directory. Additional arguments that specify the convolution shapes are defined in the table below.
 
 | data_type | layout | verify | init_type | print | time_kernel | nDims | G | N | K | C | Y | X | Hi | Wi | Sx | Sy | Dy | Dx | LPy | Lpx | RPy | RPx | split-K |
@@ -86,8 +91,21 @@ Base command `ckProfiler grouped_conv_bwd_weight_tile` (or `ckProfiler_baseline 
 
 We will do the porting in three stages
 
-1. Switch bwd weigth to use dispatcher
-2. Switch fwd to use dispatcher
-3. Switch bwd data to use dispatcher
+1. Switch bwd weigth to use dispatcher -> DONE
+2. Switch fwd to use dispatcher -> DONE
+3. Switch bwd data to use dispatcher -> DONE
 
-The bwd weight is the most complex and once we have it working, we can proceed with steps 2. and 3.
+
+## Design
+
+The existing CK Builder integration is done via configuration files in directory `projects/composablekernel/experimental/grouped_convolution_tile_instances/configs`. 
+We have a conversion script `projects/composablekernel/dispatcher/codegen/convert_builder_configs.py` that can convert the old CK Builder configurations 
+to Dispatcher configurations. The Dispatcher configurations are located in directory `projects/composablekernel/dispatcher/codegen/configs`. The dispatcher code generation 
+script `projects/composablekernel/dispatcher/codegen/unified_grouped_conv_codegen.py` can generate the the convolution instances from these configurations.
+
+The generated instances are compiled into a separate library that is integrated to the CK Profiler executable (see projects/composablekernel/profiler/src/CMakeLists.txt).
+For convenience, I have commented out all other profilers execpt the CK Tile grouped conv profilers. This will shorten the build time.
+
+The Dispatcher generated instance are integrated to the CK Profiler via one header file `projects/composablekernel/profiler/include/profiler/grouped_convolution_backward_weight_tile_dispatcher_algs.hpp` that replaces the corresponding CK Builder integration (`projects/composablekernel/profiler/include/profiler/grouped_convolution_backward_weight_tile_algs.hpp`).
+
+For now, we should keep the old CK Builder based codegen in parallel with the new dispatcher based generation. 
