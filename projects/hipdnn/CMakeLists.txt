@@ -244,6 +244,7 @@ add_subdirectory(plugin_sdk)
 
 add_subdirectory(tests)
 add_subdirectory(tools)
+add_subdirectory(python)
 
 if(NOT HIPDNN_SKIP_TESTS)
     # Keep this after all build folders have been added so they have a chance to register their tests

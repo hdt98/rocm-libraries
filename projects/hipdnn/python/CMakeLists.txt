@@ -10,25 +10,26 @@ project(hipdnn_python_bindings)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Python and nanobind
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
+find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
-# FetchContent to get nanobind if not found
 include(FetchContent)
 fetchcontent_declare(nanobind GIT_REPOSITORY https://github.com/wjakob/nanobind GIT_TAG v1.8.0)
 fetchcontent_makeavailable(nanobind)
 
-# Find hipDNN frontend headers
 set(HIPDNN_FRONTEND_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../frontend/include"
     CACHE PATH "Path to hipDNN frontend includes"
 )
 
-# Find HIP (if needed)
-find_package(hip REQUIRED)
-find_package(hipdnn_frontend CONFIG REQUIRED)
-find_package(hipdnn_backend REQUIRED)
+if(NOT TARGET hip::host)
+    find_package(hip REQUIRED)
+endif()
+if(NOT TARGET hipdnn_frontend)
+    find_package(hipdnn_frontend CONFIG REQUIRED)
+endif()
+if(NOT TARGET hipdnn_backend)
+    find_package(hipdnn_backend REQUIRED)
+endif()
 
-# Create the Python module
 nanobind_add_module(
     hipdnn_frontend_python
     src/module.cpp
@@ -40,16 +41,31 @@ nanobind_add_module(
     src/memory_bindings.cpp
 )
 
-# Include directories
 target_include_directories(
     hipdnn_frontend_python PRIVATE ${HIPDNN_FRONTEND_INCLUDE_DIR} ${HIP_INCLUDE_DIRS}
 )
 
-set_target_properties(hipdnn_frontend_python PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-# Link against hipDNN frontend library if it exists as a separate library Adjust this based on your
-# actual library structure
 target_link_libraries(hipdnn_frontend_python PRIVATE hipdnn_frontend hipdnn_backend hip::host)
 
-# Install the module - scikit-build-core handles the destination
-install(TARGETS hipdnn_frontend_python LIBRARY DESTINATION .)
+set_target_properties(hipdnn_frontend_python PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+)
+
+if(DEFINED SKBUILD)
+    # pip install: SKBUILD is set by scikit-build-core. DESTINATION . because
+    # pyproject.toml has wheel.install-dir = "hipdnn_frontend" which maps
+    # the install prefix root to hipdnn_frontend/ in the wheel.
+    install(TARGETS hipdnn_frontend_python DESTINATION .)
+    install(FILES hipdnn_frontend/__init__.py DESTINATION .)
+else()
+    # Superbuild / cmake --install: install to python/ under install prefix.
+    # TheRock's wheel builder detects python/*/ and promotes to top-level
+    # packages in the rocm-sdk-libraries wheel.
+    install(TARGETS hipdnn_frontend_python
+        LIBRARY DESTINATION python/hipdnn_frontend
+        COMPONENT python_bindings)
+
+    install(FILES hipdnn_frontend/__init__.py
+        DESTINATION python/hipdnn_frontend
+        COMPONENT python_bindings)
+endif()
