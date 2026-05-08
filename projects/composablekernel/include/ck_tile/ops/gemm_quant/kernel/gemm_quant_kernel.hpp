@@ -436,7 +436,21 @@ struct QuantGemmKernel
             }
             else if constexpr(std::is_same_v<tensor_layout::gemm::ColumnMajor, BLayout>)
             {
-                b_k_split_offset = amd_wave_read_first_lane(b_k_offset_elements);
+                if constexpr(PreshuffleB)
+                {
+                    // Preshuffled B is laid out as [N/N_Warp_Tile, K_outer, N_Warp_Tile, K_inner]
+                    // (see shuffle_b<>), where each "N_outer" row spans N_Warp_Tile * full_K
+                    // linear elements.  MakeBBlockWindow already builds the descriptor with
+                    // stride [N_Warp_Tile * kargs.K, 1], so to advance the K starting position
+                    // by k_id * KRead within row 0 we need to advance the pointer by
+                    // (k_id * KRead) * N_Warp_Tile -- not just (k_id * KRead).
+                    constexpr index_t N_Warp_Tile = GemmPipeline::BlockGemmShape::WarpTile::at(I1);
+                    b_k_split_offset = amd_wave_read_first_lane(b_k_offset_elements * N_Warp_Tile);
+                }
+                else
+                {
+                    b_k_split_offset = amd_wave_read_first_lane(b_k_offset_elements);
+                }
             }
 
             if(k_id < static_cast<uint32_t>(kargs.k_batch - 1))
@@ -1182,6 +1196,18 @@ struct QuantGemmKernel
         // it is a compile-time constant taken from the pipeline shape.
         static_assert(GemmPipeline::BlockGemmShape::WarpTile::at(I2) > 0,
                       "Pipeline warp-tile K dimension (k_unit) must be positive.");
+
+        // ABQuantGrouped does not currently support RowMajor BQ layout: the
+        // BQ tensor view, tile window, and split-K offset code are all
+        // written for ColumnMajor BQ.  The deeper static_asserts in
+        // MakeBQBlockWindow enforce this at instantiation time; surface it
+        // here at the host-arg entry point too so the limitation is visible
+        // before the first device-side instantiation.
+        static_assert(!(kQuantType == QuantType::ABQuantGrouped &&
+                        std::is_same_v<BQLayout, tensor_layout::gemm::RowMajor>),
+                      "ABQuantGrouped does not currently support RowMajor BQ layout. "
+                      "Use ColumnMajor BQ (or extend MakeBQBlockWindow and the split-K "
+                      "BQ offset path to handle RowMajor BQ).");
 
         // Split-K is supported for BQuantGrouped (without preshuffle) and
         // ABQuantGrouped (without APreshuffleQuant) modes.

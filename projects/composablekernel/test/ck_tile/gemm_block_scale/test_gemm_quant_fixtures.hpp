@@ -163,6 +163,12 @@ struct GemmConfigPreshuffleBPrefillTransposeC : public GemmConfigPreshuffleBPref
     static constexpr bool TransposeC = true;
 };
 
+struct GemmConfigPreshuffleBPrefillPadded : public GemmConfigPreshuffleBPrefill
+{
+    static constexpr bool kPadN = true;
+    static constexpr bool kPadK = true;
+};
+
 struct GemmConfigPreshuffleQuantPrefill : public GemmConfigPrefill
 {
     static constexpr bool BPreshuffleQuant = true;
@@ -1242,8 +1248,12 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
         }
     }
 
-    private:
-    // ABQuant-specific pipeline implementation
+    public:
+    // ABQuant-specific pipeline implementation.  Public so the
+    // has_run_quant_gemm_impl_splitk SFINAE trait in
+    // test_gemm_quant_base.hpp can detect this 3-arg overload from outside
+    // the class (the trait lives in a different namespace and is not a
+    // friend of this fixture).
     template <typename CodegenGemmShape, typename TilePartitioner, typename CodegenGemmTraits>
     void run_quant_gemm_impl(const ck_tile::QuantGemmHostArgs& args,
                              const ck_tile::stream_config& s,
