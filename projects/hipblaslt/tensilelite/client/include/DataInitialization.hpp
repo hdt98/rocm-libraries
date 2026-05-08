@@ -54,6 +54,34 @@ namespace TensileLite
                 || isMXFP4Tensor(problem.b(), problem.mxBlockB());
         }
 
+        // Generalised MX predicates (FP4/FP6/FP8). Used by initializeMXData
+        // (which always drives mxDataGenerator for any MX side, regardless of
+        // dtype). isMXFP4* above is kept because ReferenceValidator's
+        // per-solution re-validation logic is still wired only to the
+        // FP4-subtile preswizzle case (no behaviour change for non-FP4 MX).
+        inline bool isMXTensor(const TensorDescriptor& tensor, size_t mxBlock)
+        {
+            if(mxBlock == 0)
+                return false;
+            switch(tensor.dataType())
+            {
+            case rocisa::DataType::Float4:
+            case rocisa::DataType::Float6:
+            case rocisa::DataType::BFloat6:
+            case rocisa::DataType::Float8:
+            case rocisa::DataType::BFloat8:
+                return true;
+            default:
+                return false;
+            }
+        }
+
+        inline bool isMXProblem(const ContractionProblemGemm& problem)
+        {
+            return isMXTensor(problem.a(), problem.mxBlockA())
+                || isMXTensor(problem.b(), problem.mxBlockB());
+        }
+
         // Problem-indept. from 0~7, and 16, and 23~26 (fixed values for every problem)
         // And problem-dept. from 8~15 (values depend on problem)
         // RandomNegPosLimited: integer -128~128. fp -1.0~1.0
@@ -875,10 +903,14 @@ namespace TensileLite
                    && m_currentGemmProblem != nullptr
                    && !m_gpuPtrs.empty())
                 {
+                    // Per-solution re-init is needed only for the gfx950 FP4 subtile
+                    // preswizzle case (the preswizzle layout depends on the solution's
+                    // matrix instruction). Non-FP4 MX dtypes use the K-swizzle path which
+                    // is solution-independent, so they don't need re-running here.
                     bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
                     if(isMXFP4)
                     {
-                        initializeMXDataForFP4(*m_currentGemmProblem);
+                        initializeMXData(*m_currentGemmProblem);
                         copyValidToGPUBuffer(*m_currentGemmProblem);
                         copyInputs(m_gpuPtrs,
                                    m_gpuBatchPtrs,
@@ -1005,7 +1037,7 @@ namespace TensileLite
 
             void initializeConstantInputs(ContractionProblemGemm const& problem);
 
-            void initializeMXDataForFP4(ContractionProblemGemm const& problem);
+            void initializeMXData(ContractionProblemGemm const& problem);
 
             void copyInputs(std::vector<void*>&               ptrs,
                             std::vector<void**>&              batchPtrs,
@@ -1108,7 +1140,7 @@ namespace TensileLite
             // True when the current GPU uses preswizzled MX scale layout (gfx950 subtile).
             // False for architectures that use K-swizzle layout (e.g. gfx1250).
             bool m_isMXPreswizzleArch = false;
-            // Set by initializeMXDataForFP4 when preswizzled scale was uploaded to gpuInput.valid.
+            // Set by initializeMXData when preswizzled scale was uploaded to gpuInput.valid.
             bool m_mxPreswizzledA = false;
             bool m_mxPreswizzledB = false;
         };
