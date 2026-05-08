@@ -664,8 +664,7 @@ TEST(TestConfigBuiltInLogging, LoggingCallbackReceivesErrorOnUnknownPolicyId)
     gCallbackInvocations.store(0);
     gCallbackLastSeverity.store(HIPDNN_SEV_INFO);
 
-    ASSERT_EQ(configAbi().setLoggingCallback(&testLoggingCallback),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    ASSERT_EQ(configAbi().setLoggingCallback(&testLoggingCallback), HIPDNN_PLUGIN_STATUS_SUCCESS);
     ASSERT_EQ(configAbi().setLogLevel(HIPDNN_SEV_ERROR), HIPDNN_PLUGIN_STATUS_SUCCESS);
 
     const int64_t unknownId = hipdnn_data_sdk::utilities::policyNameToId("Vendor::NotARealPolicy");

@@ -415,8 +415,7 @@ TEST(TestStaticOrderingBuiltInLogging, LoggingCallbackReceivesErrorOnUnknownPoli
     ASSERT_NE(unknownId, STATIC_ORDERING_POLICY_ID);
 
     const char* name = nullptr;
-    EXPECT_EQ(staticOrderingAbi().getPolicyName(unknownId, &name),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(staticOrderingAbi().getPolicyName(unknownId, &name), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 
     EXPECT_GE(gCallbackInvocations.load(), 1);
     EXPECT_EQ(gCallbackLastSeverity.load(), HIPDNN_SEV_ERROR);
