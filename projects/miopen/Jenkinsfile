@@ -177,7 +177,8 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                 def asanImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
                 def video_id = sh(returnStdout: true, script: 'getent group video | cut -d: -f3').trim()
                 def render_id = sh(returnStdout: true, script: 'getent group render | cut -d: -f3').trim()
-                def dockerOpts = "--device=/dev/kfd --device=/dev/dri " +
+                def dockerOpts = "--user root " +
+                                 "--device=/dev/kfd --device=/dev/dri " +
                                  "--group-add video --group-add render " +
                                  "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined " +
                                  "--group-add=${video_id} --group-add=${render_id} " +
@@ -191,6 +192,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                         timeout(time: 420, unit: 'MINUTES') {
                             sh """
                                 set -e
+                                echo "Running as: \$(whoami)"
                                 cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
                                 LOGNAME=temp-user dvc pull -v
                                 rm -rf build && mkdir build && cd build
