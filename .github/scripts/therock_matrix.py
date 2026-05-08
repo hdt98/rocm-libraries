@@ -202,14 +202,16 @@ def collect_projects_to_run(subtrees):
             projects.add(subtree_to_project_map.get(subtree))
 
     # For each component, get tests from TheRock's script.
-    # If TheRock returns deps, use them; otherwise fall back to project_map.
+    # If TheRock returns meaningful deps (more than just the component itself),
+    # use them; otherwise fall back to project_map.
     component_names = extract_component_names_from_subtrees(subtrees)
     tests_per_component = {}
     components_needing_fallback = set()
 
     for component in component_names:
         deps = get_test_dependencies_from_therock([component])
-        if deps:
+        # Only use TheRock deps if it returns more than just the component itself
+        if deps and set(deps) != {component}:
             tests_per_component[component] = deps
         else:
             components_needing_fallback.add(component)
