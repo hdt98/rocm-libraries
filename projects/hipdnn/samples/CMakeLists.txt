@@ -257,8 +257,8 @@ block(SCOPE_FOR VARIABLES)
             "${BINARY_DIR}/bin/hipdnn_example_provider_sample${CMAKE_EXECUTABLE_SUFFIX}"
             "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}/hipdnn_example_provider_sample${CMAKE_EXECUTABLE_SUFFIX}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${BINARY_DIR}/bin/example_provider_plugin${CMAKE_SHARED_LIBRARY_SUFFIX}"
-            "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}/example_provider_plugin${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            "${BINARY_DIR}/bin/${CMAKE_SHARED_LIBRARY_PREFIX}example_provider_plugin${CMAKE_SHARED_LIBRARY_SUFFIX}"
+            "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}example_provider_plugin${CMAKE_SHARED_LIBRARY_SUFFIX}"
         COMMENT "Copying example provider executables and plugin DLL to superbuild bin directory"
     )
 
