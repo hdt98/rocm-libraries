@@ -135,6 +135,42 @@ namespace TensileLite
                 }
             };
 
+            struct DebugPredicate
+                : public Predicate_CRTP<DebugPredicate, ContractionProblemGemm>
+            {
+                enum
+                {
+                    HasIndex = true,
+                    HasValue = true
+                };
+                size_t index;
+                size_t value;
+
+                DebugPredicate() = default;
+                DebugPredicate(size_t index, size_t value)
+                    : index(index)
+                    , value(value)
+                {
+                }
+
+                static std::string Type()
+                {
+                    return "DebugPredicate";
+                }
+
+                virtual bool operator()(ContractionProblemGemm const& problem) const override
+                {
+                    return true;
+                }
+
+                virtual bool debugEval(ContractionProblemGemm const& problem,
+                                       std::ostream&                 stream) const override
+                {
+                    stream << "DebugPredicate" << std::endl;
+                    return true;
+                }
+            };
+
             struct BatchSizeMultiple
                 : public Predicate_CRTP<BatchSizeMultiple, ContractionProblemGemm>
             {
