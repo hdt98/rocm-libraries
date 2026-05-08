@@ -229,6 +229,9 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                         TEST_TYPE=full \\
                         python build_tools/github_actions/test_executable_scripts/test_miopen.py
                     """.stripIndent()
+                    // Make workspace files writable by the Jenkins agent user before the container exits,
+                    // so cleanWs() can delete root-owned files written during the build.
+                    sh "chmod -R a+w ${env.WORKSPACE} || true"
                 }
             }
             utils.setGithubStatus(variant, 'success', 'Completed successfully')
