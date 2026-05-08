@@ -117,6 +117,95 @@ std::vector<uint8_t> buildConvFwdGraphBuffer(const std::vector<int64_t>& xDims,
     return {data, data + builder.GetSize()};
 }
 
+/// Build a serialized Graph with a single ConvolutionBwd node referencing
+/// (dy, w) tensors. Mirrors buildConvFwdGraphBuffer; matchOverrideConfig pulls
+/// the rule's first two tensors against (dy, w) for "conv_dgrad".
+std::vector<uint8_t> buildConvBwdGraphBuffer(const std::vector<int64_t>& dyDims,
+                                             const std::vector<int64_t>& dyStrides,
+                                             const std::vector<int64_t>& wDims,
+                                             const std::vector<int64_t>& wStrides)
+{
+    flatbuffers::FlatBufferBuilder builder;
+
+    constexpr int64_t DY_UID = 1;
+    constexpr int64_t W_UID = 2;
+    constexpr int64_t DX_UID = 3;
+
+    const std::vector<flatbuffers::Offset<fb::TensorAttributes>> tensors{
+        fb::CreateTensorAttributesDirect(
+            builder, DY_UID, "dy", fb::DataType::FLOAT, &dyStrides, &dyDims),
+        fb::CreateTensorAttributesDirect(
+            builder, W_UID, "w", fb::DataType::FLOAT, &wStrides, &wDims),
+        fb::CreateTensorAttributesDirect(
+            builder, DX_UID, "dx", fb::DataType::FLOAT, nullptr, nullptr),
+    };
+
+    auto convAttrs = fb::CreateConvolutionBwdAttributesDirect(builder, DY_UID, W_UID, DX_UID);
+
+    const std::vector<flatbuffers::Offset<fb::Node>> nodes{
+        fb::CreateNodeDirect(builder,
+                             "conv_bwd",
+                             fb::DataType::FLOAT,
+                             fb::NodeAttributes::ConvolutionBwdAttributes,
+                             convAttrs.Union())};
+
+    auto graphOffset = fb::CreateGraphDirect(builder,
+                                             nullptr,
+                                             fb::DataType::UNSET,
+                                             fb::DataType::UNSET,
+                                             fb::DataType::UNSET,
+                                             &tensors,
+                                             &nodes,
+                                             ::flatbuffers::nullopt);
+    fb::FinishGraphBuffer(builder, graphOffset);
+    const auto* data = builder.GetBufferPointer();
+    return {data, data + builder.GetSize()};
+}
+
+/// Build a serialized Graph with a single ConvolutionWrw node referencing
+/// (x, dy) tensors. matchOverrideConfig pairs (a=x, b=dy) for "conv_wgrad".
+std::vector<uint8_t> buildConvWrwGraphBuffer(const std::vector<int64_t>& xDims,
+                                             const std::vector<int64_t>& xStrides,
+                                             const std::vector<int64_t>& dyDims,
+                                             const std::vector<int64_t>& dyStrides)
+{
+    flatbuffers::FlatBufferBuilder builder;
+
+    constexpr int64_t X_UID = 1;
+    constexpr int64_t DY_UID = 2;
+    constexpr int64_t DW_UID = 3;
+
+    const std::vector<flatbuffers::Offset<fb::TensorAttributes>> tensors{
+        fb::CreateTensorAttributesDirect(
+            builder, X_UID, "x", fb::DataType::FLOAT, &xStrides, &xDims),
+        fb::CreateTensorAttributesDirect(
+            builder, DY_UID, "dy", fb::DataType::FLOAT, &dyStrides, &dyDims),
+        fb::CreateTensorAttributesDirect(
+            builder, DW_UID, "dw", fb::DataType::FLOAT, nullptr, nullptr),
+    };
+
+    auto convAttrs = fb::CreateConvolutionWrwAttributesDirect(builder, X_UID, DY_UID, DW_UID);
+
+    const std::vector<flatbuffers::Offset<fb::Node>> nodes{
+        fb::CreateNodeDirect(builder,
+                             "conv_wrw",
+                             fb::DataType::FLOAT,
+                             fb::NodeAttributes::ConvolutionWrwAttributes,
+                             convAttrs.Union())};
+
+    auto graphOffset = fb::CreateGraphDirect(builder,
+                                             nullptr,
+                                             fb::DataType::UNSET,
+                                             fb::DataType::UNSET,
+                                             fb::DataType::UNSET,
+                                             &tensors,
+                                             &nodes,
+                                             ::flatbuffers::nullopt);
+    fb::FinishGraphBuffer(builder, graphOffset);
+    const auto* data = builder.GetBufferPointer();
+    return {data, data + builder.GetSize()};
+}
+
 /// RAII temp directory + JSON file. Returns a path that can be assigned to
 /// HIPDNN_HEUR_CONFIG_PATH; the directory is removed on destruction.
 class TempJsonOverrideFile
@@ -488,4 +577,140 @@ TEST_F(TestConfigBuiltIn, FinalizeRereadsEnvOnEachInvocation)
         ASSERT_FALSE(sorted.empty());
         EXPECT_EQ(sorted.front(), MIOPEN_ENGINE_ID);
     }
+}
+
+// ========== End-to-end: ConvolutionBwd / ConvolutionWrw node parsing ==========
+
+TEST_F(TestConfigBuiltIn, FinalizeMatchedRuleMovesEngineToFrontBwdNode)
+{
+    // Drives the conv_dgrad branch in matchOverrideConfig — the rule pairs
+    // (dy, w), so dim entries here must match the Bwd node's tensor pair.
+    constexpr const char* JSON = R"({
+      "engine_overrides": [
+        {
+          "op": "conv_dgrad",
+          "engine_name": "MIOPEN_ENGINE_DETERMINISTIC",
+          "tensors": [
+            { "dim": [1, 3, 4, 4] },
+            { "dim": [2, 3, 1, 1] }
+          ]
+        }
+      ]
+    })";
+    const TempJsonOverrideFile json(JSON);
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(OVERRIDE_ENV,
+                                                                          json.path());
+
+    setEngineIds({MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID});
+    setSerializedGraph(buildConvBwdGraphBuffer(X_DIMS, X_STRIDES, W_DIMS, W_STRIDES));
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), 3u);
+    EXPECT_EQ(sorted[0], MIOPEN_DETERMINISTIC_ID);
+}
+
+TEST_F(TestConfigBuiltIn, FinalizeMatchedRuleMovesEngineToFrontWrwNode)
+{
+    // Drives the conv_wgrad branch in matchOverrideConfig — the rule pairs
+    // (x, dy).
+    constexpr const char* JSON = R"({
+      "engine_overrides": [
+        {
+          "op": "conv_wgrad",
+          "engine_name": "MIOPEN_ENGINE_DETERMINISTIC",
+          "tensors": [
+            { "dim": [1, 3, 4, 4] },
+            { "dim": [2, 3, 1, 1] }
+          ]
+        }
+      ]
+    })";
+    const TempJsonOverrideFile json(JSON);
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(OVERRIDE_ENV,
+                                                                          json.path());
+
+    setEngineIds({MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID});
+    setSerializedGraph(buildConvWrwGraphBuffer(X_DIMS, X_STRIDES, W_DIMS, W_STRIDES));
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), 3u);
+    EXPECT_EQ(sorted[0], MIOPEN_DETERMINISTIC_ID);
+}
+
+// ========== Logging callback / getLastErrorString ABI shape ==========
+
+namespace
+{
+// Counter and severity capture for the logging-callback test. File-scope so a
+// plain C function pointer can mutate them.
+std::atomic<int> gCallbackInvocations{0};
+std::atomic<hipdnnSeverity_t> gCallbackLastSeverity{HIPDNN_SEV_INFO};
+
+void testLoggingCallback(hipdnnSeverity_t severity, const char* /*message*/)
+{
+    gCallbackInvocations.fetch_add(1);
+    gCallbackLastSeverity.store(severity);
+}
+} // namespace
+
+TEST(TestConfigBuiltInLogging, LoggingCallbackReceivesErrorOnUnknownPolicyId)
+{
+    // Drive the STATIC_ORDERING_LOG-equivalent macro body in ConfigBuiltIn.
+    // getPolicyName(unknownId) logs at ERROR severity before returning
+    // BAD_PARAM; with a callback installed and log level SEV_ERROR we should
+    // observe at least one invocation tagged at HIPDNN_SEV_ERROR.
+    gCallbackInvocations.store(0);
+    gCallbackLastSeverity.store(HIPDNN_SEV_INFO);
+
+    ASSERT_EQ(configAbi().setLoggingCallback(&testLoggingCallback),
+              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    ASSERT_EQ(configAbi().setLogLevel(HIPDNN_SEV_ERROR), HIPDNN_PLUGIN_STATUS_SUCCESS);
+
+    const int64_t unknownId = hipdnn_data_sdk::utilities::policyNameToId("Vendor::NotARealPolicy");
+    ASSERT_NE(unknownId, CONFIG_POLICY_ID);
+
+    const char* name = nullptr;
+    EXPECT_EQ(configAbi().getPolicyName(unknownId, &name), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+
+    EXPECT_GE(gCallbackInvocations.load(), 1);
+    EXPECT_EQ(gCallbackLastSeverity.load(), HIPDNN_SEV_ERROR);
+
+    // Reset globals so other tests in the binary do not see a dangling callback.
+    EXPECT_EQ(configAbi().setLoggingCallback(nullptr), HIPDNN_PLUGIN_STATUS_SUCCESS);
+    EXPECT_EQ(configAbi().setLogLevel(HIPDNN_SEV_INFO), HIPDNN_PLUGIN_STATUS_SUCCESS);
+}
+
+TEST(TestConfigBuiltInLogging, GetLastErrorStringHandlesNullOutPointer)
+{
+    // Pure ABI-shape branch coverage: getLastErrorString(nullptr) must return
+    // (void) without dereferencing the null pointer.
+    EXPECT_NO_FATAL_FAILURE(configAbi().getLastErrorString(nullptr));
+}
+
+TEST(TestConfigBuiltInLogging, GetLastErrorStringWritesPlaceholder)
+{
+    const char* msg = nullptr;
+    configAbi().getLastErrorString(&msg);
+    ASSERT_NE(msg, nullptr);
+    EXPECT_STRNE(msg, "");
+}
+
+// ========== Empty serialized graph buffer ==========
+
+TEST_F(TestConfigBuiltIn, SetSerializedGraphAcceptsZeroSizeBuffer)
+{
+    // Drives the size==0 branch in policySetSerializedGraph that clears the
+    // descriptor's stored buffer instead of copying. The validation macro
+    // rejects ptr==nullptr unconditionally, so we pass a real (but unused)
+    // byte alongside size==0.
+    const std::array<uint8_t, 1> placeholder{0x00};
+    const hipdnnPluginConstData_t data{placeholder.data(), 0};
+    EXPECT_EQ(configAbi().policySetSerializedGraph(_desc, &data), HIPDNN_PLUGIN_STATUS_SUCCESS);
+
+    // With no graph and no candidates, finalize declines (covers the empty
+    // buffer → parseGraphBuffer null-return path through finalize).
+    setEngineIds({MIOPEN_ENGINE_ID});
+    EXPECT_FALSE(_plugin->finalize(_desc));
 }

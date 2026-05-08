@@ -28,6 +28,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -379,4 +380,63 @@ TEST_F(TestStaticOrderingBuiltIn, FallbackEnvUnknownNameSilentlySkipped)
     const auto sorted = _plugin->getSortedEngineIds(_desc);
     ASSERT_EQ(sorted.size(), 1u);
     EXPECT_EQ(sorted[0], MIOPEN_ENGINE_ID);
+}
+
+// ========== Logging callback / getLastErrorString ABI shape ==========
+
+namespace
+{
+// Counter and severity capture for the logging-callback test. File-scope so a
+// plain C function pointer can mutate them.
+std::atomic<int> gCallbackInvocations{0};
+std::atomic<hipdnnSeverity_t> gCallbackLastSeverity{HIPDNN_SEV_INFO};
+
+void testLoggingCallback(hipdnnSeverity_t severity, const char* /*message*/)
+{
+    gCallbackInvocations.fetch_add(1);
+    gCallbackLastSeverity.store(severity);
+}
+} // namespace
+
+TEST(TestStaticOrderingBuiltInLogging, LoggingCallbackReceivesErrorOnUnknownPolicyId)
+{
+    // Drive the STATIC_ORDERING_LOG macro body — getPolicyName(unknownId) logs
+    // at ERROR severity before returning BAD_PARAM. With a callback installed
+    // and log level SEV_ERROR we must observe at least one invocation tagged
+    // at HIPDNN_SEV_ERROR.
+    gCallbackInvocations.store(0);
+    gCallbackLastSeverity.store(HIPDNN_SEV_INFO);
+
+    ASSERT_EQ(staticOrderingAbi().setLoggingCallback(&testLoggingCallback),
+              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    ASSERT_EQ(staticOrderingAbi().setLogLevel(HIPDNN_SEV_ERROR), HIPDNN_PLUGIN_STATUS_SUCCESS);
+
+    const int64_t unknownId = hipdnn_data_sdk::utilities::policyNameToId("Vendor::NotARealPolicy");
+    ASSERT_NE(unknownId, STATIC_ORDERING_POLICY_ID);
+
+    const char* name = nullptr;
+    EXPECT_EQ(staticOrderingAbi().getPolicyName(unknownId, &name),
+              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+
+    EXPECT_GE(gCallbackInvocations.load(), 1);
+    EXPECT_EQ(gCallbackLastSeverity.load(), HIPDNN_SEV_ERROR);
+
+    // Reset globals so other tests in the binary do not see a dangling callback.
+    EXPECT_EQ(staticOrderingAbi().setLoggingCallback(nullptr), HIPDNN_PLUGIN_STATUS_SUCCESS);
+    EXPECT_EQ(staticOrderingAbi().setLogLevel(HIPDNN_SEV_INFO), HIPDNN_PLUGIN_STATUS_SUCCESS);
+}
+
+TEST(TestStaticOrderingBuiltInLogging, GetLastErrorStringHandlesNullOutPointer)
+{
+    // Pure ABI-shape branch coverage: getLastErrorString(nullptr) must return
+    // (void) without dereferencing the null pointer.
+    EXPECT_NO_FATAL_FAILURE(staticOrderingAbi().getLastErrorString(nullptr));
+}
+
+TEST(TestStaticOrderingBuiltInLogging, GetLastErrorStringWritesPlaceholder)
+{
+    const char* msg = nullptr;
+    staticOrderingAbi().getLastErrorString(&msg);
+    ASSERT_NE(msg, nullptr);
+    EXPECT_STRNE(msg, "");
 }
