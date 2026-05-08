@@ -41,7 +41,7 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     // Priority: descriptor attr > handle > env > default
     // Storage and ABI are policy IDs (FNV-1a of the policy name); names are
     // hashed at the point they enter the system. The Config built-in
-    // (HIPDNN_POLICY_CONFIG_FILE_PATH JSON rules) is a regular policy in this
+    // (HIPDNN_HEUR_CONFIG_PATH JSON rules) is a regular policy in this
     // list, not a precursor; it declines when no rule matches so subsequent
     // policies still run. The explicit Graph.preferred_engine_id setter is
     // handled by the frontend as a post-hoc reorder of the heuristic-ranked
@@ -59,10 +59,10 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     // {
     //     return handle->getHeuristicPolicyOrder();
     // }
-    // 3. Environment variable HIPDNN_HEURISTIC_POLICY_ORDER
+    // 3. Environment variable HIPDNN_HEUR_POLICY_ORDER
     // Use the data_sdk getEnv() wrapper rather than std::getenv() so that this
     // reads the live process environment block on Windows.
-    const std::string envStr = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
+    const std::string envStr = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEUR_POLICY_ORDER");
     if(!envStr.empty())
     {
         // Parse comma-separated policy names and hash to IDs
@@ -83,7 +83,7 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
                                  policyIds.size());
         return policyIds;
     }
-    // 4. Default policy list — Config first so HIPDNN_POLICY_CONFIG_FILE_PATH
+    // 4. Default policy list — Config first so HIPDNN_HEUR_CONFIG_PATH
     // rules win when set; StaticOrdering is the canonical last-resort fallback
     // and always succeeds when there is at least one candidate. Vendor
     // heuristic plugins may be inserted via env or descriptor attribute above.

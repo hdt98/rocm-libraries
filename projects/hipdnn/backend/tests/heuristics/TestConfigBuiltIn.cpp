@@ -12,7 +12,7 @@
  *
  * Wraps the table once via HeuristicPlugin::createBuiltIn and exercises both
  * the C-ABI rejection paths (null pointers, unknown policy IDs) and the
- * policy's end-to-end behavior driven by HIPDNN_POLICY_CONFIG_FILE_PATH:
+ * policy's end-to-end behavior driven by HIPDNN_HEUR_CONFIG_PATH:
  * matching rule reorders the candidate list, miss paths decline so the
  * outer policy loop falls through.
  */
@@ -54,7 +54,7 @@ const int64_t CUSTOM_ENGINE_ID = engineNameToId("Plugin1::CustomEngine");
 const int64_t CONFIG_POLICY_ID
     = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config");
 
-constexpr const char* OVERRIDE_ENV = "HIPDNN_POLICY_CONFIG_FILE_PATH";
+constexpr const char* OVERRIDE_ENV = "HIPDNN_HEUR_CONFIG_PATH";
 
 /// Build a minimal serialized Graph FlatBuffer with no nodes.
 std::vector<uint8_t> buildEmptyGraphBuffer()
@@ -118,7 +118,7 @@ std::vector<uint8_t> buildConvFwdGraphBuffer(const std::vector<int64_t>& xDims,
 }
 
 /// RAII temp directory + JSON file. Returns a path that can be assigned to
-/// HIPDNN_POLICY_CONFIG_FILE_PATH; the directory is removed on destruction.
+/// HIPDNN_HEUR_CONFIG_PATH; the directory is removed on destruction.
 class TempJsonOverrideFile
 {
 public:

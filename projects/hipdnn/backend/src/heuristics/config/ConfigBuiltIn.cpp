@@ -6,7 +6,7 @@
  * @brief Backend-internal implementation of the
  *        SelectionHeuristic::Config policy.
  *
- * The policy reads HIPDNN_POLICY_CONFIG_FILE_PATH (a JSON file mapping
+ * The policy reads HIPDNN_HEUR_CONFIG_PATH (a JSON file mapping
  * conv-shape patterns to engine names via EngineOverrideConfig), walks
  * conv-like nodes in the serialized graph, and on the first matching rule
  * reorders the candidate engine IDs so the chosen engine is first. When the
@@ -486,7 +486,7 @@ hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int3
         if(!config.has_value())
         {
             CONFIG_BUILTIN_LOG(HIPDNN_SEV_INFO,
-                               "policyFinalize: HIPDNN_POLICY_CONFIG_FILE_PATH unset or "
+                               "policyFinalize: HIPDNN_HEUR_CONFIG_PATH unset or "
                                "unreadable; declining");
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }

@@ -74,9 +74,9 @@ int64_t policyId()
     return s_id;
 }
 
-constexpr const char* FALLBACK_ORDERING_ENV = "HIPDNN_FALLBACK_ENGINE_ORDERING";
+constexpr const char* FALLBACK_ORDERING_ENV = "HIPDNN_HEUR_FALLBACK_ENGINE_ORDER";
 
-/// Parse HIPDNN_FALLBACK_ENGINE_ORDERING (comma-separated engine names) into a
+/// Parse HIPDNN_HEUR_FALLBACK_ENGINE_ORDER (comma-separated engine names) into a
 /// list of engine IDs in the order the user wrote them. Empty / unset env →
 /// empty vector (caller falls back to the legacy sortEngineIds ordering).
 /// Blank tokens are skipped; unknown engine names hash to a deterministic ID
@@ -107,7 +107,7 @@ std::vector<int64_t> parseFallbackOrderingEnv()
 
 /// Restrict @p candidates to engines named in @p envOrder, preserving the env
 /// order. Engines not listed in the env are dropped — when the operator sets
-/// HIPDNN_FALLBACK_ENGINE_ORDERING they are explicitly opting out of every
+/// HIPDNN_HEUR_FALLBACK_ENGINE_ORDER they are explicitly opting out of every
 /// other engine. Names in the env that are not in @p candidates are silently
 /// skipped (the policy loop only sees engines the rest of the stack already
 /// filtered down to).
@@ -377,7 +377,7 @@ hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int3
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
 
-        // HIPDNN_FALLBACK_ENGINE_ORDERING, when set, replaces the legacy
+        // HIPDNN_HEUR_FALLBACK_ENGINE_ORDER, when set, replaces the legacy
         // MIOPEN-first / DETERMINISTIC-last ordering. Only engines named in
         // the env are eligible — operators use this to constrain selection
         // to a known-good shortlist. If the env is set but no listed engine
@@ -390,7 +390,7 @@ hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int3
             if(d->sortedEngineIds.empty())
             {
                 STATIC_ORDERING_LOG(HIPDNN_SEV_WARN,
-                                    "policyFinalize: HIPDNN_FALLBACK_ENGINE_ORDERING listed no "
+                                    "policyFinalize: HIPDNN_HEUR_FALLBACK_ENGINE_ORDER listed no "
                                     "engines that are candidates; declining.");
                 *outApplied = 0;
                 return HIPDNN_PLUGIN_STATUS_SUCCESS;

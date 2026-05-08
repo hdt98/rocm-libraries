@@ -71,7 +71,7 @@ protected:
 
     // This suite verifies preferred_engine_id behavior, which the frontend
     // resolves as a post-hoc reorder of the heuristic-ranked engine configs
-    // (see Graph::initializeEngineConfig). The HIPDNN_POLICY_CONFIG_FILE_PATH
+    // (see Graph::initializeEngineConfig). The HIPDNN_HEUR_CONFIG_PATH
     // env knob lives in the SelectionHeuristic::Config built-in instead. We
     // only need to chain test_good_heuristic_plugin so the heuristic loop has
     // a ranked list to reorder against.
@@ -82,7 +82,7 @@ protected:
         ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(
                       heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
                   HIPDNN_STATUS_SUCCESS);
-        sPolicyOrderEnv.emplace("HIPDNN_HEURISTIC_POLICY_ORDER",
+        sPolicyOrderEnv.emplace("HIPDNN_HEUR_POLICY_ORDER",
                                 hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
     }
 

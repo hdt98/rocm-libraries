@@ -6,7 +6,7 @@
  * @brief Unit tests for the rule-matching internals of EngineOverrideConfig
  *        (op + dim + stride wildcards, exact/wildcard partition ordering,
  *        JSON parsing). The end-to-end policy behavior driven by
- *        HIPDNN_POLICY_CONFIG_FILE_PATH is covered in TestConfigBuiltIn.cpp.
+ *        HIPDNN_HEUR_CONFIG_PATH is covered in TestConfigBuiltIn.cpp.
  */
 
 #include "heuristics/config/EngineOverrideConfig.hpp"

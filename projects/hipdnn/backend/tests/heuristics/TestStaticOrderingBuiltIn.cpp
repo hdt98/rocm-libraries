@@ -47,7 +47,7 @@ const int64_t CUSTOM_ENGINE_ID
 const int64_t STATIC_ORDERING_POLICY_ID
     = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
 
-constexpr const char* FALLBACK_ORDERING_ENV = "HIPDNN_FALLBACK_ENGINE_ORDERING";
+constexpr const char* FALLBACK_ORDERING_ENV = "HIPDNN_HEUR_FALLBACK_ENGINE_ORDER";
 
 class TestStaticOrderingBuiltIn : public ::testing::Test
 {
@@ -281,7 +281,7 @@ TEST_F(TestStaticOrderingBuiltIn, GetSortedClipsToCallerProvidedCapacity)
     EXPECT_EQ(outBuf[1], CUSTOM_ENGINE_ID);
 }
 
-// ========== HIPDNN_FALLBACK_ENGINE_ORDERING ==========
+// ========== HIPDNN_HEUR_FALLBACK_ENGINE_ORDER ==========
 // The env replaces sortEngineIds: only listed engines are eligible, in env order.
 
 TEST_F(TestStaticOrderingBuiltIn, FallbackEnvBlankFallsBackToDefaultOrdering)

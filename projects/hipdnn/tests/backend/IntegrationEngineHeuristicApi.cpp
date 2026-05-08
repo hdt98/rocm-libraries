@@ -39,7 +39,7 @@ protected:
                       heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
                   HIPDNN_STATUS_SUCCESS);
 
-        _policyOrderEnv.emplace("HIPDNN_HEURISTIC_POLICY_ORDER",
+        _policyOrderEnv.emplace("HIPDNN_HEUR_POLICY_ORDER",
                                 hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
 
         ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);

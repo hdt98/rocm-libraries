@@ -58,7 +58,7 @@ inline Error
 
     // Fetch only the top engine config unless the caller needs the full ranked
     // list (e.g. get_ranked_engine_ids, or the explicit Graph.preferred_engine_id
-    // post-hoc reorder in initializeEngineConfig). HIPDNN_POLICY_CONFIG_FILE_PATH
+    // post-hoc reorder in initializeEngineConfig). HIPDNN_HEUR_CONFIG_PATH
     // reordering happens inside the SelectionHeuristic::Config built-in and is
     // already reflected in the ranked list — no extra frontend search is needed
     // for that knob.

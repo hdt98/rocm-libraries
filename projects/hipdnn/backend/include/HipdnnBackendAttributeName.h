@@ -93,7 +93,7 @@ typedef enum
      * by ID only.
      *
      * Overrides handle-level and environment variable defaults. If not set, the descriptor uses
-     * the handle's policy order, then HIPDNN_HEURISTIC_POLICY_ORDER env var (parsed as
+     * the handle's policy order, then HIPDNN_HEUR_POLICY_ORDER env var (parsed as
      * comma-separated names and hashed at parse time), then the built-in default.
      *
      * Type: HIPDNN_TYPE_INT64

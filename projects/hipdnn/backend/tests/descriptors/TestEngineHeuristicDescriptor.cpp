@@ -735,7 +735,7 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderWhenNotSet)
 {
     // Make sure no env-var override leaks in from the surrounding shell.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter envGuard(
-        "HIPDNN_HEURISTIC_POLICY_ORDER", "");
+        "HIPDNN_HEUR_POLICY_ORDER", "");
 
     auto heur = getEngineHeuristicDescriptor();
     setGraph();
@@ -1110,7 +1110,7 @@ TEST_F(TestEngineHeuristicDescriptor, EnvironmentVariablePolicyOrderIsRespected)
     // succeeds. Restricting the env-var order to a policy nothing maps to should
     // make finalize() throw, proving the env var supersedes the default.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
-        "HIPDNN_HEURISTIC_POLICY_ORDER", "Vendor::Unregistered");
+        "HIPDNN_HEUR_POLICY_ORDER", "Vendor::Unregistered");
 
     auto heur = getEngineHeuristicDescriptor();
     setGraph();
@@ -1128,7 +1128,7 @@ TEST_F(TestEngineHeuristicDescriptor, DescriptorPolicyOrderTakesPrecedenceOverEn
     // on its own), but the descriptor-level attribute lists only StaticOrdering.
     // The descriptor attribute is highest priority, so finalize() must succeed.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
-        "HIPDNN_HEURISTIC_POLICY_ORDER", "Vendor::Unregistered");
+        "HIPDNN_HEUR_POLICY_ORDER", "Vendor::Unregistered");
 
     auto heur = getEngineHeuristicDescriptor();
 

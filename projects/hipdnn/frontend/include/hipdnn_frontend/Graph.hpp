@@ -381,7 +381,7 @@ private:
     Error initializeEngineConfig(hipdnnBackendDescriptor_t engineHeuristicDesc)
     {
         // The backend's SelectionHeuristic::Config built-in honors
-        // HIPDNN_POLICY_CONFIG_FILE_PATH inside the policy loop, so the
+        // HIPDNN_HEUR_CONFIG_PATH inside the policy loop, so the
         // heuristic-ranked list already reflects env/config-file overrides.
         // The explicit Graph.preferred_engine_id setter is honored here as a
         // post-hoc reorder: if the user pinned an engine and it appears in

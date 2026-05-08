@@ -118,7 +118,7 @@ struct DimKeyHash
 } // namespace detail
 
 /// Loaded set of engine-override rules (process-lifetime cache around
-/// HIPDNN_POLICY_CONFIG_FILE_PATH). Rules are evaluated in declaration order;
+/// HIPDNN_HEUR_CONFIG_PATH). Rules are evaluated in declaration order;
 /// first match wins. Internally split per-op into an exact hash bucket and
 /// an order-preserving wildcard list, reconciled by declaration index.
 class EngineOverrideConfig
@@ -163,13 +163,13 @@ public:
         }
     }
 
-    /// Read HIPDNN_POLICY_CONFIG_FILE_PATH and load the referenced config.
+    /// Read HIPDNN_HEUR_CONFIG_PATH and load the referenced config.
     /// Returns nullopt when the variable is unset / empty / the file cannot
     /// be opened or parsed. Called once per heuristic finalize so env changes
     /// take effect without process restart and the path stays testable.
     static std::optional<EngineOverrideConfig> loadFromEnv()
     {
-        static constexpr const char* ENV_VAR = "HIPDNN_POLICY_CONFIG_FILE_PATH";
+        static constexpr const char* ENV_VAR = "HIPDNN_HEUR_CONFIG_PATH";
         std::string path = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
         const auto first = path.find_first_not_of(" \t\r\n");
         if(first == std::string::npos)
