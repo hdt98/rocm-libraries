@@ -177,15 +177,15 @@ def generate_roundtrip_kernel(cfg, wave_id=0):
     # LDS allocation must match production formula (KernelWriter.py):
     # align A and B sizes to readSize (2*subtileSize) for DTL 2xsubtile reads
     readSize = 2 * tileInfoA.subtileSize
-    numASubtiles = tileInfoA.globalSubtileGrid[0] * tileInfoA.globalSubtileGrid[1]
-    numBSubtiles = tileInfoB.globalSubtileGrid[0] * tileInfoB.globalSubtileGrid[1]
+    numASubtiles = int(tileInfoA.globalSubtileGrid[0] * tileInfoA.globalSubtileGrid[1])
+    numBSubtiles = int(tileInfoB.globalSubtileGrid[0] * tileInfoB.globalSubtileGrid[1])
     sizeA = ((numASubtiles * tileInfoA.subtileSize + readSize - 1) // readSize) * readSize
     sizeB = ((numBSubtiles * tileInfoB.subtileSize + readSize - 1) // readSize) * readSize
     lds_size = sizeA + sizeB
     writer.ldsTotalSize = lds_size
 
-    tileInfoA.allocVgprTileRegisters(writer, kernel)
-    tileInfoB.allocVgprTileRegisters(writer, kernel)
+    tileInfoA.allocVgprTileRegisters_legacy(writer, kernel)
+    tileInfoB.allocVgprTileRegisters_legacy(writer, kernel)
 
     # GRA + LRA offset computation
     gra_module = graTileAssignment(writer, kernel, useSwizzling=True)
@@ -348,17 +348,14 @@ def compare_tiles(actual_bytes, expected_tiles, tileInfoA, tileInfoB, wave_id, d
 
 
 def _build_tile_to_mma(tileInfo):
-    """Build map from vgprTile index to (mmaId0, mmaId1).
-    Non-interleaved layout: interleave_factor = 1 for all configs."""
+    """Build map from vgprTile index to (mmaId0, mmaId1)."""
     tile_to_mma = {}
-    for linearId, subtile in enumerate(tileInfo.localSubtiles):
-        for mfmaIdx, tileIdx in enumerate(subtile.localReadMap):
-            sId0, sId1 = tileInfo.getLocalSubtileIdFromLinearId(linearId)
-            mfmaR = mfmaIdx % tileInfo.subtileShape[0]
-            mfmaC = mfmaIdx // tileInfo.subtileShape[0]
-            mmaId0 = sId0 * tileInfo.subtileShape[0] + mfmaR
-            mmaId1 = sId1 * tileInfo.subtileShape[1] + mfmaC
-            tile_to_mma[tileIdx] = (mmaId0, mmaId1)
+    for sId0 in range(tileInfo.lrLocalSubtileGrid[0]):
+        for sId1 in range(tileInfo.lrLocalSubtileGrid[1]):
+            mma_tiles = tileInfo.waveMmaTilesForSubtile(sId0, sId1)
+            for mfmaId, (mmaId0, mmaId1) in enumerate(mma_tiles):
+                tileIdx = tileInfo.lrTileIndexForSubtile(sId0, sId1, mfmaId)
+                tile_to_mma[tileIdx] = (mmaId0, mmaId1)
     return tile_to_mma
 
 

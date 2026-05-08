@@ -131,6 +131,13 @@ def _create_kernel(cfg, mi_wave_group=None):
     }
 
 
+def compute_lds_start_offset_b(tileInfoA):
+    """Compute LDS start offset for B (A subtiles followed by B, aligned to readSize)."""
+    readSize = 2 * tileInfoA.subtileSize
+    numASubtiles = tileInfoA.globalSubtileGrid[0] * tileInfoA.globalSubtileGrid[1]
+    return int(((numASubtiles * tileInfoA.subtileSize + readSize - 1) // readSize) * readSize)
+
+
 def create_writer(cfg, mi_wave_group=None):
     """Create a minimal mock writer with register pools, kernel dict, and TileInfo.
 
@@ -174,10 +181,8 @@ def create_writer(cfg, mi_wave_group=None):
         archCaps={"LDSBankCount": 64, "LDSBankWidth": 4},
     )
     # LDS layout: A subtiles followed by B subtiles, aligned to readSize
-    readSize = 2 * tileInfoA.subtileSize
-    numASubtiles = tileInfoA.globalSubtileGrid[0] * tileInfoA.globalSubtileGrid[1]
     writer.ldsStartOffsetA = 0
-    writer.ldsStartOffsetB = ((numASubtiles * tileInfoA.subtileSize + readSize-1) // readSize) * readSize
+    writer.ldsStartOffsetB = compute_lds_start_offset_b(tileInfoA)
 
     return writer, kernel, tileInfoA, tileInfoB
 
