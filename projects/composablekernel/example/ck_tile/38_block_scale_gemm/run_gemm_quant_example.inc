@@ -105,8 +105,8 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
     const ck_tile::index_t K_split =
         args.k_batch == 1 ? ck_tile::integer_least_multiple(args.K, GemmConfig::K_Tile)
                           : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
-    const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
-    const bool has_hot_loop         = BaseGemmPipeline::BlockHasHotloop(num_loop);
+    const ck_tile::index_t num_loop    = TilePartitioner::GetLoopNum(K_split);
+    const bool has_hot_loop            = BaseGemmPipeline::BlockHasHotloop(num_loop);
     const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
 
     const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {

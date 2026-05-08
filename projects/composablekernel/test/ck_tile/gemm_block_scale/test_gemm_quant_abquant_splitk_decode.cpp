@@ -114,18 +114,18 @@ TYPED_TEST(TestCkTileGemmABQuant, SplitK8_LargeK_LargeMN)
 // Test one padded-K split shape whose earlier split-K batches and final batch would need
 // different compile-time pipeline tail handling. Fixed host-side tail selection rejects it.
 using ABQuantSplitKRejectTypes = ::testing::Types<std::tuple<RowMajor,
-                                                            ColumnMajor,
-                                                            RowMajor,
-                                                            RowMajor,
-                                                            FP8,
-                                                            FP8,
-                                                            float,
-                                                            Half,
-                                                            ABQuantGrouped,
-                                                            GemmConfigPadding,
-                                                            GroupSize1x1x128,
-                                                            GroupSize1x1x128,
-                                                            ColumnMajor>>;
+                                                             ColumnMajor,
+                                                             RowMajor,
+                                                             RowMajor,
+                                                             FP8,
+                                                             FP8,
+                                                             float,
+                                                             Half,
+                                                             ABQuantGrouped,
+                                                             GemmConfigPadding,
+                                                             GroupSize1x1x128,
+                                                             GroupSize1x1x128,
+                                                             ColumnMajor>>;
 
 template <typename Tuple>
 class TestCkTileGemmABQuantSplitKReject : public TestCkTileGemmABQuant<Tuple>
@@ -141,6 +141,5 @@ TYPED_TEST(TestCkTileGemmABQuantSplitKReject, RejectsMismatchedTailSplitK)
 
 TYPED_TEST(TestCkTileGemmABQuantSplitKReject, RuntimeTailAllowsMismatchedTailSplitK)
 {
-    this->run_test_with_validation(
-        32, 128, 1792, 5, 0, true /* allow_runtime_splitk_tail */);
+    this->run_test_with_validation(32, 128, 1792, 5, 0, true /* allow_runtime_splitk_tail */);
 }

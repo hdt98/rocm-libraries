@@ -179,7 +179,8 @@ struct QuantGemmHostArgs : public QuantGemmProblem
     const void* aq_ptr = nullptr;
     const void* bq_ptr = nullptr;
     void* c_ptr        = nullptr;
-    index_t k_batch    = 0;
+    // k_batch must be a positive integer; defaults to 1 (no split-K).
+    index_t k_batch = 1;
 };
 
 struct QuantGemmKernelArgs
@@ -205,6 +206,13 @@ struct QuantGemmKernelArgs
 CK_TILE_HOST_DEVICE auto
 get_splitk_batch_k_read(index_t K, index_t k_batch, index_t k_unit) noexcept -> index_t
 {
+    // k_batch and k_unit must be positive integers.  Callers are expected to
+    // validate via IsSupportedArgument(); this fallback returns K so a
+    // misconfigured launch behaves as a no-split kernel.
+    if(k_batch <= 0 || k_unit <= 0)
+    {
+        return K;
+    }
     const index_t k_t = k_batch * k_unit;
     return (K + k_t - 1) / k_t * k_unit;
 }
@@ -212,6 +220,10 @@ get_splitk_batch_k_read(index_t K, index_t k_batch, index_t k_unit) noexcept -> 
 CK_TILE_HOST_DEVICE auto
 get_splitk_last_batch_k(index_t K, index_t k_batch, index_t k_read) noexcept -> index_t
 {
+    if(k_batch <= 0)
+    {
+        return K;
+    }
     return K - k_read * (k_batch - 1);
 }
 
@@ -257,7 +269,7 @@ struct QuantGemmKernel
     static constexpr auto I3 = number<3>(); // BQ Tensor
     static constexpr auto I4 = number<4>(); // C Tensor
 
-    static constexpr auto kQuantType = QuantType_;
+    static constexpr auto kQuantType        = QuantType_;
     static constexpr bool RuntimeSplitKTail = RuntimeSplitKTail_;
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
@@ -400,8 +412,8 @@ struct QuantGemmKernel
         {
             constexpr auto K1 =
                 GemmPipeline::BlockGemmShape::WarpTile::at(I2); // smallest unit of K work per block
-            const index_t KRead = amd_wave_read_first_lane(
-                get_splitk_batch_k_read(kargs.K, kargs.k_batch, K1));
+            const index_t KRead =
+                amd_wave_read_first_lane(get_splitk_batch_k_read(kargs.K, kargs.k_batch, K1));
             // total k elements to be read in this batch
             // offset not necessarily = KRead, because B can have packed elements (e.g. fp8i4)
             constexpr index_t BPackedSize =
@@ -475,7 +487,7 @@ struct QuantGemmKernel
 
                 // Compute AQ K-group offset for this split-K batch.
                 const index_t k_offset_aq = amd_wave_read_first_lane(k_id * KRead);
-                aq_group_offset   = amd_wave_read_first_lane(k_offset_aq / AQuantGroupSize::kK);
+                aq_group_offset = amd_wave_read_first_lane(k_offset_aq / AQuantGroupSize::kK);
                 if constexpr(std::is_same_v<AQLayout, tensor_layout::gemm::RowMajor>)
                 {
                     // RowMajor AQ is [M, QK_A] with stride [stride_AQ, 1].
@@ -486,8 +498,7 @@ struct QuantGemmKernel
                 {
                     // ColumnMajor AQ is [QK_A, M] with K-group row stride stride_AQ.
                     // Advancing to K-group row g is a pointer offset of g * stride_AQ.
-                    aq_k_split_offset =
-                        amd_wave_read_first_lane(aq_group_offset * kargs.stride_AQ);
+                    aq_k_split_offset = amd_wave_read_first_lane(aq_group_offset * kargs.stride_AQ);
                 }
 
                 // Compute BQ K-group offset for this split-K batch.
@@ -1156,6 +1167,22 @@ struct QuantGemmKernel
 
     CK_TILE_HOST static bool IsSupportedArgument(const QuantGemmKernelArgs& kargs)
     {
+        // k_batch must be a positive integer.
+        if(kargs.k_batch <= 0)
+        {
+            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+            {
+                CK_TILE_ERROR("k_batch must be a positive integer (got " +
+                              std::to_string(kargs.k_batch) + ")!");
+            }
+            return false;
+        }
+
+        // The split-K K-unit (warp-tile K dimension) must be positive too;
+        // it is a compile-time constant taken from the pipeline shape.
+        static_assert(GemmPipeline::BlockGemmShape::WarpTile::at(I2) > 0,
+                      "Pipeline warp-tile K dimension (k_unit) must be positive.");
+
         // Split-K is supported for BQuantGrouped (without preshuffle) and
         // ABQuantGrouped (without APreshuffleQuant) modes.
         if(kargs.k_batch != 1)
@@ -1179,9 +1206,9 @@ struct QuantGemmKernel
             }
             else
             {
-                constexpr auto K1   = GemmPipeline::BlockGemmShape::WarpTile::at(I2);
-                const index_t KRead = get_splitk_batch_k_read(
-                    kargs.K, kargs.k_batch, K1); // per-batch K read size
+                constexpr auto K1 = GemmPipeline::BlockGemmShape::WarpTile::at(I2);
+                const index_t KRead =
+                    get_splitk_batch_k_read(kargs.K, kargs.k_batch, K1); // per-batch K read size
                 const index_t KLast = get_splitk_last_batch_k(kargs.K, kargs.k_batch, KRead);
                 constexpr index_t BPackedSize =
                     ck_tile::numeric_traits<remove_cvref_t<BDataType>>::PackedSize;
@@ -1254,8 +1281,7 @@ struct QuantGemmKernel
                 // (i.e. per_batch_num_loop == 1) the prefetch would read the tile
                 // belonging to the next split-K batch, producing incorrect results.
                 {
-                    const index_t per_batch_num_loop =
-                        TilePartitioner::GetLoopNum(KRead);
+                    const index_t per_batch_num_loop = TilePartitioner::GetLoopNum(KRead);
                     if(per_batch_num_loop < 2)
                     {
                         if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
@@ -1278,8 +1304,8 @@ struct QuantGemmKernel
                 {
                     const index_t first_num_loop = TilePartitioner::GetLoopNum(KRead);
                     const index_t last_num_loop  = TilePartitioner::GetLoopNum(KLast);
-                    const bool first_hot_loop = GemmPipeline::BlockHasHotloop(first_num_loop);
-                    const bool last_hot_loop  = GemmPipeline::BlockHasHotloop(last_num_loop);
+                    const bool first_hot_loop    = GemmPipeline::BlockHasHotloop(first_num_loop);
+                    const bool last_hot_loop     = GemmPipeline::BlockHasHotloop(last_num_loop);
                     const auto first_tail = GemmPipeline::GetBlockLoopTailNum(first_num_loop);
                     const auto last_tail  = GemmPipeline::GetBlockLoopTailNum(last_num_loop);
 
@@ -1441,9 +1467,7 @@ struct QuantGemmKernel
         return true;
     }
 
-    template <typename ADramBlockWindow,
-              typename BDramBlockWindow,
-              typename BQDramBlockWindow>
+    template <typename ADramBlockWindow, typename BDramBlockWindow, typename BQDramBlockWindow>
     CK_TILE_DEVICE static auto CallBQuantGemmPipeline(const ADramBlockWindow& a_block_window,
                                                       const BDramBlockWindow& b_block_window,
                                                       const BQDramBlockWindow& bq_block_window,

@@ -39,6 +39,31 @@ struct SafeTupleElement<TTuple,
 template <typename TTuple, size_t Index, typename DefaultType>
 using SafeTupleElement_t = typename SafeTupleElement<TTuple, Index, DefaultType>::type;
 
+namespace test_gemm_quant_base_detail {
+// TODO: replace with C++20 requires later.
+// C++17 detection idiom: true when
+// T::run_quant_gemm_impl<Shape, Partitioner, Traits>(QuantGemmHostArgs, stream_config, bool)
+// is a well-formed expression.
+template <typename T, typename Shape, typename Partitioner, typename Traits, typename = void>
+struct has_run_quant_gemm_impl_splitk : std::false_type
+{
+};
+
+template <typename T, typename Shape, typename Partitioner, typename Traits>
+struct has_run_quant_gemm_impl_splitk<
+    T,
+    Shape,
+    Partitioner,
+    Traits,
+    std::void_t<
+        decltype(std::declval<T*>()->template run_quant_gemm_impl<Shape, Partitioner, Traits>(
+            std::declval<const ck_tile::QuantGemmHostArgs&>(),
+            std::declval<const ck_tile::stream_config&>(),
+            std::declval<bool>()))>> : std::true_type
+{
+};
+} // namespace test_gemm_quant_base_detail
+
 // Base class for common quant gemm functionality
 template <typename Tuple, typename Derived>
 class TestCkTileGemmQuantBase : public ::testing::Test
@@ -130,12 +155,11 @@ class TestCkTileGemmQuantBase : public ::testing::Test
 
         // Let the derived class create the appropriate pipeline and epilogue
         auto* derived = static_cast<Derived*>(this);
-        if constexpr(requires {
-                         derived->template run_quant_gemm_impl<CodegenGemmShape,
-                                                                TilePartitioner,
-                                                                CodegenGemmTraits>(
-                             args, s, allow_runtime_splitk_tail);
-                     })
+        if constexpr(test_gemm_quant_base_detail::has_run_quant_gemm_impl_splitk<
+                         Derived,
+                         CodegenGemmShape,
+                         TilePartitioner,
+                         CodegenGemmTraits>::value)
         {
             derived->template run_quant_gemm_impl<CodegenGemmShape,
                                                   TilePartitioner,
