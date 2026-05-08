@@ -27,7 +27,7 @@ from pprint import pformat
 from pathlib import Path
 from typing import Dict, Tuple
 
-from Tensile.Common import print1, printWarning, IsaVersion, IsaInfo
+from Tensile.Common import print1, print2, printWarning, IsaVersion, IsaInfo
 from Tensile.SolutionStructs.Validators.MatrixInstruction import matrixInstructionToMIParameters
 
 from Tensile.CustomKernels import isCustomKernelConfig, getCustomKernelConfig
@@ -62,10 +62,10 @@ def handleCustomKernel(sol: dict, isaInfoMap: Dict[IsaVersion, IsaInfo]) -> Tupl
     sol.update(config)
 
     mi = sol["MatrixInstruction"]
-    print1(f">>   Found custom kernel: {name} with MI {mi}")
+    print2(f">>   Found custom kernel: {name} with MI {mi}")
 
     if not (len(mi) == 4 or len(mi) == 0):
-        print1(
+        print2(
             f">>     Error: Custom kernels in logic files should have 'MatrixInstruction' of length 4 or 0, not length {len(mi)}"
         )
         mi = sol["MatrixInstruction"]
@@ -76,7 +76,7 @@ def handleCustomKernel(sol: dict, isaInfoMap: Dict[IsaVersion, IsaInfo]) -> Tupl
         miParams = matrixInstructionToMIParameters(
             mi, isa, wavefrontSize, ptype, workgroup, isaInfoMap
         )
-        print1(
+        print2(
             f">>     Hint: Replace 'MatrixInstruction' in {name}.s with following diff:\n"
             f"{prepareCustomKernelConfig(miParams, mi)}"
         )

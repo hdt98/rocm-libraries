@@ -35,6 +35,7 @@
 #include <Tensile/DataTypes.hpp>
 #include <Tensile/Macros.hpp>
 
+TENSILE_HIDDEN_BEGIN
 namespace TensileLite
 {
     template <typename T>
@@ -388,6 +389,40 @@ namespace TensileLite
         appendCustomType(name, static_cast<float>(value), type);
     }
 
+#if !defined(_WIN32) && defined(TENSILE_USE_FP6)
+    template <>
+    inline void KernelArguments::appendCustomType<Float6x32>(std::string const& name, Float6x32 value, CustomArgType type)
+    {
+        // Use first packed element for scalar custom argument conversion.
+        appendCustomType(name, value.getElement(0), type);
+    }
+#endif // !_WIN32 && TENSILE_USE_FP6
+
+#if !defined(_WIN32) && defined(TENSILE_USE_BF6)
+    template <>
+    inline void KernelArguments::appendCustomType<BFloat6x32>(std::string const& name, BFloat6x32 value, CustomArgType type)
+    {
+        // Use first packed element for scalar custom argument conversion.
+        appendCustomType(name, value.getElement(0), type);
+    }
+#endif // !_WIN32 && TENSILE_USE_BF6
+
+#if !defined(_WIN32) && defined(TENSILE_USE_FP4)
+    template <>
+    inline void KernelArguments::appendCustomType<Float4x2>(std::string const& name, Float4x2 value, CustomArgType type)
+    {
+        // Use first packed element for scalar custom argument conversion.
+        appendCustomType(name, value.getElement(0), type);
+    }
+#endif // !_WIN32 && TENSILE_USE_FP4
+
+    template <>
+    inline void KernelArguments::appendCustomType<E8>(std::string const& name, E8 value, CustomArgType type)
+    {
+        // E8 is a scale exponent; convert through float for downstream casts.
+        appendCustomType(name, static_cast<float>(value), type);
+    }
+
     template <>
     inline void KernelArguments::appendCustomType<ConstantVariant>(std::string const& name, ConstantVariant value, CustomArgType type)
     {
@@ -601,3 +636,4 @@ namespace TensileLite
         size_t counter = 0;
     };
 } // namespace TensileLite
+TENSILE_HIDDEN_END
