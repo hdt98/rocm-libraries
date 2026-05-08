@@ -170,82 +170,76 @@ def runHipClangStage(Map conf=[:]) {
 }
 
 def runAsanTests(String gpuLabel, String gfxFamily) {
-    node(rocmnode(gpuLabel)) {
+    withWorkingDir {
+        def variant = env.STAGE_NAME
+        def asanImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
+        def video_id = sh(returnStdout: true, script: 'getent group video | cut -d: -f3').trim()
+        def render_id = sh(returnStdout: true, script: 'getent group render | cut -d: -f3').trim()
+        def dockerOpts = "--user root " +
+                         "--device=/dev/kfd --device=/dev/dri " +
+                         "--group-add video --group-add render " +
+                         "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined " +
+                         "--group-add=${video_id} --group-add=${render_id} " +
+                         "-v ${env.WORKSPACE}:${env.WORKSPACE}"
+        utils.setGithubStatus(variant, 'pending', 'In progress')
         try {
-            withWorkingDir {
-                def variant = env.STAGE_NAME
-                def asanImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
-                def video_id = sh(returnStdout: true, script: 'getent group video | cut -d: -f3').trim()
-                def render_id = sh(returnStdout: true, script: 'getent group render | cut -d: -f3').trim()
-                def dockerOpts = "--user root " +
-                                 "--device=/dev/kfd --device=/dev/dri " +
-                                 "--group-add video --group-add render " +
-                                 "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined " +
-                                 "--group-add=${video_id} --group-add=${render_id} " +
-                                 "-v ${env.WORKSPACE}:${env.WORKSPACE}"
-                utils.setGithubStatus(variant, 'pending', 'In progress')
-                try {
-                    withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
-                        docker.image(asanImage).pull()
-                    }
-                    withDockerContainer(image: asanImage, args: dockerOpts) {
-                        timeout(time: 420, unit: 'MINUTES') {
-                            sh """
-                                set -e
-                                echo "Running as: \$(whoami)"
-                                cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
-                                LOGNAME=temp-user dvc pull -v
-                                rm -rf build && mkdir build && cd build
+            withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
+                docker.image(asanImage).pull()
+            }
+            withDockerContainer(image: asanImage, args: dockerOpts) {
+                timeout(time: 420, unit: 'MINUTES') {
+                    sh """
+                        set -e
+                        echo "Running as: \$(whoami)"
+                        cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
+                        LOGNAME=temp-user dvc pull -v
+                        rm -rf build && mkdir build && cd build
 
-                                export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname \$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so))
+                        export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname \$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so))
 
-                                CXX=\${ROCM_PATH}/llvm/bin/clang++ cmake \\
-                                    -DMIOPEN_TEST_FLAGS="--disable-verification-cache" \\
-                                    -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
-                                    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g1" \\
-                                    -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g -shared-libasan" \\
-                                    -DCMAKE_INSTALL_PREFIX=\${ROCM_PATH} \\
-                                    -DCMAKE_PREFIX_PATH="\${ROCM_PATH};\${ROCM_PATH}/lib" \\
-                                    -DMIOPEN_USE_MLIR=OFF \\
-                                    -DMIOPEN_USE_COMPOSABLEKERNEL=ON \\
-                                    -DMIOPEN_TEST_DISCRETE=OFF \\
-                                    -DMIOPEN_GPU_SYNC=OFF \\
-                                    -DGTEST_PARALLEL_LEVEL=4 \\
-                                    -DMIOPEN_INSTALL_GPU_DATABASES=${gfxFamily} \\
-                                    -DGPU_TARGETS="${gfxFamily}:xnack+" \\
-                                    -DHIP_PLATFORM=amd \\
-                                    -DBUILD_TESTING=ON \\
-                                    -DENABLE_ASAN_PACKAGING=ON \\
-                                    -DTHEROCK_SANITIZER=ASAN \\
-                                    ..
+                        CXX=\${ROCM_PATH}/llvm/bin/clang++ cmake \\
+                            -DMIOPEN_TEST_FLAGS="--disable-verification-cache" \\
+                            -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+                            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g1" \\
+                            -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g -shared-libasan" \\
+                            -DCMAKE_INSTALL_PREFIX=\${ROCM_PATH} \\
+                            -DCMAKE_PREFIX_PATH="\${ROCM_PATH};\${ROCM_PATH}/lib" \\
+                            -DMIOPEN_USE_MLIR=OFF \\
+                            -DMIOPEN_USE_COMPOSABLEKERNEL=ON \\
+                            -DMIOPEN_TEST_DISCRETE=OFF \\
+                            -DMIOPEN_GPU_SYNC=OFF \\
+                            -DGTEST_PARALLEL_LEVEL=4 \\
+                            -DMIOPEN_INSTALL_GPU_DATABASES=${gfxFamily} \\
+                            -DGPU_TARGETS="${gfxFamily}:xnack+" \\
+                            -DHIP_PLATFORM=amd \\
+                            -DBUILD_TESTING=ON \\
+                            -DENABLE_ASAN_PACKAGING=ON \\
+                            -DTHEROCK_SANITIZER=ASAN \\
+                            ..
 
-                                ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
-                            """.stripIndent()
-                            sh """
-                                set -e
-                                export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
-                                . /opt/venv/bin/activate
-                                cd /TheRock
-                                THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
-                                AMDGPU_FAMILIES=${gfxFamily} \\
-                                TEST_TYPE=full \\
-                                python build_tools/github_actions/test_executable_scripts/test_miopen.py
-                            """.stripIndent()
-                        }
-                    }
-                    utils.setGithubStatus(variant, 'success', 'Completed successfully')
-                }
-                catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
-                    utils.setGithubStatus(variant, 'error', 'Job cancelled or aborted')
-                    throw e
-                }
-                catch (Exception ex) {
-                    utils.setGithubStatus(variant, 'failure', 'Stage failed')
-                    throw ex
+                        ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
+                    """.stripIndent()
+                    sh """
+                        set -e
+                        export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
+                        . /opt/venv/bin/activate
+                        cd /TheRock
+                        THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
+                        AMDGPU_FAMILIES=${gfxFamily} \\
+                        TEST_TYPE=full \\
+                        python build_tools/github_actions/test_executable_scripts/test_miopen.py
+                    """.stripIndent()
                 }
             }
-        } finally {
-            cleanWs()
+            utils.setGithubStatus(variant, 'success', 'Completed successfully')
+        }
+        catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+            utils.setGithubStatus(variant, 'error', 'Job cancelled or aborted')
+            throw e
+        }
+        catch (Exception ex) {
+            utils.setGithubStatus(variant, 'failure', 'Stage failed')
+            throw ex
         }
     }
 }
@@ -853,12 +847,13 @@ pipeline {
                         beforeAgent true
                         expression { params.TARGET_GFX942 }
                     }
-                    agent none
+                    agent{ label rocmnode("gfx942") }
                     steps {
                         script {
                             runAsanTests("gfx942", "gfx942")
                         }
                     }
+                    post { always { cleanWs() } }
                 }
                 // GFX1101 Tests
                 stage('Fp16 Hip Install All gfx1101') {
