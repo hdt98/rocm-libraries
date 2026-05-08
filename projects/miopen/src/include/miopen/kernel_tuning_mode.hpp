@@ -133,8 +133,10 @@ struct GroupedKernelData
 /// Structure to hold solution data for JSON output
 struct SolutionExecutionData
 {
+    SolutionExecutionData() = default;
+
     std::string solution_name;
-    uint64_t solver_id;
+    uint64_t solver_id = 0;
     std::string phase;
     size_t workspace_bytes = 0;                             // Workspace size for this solution
     std::vector<PerformanceConfigData> performance_configs; // Array of performance configs
