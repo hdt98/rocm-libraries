@@ -7,9 +7,13 @@
 #include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/numeric/integral_constant.hpp"
 #include "ck_tile/core/utility/bit_cast.hpp"
-#include <type_traits>
+
 #include <stdint.h>
+#include <type_traits>
+#include <utility>
+#ifndef __HIP_DEVICE_COMPILE__
 #include <cmath>
+#endif
 
 namespace ck_tile {
 

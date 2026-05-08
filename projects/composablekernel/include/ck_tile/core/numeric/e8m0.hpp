@@ -4,7 +4,10 @@
 #pragma once
 
 #include "ck_tile/core/config.hpp"
+#include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/numeric/mxfp_convert.hpp"
+#include "ck_tile/core/numeric/numeric.hpp"
+#include "ck_tile/core/utility/bit_cast.hpp"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wno-unknown-warning-option"
