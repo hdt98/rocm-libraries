@@ -291,9 +291,9 @@ inline void FlushJsonAccumulator()
     const bool show_kernels = (log_level == 2 || log_level == 4);
 
     // Output JSON with solution-level metrics
-    std::cerr << "{\"solution\":\"" << JsonEscape(data.solution_name) << "\","
+    std::cerr << R"({"solution":")" << JsonEscape(data.solution_name) << "\","
               << "\"solver_id\":" << data.solver_id << ","
-              << "\"workspace_bytes\":" << data.workspace_bytes << "," << "\"phase\":\""
+              << "\"workspace_bytes\":" << data.workspace_bytes << "," << R"("phase":")"
               << data.phase << "\"," << "\"performance_configs\":[";
 
     // Output each performance config
@@ -325,12 +325,12 @@ inline void FlushJsonAccumulator()
             display_name = data.solution_name;
         }
 
-        std::cerr << "{\"config_name\":\"" << JsonEscape(display_name) << "\",";
+        std::cerr << R"({"config_name":")" << JsonEscape(display_name) << "\",";
 
         // Output config_descriptor if present
         if(!config.config_descriptor.empty())
         {
-            std::cerr << "\"config_descriptor\":\"" << JsonEscape(config.config_descriptor)
+            std::cerr << R"("config_descriptor":")" << JsonEscape(config.config_descriptor)
                       << "\",";
         }
 
@@ -452,7 +452,7 @@ inline void FlushJsonAccumulator()
                     std::cerr << ",";
                 first_kernel = false;
 
-                std::cerr << "{\"kernel_name\":\"" << JsonEscape(g.kernel_name) << "\","
+                std::cerr << R"({"kernel_name":")" << JsonEscape(g.kernel_name) << "\","
                           << "\"time_executions_ms\":[";
 
                 for(size_t i = 0; i < g.time_executions_ms.size(); ++i)
