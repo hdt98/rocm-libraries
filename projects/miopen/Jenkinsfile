@@ -220,28 +220,29 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                         ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
                     """.stripIndent()
                     sh """
-                        set -e
                         export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
                         . /opt/venv/bin/activate
                         cd /TheRock
                         SHARD_LOGS_DIR=${env.WORKSPACE}/shard_logs
                         mkdir -p \$SHARD_LOGS_DIR
-                        (
-                            trap 'kill 0' EXIT
-                            for i in \$(seq 1 4); do
-                                (
-                                    THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
-                                    AMDGPU_FAMILIES=${gfxFamily} \\
-                                    TEST_TYPE=full \\
-                                    SHARD_INDEX=\$i \\
-                                    TOTAL_SHARDS=4 \\
-                                    python build_tools/github_actions/test_executable_scripts/test_miopen.py
-                                ) 2>&1 | tee \$SHARD_LOGS_DIR/asan_shard_\$i.log | sed "s/^/[shard \$i] /" &
-                            done
-                            wait
-                        )
+                        overall_exit=0
+                        pids=()
+                        for i in \$(seq 1 4); do
+                            (
+                                THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
+                                AMDGPU_FAMILIES=${gfxFamily} \\
+                                TEST_TYPE=full \\
+                                SHARD_INDEX=\$i \\
+                                TOTAL_SHARDS=4 \\
+                                python build_tools/github_actions/test_executable_scripts/test_miopen.py
+                            ) 2>&1 | tee \$SHARD_LOGS_DIR/asan_shard_\$i.log | sed "s/^/[shard \$i] /" &
+                            pids+=(\$!)
+                        done
+                        for pid in "\${pids[@]}"; do
+                            wait \$pid || overall_exit=1
+                        done
+                        exit \$overall_exit
                     """.stripIndent()
-                    archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
                     // Make workspace files writable by the Jenkins agent user before the container exits,
                     // so cleanWs() can delete root-owned files written during the build.
                     sh "chmod -R a+w ${env.WORKSPACE} || true"
@@ -799,7 +800,12 @@ pipeline {
                             runAsanTests("gfx942", "gfx942")
                         }
                     }
-                    post { always { cleanWs() } }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
+                            cleanWs()
+                        }
+                    }
                 }
                 stage('Dbsync gfx942') {
                     when {
