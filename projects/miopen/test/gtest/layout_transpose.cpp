@@ -25,7 +25,6 @@
  *******************************************************************************/
 #include <gtest/gtest.h>
 
-#include "../../driver/conv_common.hpp"
 #include <miopen/batched_transpose_sol.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/invoker.hpp>

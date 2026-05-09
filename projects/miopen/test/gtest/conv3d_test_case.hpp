@@ -30,7 +30,6 @@
 #include "get_handle.hpp"
 #include <miopen/conv/data_invoke_params.hpp>
 
-#include "../driver/tensor_driver.hpp"
 #include "conv_common.hpp"
 #include "conv_test_base.hpp"
 

@@ -24,7 +24,6 @@
  *
  *******************************************************************************/
 
-#include "../driver/tensor_driver.hpp"
 #include "get_handle.hpp"
 #include "random.hpp"
 #include "tensor_holder.hpp"

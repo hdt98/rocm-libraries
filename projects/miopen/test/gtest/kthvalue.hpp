@@ -23,7 +23,6 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include "../driver/tensor_driver.hpp"
 #include "cpu_kthvalue.hpp"
 #include "get_handle.hpp"
 

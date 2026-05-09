@@ -32,7 +32,6 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 
-#include "../driver/tensor_driver.hpp"
 #include "conv_common.hpp"
 #include "gtest_common.hpp"
 

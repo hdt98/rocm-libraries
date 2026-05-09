@@ -24,7 +24,6 @@
  *
  *******************************************************************************/
 #define MIOPEN_BETA_API 1
-#include "../driver/tensor_driver.hpp"
 #include "cpu_transformers_adam_w.hpp"
 #include "get_handle.hpp"
 #include "random.hpp"

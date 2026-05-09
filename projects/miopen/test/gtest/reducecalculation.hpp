@@ -24,7 +24,6 @@
  *
  *******************************************************************************/
 
-#include "../driver/tensor_driver.hpp"
 #include "../src/kernels/MIOpenReduceCalculation.hpp"
 #include "get_handle.hpp"
 #include "random.hpp"

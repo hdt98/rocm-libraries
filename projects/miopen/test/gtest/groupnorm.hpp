@@ -31,7 +31,6 @@
 #include "cpu_groupnorm.hpp"
 #include "get_handle.hpp"
 #include "random.hpp"
-#include "../driver/tensor_driver.hpp"
 #include "verify.hpp"
 #include <random>
 
