@@ -32,13 +32,13 @@
 #include "mloPoolingHost.hpp"
 #include "random.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
-#include <miopen/errors.hpp>
+#include "driver_errors.hpp"
 #include <miopen/miopen.h>
-#include <miopen/pooling.hpp>
 #include <miopen/tensor.hpp>
 
 #include <algorithm>
@@ -164,11 +164,11 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
     spatial_dim = input.lengths.size() - 2;
 
     if(input.SetTensordDescriptor(inputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     auto dinput = inflags.GetValueTensor("dinput").FillMissing(input);
     if(dinput.SetTensordDescriptor(dInputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing dinput tensor: " + inflags.GetValueStr("dinput") + ".");
+        DRIVER_THROW("Error parsing dinput tensor: " + inflags.GetValueStr("dinput") + ".");
 
     SetPoolDescriptorFromCmdLineArgs();
 
@@ -179,18 +179,19 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
         output.layout = input.layout;
 
     if(output.SetTensordDescriptor(outputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing output tensor: " + inflags.GetValueStr("output") + ".");
+        DRIVER_THROW("Error parsing output tensor: " + inflags.GetValueStr("output") + ".");
 
     auto doutput = inflags.GetValueTensor("doutput").FillMissing(output);
     if(doutput.SetTensordDescriptor(dOutputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing doutput tensor: " + inflags.GetValueStr("doutput") + ".");
+        DRIVER_THROW("Error parsing doutput tensor: " + inflags.GetValueStr("doutput") + ".");
 
     int nInStride, cInStride, dInStride, hInStride, wInStride;
     int nIn, cIn, dIn, hIn, wIn;
     int nOutStride, cOutStride, dOutStride, hOutStride, wOutStride;
     int nOut, cOut, dOut, hOut, wOut;
     miopenPoolingMode_t mode  = miopenPoolingMax;
-    miopenPaddingMode_t pmode = miopen::deref(poolDesc).pmode;
+    miopenPaddingMode_t pmode;
+    miopenGetPoolingPaddingMode(poolDesc, &pmode);
     int windowDepth, windowHeight, windowWidth;
     int pad_d, pad_h, pad_w;
     int stride_d, stride_h, stride_w;
@@ -229,13 +230,13 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
 
         miopenGetNdPoolingDescriptor(
             poolDesc, spatial_dim, &mode, nullptr, winV.data(), padV.data(), strV.data());
-        std::tie(windowDepth, windowHeight, windowWidth) = miopen::tien<3>(winV);
-        std::tie(pad_d, pad_h, pad_w)                    = miopen::tien<3>(padV);
-        std::tie(stride_d, stride_h, stride_w)           = miopen::tien<3>(strV);
+        std::tie(windowDepth, windowHeight, windowWidth) = driver_tensor::Tien<3>(winV);
+        std::tie(pad_d, pad_h, pad_w)                    = driver_tensor::Tien<3>(padV);
+        std::tie(stride_d, stride_h, stride_w)           = driver_tensor::Tien<3>(strV);
     }
     else
     {
-        MIOPEN_THROW("Unsupported spatial dimension");
+        DRIVER_THROW("Unsupported spatial dimension");
     }
 
     if(pmode == miopenPaddingSame)
@@ -355,7 +356,7 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Pooling Mode");
+        DRIVER_THROW("Incorrect Pooling Mode");
     }
 
     if((inflags.GetValueStr("pad_mode")) == "same")
@@ -372,7 +373,7 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Padding Mode");
+        DRIVER_THROW("Incorrect Padding Mode");
     }
 
     if((inflags.GetValueStr("index_type")) == "miopenIndexUint8")
@@ -393,24 +394,25 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Index Data Type");
+        DRIVER_THROW("Incorrect Index Data Type");
     }
 
     in_filename  = inflags.GetValueStr("in_data");
     out_filename = inflags.GetValueStr("out_data");
     dump_root    = inflags.GetValueStr("dump_root");
 
-    std::initializer_list<int> lens    = {win_d, win_h, win_w};
-    std::initializer_list<int> pads    = {pad_d, pad_h, pad_w};
-    std::initializer_list<int> strides = {stride_d, stride_h, stride_w};
-    miopen::deref(poolDesc)            = miopen::PoolingDescriptor(mode,
-                                                        pmode,
-                                                        lens.begin() + 3 - spatial_dim,
-                                                        pads.begin() + 3 - spatial_dim,
-                                                        strides.begin() + 3 - spatial_dim,
-                                                        spatial_dim);
+    std::vector<int> lens_full    = {win_d, win_h, win_w};
+    std::vector<int> pads_full    = {pad_d, pad_h, pad_w};
+    std::vector<int> strides_full = {stride_d, stride_h, stride_w};
+    int offset = 3 - spatial_dim;
+    miopenSetNdPoolingDescriptor(poolDesc,
+                                 mode,
+                                 spatial_dim,
+                                 lens_full.data() + offset,
+                                 pads_full.data() + offset,
+                                 strides_full.data() + offset);
 
-    miopen::deref(poolDesc).SetIndexType(index_type);
+    miopenSetPoolingIndexType(poolDesc, index_type);
 
     miopenSetPoolingWorkSpaceIndexMode(
         poolDesc,

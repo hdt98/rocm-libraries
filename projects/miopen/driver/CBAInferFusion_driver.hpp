@@ -40,14 +40,15 @@
 #include "../test/cpu_conv.hpp"
 #include "../test/cpu_bias.hpp"
 
-#include <miopen/env.hpp>
-#include <miopen/errors.hpp>
-#include <miopen/handle.hpp>
+#include "driver_env.hpp"
+#include "driver_errors.hpp"
+#include "driver_tensor.hpp"
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 
 #include <algorithm>
 #include <cassert>
+#include <ranges>
 #include <cmath>
 #include <cstdlib>
 #include <float.h>
@@ -62,8 +63,6 @@
 #define EPSILON 1e-6
 
 #define CBA_DEBUG_VALUES 0
-
-MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DRIVER_PAD_BUFFERS_2M)
 
 //"Fusion mode (cbna = 0, cna = 1, na = 2, cn = 3, cba = 4, ca = 5, cb = 6) (Default=cbna)",
 typedef enum
@@ -177,7 +176,7 @@ public:
                 avgtime += time;
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
 
         if(WALL_CLOCK)
@@ -280,7 +279,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::ChkLayout_ShortName()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid Short Name!");
+        DRIVER_THROW("Invalid Short Name!");
     }
 }
 
@@ -289,8 +288,7 @@ void CBAInferFusionDriver<Tgpu, Tref>::ValidateLayoutInputParameters(std::string
 {
     if((ChkLayout_ShortName()))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "Invalid Layout Short Name = " + std::to_string(ChkLayout_ShortName()));
+        DRIVER_THROW("Invalid Layout Short Name = " + std::to_string(ChkLayout_ShortName()));
     }
     else
     {
@@ -302,7 +300,7 @@ void CBAInferFusionDriver<Tgpu, Tref>::ValidateLayoutInputParameters(std::string
         }
         else
         {
-            MIOPEN_THROW(miopenStatusBadParm, "Invalid Layout Parameter Value - " + layout_value);
+            DRIVER_THROW("Invalid Layout Parameter Value - " + layout_value);
         }
     }
 }
@@ -357,7 +355,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     fusion_mode = inflags.GetValueInt("fusion_mode");
     if(fusion_mode > 6 || fusion_mode < 0)
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Fusion mode out of range");
+        DRIVER_THROW("Fusion mode out of range");
     }
     if(fusion_mode != miopen_fusion_cba && fusion_mode != miopen_fusion_ca &&
        fusion_mode != miopen_fusion_cb)
@@ -401,7 +399,7 @@ std::vector<int> CBAInferFusionDriver<Tgpu, Tref>::GetWeightTensorLengthsFromCmd
         if(wei_c % group_count != 0 || wei_n % group_count != 0 || group_count > wei_c ||
            group_count > wei_n)
         {
-            MIOPEN_THROW("Invalid group number\n");
+            DRIVER_THROW("Invalid group number\n");
         }
     }
 
@@ -573,7 +571,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::SetBNParametersFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Mode");
+        DRIVER_THROW("Incorrect Batch Normalization Mode");
     }
 
     return miopenStatusSuccess;
@@ -633,15 +631,15 @@ int CBAInferFusionDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
         if(in_c % group_count != 0 || out_c % group_count != 0 || group_count > in_c ||
            group_count > out_c)
         {
-            MIOPEN_THROW(miopenStatusBadParm, "Invalid group number");
+            DRIVER_THROW("Invalid group number");
         }
     }
 
     mode = miopenConvolution;
 
     if(mode == miopenConvolution &&
-       (miopen::all_of(dilations, [](auto v) { return v == 1; }) ||
-        miopen::all_of(wei_spatial_lens, [](auto v) { return v == 1; })))
+       (std::ranges::all_of(dilations, [](auto v) { return v == 1; }) ||
+        std::ranges::all_of(wei_spatial_lens, [](auto v) { return v == 1; })))
     {
         if((inflags.GetValueStr("pad_mode")) == "same")
         {
@@ -674,7 +672,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
 template <typename Tgpu, typename Tref>
 std::vector<int> CBAInferFusionDriver<Tgpu, Tref>::GetOutputTensorLengths()
 {
-    int ndim = miopen::deref(inputTensor).GetNumDims();
+    int ndim = driver_tensor::GetNumDims(inputTensor);
 
     std::vector<int> out_lens(ndim);
 
@@ -739,7 +737,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::createRunningBuffers()
         status |= runningVariance_dev->ToGPU(q, runningVariance.data());
         if(status != STATUS_SUCCESS)
         {
-            MIOPEN_THROW(miopenStatusInternalError, "Error copying data to GPU");
+            DRIVER_THROW("Error copying data to GPU");
         }
     }
     else
@@ -775,7 +773,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     else
         out_sz = in_sz; // This is for N+A so the output is the same as the input size
 
-    if(env::enabled(MIOPEN_DRIVER_PAD_BUFFERS_2M))
+    if(driver_env::enabled("MIOPEN_DRIVER_PAD_BUFFERS_2M"))
     {
         PadBufferSize(wei_sz, sizeof(Tgpu));
     }
@@ -910,7 +908,7 @@ void CBAInferFusionDriver<Tgpu, Tref>::runGPUBatchNormActivInference()
     miopenError = miopenCompileFusionPlan(GetHandle(), fusePlanDesc);
     if(miopenError != miopenStatusSuccess)
     {
-        MIOPEN_THROW(miopenStatusNotImplemented, "BatchNormActivInference plan not supported");
+        DRIVER_THROW("BatchNormActivInference plan not supported");
     }
 
     size_t workspace_size = 0;
@@ -1006,7 +1004,7 @@ void CBAInferFusionDriver<Tgpu, Tref>::runGPUConvBatchNormActivInference()
     miopenError = miopenCompileFusionPlan(GetHandle(), fusePlanDesc);
     if(miopenError != miopenStatusSuccess)
     {
-        MIOPEN_THROW(miopenStatusNotImplemented, plan_error_str + " plan not supported");
+        DRIVER_THROW(plan_error_str + " plan not supported");
     }
 
     size_t workspace_size = 0;
@@ -1067,8 +1065,7 @@ void CBAInferFusionDriver<Tgpu, Tref>::runGPUConvActivInference()
     miopenError = miopenCompileFusionPlan(GetHandle(), fusePlanDesc);
     if(miopenError != miopenStatusSuccess)
     {
-        MIOPEN_THROW(miopenStatusNotImplemented,
-                     bias_mode ? "ConvBiasActivInference plan not supported"
+        DRIVER_THROW(bias_mode ? "ConvBiasActivInference plan not supported"
                                : "ConvActivInference plan not supported");
     }
 
@@ -1287,14 +1284,24 @@ void CBAInferFusionDriver<Tgpu, Tref>::runCPUConvFwdInference()
     in_local_host.data  = in_host;
     wei_local_host.data = wei_host;
     outhost_local_host.data.resize(outhost_local_host.desc.GetElementSpace());
-    cpu_convolution_forward(miopen::deref(convDesc).GetSpatialDimension(),
+    int conv_sdim = 0;
+    miopenGetConvolutionSpatialDim(convDesc, &conv_sdim);
+    std::vector<int> conv_pads(conv_sdim), conv_strides(conv_sdim), conv_dilations(conv_sdim);
+    miopenConvolutionMode_t conv_cmode;
+    int conv_actualDim;
+    miopenGetConvolutionNdDescriptor(convDesc, conv_sdim, &conv_actualDim,
+                                     conv_pads.data(), conv_strides.data(),
+                                     conv_dilations.data(), &conv_cmode);
+    int conv_groupCount = 0;
+    miopenGetConvolutionGroupCount(convDesc, &conv_groupCount);
+    cpu_convolution_forward(conv_sdim,
                             in_local_host,
                             wei_local_host,
                             outhost_local_host,
-                            miopen::deref(convDesc).GetConvPads(),
-                            miopen::deref(convDesc).GetConvStrides(),
-                            miopen::deref(convDesc).GetConvDilations(),
-                            miopen::deref(convDesc).GetGroupCount());
+                            conv_pads,
+                            conv_strides,
+                            conv_dilations,
+                            conv_groupCount);
 
     if constexpr(!std::is_same_v<Tgpu, Tref>)
     {
@@ -1307,8 +1314,8 @@ void CBAInferFusionDriver<Tgpu, Tref>::runCPUConvFwdInference()
 
     if(bias_mode)
     {
-        tensor<Tref> bias_local_host(miopen::deref(biasTensor).GetLengths(),
-                                     miopen::deref(biasTensor).GetStrides());
+        tensor<Tref> bias_local_host(driver_tensor::GetLengths(biasTensor),
+                                     driver_tensor::GetStrides(biasTensor));
         bias_local_host.data = bias_host;
         cpu_bias_forward(outhost_local_host, bias_local_host);
     }
@@ -1364,8 +1371,7 @@ void CBAInferFusionDriver<Tgpu, Tref>::runCPUBNFwdInference()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
-                     "Bad batch normalization mode in host kernel selection");
+        DRIVER_THROW("Bad batch normalization mode in host kernel selection");
     }
     // C+N mode so we are done
     if(fusion_mode == miopen_fusion_cn)

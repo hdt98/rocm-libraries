@@ -33,7 +33,7 @@
 #include <cfloat>
 #include <vector>
 
-#include <miopen/par_for.hpp>
+#include "driver_ford.hpp"
 
 #define NEGATIVE_CUTOFF_VAL (-1e20)
 
@@ -314,8 +314,8 @@ void launchCTCLoss(const int class_sz,
     {
         if(parallel)
         {
-            miopen::par_for(time_batch_task_count,
-                            miopen::max_threads{time_batch_thread_count},
+            driver_ford::par_for(time_batch_task_count,
+                                time_batch_thread_count,
                             [&](std::size_t tb) {
                                 subvec_logsoftmax_gpu(&(probs[0]),
                                                       &(workspace_gpu[problog_offset]),
@@ -378,7 +378,7 @@ void launchCTCLoss(const int class_sz,
 
     if(parallel)
     {
-        miopen::par_for(batch_size, miopen::max_threads{batch_thread_count}, work_per_batch);
+        driver_ford::par_for(batch_size, batch_thread_count, work_per_batch);
     }
     else
     {

@@ -29,6 +29,7 @@
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include "random.hpp"
 #include <algorithm>
@@ -52,8 +53,8 @@ int32_t mloRoPEForwardRunHost(miopenTensorDescriptor_t xDesc,
                               Tgpu* sin,
                               Tcheck* yhost)
 {
-    auto x_dims   = miopen::deref(xDesc).GetLengths();
-    auto cos_dims = miopen::deref(cosDesc).GetLengths();
+    auto x_dims   = driver_tensor::GetLengths(xDesc);
+    auto cos_dims = driver_tensor::GetLengths(cosDesc);
     auto input_numel =
         std::accumulate(x_dims.begin(), x_dims.end(), 1LL, std::multiplies<int64_t>());
     auto rotary_numel =
@@ -89,10 +90,10 @@ int32_t mloRoPEBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                Tgpu* sin,
                                Tcheck* dxhost)
 {
-    auto dy_dims = miopen::deref(dyDesc).GetLengths();
+    auto dy_dims = driver_tensor::GetLengths(dyDesc);
     auto input_numel =
         std::accumulate(dy_dims.begin(), dy_dims.end(), 1LL, std::multiplies<int64_t>());
-    auto cos_dims = miopen::deref(cosDesc).GetLengths();
+    auto cos_dims = driver_tensor::GetLengths(cosDesc);
     auto rotary_numel =
         std::accumulate(cos_dims.begin(), cos_dims.end(), 1LL, std::multiplies<int64_t>());
 
@@ -200,16 +201,16 @@ int RoPEDriver<Tgpu, Tref>::GetandSetData()
     std::vector<uint64_t> rotary_dim = {in_len[1], in_len[2], in_len[3]};
 
     if(SetTensorNd(x_dyDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(cosDesc, rotary_dim, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting cos tensor.");
+        DRIVER_THROW("Error setting cos tensor.");
 
     if(SetTensorNd(sinDesc, rotary_dim, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting sin tensor.");
+        DRIVER_THROW("Error setting sin tensor.");
 
     if(SetTensorNd(y_dxDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        DRIVER_THROW("Error setting output tensor.");
 
     return 0;
 }

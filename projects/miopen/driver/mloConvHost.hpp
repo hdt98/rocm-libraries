@@ -27,7 +27,9 @@
 #ifndef MLO_CONVHOST_H_
 #define MLO_CONVHOST_H_
 
-#include <miopen/tensor.hpp>
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
+
 
 #include <cmath>
 #include <iostream>
@@ -898,21 +900,22 @@ bool mloVerify(const miopenTensorDescriptor_t& cpu_,
                bool check_ulps,
                double& report_err)
 {
-    const auto& cpu = miopen::deref(cpu_);
-    const auto& gpu = miopen::deref(gpu_);
+    const auto cpu_lens    = driver_tensor::GetLengths(cpu_);
+    const auto cpu_strides = driver_tensor::GetStrides(cpu_);
+    const auto gpu_strides = driver_tensor::GetStrides(gpu_);
 
-    const auto spatial_dim = cpu.GetLengths().size() - 2;
+    const auto spatial_dim = cpu_lens.size() - 2;
 
     size_t n_batchs, n_channels, depth, height, width;
     size_t c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride;
     size_t g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride;
 
     std::tie(n_batchs, n_channels, depth, height, width) =
-        miopen::GetNCDHW(spatial_dim, cpu.GetLengths());
+        driver_tensor::GetNCDHW(spatial_dim, cpu_lens);
     std::tie(c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride) =
-        miopen::GetNCDHW(spatial_dim, cpu.GetStrides());
+        driver_tensor::GetNCDHW(spatial_dim, cpu_strides);
     std::tie(g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride) =
-        miopen::GetNCDHW(spatial_dim, gpu.GetStrides());
+        driver_tensor::GetNCDHW(spatial_dim, gpu_strides);
 
     bool match          = true;
     double rms_accum    = 0.0;
@@ -1050,21 +1053,22 @@ bool mloVerify_mt(const miopenTensorDescriptor_t& cpu_,
                   bool check_ulps,
                   double& report_err)
 {
-    const auto& cpu = miopen::deref(cpu_);
-    const auto& gpu = miopen::deref(gpu_);
+    const auto cpu_lens    = driver_tensor::GetLengths(cpu_);
+    const auto cpu_strides = driver_tensor::GetStrides(cpu_);
+    const auto gpu_strides = driver_tensor::GetStrides(gpu_);
 
-    const auto spatial_dim = cpu.GetLengths().size() - 2;
+    const auto spatial_dim = cpu_lens.size() - 2;
 
     size_t n_batchs, n_channels, depth, height, width;
     size_t c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride;
     size_t g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride;
 
     std::tie(n_batchs, n_channels, depth, height, width) =
-        miopen::GetNCDHW(spatial_dim, cpu.GetLengths());
+        driver_tensor::GetNCDHW(spatial_dim, cpu_lens);
     std::tie(c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride) =
-        miopen::GetNCDHW(spatial_dim, cpu.GetStrides());
+        driver_tensor::GetNCDHW(spatial_dim, cpu_strides);
     std::tie(g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride) =
-        miopen::GetNCDHW(spatial_dim, gpu.GetStrides());
+        driver_tensor::GetNCDHW(spatial_dim, gpu_strides);
 
     double rms_accum    = 0.0;
     Tcheck_ worst_c_val = static_cast<Tcheck_>(0);
@@ -1073,7 +1077,7 @@ bool mloVerify_mt(const miopenTensorDescriptor_t& cpu_,
     size_t worst_b = 0, worst_c = 0, worst_i = 0, worst_j = 0, worst_k = 0;
 
     std::mutex mt;
-    miopen::par_ford(n_batchs, n_channels)([&](int b, int c) {
+    driver_ford::par_ford(n_batchs, n_channels)([&](int b, int c) {
         double rms_local          = 0.0;
         Tcheck_ worst_c_val_local = static_cast<Tcheck_>(0);
         Tcheck_ worst_g_val_local = static_cast<Tcheck_>(0);
@@ -1147,7 +1151,7 @@ bool mloVerify_mt(const miopenTensorDescriptor_t& cpu_,
     if(check_ulps)
     {
         std::atomic_bool match = true;
-        miopen::par_ford(n_batchs, n_channels)([&](int b, int c) {
+        driver_ford::par_ford(n_batchs, n_channels)([&](int b, int c) {
             for(size_t k = 0; k < depth && match; ++k)
             {
                 for(size_t j = 0; j < height && match; ++j)

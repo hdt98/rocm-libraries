@@ -32,6 +32,8 @@
 #include "driver.hpp"
 #include "random.hpp"
 #include "tensor_driver.hpp"
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include <algorithm>
 #include <cfloat>
@@ -55,7 +57,7 @@ int32_t mloAddLayerNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                       miopenNormMode_t mode,
                                       bool use_multithread)
 {
-    auto dims         = miopen::deref(inputDesc).GetLengths();
+    auto dims         = driver_tensor::GetLengths(inputDesc);
     size_t outer_size = 1;
     size_t inner_size = 1;
     size_t norm_dim   = static_cast<size_t>(normalized_dim);
@@ -71,7 +73,7 @@ int32_t mloAddLayerNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
     int32_t ret      = 0;
     size_t min_grain = use_multithread ? 8 : outer_size;
 
-    miopen::par_for(outer_size, min_grain, [&](int32_t o) {
+    driver_ford::par_for(outer_size, min_grain, [&](int32_t o) {
         Tcheck pmean = 0.0f;
         Tcheck pvar  = 0.0f;
         for(int32_t i = 0; i < inner_size; i++)
@@ -214,7 +216,7 @@ int AddLayerNormDriver<Tgpu, Tref>::GetandSetData()
 
     dim = inflags.GetValueInt("normalized_dim");
 
-    MIOPEN_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
+    DRIVER_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
                     "normalized_dim out of range");
 
     std::vector<int> inner_len;
@@ -230,25 +232,25 @@ int AddLayerNormDriver<Tgpu, Tref>::GetandSetData()
         outer_len = {in_len.begin(), in_len.end() - (in_len.size() - dim)};
 
     if(SetTensorNd(inputDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(input2Desc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input2 tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input2 tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(weightDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting weight tensor.");
+        DRIVER_THROW("Error setting weight tensor.");
 
     if(SetTensorNd(biasDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting bias tensor.");
+        DRIVER_THROW("Error setting bias tensor.");
 
     if(SetTensorNd(outputDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting doutput tensor.");
+        DRIVER_THROW("Error setting doutput tensor.");
 
     if(SetTensorNd(meanDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting mean tensor.");
+        DRIVER_THROW("Error setting mean tensor.");
 
     if(SetTensorNd(rstdDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting rstd tensor.");
+        DRIVER_THROW("Error setting rstd tensor.");
 
     eps  = static_cast<double>(inflags.GetValueDouble("eps"));
     mode = miopenNormMode_t(inflags.GetValueInt("mode"));

@@ -33,6 +33,7 @@
 #include <cfloat>
 #include <vector>
 #include "ctc_gpu_emulator.hpp"
+#include "driver_ford.hpp"
 
 #define NEGATIVE_CUTOFF_VAL (-1e20)
 
@@ -482,7 +483,7 @@ void RunCTCLossCPUVerify(const int num_class,
 
         if(parallel)
         {
-            miopen::par_for(batch_size, per_batch_work);
+            driver_ford::par_for(batch_size, per_batch_work);
         }
         else
         {

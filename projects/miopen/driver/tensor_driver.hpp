@@ -28,14 +28,62 @@
 
 #define UNPACK_VEC4(v) (v[0]), (v[1]), (v[2]), (v[3])
 
+#include "driver_errors.hpp"
+#include "driver_tensor.hpp"
+
 #include <algorithm>
 #include <iterator>
+#include <map>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
-#include <miopen/tensor_extra.hpp>
-#include <miopen/tensor_layout.hpp>
 #include <numeric>
+#include <string>
 #include <vector>
+
+// Local replacements for miopen::tensor_layout_get_default and
+// miopen::tensor_layout_to_strides (originally from miopen/tensor_layout.hpp).
+namespace driver_layout {
+
+inline std::string tensor_layout_get_default(unsigned size)
+{
+    if(size == 4)
+        return "NCHW";
+    if(size == 5)
+        return "NCDHW";
+    return "";
+}
+
+template <typename T>
+void tensor_layout_to_strides(const std::vector<T>& len,
+                              const std::string& len_layout,
+                              const std::string& layout,
+                              std::vector<T>& strides)
+{
+    std::map<char, T> dim_to_len;
+    std::transform(len.begin(),
+                   len.end(),
+                   len_layout.begin(),
+                   std::inserter(dim_to_len, dim_to_len.end()),
+                   [](T l, char dim) { return std::make_pair(dim, l); });
+
+    std::transform(len_layout.begin(),
+                   len_layout.end(),
+                   std::back_inserter(strides),
+                   [&layout, &dim_to_len](char cur_layout_char) {
+                       auto pos = layout.find(cur_layout_char);
+                       if(pos == std::string::npos)
+                       {
+                           DRIVER_THROW(std::string("mismatched layout string - ").append(layout));
+                       }
+                       return std::accumulate(layout.begin() + pos + 1,
+                                              layout.end(),
+                                              static_cast<T>(1),
+                                              [&dim_to_len](T accumulator, char l) {
+                                                  return accumulator * dim_to_len[l];
+                                              });
+                   });
+}
+
+} // namespace driver_layout
 
 inline miopenTensorLayout_t StringToLayoutType(std::string layout_str)
 {
@@ -66,7 +114,7 @@ inline miopenTensorLayout_t StringToLayoutType(std::string layout_str)
     }
     else
     {
-        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
+        DRIVER_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
                      "vectorized tensor layout.");
         return default_layout;
     }
@@ -86,73 +134,17 @@ inline void LengthReorder(std::vector<int>& lens, const std::initializer_list<in
 
 inline std::size_t GetTensorVectorLength(const miopenTensorDescriptor_t& tensor)
 {
-    std::size_t vectorLength;
-
-    int size = 0;
-    miopenGetTensorDescriptorSize(tensor, &size);
-
-    miopenGetNdTensorDescriptorVectorLength(tensor, &vectorLength);
-    return vectorLength;
+    return driver_tensor::GetVectorLength(tensor);
 }
 
 inline std::vector<int> GetTensorLengths(const miopenTensorDescriptor_t& tensor)
 {
-    int n;
-    int c;
-    int h;
-    int w;
-    int d;
-
-    int size = 0;
-    miopenGetTensorDescriptorSize(tensor, &size);
-
-    if(size == 5)
-    {
-        miopenGet5dTensorDescriptorLengths(tensor, &n, &c, &d, &h, &w);
-        return std::vector<int>({n, c, d, h, w});
-    }
-    else if(size == 4)
-    {
-        miopenGet4dTensorDescriptorLengths(tensor, &n, &c, &h, &w);
-        return std::vector<int>({n, c, h, w});
-    }
-
-    std::vector<int> tensor_len;
-    tensor_len.resize(miopen::deref(tensor).GetNumDims());
-    miopenGetTensorDescriptor(tensor, nullptr, tensor_len.data(), nullptr);
-
-    return tensor_len;
+    return driver_tensor::GetLengths(tensor);
 }
 
 inline std::vector<int> GetTensorStrides(const miopenTensorDescriptor_t& tensor)
 {
-    int nstride;
-    int cstride;
-    int dstride;
-    int hstride;
-    int wstride;
-
-    int size = 0;
-    miopenGetTensorDescriptorSize(tensor, &size);
-
-    if(size == 5)
-    {
-        miopenGet5dTensorDescriptorStrides(
-            tensor, &nstride, &cstride, &dstride, &hstride, &wstride);
-        return std::vector<int>({nstride, cstride, dstride, hstride, wstride});
-    }
-    else if(size == 4)
-    {
-        miopenGet4dTensorDescriptorStrides(tensor, &nstride, &cstride, &hstride, &wstride);
-        return std::vector<int>({nstride, cstride, hstride, wstride});
-    }
-
-    std::vector<int> tensor_strides;
-    tensor_strides.resize(miopen::deref(tensor).GetNumDims());
-
-    miopenGetTensorDescriptor(tensor, nullptr, nullptr, tensor_strides.data());
-
-    return tensor_strides;
+    return driver_tensor::GetStrides(tensor);
 }
 
 inline int SetTensor4d(miopenTensorDescriptor_t t,
@@ -178,7 +170,7 @@ inline int SetTensorNdVector(miopenTensorDescriptor_t t,
     }
     else
     {
-        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
+        DRIVER_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
                      "vectorized tensor layout.");
         return -1;
     }
@@ -227,7 +219,7 @@ inline int SetTensorNd(miopenTensorDescriptor_t t,
 
     if(layout.size() != len.size() && layout.find('c') == std::string::npos)
     {
-        MIOPEN_THROW("unmatched layout and dimension size");
+        DRIVER_THROW("unmatched layout and dimension size");
     }
 
     if(layout.find('c') != std::string::npos)
@@ -236,7 +228,7 @@ inline int SetTensorNd(miopenTensorDescriptor_t t,
     }
 
     // Dimension lengths vector 'len' comes with a default layout.
-    std::string len_layout = miopen::tensor_layout_get_default(layout.size());
+    std::string len_layout = driver_layout::tensor_layout_get_default(layout.size());
     if(len_layout.empty())
     {
         return SetTensorNd(t, len, data_type);
@@ -244,7 +236,7 @@ inline int SetTensorNd(miopenTensorDescriptor_t t,
 
     std::vector<std::size_t> strides2;
     std::vector<std::size_t> len2(len.cbegin(), len.cend());
-    miopen::tensor_layout_to_strides(len2, len_layout, layout, strides2);
+    driver_layout::tensor_layout_to_strides(len2, len_layout, layout, strides2);
     return SetTensorNd(t, len2, strides2, data_type);
 }
 
@@ -254,7 +246,7 @@ inline int SetTensorNd(miopenTensorDescriptor_t t,
 // The implementation is a copy-paste from miopen::TensorDescriptor.
 inline size_t GetTensorSize(const miopenTensorDescriptor_t& tensor)
 {
-    assert(miopen::deref(tensor).IsPacked() &&
+    assert(driver_tensor::IsPacked(tensor) &&
            "GetTensorSize should not be used on an unpacked tensor.");
     const auto len            = GetTensorLengths(tensor);
     const size_t vectorLength = GetTensorVectorLength(tensor);
@@ -268,7 +260,7 @@ inline size_t GetTensorSize(const miopenTensorDescriptor_t& tensor)
 // GetTensorSize. Unless, of course, there is absolutely zero chance to receive an unpacked tensor.
 inline size_t GetTensorSpace(const miopenTensorDescriptor_t& tensor)
 {
-    return miopen::deref(tensor).GetElementSpace();
+    return driver_tensor::GetElementSpace(tensor);
 }
 
 #endif // GUARD_MIOPEN_TENSOR_DRIVER_HPP

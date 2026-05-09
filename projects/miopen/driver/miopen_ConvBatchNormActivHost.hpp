@@ -28,11 +28,9 @@
 #define MIO_CONV_BATCHNORM_ACTIV_HOST_H_
 
 #include "mloNeuronHost.hpp"
+#include "driver_tensor.hpp"
 
-#include <miopen/convolution.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
-#include <miopen/tensor_extra.hpp>
 
 #include <cmath>
 #include <iomanip>
@@ -47,14 +45,13 @@ int miopenBNSpatialFwdInferHost(miopenTensorDescriptor_t& inputTensor,
                                 const Tgpu* estimatedMean,
                                 const Tgpu* estimatedVariance)
 {
-    int nIn, cIn, hIn, wIn;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
-    const auto tensorLayout = miopen::deref(inputTensor).GetLayout_t();
+    auto in_lens = driver_tensor::GetLengths(inputTensor);
+    const auto tensorLayout = driver_tensor::GetLayout(inputTensor);
 
-    int n_batchs = nIn;
-    int channels = cIn;
-    int height   = hIn;
-    int width    = wIn;
+    int n_batchs = in_lens[0];
+    int channels = in_lens[1];
+    int height   = in_lens[2];
+    int width    = in_lens[3];
 
     unsigned int index;
     unsigned int adjIndex;
@@ -104,14 +101,13 @@ int miopenBNPerActivFwdInferHost(miopenTensorDescriptor_t& inputTensor,
                                  const Tgpu* estimatedVariance)
 { // use running mean and variance
 
-    int nIn, cIn, hIn, wIn;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
-    const auto tensorLayout = miopen::deref(inputTensor).GetLayout_t();
+    auto in_lens2 = driver_tensor::GetLengths(inputTensor);
+    const auto tensorLayout = driver_tensor::GetLayout(inputTensor);
 
-    int n_batchs = nIn;
-    int channels = cIn;
-    int height   = hIn;
-    int width    = wIn;
+    int n_batchs = in_lens2[0];
+    int channels = in_lens2[1];
+    int height   = in_lens2[2];
+    int width    = in_lens2[3];
 
     // C*H*W is also stored as in_nstride, H*W is in_cstride, W is in_hstride.
     unsigned int index;
@@ -242,138 +238,6 @@ int miopenInferVerify(size_t size, const Tref* c_res, const Tgpu* top_ptr, Tref 
     }
 
     return (match);
-}
-
-template <typename Tgpu, typename Tref>
-int ConvForwardCPU(const std::vector<Tref>& in,
-                   std::vector<Tref>& outhost,
-                   const std::vector<Tgpu>& wei,
-                   const std::vector<Tgpu>& b,
-                   const int bias,
-                   miopenConvolutionDescriptor_t& convDesc,
-                   miopenTensorDescriptor_t& inputTensor,
-                   miopenTensorDescriptor_t& weightTensor,
-                   miopenTensorDescriptor_t& outputTensor)
-{
-
-    int in_n, in_c, in_h, in_w;
-    int in_nstride, in_cstride, in_hstride, in_wstride;
-    miopenDataType_t dt;
-    miopenGet4dTensorDescriptor(inputTensor,
-                                &dt,
-                                &in_n,
-                                &in_c,
-                                &in_h,
-                                &in_w,
-                                &in_nstride,
-                                &in_cstride,
-                                &in_hstride,
-                                &in_wstride);
-
-    int wei_n, wei_c, wei_h, wei_w;
-    int wei_nstride, wei_cstride, wei_hstride, wei_wstride;
-
-    miopenGet4dTensorDescriptor(weightTensor,
-                                &dt,
-                                &wei_n,
-                                &wei_c,
-                                &wei_h,
-                                &wei_w,
-                                &wei_nstride,
-                                &wei_cstride,
-                                &wei_hstride,
-                                &wei_wstride);
-
-    int out_n, out_c, out_h, out_w;
-    int out_nstride, out_cstride, out_hstride, out_wstride;
-    miopenGet4dTensorDescriptor(outputTensor,
-                                &dt,
-                                &out_n,
-                                &out_c,
-                                &out_h,
-                                &out_w,
-                                &out_nstride,
-                                &out_cstride,
-                                &out_hstride,
-                                &out_wstride);
-
-    int stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w;
-    miopenConvolutionMode_t mode;
-    miopenPaddingMode_t pmode = miopen::deref(convDesc).paddingMode;
-    miopenGetConvolutionDescriptor(
-        convDesc, &mode, &pad_h, &pad_w, &stride_h, &stride_w, &dilation_h, &dilation_w);
-
-    if(pmode == miopenPaddingSame)
-    {
-        pad_h = (in_h % stride_h == 0) ? (std::max((wei_h - stride_h), 0))
-                                       : (std::max((wei_h - (in_h % stride_h)), 0));
-        pad_w = (in_w % stride_w == 0) ? (std::max((wei_w - stride_w), 0))
-                                       : (std::max((wei_w - (in_w % stride_w)), 0));
-        pad_h /= 2;
-        pad_w /= 2;
-    }
-    else if(pmode == miopenPaddingValid)
-    {
-        pad_h = 0;
-        pad_w = 0;
-    }
-
-    if(out_h <= 0 || out_w <= 0)
-        throw std::runtime_error("Invalid Test Case: Check Output Dimension.");
-
-    miopenGet4dTensorDescriptor(weightTensor,
-                                &dt,
-                                &wei_n,
-                                &wei_c,
-                                &wei_h,
-                                &wei_w,
-                                &wei_nstride,
-                                &wei_cstride,
-                                &wei_hstride,
-                                &wei_wstride);
-
-    for(int o = 0; o < out_n; o++)
-    { // mini-batch size
-        for(int w = 0; w < out_c; w++)
-        { // out_channels (num filters)
-            for(int i = 0; i < out_h; i++)
-            { // output_height (from getforwardoutputdim())
-                int in_off_h = i * stride_h;
-                for(int j = 0; j < out_w; j++)
-                { // output_width (from getforwardoutputdim())
-                    Tgpu acc     = static_cast<Tgpu>(0.);
-                    int in_off_w = j * stride_w;
-                    for(int k = 0; k < in_c; k++)
-                    { // in_channels (RGB)
-                        for(int x = 0; x < wei_h; x++)
-                        {
-                            int in_x = in_off_h - pad_h + x * dilation_h;
-                            if(in_x >= 0 && in_x < in_h)
-                            {
-                                for(int y = 0; y < wei_w; y++)
-                                {
-                                    int in_y = in_off_w - pad_w + y * dilation_w;
-                                    if(in_y >= 0 && in_y < in_w)
-                                    {
-                                        acc += static_cast<Tgpu>(in.at(o * in_nstride +
-                                                                       k * in_cstride +
-                                                                       in_x * in_w + in_y)) *
-                                               static_cast<Tgpu>(wei.at(w * wei_nstride +
-                                                                        k * wei_cstride +
-                                                                        x * wei_hstride + y));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    acc = bias != 0 ? acc + static_cast<Tgpu>(b[w]) : acc;
-                    outhost[o * out_nstride + w * out_cstride + i * out_hstride + j] = acc;
-                }
-            }
-        }
-    }
-
-    return 0;
 }
 
 #endif

@@ -27,17 +27,18 @@
 
 #include "InputFlags.hpp"
 #include "driver.hpp"
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
 #include "tensor_driver.hpp"
 #include "timer.hpp"
 #include "random.hpp"
+#include "driver_tensor_view.hpp"
 #include <cstdlib>
 #include <memory>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <vector>
 #include <../test/tensor_holder.hpp>
 #include <../test/verify.hpp>
-#include <miopen/tensor_view_utils.hpp>
 
 template <typename Tgpu, typename Tcheck>
 int32_t mloSoftMarginLossForwardRunHost(miopenTensorDescriptor_t inputDesc,
@@ -48,10 +49,10 @@ int32_t mloSoftMarginLossForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                         Tcheck* outputhost,
                                         miopenLossReductionMode_t reduction_mode)
 {
-    auto input_numel = miopen::deref(inputDesc).GetElementSize();
-    auto i_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
-    auto t_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(targetDesc));
-    auto o_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(outputDesc));
+    auto input_numel = driver_tensor::GetElementSize(inputDesc);
+    auto i_tv        = get_inner_expanded_tv<5>(inputDesc);
+    auto t_tv        = get_inner_expanded_tv<5>(targetDesc);
+    auto o_tv        = get_inner_expanded_tv<5>(outputDesc);
 
     int32_t ret = miopenStatusSuccess;
 
@@ -86,15 +87,15 @@ int32_t mloSoftMarginLossBackwardRunHost(miopenTensorDescriptor_t inputDesc,
                                          Tcheck* dIhost,
                                          miopenLossReductionMode_t reduction_mode)
 {
-    auto input_numel = miopen::deref(inputDesc).GetElementSize();
-    auto i_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
-    auto t_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(targetDesc));
-    auto dO_tv       = miopen::get_inner_expanded_tv<5>(miopen::deref(dODesc));
-    auto dI_tv       = miopen::get_inner_expanded_tv<5>(miopen::deref(dIDesc));
+    auto input_numel = driver_tensor::GetElementSize(inputDesc);
+    auto i_tv        = get_inner_expanded_tv<5>(inputDesc);
+    auto t_tv        = get_inner_expanded_tv<5>(targetDesc);
+    auto dO_tv       = get_inner_expanded_tv<5>(dODesc);
+    auto dI_tv       = get_inner_expanded_tv<5>(dIDesc);
 
     int32_t ret = miopenStatusSuccess;
 
-    miopen::par_ford(input_numel)([&](size_t gid) {
+    driver_ford::par_ford(input_numel)([&](size_t gid) {
         tensor_layout_t<5> idx(i_tv, gid);
         double i   = input[i_tv.get_tensor_view_idx(idx)];
         double t   = target[t_tv.get_tensor_view_idx(idx)];
@@ -412,7 +413,7 @@ int SoftMarginLossDriver<Tgpu, Tref>::RunForwardGPU()
             (workspace_dev == nullptr) ? nullptr : workspace_dev->GetMem(),
             ws_sizeInBytes);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossForward");
+        DRIVER_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossForward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);
@@ -478,7 +479,7 @@ int SoftMarginLossDriver<Tgpu, Tref>::RunBackwardGPU()
                                                              dI_dev->GetMem(),
                                                              reduction_mode);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossBackward");
+        DRIVER_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossBackward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);

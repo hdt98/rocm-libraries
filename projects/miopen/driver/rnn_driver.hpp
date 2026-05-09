@@ -38,9 +38,8 @@
 
 #include <../test/verify.hpp>
 
-#include <miopen/errors.hpp>
+#include "driver_errors.hpp"
 #include <miopen/miopen.h>
-#include <miopen/rnn.hpp>
 #include <miopen/tensor.hpp>
 
 #include <algorithm>
@@ -407,7 +406,7 @@ int RNNDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect RNN Mode");
+        DRIVER_THROW("Incorrect RNN Mode");
     }
 
     miopenRNNBiasMode_t biasMode;
@@ -421,7 +420,7 @@ int RNNDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect bias Mode");
+        DRIVER_THROW("Incorrect bias Mode");
     }
 
     miopenRNNDirectionMode_t directionMode;
@@ -435,7 +434,7 @@ int RNNDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect direction Mode");
+        DRIVER_THROW("Incorrect direction Mode");
     }
 
     miopenRNNInputMode_t inMode;
@@ -449,7 +448,7 @@ int RNNDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect input Mode");
+        DRIVER_THROW("Incorrect input Mode");
     }
 
     miopenRNNAlgo_t algo;
@@ -467,7 +466,7 @@ int RNNDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect RNN algorithm");
+        DRIVER_THROW("Incorrect RNN algorithm");
     }
 
     if(inflags.GetValueInt("use_dropout"))
@@ -773,10 +772,8 @@ int RNNDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
 
 #include <array>
 #include <initializer_list>
-#include <miopen/errors.hpp>
-#include <miopen/logger.hpp>
+#include "driver_errors.hpp"
 #include <miopen/tensor.hpp>
-#include <miopen/tensor_ops.hpp>
 
 template <typename Tgpu, typename Tref>
 int RNNDriver<Tgpu, Tref>::RunForwardGPU()
@@ -859,7 +856,7 @@ int RNNDriver<Tgpu, Tref>::RunForwardGPU()
         time_logger.StopAndPush();
     }
 
-    miopen::deref(GetHandle()).Finish();
+    (void)hipStreamSynchronize(GetStream());
     if(inflags.GetValueInt("time") == 1)
     {
         printf("Forward RNN time results:\n");
@@ -1135,7 +1132,7 @@ int RNNDriver<Tgpu, Tref>::RunBackwardGPU()
             time_logger.StopAndPush();
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         if(inflags.GetValueInt("time") == 1)
         {
             printf("Backward Data RNN time results:\n");
@@ -1175,7 +1172,7 @@ int RNNDriver<Tgpu, Tref>::RunBackwardGPU()
                                            reservespace_dev->GetSize());
             time_logger.StopAndPush();
         }
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
 
         if(inflags.GetValueInt("time") == 1)
         {

@@ -8,19 +8,20 @@
 #include "driver.hpp"
 #include "random.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
+#include "driver_utils.hpp"
 #include "timer.hpp"
 #include <algorithm>
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
 #include <miopen/miopen.h>
-#include <miopen/float_equal.hpp>
 #include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 #include <../test/tensor_holder.hpp>
 #include <../test/verify.hpp>
-#include <miopen/ford.hpp>
+#include "driver_ford.hpp"
 
 #ifndef MLO_CATHOST_H_
 #define MLO_CATHOST_H_
@@ -33,7 +34,7 @@ int32_t mloCatForwardRunHost(const std::vector<miopenTensorDescriptor_t>& inputD
                              uint32_t dim,
                              bool multi_threaded)
 {
-    const auto& shape            = miopen::deref(outputDesc).GetLengths();
+    const auto shape              = driver_tensor::GetLengths(outputDesc);
     const size_t output_dim_size = shape[dim];
     size_t outer_size            = 1;
     size_t inner_size            = 1;
@@ -61,19 +62,19 @@ int32_t mloCatForwardRunHost(const std::vector<miopenTensorDescriptor_t>& inputD
     copy_sizes.reserve(n);
     output_start_offsets.reserve(n);
 
-    copy_sizes.emplace_back(inner_size * miopen::deref(inputDescs[0]).GetLengths()[dim]);
+    copy_sizes.emplace_back(inner_size * driver_tensor::GetLengths(inputDescs[0])[dim]);
     output_start_offsets.emplace_back(0);
 
     for(size_t i{1}; i < n; ++i)
     {
-        const size_t dim_size = miopen::deref(inputDescs[i]).GetLengths()[dim];
+        const size_t dim_size = driver_tensor::GetLengths(inputDescs[i])[dim];
 
         output_start_offsets.emplace_back(output_start_offsets.back() + copy_sizes.back());
         copy_sizes.emplace_back(inner_size * dim_size);
     }
     /////////////////////////////////////////////////////////////////////////////////////////////
 
-    miopen::par_for(n, min_grain, [&](size_t i) {
+    driver_ford::par_for(n, min_grain, [&](size_t i) {
         const auto input                = inputs[i];
         const size_t copy_size          = copy_sizes[i];
         const size_t copy_size_in_bytes = copy_size * sizeof(*outputhost);
@@ -335,7 +336,7 @@ int CatDriver<Tgpu, Tref>::VerifyForward()
     const auto error     = miopen::rms_range(outhost, out);
     const char* pRefType = use_multithread ? "multi-threaded" : "single-threaded";
 
-    if(!std::isfinite(error) || !miopen::float_equal_sentinel(error, 0))
+    if(!std::isfinite(error) || !driver_utils::float_equal_sentinel(error, 0))
     {
         std::cout << "Forward Cat FAILED against " << pRefType << " CPU reference: " << error
                   << " > 0" << std::endl;

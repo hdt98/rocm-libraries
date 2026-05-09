@@ -29,6 +29,7 @@
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include "random.hpp"
 #include <algorithm>
@@ -58,12 +59,12 @@ int32_t mloReduceExtremeForwardRunHost(miopenTensorDescriptor_t xDesc,
                                        int32_t* indicehost,
                                        int32_t dim)
 {
-    auto x_dims = miopen::deref(xDesc).GetLengths();
-    std::vector<std::size_t> indice_dims;
+    auto x_dims = driver_tensor::GetLengths(xDesc);
+    std::vector<int> indice_dims;
     if(yhost)
-        indice_dims = miopen::deref(yDesc).GetLengths();
+        indice_dims = driver_tensor::GetLengths(yDesc);
     else
-        indice_dims = miopen::deref(indiceDesc).GetLengths();
+        indice_dims = driver_tensor::GetLengths(indiceDesc);
 
     int32_t reduce_size = static_cast<int32_t>(x_dims[dim]);
     auto indice_numel =
@@ -208,13 +209,13 @@ int ReduceExtremeDriver<Tgpu, Tref>::GetandSetData()
         out_len.push_back(1);
 
     if(SetTensorNd(xDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing x tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing x tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(yDesc, out_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting y tensor.");
+        DRIVER_THROW("Error setting y tensor.");
 
     if(SetTensorNd(indiceDesc, out_len, indice_data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting indice tensor.");
+        DRIVER_THROW("Error setting indice tensor.");
 
     return 0;
 }

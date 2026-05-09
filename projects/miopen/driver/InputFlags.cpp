@@ -28,14 +28,32 @@
 
 #include "tensor_driver.hpp"
 
-#include <miopen/errors.hpp>
-#include <miopen/tensor.hpp>
-#include <miopen/stringutils.hpp>
+#include "driver_errors.hpp"
 
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <algorithm>
+
+namespace {
+
+// Local replacement for SplitDelim.
+// Splits a string by the given delimiter character.
+inline std::vector<std::string> SplitDelim(const std::string& in, const char delim)
+{
+    std::vector<std::string> rv;
+    std::string token;
+    std::istringstream ss(in);
+
+    while(std::getline(ss, token, delim))
+    {
+        rv.push_back(token);
+    }
+    return rv;
+}
+
+} // anonymous namespace
 
 int TensorParameters::SetTensordDescriptor(miopenTensorDescriptor_t result,
                                            miopenDataType_t data_type)
@@ -52,16 +70,16 @@ int TensorParameters::SetTensordDescriptor(miopenTensorDescriptor_t result,
 void TensorParameters::CalculateStrides()
 {
     if(layout.empty())
-        MIOPEN_THROW("Attempt to calculate strides without layout.");
+        DRIVER_THROW("Attempt to calculate strides without layout.");
     if(layout.size() != lengths.size())
-        MIOPEN_THROW("Unmatched layout and lengths sizes.");
+        DRIVER_THROW("Unmatched layout and lengths sizes.");
 
-    const auto len_layout = miopen::tensor_layout_get_default(layout.size());
+    const auto len_layout = driver_layout::tensor_layout_get_default(layout.size());
     if(len_layout.empty())
-        MIOPEN_THROW("Invalid tensor lengths dimentions.");
+        DRIVER_THROW("Invalid tensor lengths dimentions.");
 
     strides = {};
-    miopen::tensor_layout_to_strides(lengths, len_layout, layout, strides);
+    driver_layout::tensor_layout_to_strides(lengths, len_layout, layout, strides);
 }
 
 InputFlags::InputFlags() { AddInputFlag("help", 'h', "", "Print Help Message", "string"); }
@@ -145,7 +163,7 @@ char InputFlags::FindShortName(const std::string& long_name) const
     }
     if(short_name == '\0')
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Long Name: " + long_name + " Not Found!");
+        DRIVER_THROW("Long Name: " + long_name + " Not Found!");
     }
     return short_name;
 }
@@ -183,8 +201,7 @@ void InputFlags::Parse(int argc, char* argv[])
             char short_name = temp[1];
             if(MapInputs.find(short_name) == MapInputs.end())
             {
-                MIOPEN_THROW(miopenStatusBadParm,
-                             std::string("Input Flag: ") + short_name + " Not Found!");
+                DRIVER_THROW(std::string("Input Flag: ") + short_name + " Not Found!");
             }
             if(short_name == 'h')
                 Print();
@@ -252,14 +269,14 @@ double InputFlags::GetValueDouble(const std::string& long_name) const
 TensorParameters InputFlags::GetValueTensor(const std::string& long_name) const
 {
     const auto& input     = MapInputs.at(FindShortName(long_name));
-    const auto components = miopen::SplitDelim(input.value.c_str(), ',');
+    const auto components = SplitDelim(input.value.c_str(), ',');
 
     if(components.empty())
         return {};
 
     auto parse = [](const std::string& line) {
         auto ret        = std::vector<int>{};
-        const auto strs = miopen::SplitDelim(line, 'x');
+        const auto strs = SplitDelim(line, 'x');
         for(auto&& str : strs)
         {
             auto elem = int{};
@@ -267,7 +284,7 @@ TensorParameters InputFlags::GetValueTensor(const std::string& long_name) const
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                DRIVER_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }
@@ -290,20 +307,20 @@ TensorParameters InputFlags::GetValueTensor(const std::string& long_name) const
     if(components.size() == 2)
         return {lens, strides, layout};
 
-    MIOPEN_THROW("Too many tensor descriptor parameters.");
+    DRIVER_THROW("Too many tensor descriptor parameters.");
 }
 
 TensorParametersUint64 InputFlags::GetValueTensorUint64(const std::string& long_name) const
 {
     const auto& input     = MapInputs.at(FindShortName(long_name));
-    const auto components = miopen::SplitDelim(input.value.c_str(), ',');
+    const auto components = SplitDelim(input.value.c_str(), ',');
 
     if(components.size() < 1)
         return {};
 
     auto parse = [](const std::string& line) {
         auto ret        = std::vector<uint64_t>{};
-        const auto strs = miopen::SplitDelim(line, 'x');
+        const auto strs = SplitDelim(line, 'x');
         for(auto&& str : strs)
         {
             auto elem = uint64_t{};
@@ -311,7 +328,7 @@ TensorParametersUint64 InputFlags::GetValueTensorUint64(const std::string& long_
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                DRIVER_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }
@@ -334,7 +351,7 @@ TensorParametersUint64 InputFlags::GetValueTensorUint64(const std::string& long_
     if(components.size() == 2)
         return {lens, strides, layout};
 
-    MIOPEN_THROW("Too many tensor descriptor parameters.");
+    DRIVER_THROW("Too many tensor descriptor parameters.");
 }
 
 std::vector<int32_t> InputFlags::GetValueVectorInt(const std::string& long_name) const
@@ -342,7 +359,7 @@ std::vector<int32_t> InputFlags::GetValueVectorInt(const std::string& long_name)
     const auto& input = MapInputs.at(FindShortName(long_name));
 
     auto ret        = std::vector<int32_t>{};
-    const auto strs = miopen::SplitDelim(input.value.c_str(), ',');
+    const auto strs = SplitDelim(input.value.c_str(), ',');
 
     for(auto&& str : strs)
     {
@@ -351,7 +368,7 @@ std::vector<int32_t> InputFlags::GetValueVectorInt(const std::string& long_name)
         ss >> elem;
 
         if(ss.bad() || ss.fail())
-            MIOPEN_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
+            DRIVER_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
 
         ret.push_back(elem);
     }
@@ -364,7 +381,7 @@ std::vector<uint64_t> InputFlags::GetValueVectorUint64(const std::string& long_n
     const auto& input = MapInputs.at(FindShortName(long_name));
 
     auto ret        = std::vector<uint64_t>{};
-    const auto strs = miopen::SplitDelim(input.value.c_str(), ',');
+    const auto strs = SplitDelim(input.value.c_str(), ',');
 
     for(auto&& str : strs)
     {
@@ -373,7 +390,7 @@ std::vector<uint64_t> InputFlags::GetValueVectorUint64(const std::string& long_n
         ss >> elem;
 
         if(ss.bad() || ss.fail())
-            MIOPEN_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
+            DRIVER_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
 
         ret.push_back(elem);
     }
@@ -385,7 +402,7 @@ std::vector<std::vector<int32_t>>
 InputFlags::GetValue2dVectorInt(const std::string& long_name) const
 {
     const auto& input     = MapInputs.at(FindShortName(long_name));
-    const auto components = miopen::SplitDelim(input.value.c_str(), ',');
+    const auto components = SplitDelim(input.value.c_str(), ',');
     std::vector<std::vector<int32_t>> output;
 
     if(components.size() < 1)
@@ -393,7 +410,7 @@ InputFlags::GetValue2dVectorInt(const std::string& long_name) const
 
     auto parse = [](const std::string& line) {
         auto ret        = std::vector<int32_t>{};
-        const auto strs = miopen::SplitDelim(line, 'x');
+        const auto strs = SplitDelim(line, 'x');
         for(auto&& str : strs)
         {
             auto elem = int32_t{};
@@ -401,7 +418,7 @@ InputFlags::GetValue2dVectorInt(const std::string& long_name) const
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                DRIVER_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }
@@ -420,14 +437,14 @@ std::vector<std::vector<uint64_t>>
 InputFlags::GetValue2dVectorUint64(const std::string& long_name) const
 {
     const auto& input     = MapInputs.at(FindShortName(long_name));
-    const auto components = miopen::SplitDelim(input.value.c_str(), ',');
+    const auto components = SplitDelim(input.value.c_str(), ',');
 
     if(components.size() < 1)
         return {};
 
     auto parse = [](const std::string& line) {
         auto ret        = std::vector<uint64_t>{};
-        const auto strs = miopen::SplitDelim(line, 'x');
+        const auto strs = SplitDelim(line, 'x');
         for(auto&& str : strs)
         {
             auto elem = uint64_t{};
@@ -435,7 +452,7 @@ InputFlags::GetValue2dVectorUint64(const std::string& long_name) const
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                DRIVER_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }

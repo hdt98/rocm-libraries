@@ -212,7 +212,7 @@ std::vector<int> GroupNormDriver<Tgpu, Tref>::GetInputTensorLengthsFromCmdLine()
     }
     else
     {
-        MIOPEN_THROW("Error Input Tensor Lengths");
+        DRIVER_THROW("Error Input Tensor Lengths");
     }
 }
 

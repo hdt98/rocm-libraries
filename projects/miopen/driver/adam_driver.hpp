@@ -30,12 +30,13 @@
 #include "driver.hpp"
 #include "random.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
+#include "driver_utils.hpp"
 #include "timer.hpp"
 
 #include "../test/verify.hpp"
 
-#include <miopen/float_equal.hpp>
-#include <miopen/ford.hpp>
+#include "driver_ford.hpp"
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 
@@ -73,7 +74,7 @@ void mloAdamRunHost(miopenTensorDescriptor_t paramDesc,
     if(is_amp && found_inf)
         return;
 
-    const size_t numel = miopen::deref(paramDesc).GetElementSize();
+    const size_t numel = driver_tensor::GetElementSize(paramDesc);
 
     const float bias_correction1             = 1.0 - pow(beta1, step);
     const float bias_correction2             = 1.0 - pow(beta2, step);
@@ -85,7 +86,7 @@ void mloAdamRunHost(miopenTensorDescriptor_t paramDesc,
     const float one_minus_beta2              = 1.0f - beta2;
     const size_t min_grain                   = multi_threaded ? 8 : numel;
 
-    miopen::par_for(numel, min_grain, [&](int i) {
+    driver_ford::par_for(numel, min_grain, [&](int i) {
         Tref exp_avg    = exp_avgs[i];
         Tref exp_avg_sq = exp_avg_sqs[i];
 
@@ -96,7 +97,7 @@ void mloAdamRunHost(miopenTensorDescriptor_t paramDesc,
         if(is_amp)
             grad *= inv_grad_scale;
 
-        if(!miopen::float_equal_sentinel(weight_decay, 0))
+        if(!driver_utils::float_equal_sentinel(weight_decay, 0))
         {
             if(adamw)
                 param *= one_minus_lr_by_weight_decay;

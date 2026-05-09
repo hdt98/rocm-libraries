@@ -142,7 +142,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
         miopenDropoutGetStatesSize(handle, &statesSizeInBytes);
         size_t states_size  = statesSizeInBytes / sizeof(rocrand_state_xorwow);
         dropout_states_host = std::vector<rocrand_state_xorwow>(states_size);
-        InitKernelStateEmulator(dropout_states_host, dropoutDesc);
+        InitKernelStateEmulator(dropout_states_host, dropoutDesc, handle);
 
         std::array<int, 2> drop_in_len  = {{batch_n, hy_h * bi}};
         std::array<int, 2> drop_in_str  = {{hy_stride, 1}};
@@ -874,7 +874,8 @@ void RunLSTMBackwardDataGEMMCPUVerify(
 
             if(use_dropout)
             {
-                RunDropoutBackwardEmulator<Tref>(dropoutDesc,
+                RunDropoutBackwardEmulator<Tref>(handle,
+                                                 dropoutDesc,
                                                  dropout_inputTensor,
                                                  dh_state,
                                                  dropout_inputTensor,

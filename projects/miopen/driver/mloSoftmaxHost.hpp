@@ -4,8 +4,9 @@
 #ifndef MLO_SOFTMAXHOST_H_
 #define MLO_SOFTMAXHOST_H_
 
-#include <miopen/tensor.hpp>
-#include <miopen/tensor_extra.hpp>
+#include "driver_tensor.hpp"
+
+#include <miopen/miopen.h>
 
 ////////////////////////////////////////////////////////////
 //
@@ -34,11 +35,12 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                              miopenSoftmaxAlgorithm_t algo,
                              miopenSoftmaxMode_t mode)
 {
-    int n, c, h, w, in_nstr, in_cstr, in_hstr, in_wstr;
-    int out_nstr, out_cstr, out_hstr, out_wstr;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &n, &c, &h, &w);
-    miopenGet4dTensorDescriptorStrides(inputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
-    miopenGet4dTensorDescriptorStrides(outputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
+    auto in_lens = driver_tensor::GetLengths(inputTensor);
+    auto in_strs = driver_tensor::GetStrides(inputTensor);
+    auto out_strs = driver_tensor::GetStrides(outputTensor);
+    int n = in_lens[0], c = in_lens[1], h = in_lens[2], w = in_lens[3];
+    int in_nstr = in_strs[0], in_cstr = in_strs[1], in_hstr = in_strs[2], in_wstr = in_strs[3];
+    int out_nstr = out_strs[0], out_cstr = out_strs[1], out_hstr = out_strs[2], out_wstr = out_strs[3];
 
     Tcheck max_val = (sizeof(Tgpu) == 4) ? 3.402823466e+38f : 65504.;
     std::vector<Tcheck> channel_max((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
@@ -87,8 +89,8 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
             if(algo == MIOPEN_SOFTMAX_LOG)
             {
                 Tcheck neg_inf = static_cast<Tcheck>(
-                    miopen::deref(inputTensor).GetType() == miopenHalf ? NEGATIVE_INF_FP16
-                                                                       : NEGATIVE_INF_FP32);
+                    driver_tensor::GetType(inputTensor) == miopenHalf ? NEGATIVE_INF_FP16
+                                                                      : NEGATIVE_INF_FP32);
                 channel_max[i] = neg_inf;
                 for(int j = 0; j < c; j++)
                     for(int s0 = 0; s0 < h; s0++)
@@ -172,8 +174,8 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                     if(algo == MIOPEN_SOFTMAX_LOG)
                     {
                         Tcheck neg_inf = static_cast<Tcheck>(
-                            miopen::deref(inputTensor).GetType() == miopenHalf ? NEGATIVE_INF_FP16
-                                                                               : NEGATIVE_INF_FP32);
+                            driver_tensor::GetType(inputTensor) == miopenHalf ? NEGATIVE_INF_FP16
+                                                                              : NEGATIVE_INF_FP32);
                         channel_max[i * h * w + s0 * w + s1] = results[i * c * h * w + s0 * w + s1];
                         for(int j = 1; j < c; j++)
                         {
@@ -231,11 +233,12 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                               miopenSoftmaxAlgorithm_t algo,
                               miopenSoftmaxMode_t mode)
 {
-    int n, c, h, w, in_nstr, in_cstr, in_hstr, in_wstr;
-    int out_nstr, out_cstr, out_hstr, out_wstr;
-    miopenGet4dTensorDescriptorLengths(dOutputTensor, &n, &c, &h, &w);
-    miopenGet4dTensorDescriptorStrides(dInputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
-    miopenGet4dTensorDescriptorStrides(dOutputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
+    auto dout_lens = driver_tensor::GetLengths(dOutputTensor);
+    auto din_strs = driver_tensor::GetStrides(dInputTensor);
+    auto dout_strs = driver_tensor::GetStrides(dOutputTensor);
+    int n = dout_lens[0], c = dout_lens[1], h = dout_lens[2], w = dout_lens[3];
+    int in_nstr = din_strs[0], in_cstr = din_strs[1], in_hstr = din_strs[2], in_wstr = din_strs[3];
+    int out_nstr = dout_strs[0], out_cstr = dout_strs[1], out_hstr = dout_strs[2], out_wstr = dout_strs[3];
 
     std::vector<Tcheck> channel_dot((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
                                     static_cast<Tcheck>(0.0));

@@ -26,10 +26,10 @@
 
 #pragma once
 
-#include <miopen/ford.hpp>
-#include <miopen/tensor.hpp>
-#include <miopen/tensor_view_utils.hpp>
-#include <miopen/prelu/utils.hpp>
+#include "driver_tensor.hpp"
+#include "driver_tensor_view.hpp"
+
+#include "driver_ford.hpp"
 
 template <typename Tgpu, typename Tcheck>
 int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
@@ -42,15 +42,15 @@ int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
                                 Tcheck* dinput_host,
                                 Tcheck* dweight_host)
 {
-    auto input_tv   = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
-    auto doutput_tv = miopen::get_inner_expanded_tv<5>(miopen::deref(doutputDesc));
-    auto dinput_tv  = miopen::get_inner_expanded_tv<5>(miopen::deref(dinputDesc));
+    auto input_tv   = get_inner_expanded_tv<5>(inputDesc);
+    auto doutput_tv = get_inner_expanded_tv<5>(doutputDesc);
+    auto dinput_tv  = get_inner_expanded_tv<5>(dinputDesc);
 
-    auto input_sz              = miopen::deref(inputDesc).GetElementSize();
-    auto weight_sz             = miopen::deref(weightDesc).GetElementSize();
+    auto input_sz              = driver_tensor::GetElementSize(inputDesc);
+    auto weight_sz             = driver_tensor::GetElementSize(weightDesc);
     auto weight_grad_collector = std::vector<float>(input_sz);
 
-    miopen::par_ford(input_sz)([&](int gid) {
+    driver_ford::par_ford(input_sz)([&](int gid) {
         auto tensor_layout = tensor_layout_t<5>(input_tv, gid);
         float input_v      = static_cast<float>(input[input_tv.get_tensor_view_idx(tensor_layout)]);
         float grad_v = static_cast<float>(doutput[doutput_tv.get_tensor_view_idx(tensor_layout)]);
@@ -86,10 +86,10 @@ int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
             size_t inner_size = std::accumulate(
                 &input_tv.size[2], &input_tv.size[4], 1ul, std::multiplies<size_t>());
             size_t outer_size = inner_size * input_tv.size[1];
-            miopen::par_ford(weight_sz)([&](int i) {
+            driver_ford::par_ford(weight_sz)([&](int i) {
                 double sum = 0;
-                miopen::ford(input_tv.size[0])([&](int j) {
-                    miopen::ford(inner_size)([&](int k) {
+                driver_ford::ford(input_tv.size[0])([&](int j) {
+                    driver_ford::ford(inner_size)([&](int k) {
                         sum += static_cast<double>(
                             weight_grad_collector[j * outer_size + i * inner_size + k]);
                     });

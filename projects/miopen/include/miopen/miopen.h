@@ -919,6 +919,48 @@ MIOPEN_EXPORT miopenStatus_t miopenScaleTensor(miopenHandle_t handle,
 MIOPEN_EXPORT miopenStatus_t miopenGetTensorNumBytes(miopenTensorDescriptor_t tensorDesc,
                                                      size_t* numBytes);
 
+/*! @brief Get the layout of a tensor descriptor
+ *
+ * @param tensorDesc  Tensor descriptor (input)
+ * @param layout      Pointer to the tensor layout enum value (output).
+ *                    Set to miopenTensorNCHW if no explicit layout was specified.
+ * @return            miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetTensorLayout(miopenTensorDescriptor_t tensorDesc,
+                                                    miopenTensorLayout_t* layout);
+
+/*! @brief Get the total element space of a tensor descriptor
+ *
+ * Returns the total number of elements including padding/stride gaps.
+ * This is the minimum number of elements that must be allocated to hold the tensor.
+ *
+ * @param tensorDesc   Tensor descriptor (input)
+ * @param elementSpace Pointer to the element space (output)
+ * @return             miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetTensorElementSpace(miopenTensorDescriptor_t tensorDesc,
+                                                          size_t* elementSpace);
+
+/*! @brief Query whether a tensor is packed (contiguous in memory with no stride gaps)
+ *
+ * @param tensorDesc Tensor descriptor (input)
+ * @param isPacked   Pointer to boolean result: true if packed (output)
+ * @return           miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenIsTensorPacked(miopenTensorDescriptor_t tensorDesc,
+                                                   bool* isPacked);
+
+/*! @brief Get the vector length of a vectorized tensor descriptor
+ *
+ * For non-vectorized tensor layouts this returns 1.
+ *
+ * @param tensorDesc   Tensor descriptor (input)
+ * @param vectorLength Pointer to the vector length (output)
+ * @return             miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetTensorVectorLength(miopenTensorDescriptor_t tensorDesc,
+                                                          size_t* vectorLength);
+
 /*! @brief Copies one tensor to another tensor with a different layout/scale.
  *
  * This function implements:
@@ -1063,6 +1105,16 @@ miopenGetConvolutionNdDescriptor(miopenConvolutionDescriptor_t convDesc,
  */
 MIOPEN_EXPORT miopenStatus_t miopenGetConvolutionGroupCount(miopenConvolutionDescriptor_t convDesc,
                                                             int* groupCount);
+
+/*! @brief Get the padding mode of the convolution descriptor
+ *
+ * @param convDesc    Convolution layer descriptor (input)
+ * @param paddingMode Pointer to the padding mode (output)
+ * @return            miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t
+miopenGetConvolutionPaddingMode(miopenConvolutionDescriptor_t convDesc,
+                                miopenPaddingMode_t* paddingMode);
 
 /*! @brief Set the number of groups to be used in Group/Depthwise convolution
  *
@@ -2230,6 +2282,16 @@ MIOPEN_EXPORT miopenStatus_t miopenSetPoolingIndexType(miopenPoolingDescriptor_t
  */
 MIOPEN_EXPORT miopenStatus_t miopenGetPoolingIndexType(miopenPoolingDescriptor_t poolDesc,
                                                        miopenIndexType_t* index_type);
+
+/*! @brief Get the padding mode of the pooling descriptor
+ *
+ * @param poolDesc    Pooling layer descriptor (input)
+ * @param paddingMode Pointer to the padding mode (output)
+ * @return            miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t
+miopenGetPoolingPaddingMode(miopenPoolingDescriptor_t poolDesc,
+                            miopenPaddingMode_t* paddingMode);
 
 /*! @brief Set workspace index mode for pooling layer. The default mode is
  * miopenPoolingWorkSpaceIndexMask.
@@ -8047,6 +8109,36 @@ MIOPEN_EXPORT miopenStatus_t miopenSetTuningPolicy(miopenHandle_t handle,
  */
 MIOPEN_EXPORT miopenStatus_t miopenGetTuningPolicy(miopenHandle_t handle,
                                                    miopenTuningPolicy_t* value);
+
+// Debug flags
+// ============
+
+/*! @enum miopenDebugFlag_t
+ * Debug flags that control internal library behavior for testing and debugging.
+ */
+typedef enum
+{
+    miopenDebugLoggingQuiet              = 0, /*!< Suppress all logging output */
+    miopenDebugFindEnforceDisable        = 1, /*!< Disable MIOPEN_FIND_ENFORCE */
+    miopenDebugIsWarmupOngoing           = 2, /*!< Signal that a warmup pass is in progress */
+    miopenDebugAlwaysEnableConvDirectNaive = 3, /*!< Force-enable the naive direct convolution solver */
+} miopenDebugFlag_t;
+
+/*! @brief Set a debug flag
+ *
+ * @param flag   The debug flag to set (input)
+ * @param value  The value to set (input)
+ * @return       miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenSetDebugFlag(miopenDebugFlag_t flag, bool value);
+
+/*! @brief Get the current value of a debug flag
+ *
+ * @param flag   The debug flag to query (input)
+ * @param value  Pointer to the output value (output)
+ * @return       miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetDebugFlag(miopenDebugFlag_t flag, bool* value);
 
 #ifdef __cplusplus
 }

@@ -271,6 +271,35 @@ extern "C" miopenStatus_t miopenGetTensorNumBytes(miopenTensorDescriptor_t tenso
     return miopen::try_([&] { miopen::deref(numBytes) = miopen::deref(tensorDesc).GetNumBytes(); });
 }
 
+extern "C" miopenStatus_t miopenGetTensorLayout(miopenTensorDescriptor_t tensorDesc,
+                                                 miopenTensorLayout_t* layout)
+{
+    MIOPEN_LOG_FUNCTION(tensorDesc);
+    return miopen::try_([&] { miopen::deref(layout) = miopen::deref(tensorDesc).GetLayout_t(); });
+}
+
+extern "C" miopenStatus_t miopenGetTensorElementSpace(miopenTensorDescriptor_t tensorDesc,
+                                                       size_t* elementSpace)
+{
+    MIOPEN_LOG_FUNCTION(tensorDesc);
+    return miopen::try_(
+        [&] { miopen::deref(elementSpace) = miopen::deref(tensorDesc).GetElementSpace(); });
+}
+
+extern "C" miopenStatus_t miopenIsTensorPacked(miopenTensorDescriptor_t tensorDesc, bool* isPacked)
+{
+    MIOPEN_LOG_FUNCTION(tensorDesc);
+    return miopen::try_([&] { miopen::deref(isPacked) = miopen::deref(tensorDesc).IsPacked(); });
+}
+
+extern "C" miopenStatus_t miopenGetTensorVectorLength(miopenTensorDescriptor_t tensorDesc,
+                                                       size_t* vectorLength)
+{
+    MIOPEN_LOG_FUNCTION(tensorDesc);
+    return miopen::try_(
+        [&] { miopen::deref(vectorLength) = miopen::deref(tensorDesc).GetVectorLength(); });
+}
+
 // Internal API
 int miopenGetTensorDescriptorElementSize(miopenTensorDescriptor_t tensorDesc)
 {

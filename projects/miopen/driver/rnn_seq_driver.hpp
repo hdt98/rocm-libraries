@@ -32,18 +32,16 @@
 #include "random.hpp"
 #include "rnn_verify_gemm.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
 #include <../test/verify.hpp>
 
-#include <miopen/errors.hpp>
-#include <miopen/logger.hpp>
+#include "driver_errors.hpp"
 #include <miopen/miopen.h>
-#include <miopen/rnn.hpp>
 #include <miopen/tensor.hpp>
-#include <miopen/tensor_ops.hpp>
 
 #include <algorithm>
 #include <array>
@@ -295,19 +293,19 @@ int RNNSeqDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     int nn_dir = inflags.GetValueInt("forw");
     if(inflags.GetValueInt("fwdtype") == 1 && !(nn_dir == 0 || nn_dir == 1))
     {
-        MIOPEN_THROW(
+        DRIVER_THROW(
             "Incorrect input, In Inference only fwd direction is allowed ((forw=0) OR (forw=1)).");
     }
 
     if(inflags.GetValueInt("iter") > 1 && inflags.GetValueInt("verify") != 0)
-        MIOPEN_THROW(
+        DRIVER_THROW(
             "To use non default Number of Iterations >1 need to disable Verification -V 0.");
 
     if((nn_dir & 4) && !(nn_dir & 2) && !(nn_dir & 1))
-        MIOPEN_THROW("Incorrect input, calculation of BackwardWeights require BackwardData and "
+        DRIVER_THROW("Incorrect input, calculation of BackwardWeights require BackwardData and "
                      "ForwardData.");
     if((nn_dir & 2) && !(nn_dir & 1))
-        MIOPEN_THROW("Incorrect input, calculation of BackwardData require ForwardData.");
+        DRIVER_THROW("Incorrect input, calculation of BackwardData require ForwardData.");
 
     return miopenStatusSuccess;
 }
@@ -507,7 +505,7 @@ miopenRNNBaseLayout_t RNNSeqDriver<Tgpu, Tref>::GetIODataLayoutFromCmdLine()
     case 1: return miopenRNNDataSeqMajorNotPadded;
     case 2: return miopenRNNDataSeqMajorPadded;
     case 3: return miopenRNNDataBatchMajorPadded;
-    default: MIOPEN_THROW("Incorrect input, unsupported RNNLayout.");
+    default: DRIVER_THROW("Incorrect input, unsupported RNNLayout.");
     }
 }
 
@@ -519,7 +517,7 @@ miopenRNNFWDMode_t RNNSeqDriver<Tgpu, Tref>::GetRNNFwdModeFromCmdLine()
     {
     case 0: return miopenRNNFWDMode_t::miopenRNNTraining;
     case 1: return miopenRNNFWDMode_t::miopenRNNInference;
-    default: MIOPEN_THROW("Incorrect input, unsupported fwdtype.");
+    default: DRIVER_THROW("Incorrect input, unsupported fwdtype.");
     }
 }
 
@@ -540,10 +538,10 @@ std::vector<int> RNNSeqDriver<Tgpu, Tref>::GetSeqLengthsFromCmdLine()
     while(ss >> element)
     {
         if(seq_it == data_seq_lens.end())
-            MIOPEN_THROW("Incorrect input, seq_len_array bigger than provided batch_size.\n");
+            DRIVER_THROW("Incorrect input, seq_len_array bigger than provided batch_size.\n");
 
         if(element > seq_len_max)
-            MIOPEN_THROW("Length of data sequence is longer than required unrolled time sequence "
+            DRIVER_THROW("Length of data sequence is longer than required unrolled time sequence "
                          "provided.\n"
                          "The data sequence will be truncated to match unrolled time sequence.\n");
 
@@ -558,7 +556,7 @@ std::vector<int> RNNSeqDriver<Tgpu, Tref>::GetSeqLengthsFromCmdLine()
     if(io_layout == miopenRNNDataSeqMajorNotPadded && (seq_it != data_seq_lens.begin()) &&
        (!std::is_sorted(data_seq_lens.begin(), seq_it, std::greater<>{})))
     {
-        MIOPEN_THROW("Incorrect input, seq_lens should not to increase with "
+        DRIVER_THROW("Incorrect input, seq_lens should not to increase with "
                      "miopenRNNDataSeqMajorNotPadded layout\n");
     }
 
@@ -639,7 +637,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect RNN Mode");
+        DRIVER_THROW("Incorrect RNN Mode");
     }
 
     miopenRNNBiasMode_t biasMode;
@@ -653,7 +651,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect bias Mode");
+        DRIVER_THROW("Incorrect bias Mode");
     }
 
     miopenRNNDirectionMode_t directionMode;
@@ -667,7 +665,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect direction Mode");
+        DRIVER_THROW("Incorrect direction Mode");
     }
 
     miopenRNNInputMode_t inMode;
@@ -681,7 +679,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect input Mode");
+        DRIVER_THROW("Incorrect input Mode");
     }
 
     miopenRNNAlgo_t algo;
@@ -699,7 +697,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect RNN algorithm");
+        DRIVER_THROW("Incorrect RNN algorithm");
     }
 
     if(inflags.GetValueInt("use_dropout"))
@@ -761,7 +759,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
 // GetTensorSize broken So this is WA
 inline size_t Get3DNoVECTensorSize(miopenTensorDescriptor_t& tensor)
 {
-    assert(miopen::deref(tensor).IsPacked() &&
+    assert(driver_tensor::IsPacked(tensor) &&
            "GetTensorSize should not be used on an unpacked tensor.");
     const auto len = GetTensorLengths(tensor);
     size_t sz      = std::accumulate(len.begin(), len.end(), 1ULL, std::multiplies<size_t>());
@@ -1110,7 +1108,7 @@ int RNNSeqDriver<Tgpu, Tref>::RunForwardGPU()
         time_logger.StopAndPush();
     }
 
-    miopen::deref(GetHandle()).Finish();
+    (void)hipStreamSynchronize(GetStream());
     if(inflags.GetValueInt("time") == 1)
     {
         printf("Forward RNN time results:\n");
@@ -1208,7 +1206,7 @@ int RNNSeqDriver<Tgpu, Tref>::RunBackwardGPU()
             time_logger.StopAndPush();
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         if(inflags.GetValueInt("time") == 1)
         {
             printf("Backward Data RNN time results:\n");
@@ -1280,7 +1278,7 @@ int RNNSeqDriver<Tgpu, Tref>::RunBackwardGPU()
             time_logger.StopAndPush();
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
 
         if(inflags.GetValueInt("time") == 1)
         {

@@ -26,6 +26,9 @@
 #ifndef MLO_GROUPNORMHOST_H_
 #define MLO_GROUPNORMHOST_H_
 
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
+
 #include <miopen/tensor.hpp>
 
 ////////////////////////////////////////////////////////////
@@ -44,9 +47,9 @@ int32_t mloGroupNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                    miopenNormMode_t mode,
                                    bool use_multithread)
 {
-    auto dims = miopen::deref(inputDesc).GetLengths();
+    auto dims = driver_tensor::GetLengths(inputDesc);
 
-    size_t numel             = miopen::deref(inputDesc).GetElementSize();
+    size_t numel             = driver_tensor::GetElementSize(inputDesc);
     size_t numel_per_channel = numel / dims[0] / dims[1];
     size_t num_channels      = dims[1];
 
@@ -55,7 +58,7 @@ int32_t mloGroupNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
 
     size_t min_grain = use_multithread ? 8 : outer_size;
 
-    miopen::par_for(outer_size, min_grain, [&](size_t o) {
+    driver_ford::par_for(outer_size, min_grain, [&](size_t o) {
         Tcheck pmean = 0.0f;
         Tcheck pvar  = 0.0f;
         for(size_t i = 0; i < inner_size; i++)

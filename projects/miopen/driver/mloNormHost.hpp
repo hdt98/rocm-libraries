@@ -6,7 +6,7 @@
 
 #include <cmath>
 
-#include <miopen/ford.hpp>
+#include "driver_ford.hpp"
 
 ////////////////////////////////////////////////////////////
 //
@@ -63,7 +63,7 @@ int mloLRNForwardRunHost(bool do_scale,
 
     if(norm_region == MLO_LRN_ACROSS_CHANNELS)
     {
-        miopen::par_for(n_batches, min_grain, [&](int b) {
+        driver_ford::par_for(n_batches, min_grain, [&](int b) {
             const int b_by_bot_batch_stride     = b * bot_batch_stride;
             const int b_by_scale_v_batch_stride = b * scale_v_batch_stride;
             const int b_by_top_v_batch_stride   = b * top_v_batch_stride;
@@ -192,11 +192,11 @@ int mloLRNForwardRunHost(bool do_scale,
                     }
                 } // for (int i = 0; i < top_width; i++)
             } // for (int j = 0; j < top_height; j++)
-        }); // miopen::par_for
+        }); // driver_ford::par_for
     }
     else
     {
-        miopen::par_for(n_batches, min_grain, [&](int b) {
+        driver_ford::par_for(n_batches, min_grain, [&](int b) {
             const int b_by_bot_batch_stride     = b * bot_batch_stride;
             const int b_by_scale_v_batch_stride = b * scale_v_batch_stride;
             const int b_by_top_v_batch_stride   = b * top_v_batch_stride;
@@ -263,7 +263,7 @@ int mloLRNForwardRunHost(bool do_scale,
                     } // for (int i = 0; i < top_width; i++)
                 } // for (int j = 0; j < top_height; j++)
             } // for (int o = 0; o < outputs; o++)
-        }); // miopen::par_for
+        }); // driver_ford::par_for
     } // (norm_region == ACROSS_CHANNELS)
 
     return ret;
@@ -328,7 +328,7 @@ int mloLRNBackwardRunHost(int norm_region,
     {
         const Tcheck_ ratio_dta_bwd = double_alpha_beta / static_cast<Tcheck_>(local_area);
 
-        miopen::par_for(n_batches, min_grain, [&](int b) {
+        driver_ford::par_for(n_batches, min_grain, [&](int b) {
             // Precompute constant values used by the subsequent loops
             const int b_by_top_df_batch_stride   = b * top_df_batch_stride;
             const int b_by_top_batch_stride      = b * top_batch_stride;
@@ -516,11 +516,11 @@ int mloLRNBackwardRunHost(int norm_region,
                     }
                 } // for (int i = 0; i < bot_width; i++)
             } // for (int j = 0; j < bot_height; j++)
-        }); // miopen::par_for
+        }); // driver_ford::par_for
     } // if (norm_region == MLO_LRN_ACROSS_CHANNELS)
     else
     {
-        miopen::par_for(n_batches, min_grain, [&](int b) {
+        driver_ford::par_for(n_batches, min_grain, [&](int b) {
             // Precompute constant values used by the subsequent loops
             const int b_by_top_df_batch_stride   = b * top_df_batch_stride;
             const int b_by_top_batch_stride      = b * top_batch_stride;
@@ -593,7 +593,7 @@ int mloLRNBackwardRunHost(int norm_region,
                     } // for(int i = 0; i < bot_width; ++i)
                 } // for(int j = 0; j < bot_height; ++j)
             } // for(int o = 0; o < n_inputs; ++o)
-        }); // miopen::par_for
+        }); // driver_ford::par_for
     } // if (norm_region == MLO_LRN_ACROSS_CHANNELS)
 
     return ret;

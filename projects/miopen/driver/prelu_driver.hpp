@@ -143,17 +143,17 @@ int PReLUDriver<Tgpu, Tref>::GetandSetData()
     std::vector<int> weight_length = {inflags.GetValueInt("NumParameters")};
 
     if(SetTensorNd(inputDesc, input_length, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
     if(SetTensorNd(dinputDesc, input_length, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input gradient tensor");
+        DRIVER_THROW("Error parsing input gradient tensor");
 
     if(SetTensorNd(weightDesc, weight_length, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing weight tensor");
+        DRIVER_THROW("Error parsing weight tensor");
     if(SetTensorNd(dweightDesc, weight_length, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing weight gradient tensor");
+        DRIVER_THROW("Error parsing weight gradient tensor");
 
     if(SetTensorNd(doutputDesc, input_length, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing output gradient tensor");
+        DRIVER_THROW("Error parsing output gradient tensor");
 
     return miopenStatusSuccess;
 }

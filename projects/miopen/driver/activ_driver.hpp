@@ -34,6 +34,7 @@
 #include "timer.hpp"
 #include "util_driver.hpp"
 
+#include "driver_tensor.hpp"
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 
@@ -329,7 +330,7 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
 
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -373,9 +374,9 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = driver_tensor::Tien<4>(driver_tensor::GetLengths(inputTensor));
         size_t dataSz =
-            in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
+            in_n * in_c * in_h * in_w * driver_tensor::GetTypeSize(driver_tensor::GetType(inputTensor));
 
         // layer, readbytes, writebytes, BG/s, timeMS
         printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
@@ -432,7 +433,7 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
 
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -476,9 +477,9 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = driver_tensor::Tien<4>(driver_tensor::GetLengths(inputTensor));
         size_t dataSz =
-            in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
+            in_n * in_c * in_h * in_w * driver_tensor::GetTypeSize(driver_tensor::GetType(inputTensor));
 
         // layer, readbytes, writebytes, BG/s, timeMS
         printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");

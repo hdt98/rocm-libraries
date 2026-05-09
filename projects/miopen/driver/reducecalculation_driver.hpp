@@ -29,6 +29,7 @@
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include "random.hpp"
 #include <algorithm>
@@ -55,8 +56,8 @@ int32_t mloReduceCalculationForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                            int32_t dim,
                                            miopenReduceCalculationNanPropagation_t nanPropagation)
 {
-    auto input_dims  = miopen::deref(inputDesc).GetLengths();
-    auto output_dims = miopen::deref(outputDesc).GetLengths();
+    auto input_dims  = driver_tensor::GetLengths(inputDesc);
+    auto output_dims = driver_tensor::GetLengths(outputDesc);
 
     auto reduce_size = input_dims[dim];
     auto output_numel =
@@ -167,7 +168,7 @@ int ReduceCalculationDriver<Tgpu, Tref>::GetandSetData()
     auto in_len        = inTensorParam.lengths;
 
     if(SetTensorNd(inputDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     std::vector<int> out_len;
 
@@ -183,7 +184,7 @@ int ReduceCalculationDriver<Tgpu, Tref>::GetandSetData()
         out_len.push_back(1);
 
     if(SetTensorNd(outputDesc, out_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        DRIVER_THROW("Error setting output tensor.");
 
     nanPropagation =
         static_cast<miopenReduceCalculationNanPropagation_t>(inflags.GetValueInt("NanPropagation"));

@@ -39,11 +39,10 @@
 #include "../test/random.hpp"
 #include "../test/fusionHost.hpp"
 
-#include <miopen/errors.hpp>
-#include <miopen/handle.hpp>
+#include "driver_errors.hpp"
+#include "driver_tensor.hpp"
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
-#include "miopen/batch_norm.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -66,6 +65,67 @@
 #define MIO_DRIVER_BN_REFERENCE_COMPUTE_3D_AS_2D 1 // Resolves issue #1974
 
 // #define BN_RUNFOR_PROFILER
+
+// Local replacements for miopen::DeriveBNTensorDescriptor and
+// miopen::BuildReshaped4DTensorDescriptor (from miopen/batch_norm.hpp)
+// to avoid depending on an internal header.
+namespace bn_driver_detail {
+
+inline void DeriveBNTensorDescriptor(miopen::TensorDescriptor& derivedBnDesc,
+                                     const miopen::TensorDescriptor& xDesc,
+                                     miopenBatchNormMode_t bn_mode)
+{
+    auto lengths = xDesc.GetLengths();
+    std::vector<int> newlens(lengths.size());
+    newlens[1] = lengths[1];
+    if(bn_mode == miopenBNSpatial)
+    {
+        newlens[0] = newlens[2] = newlens[3] = 1;
+        if(lengths.size() == 5)
+            newlens[4] = 1;
+    }
+    else
+    {
+        newlens[0] = 1;
+        newlens[2] = lengths[2];
+        newlens[3] = lengths[3];
+        if(lengths.size() == 5)
+            newlens[4] = lengths[4];
+    }
+    derivedBnDesc = miopen::TensorDescriptor(miopenFloat, newlens);
+}
+
+inline miopen::TensorDescriptor
+BuildReshaped4DTensorDescriptor(const miopen::TensorDescriptor& tDesc)
+{
+    std::vector<size_t> dims(tDesc.GetLengths());
+
+    auto dataType = tDesc.GetType();
+    auto layout   = tDesc.GetLayout_t();
+    if(layout == miopenTensorNCDHW)
+    {
+        layout = miopenTensorNCHW;
+    }
+    else if(layout == miopenTensorNDHWC)
+    {
+        layout = miopenTensorNHWC;
+    }
+    else
+    {
+        std::cout << "Cannot handle layout : " << layout << "\n";
+        exit(EXIT_FAILURE); // NOLINT (concurrency-mt-unsafe)
+    }
+
+    // Both NCDHW and NDHWC layout store the lens in NCDHW form
+    // hence : NxCxDxHxW -> NxCx(D*H)xW
+    dims[2] *= dims[3];
+    dims[3] = dims[4];
+    dims.pop_back();
+
+    return {dataType, layout, dims};
+}
+
+} // namespace bn_driver_detail
 
 template <typename TInput,
           typename Tref,
@@ -218,7 +278,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::GetandSetData()
     in.GetTensor().generate(uniform_unsigned_initializer<TInput>(2e-3 /*scale*/, 1000 /*range*/));
 
     auto derivedBnDesc = miopen::TensorDescriptor{};
-    miopen::DeriveBNTensorDescriptor(derivedBnDesc, in.GetTensor().desc, bn_mode);
+    bn_driver_detail::DeriveBNTensorDescriptor(derivedBnDesc, in.GetTensor().desc, bn_mode);
 
     if(isFwdInfer || isFwdTrain)
     {
@@ -306,7 +366,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::GetandSetData()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Unknown batch norm state");
+        DRIVER_THROW("Unknown batch norm state");
     }
     return miopenStatusSuccess;
 }
@@ -425,7 +485,7 @@ bool BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::ChkLayout_ShortName(
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid Short Name for layout!");
+        DRIVER_THROW("Invalid Short Name for layout!");
     }
 }
 
@@ -435,13 +495,12 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::ValidateLayoutInputP
 {
     if(!ChkLayout_ShortName())
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     std::string("Invalid Layout Short Name = ") + inflags.FindShortName("layout"));
+        DRIVER_THROW(std::string("Invalid Layout Short Name = ") + inflags.FindShortName("layout"));
     }
     if((layout_value.compare("NCHW") != 0) && (layout_value.compare("NHWC") != 0) &&
        (layout_value.compare("NCDHW") != 0) && (layout_value.compare("NDHWC") != 0))
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid Layout Parameter Value - " + layout_value);
+        DRIVER_THROW("Invalid Layout Parameter Value - " + layout_value);
     }
 }
 
@@ -487,7 +546,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Cannot handle layout: " + layout);
+        DRIVER_THROW("Cannot handle layout: " + layout);
     }
 
     // batch norm mode type
@@ -501,7 +560,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Mode");
+        DRIVER_THROW("Incorrect Batch Normalization Mode");
     }
 
     // save off mean and variance?
@@ -515,7 +574,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Save mode");
+        DRIVER_THROW("Incorrect Batch Normalization Save mode");
     }
 
     // keep running mean and variance
@@ -529,20 +588,19 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Running mode");
+        DRIVER_THROW("Incorrect Batch Normalization Running mode");
     }
 
     forw = inflags.GetValueInt("forw");
     if(forw > 2)
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization forward mode");
+        DRIVER_THROW("Incorrect Batch Normalization forward mode");
     }
 
     back = inflags.GetValueInt("back");
     if(back > 1)
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "Incorrect Batch Normalization backwards propagation mode");
+        DRIVER_THROW("Incorrect Batch Normalization backwards propagation mode");
     }
 
     if(back && forw)
@@ -582,8 +640,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     {
         if(forw != 1 || !keepRunningMeanVar)
         {
-            MIOPEN_THROW(miopenStatusBadParm,
-                         "Ping-pong buffers are only supported in forward training when running "
+            DRIVER_THROW("Ping-pong buffers are only supported in forward training when running "
                          "mean and variance are kept");
         }
         usePingPongBuffers = true;
@@ -1308,7 +1365,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
         iteration = i; // Modifies the captured reference for the case of not using HIP graph
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -1354,9 +1411,9 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(in.GetTensor().desc.GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = driver_tensor::Tien<4>(in.GetTensor().desc.GetLengths());
         size_t M                         = in_n * in_c * in_h * in_w;
-        size_t dataSz = (M + 2 * in_c) * miopen::GetTypeSize(in.GetTensor().desc.GetType());
+        size_t dataSz = (M + 2 * in_c) * driver_tensor::GetTypeSize(in.GetTensor().desc.GetType());
         float rdCnt   = -1.0;
         float wrCnt   = 1.0;
         if(forw == 1)
@@ -1385,14 +1442,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdInference(T
 
     if(size == 5)
     {
-        in.GetTensor().desc    = miopen::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
-        out_ref.desc           = miopen::BuildReshaped4DTensorDescriptor(out_ref.desc);
-        scale.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(scale.GetTensor().desc);
-        bias.GetTensor().desc  = miopen::BuildReshaped4DTensorDescriptor(bias.GetTensor().desc);
+        in.GetTensor().desc    = bn_driver_detail::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
+        out_ref.desc           = bn_driver_detail::BuildReshaped4DTensorDescriptor(out_ref.desc);
+        scale.GetTensor().desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(scale.GetTensor().desc);
+        bias.GetTensor().desc  = bn_driver_detail::BuildReshaped4DTensorDescriptor(bias.GetTensor().desc);
         estMean.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(estMean.GetTensor().desc);
+            bn_driver_detail::BuildReshaped4DTensorDescriptor(estMean.GetTensor().desc);
         estVariance.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(estVariance.GetTensor().desc);
+            bn_driver_detail::BuildReshaped4DTensorDescriptor(estVariance.GetTensor().desc);
     }
 
     if(bn_mode == miopenBNPerActivation)
@@ -1430,8 +1487,7 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdInference(T
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
-                     "Bad batch normalization mode in host kernel selection");
+        DRIVER_THROW("Bad batch normalization mode in host kernel selection");
     }
     return;
 }
@@ -1443,14 +1499,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdTrain(Tref 
     miopenGetTensorDescriptorSize(&in.GetTensor().desc, &size);
     if(size == 5)
     {
-        in.GetTensor().desc    = miopen::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
-        out_ref.desc           = miopen::BuildReshaped4DTensorDescriptor(out_ref.desc);
-        scale.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(scale.GetTensor().desc);
-        bias.GetTensor().desc  = miopen::BuildReshaped4DTensorDescriptor(bias.GetTensor().desc);
-        savedMean_ref.desc     = miopen::BuildReshaped4DTensorDescriptor(savedMean_ref.desc);
-        savedVariance_ref.desc = miopen::BuildReshaped4DTensorDescriptor(savedVariance_ref.desc);
-        runMean_ref.desc       = miopen::BuildReshaped4DTensorDescriptor(runMean_ref.desc);
-        runVariance_ref.desc   = miopen::BuildReshaped4DTensorDescriptor(runVariance_ref.desc);
+        in.GetTensor().desc    = bn_driver_detail::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
+        out_ref.desc           = bn_driver_detail::BuildReshaped4DTensorDescriptor(out_ref.desc);
+        scale.GetTensor().desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(scale.GetTensor().desc);
+        bias.GetTensor().desc  = bn_driver_detail::BuildReshaped4DTensorDescriptor(bias.GetTensor().desc);
+        savedMean_ref.desc     = bn_driver_detail::BuildReshaped4DTensorDescriptor(savedMean_ref.desc);
+        savedVariance_ref.desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(savedVariance_ref.desc);
+        runMean_ref.desc       = bn_driver_detail::BuildReshaped4DTensorDescriptor(runMean_ref.desc);
+        runVariance_ref.desc   = bn_driver_detail::BuildReshaped4DTensorDescriptor(runVariance_ref.desc);
     }
     if(bn_mode == miopenBNPerActivation)
     { // 1xCxHxW
@@ -1508,8 +1564,7 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdTrain(Tref 
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
-                     "Bad batch normalization mode in host kernel selection");
+        DRIVER_THROW("Bad batch normalization mode in host kernel selection");
     }
 }
 
@@ -1535,7 +1590,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardCPU()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Unsupported forward cpu run state");
+        DRIVER_THROW("Unsupported forward cpu run state");
     }
 
     return miopenStatusSuccess;
@@ -1692,7 +1747,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
 
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -1718,9 +1773,9 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                 avgtime += time;
 
             int in_n, in_c, in_h, in_w;
-            std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(in.GetTensor().desc.GetLengths());
+            std::tie(in_n, in_c, in_h, in_w) = driver_tensor::Tien<4>(in.GetTensor().desc.GetLengths());
             size_t M                         = in_n * in_c * in_h * in_w;
-            size_t dataSz = (M + 2 * in_c) * miopen::GetTypeSize(in.GetTensor().desc.GetType());
+            size_t dataSz = (M + 2 * in_c) * driver_tensor::GetTypeSize(in.GetTensor().desc.GetType());
             float rdCnt   = 2.0;
             float wrCnt   = 1.0;
             // layer, flopCnt, reads, writes, GFLOPS, GB/s, timeMs
@@ -1979,20 +2034,20 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardCPU()
     miopenGetTensorDescriptorSize(&in.GetTensor().desc, &size);
     if(size == 5)
     {
-        in.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
-        dy.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(dy.GetTensor().desc);
+        in.GetTensor().desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
+        dy.GetTensor().desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(dy.GetTensor().desc);
         out_bwd.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(out_bwd.GetTensor().desc);
-        out_ref.desc = miopen::BuildReshaped4DTensorDescriptor(out_ref.desc);
+            bn_driver_detail::BuildReshaped4DTensorDescriptor(out_bwd.GetTensor().desc);
+        out_ref.desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(out_ref.desc);
         bnScale.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(bnScale.GetTensor().desc);
-        dBias.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(dBias.GetTensor().desc);
-        dScale_ref.desc        = miopen::BuildReshaped4DTensorDescriptor(dScale_ref.desc);
-        dBias_ref.desc         = miopen::BuildReshaped4DTensorDescriptor(dBias_ref.desc);
+            bn_driver_detail::BuildReshaped4DTensorDescriptor(bnScale.GetTensor().desc);
+        dBias.GetTensor().desc = bn_driver_detail::BuildReshaped4DTensorDescriptor(dBias.GetTensor().desc);
+        dScale_ref.desc        = bn_driver_detail::BuildReshaped4DTensorDescriptor(dScale_ref.desc);
+        dBias_ref.desc         = bn_driver_detail::BuildReshaped4DTensorDescriptor(dBias_ref.desc);
         savedMean.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(savedMean.GetTensor().desc);
+            bn_driver_detail::BuildReshaped4DTensorDescriptor(savedMean.GetTensor().desc);
         savedInvVar.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(savedInvVar.GetTensor().desc);
+            bn_driver_detail::BuildReshaped4DTensorDescriptor(savedInvVar.GetTensor().desc);
     }
 
     if(bn_mode == miopenBNPerActivation)
@@ -2058,8 +2113,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardCPU()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
-                     "Bad batch normalization mode in host kernel selection");
+        DRIVER_THROW("Bad batch normalization mode in host kernel selection");
     }
 
     return miopenStatusSuccess;

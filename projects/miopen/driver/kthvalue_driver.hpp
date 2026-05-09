@@ -33,9 +33,10 @@
 #include <../test/tensor_holder.hpp>
 #include <../test/verify.hpp>
 
-#include <miopen/tensor_view_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/errors.hpp>
+#include "driver_errors.hpp"
+#include "driver_tensor.hpp"
+#include "driver_tensor_view.hpp"
 
 #include <vector>
 
@@ -49,14 +50,15 @@ void mloKthvalueFwdRunHost(TIO* input,
                            size_t k,
                            int dim)
 {
-    auto inputDesc         = miopen::deref(pInputDesc);
-    size_t inputSize       = inputDesc.GetElementSize();
-    size_t dimSize         = inputDesc.GetLengths()[dim];
-    size_t dimStride       = inputDesc.GetStrides()[dim];
-    auto inputTv           = miopen::get_inner_expanded_tv<5>(miopen::deref(pInputDesc));
-    auto inputTvWithoutDim = miopen::get_tv_without_dim<5>(inputTv, dim);
-    auto outputTv          = miopen::get_inner_expanded_tv<5>(miopen::deref(outputDesc));
-    auto indicesTv         = miopen::get_inner_expanded_tv<5>(miopen::deref(indicesDesc));
+    size_t inputSize       = driver_tensor::GetElementSize(pInputDesc);
+    auto inputLengths      = driver_tensor::GetLengths(pInputDesc);
+    auto inputStrides      = driver_tensor::GetStrides(pInputDesc);
+    size_t dimSize         = inputLengths[dim];
+    size_t dimStride       = inputStrides[dim];
+    auto inputTv           = get_inner_expanded_tv<5>(pInputDesc);
+    auto inputTvWithoutDim = get_tv_without_dim<5>(inputTv, dim);
+    auto outputTv          = get_inner_expanded_tv<5>(outputDesc);
+    auto indicesTv         = get_inner_expanded_tv<5>(indicesDesc);
 
     size_t numSlice = inputSize / dimSize;
 
@@ -161,7 +163,7 @@ int KthvalueDriver<TIO>::ParseCmdLineArgs(int argc, char* argv[])
     int num_dim  = inDims.size();
     if(dim < -num_dim || dim >= num_dim)
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Kthvalue: dim doesn't not exist");
+        DRIVER_THROW("Kthvalue: dim doesn't not exist");
     }
 
     if(inflags.GetValueInt("time") == 1)
@@ -241,9 +243,9 @@ int KthvalueDriver<TIO>::AddCmdLineArgs()
 template <typename TIO>
 int KthvalueDriver<TIO>::AllocateBuffersAndCopy()
 {
-    size_t in_sz  = miopen::deref(inputDesc).GetElementSize();
-    size_t idx_sz = miopen::deref(indicesDesc).GetElementSize();
-    size_t out_sz = miopen::deref(outputDesc).GetElementSize();
+    size_t in_sz  = driver_tensor::GetElementSize(inputDesc);
+    size_t idx_sz = driver_tensor::GetElementSize(indicesDesc);
+    size_t out_sz = driver_tensor::GetElementSize(outputDesc);
 
     uint32_t ctx = 0;
 

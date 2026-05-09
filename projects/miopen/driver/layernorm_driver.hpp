@@ -31,6 +31,7 @@
 #include <../test/cpu_layernorm.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
+#include "driver_tensor.hpp"
 #include "miopen/miopen.h"
 #include "random.hpp"
 #include "tensor_driver.hpp"
@@ -38,7 +39,7 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <miopen/errors.hpp>
+#include "driver_errors.hpp"
 #include <miopen/tensor.hpp>
 #include <vector>
 
@@ -172,7 +173,7 @@ int LayerNormDriver<T>::GetandSetData()
 
     dim = inflags.GetValueInt("normalized_dim");
 
-    MIOPEN_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
+    DRIVER_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
                     "normalized_dim out of range");
 
     std::vector<int> inner_len;
@@ -189,35 +190,35 @@ int LayerNormDriver<T>::GetandSetData()
 
     if(SetTensorNd(inputDesc, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor.");
+        DRIVER_THROW("Error parsing input tensor.");
 
     if(SetTensorNd(weightDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting weight tensor.");
+        DRIVER_THROW("Error setting weight tensor.");
 
     if(SetTensorNd(biasDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting bias tensor.");
+        DRIVER_THROW("Error setting bias tensor.");
 
     if(SetTensorNd(outputDesc, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        DRIVER_THROW("Error setting output tensor.");
 
     if(SetTensorNd(meanDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting mean tensor.");
+        DRIVER_THROW("Error setting mean tensor.");
 
     if(SetTensorNd(rstdDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting rstd tensor.");
+        DRIVER_THROW("Error setting rstd tensor.");
 
     if(SetTensorNd(dyDesc, in_len, inflags.GetValueStr("layout"), data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dy tensor.");
+        DRIVER_THROW("Error setting dy tensor.");
 
     if(SetTensorNd(dxDesc, in_len, inflags.GetValueStr("layout"), data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dx tensor.");
+        DRIVER_THROW("Error setting dx tensor.");
 
     if(SetTensorNd(dwDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dw tensor.");
+        DRIVER_THROW("Error setting dw tensor.");
 
     if(SetTensorNd(dbDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting db tensor.");
+        DRIVER_THROW("Error setting db tensor.");
 
     eps  = inflags.GetValueDouble("eps");
     mode = miopenNormMode_t(inflags.GetValueInt("mode"));
@@ -308,22 +309,22 @@ int LayerNormDriver<T>::AllocateBuffersAndCopy()
     db_dev        = std::unique_ptr<GPUMem>(new GPUMem(ctx, db_sz, sizeof(T)));
     workspace_dev = std::unique_ptr<GPUMem>(new GPUMem(ctx, ws_sizeInBytes, sizeof(std::byte)));
 
-    in       = tensor<T>(miopen::deref(inputDesc)).generate(genT0val);
-    weight   = tensor<T>(miopen::deref(weightDesc)).generate(genT0val);
-    bias     = tensor<T>(miopen::deref(biasDesc)).generate(genT0val);
-    out      = tensor<T>(miopen::deref(outputDesc)).generate(genT0val);
-    mean     = tensor<T>(miopen::deref(meanDesc)).generate(genT0val);
-    rstd     = tensor<T>(miopen::deref(rstdDesc)).generate(genT0val);
-    dy       = tensor<T>(miopen::deref(dyDesc)).generate(genT0val);
-    dx       = tensor<T>(miopen::deref(dxDesc)).generate(genT0val);
-    dw       = tensor<T>(miopen::deref(dwDesc)).generate(genT0val);
-    db       = tensor<T>(miopen::deref(dbDesc)).generate(genT0val);
-    outhost  = tensor<T>(miopen::deref(outputDesc)).generate(genT0val);
-    meanhost = tensor<T>(miopen::deref(meanDesc)).generate(genT0val);
-    rstdhost = tensor<T>(miopen::deref(rstdDesc)).generate(genT0val);
-    dxhost   = tensor<T>(miopen::deref(dxDesc)).generate(genT0val);
-    dwhost   = tensor<T>(miopen::deref(dwDesc)).generate(genT0val);
-    dbhost   = tensor<T>(miopen::deref(dbDesc)).generate(genT0val);
+    in       = tensor<T>(driver_tensor::GetLengths(inputDesc), driver_tensor::GetStrides(inputDesc)).generate(genT0val);
+    weight   = tensor<T>(driver_tensor::GetLengths(weightDesc), driver_tensor::GetStrides(weightDesc)).generate(genT0val);
+    bias     = tensor<T>(driver_tensor::GetLengths(biasDesc), driver_tensor::GetStrides(biasDesc)).generate(genT0val);
+    out      = tensor<T>(driver_tensor::GetLengths(outputDesc), driver_tensor::GetStrides(outputDesc)).generate(genT0val);
+    mean     = tensor<T>(driver_tensor::GetLengths(meanDesc), driver_tensor::GetStrides(meanDesc)).generate(genT0val);
+    rstd     = tensor<T>(driver_tensor::GetLengths(rstdDesc), driver_tensor::GetStrides(rstdDesc)).generate(genT0val);
+    dy       = tensor<T>(driver_tensor::GetLengths(dyDesc), driver_tensor::GetStrides(dyDesc)).generate(genT0val);
+    dx       = tensor<T>(driver_tensor::GetLengths(dxDesc), driver_tensor::GetStrides(dxDesc)).generate(genT0val);
+    dw       = tensor<T>(driver_tensor::GetLengths(dwDesc), driver_tensor::GetStrides(dwDesc)).generate(genT0val);
+    db       = tensor<T>(driver_tensor::GetLengths(dbDesc), driver_tensor::GetStrides(dbDesc)).generate(genT0val);
+    outhost  = tensor<T>(driver_tensor::GetLengths(outputDesc), driver_tensor::GetStrides(outputDesc)).generate(genT0val);
+    meanhost = tensor<T>(driver_tensor::GetLengths(meanDesc), driver_tensor::GetStrides(meanDesc)).generate(genT0val);
+    rstdhost = tensor<T>(driver_tensor::GetLengths(rstdDesc), driver_tensor::GetStrides(rstdDesc)).generate(genT0val);
+    dxhost   = tensor<T>(driver_tensor::GetLengths(dxDesc), driver_tensor::GetStrides(dxDesc)).generate(genT0val);
+    dwhost   = tensor<T>(driver_tensor::GetLengths(dwDesc), driver_tensor::GetStrides(dwDesc)).generate(genT0val);
+    dbhost   = tensor<T>(driver_tensor::GetLengths(dbDesc), driver_tensor::GetStrides(dbDesc)).generate(genT0val);
 
     for(int i = 0; i < in_sz; i++)
     {
@@ -661,7 +662,7 @@ std::vector<int> LayerNormDriver<T>::GetInputTensorLengthsFromCmdLine()
     }
     else
     {
-        MIOPEN_THROW("Invalid tensor sizes");
+        DRIVER_THROW("Invalid tensor sizes");
     }
 }
 
@@ -690,45 +691,39 @@ void LayerNormDriver<T>::ValidateLayout()
     else if(layout_value != "NCHW" && layout_value != "NHWC" && layout_value != "NCDHW" &&
             layout_value != "NDHWC" && layout_value != "NW")
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid layout parameter value: " + layout_value);
+        DRIVER_THROW("Invalid layout parameter value: " + layout_value);
     }
     else if((in_d == 0 || in_c == 0 || in_h == 0) &&
             (layout_value == "NCDHW" || layout_value == "NDHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "The input depth (in_d), channels (in_c) and height (in_h) must be greater "
+        DRIVER_THROW("The input depth (in_d), channels (in_c) and height (in_h) must be greater "
                      "than zero for layouts NCDHW and NDHWC");
     }
     else if(in_d != 0 && (layout_value == "NCHW" || layout_value == "NHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "The input depth (in_d) must be zero and the input channels (in_c) and height "
+        DRIVER_THROW("The input depth (in_d) must be zero and the input channels (in_c) and height "
                      "(in_h) must be greater than zero for layouts NCHW and NHWC");
     }
     else if((in_d != 0 || in_c != 0 || in_h != 0) && layout_value == "NW")
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "The input depth (in_d), channels (in_c) and height (in_h) must be zero for "
+        DRIVER_THROW("The input depth (in_d), channels (in_c) and height (in_h) must be zero for "
                      "layout NW");
     }
 
     int normalized_dim = inflags.GetValueInt("normalized_dim");
     if(normalized_dim >= 5 && (layout_value == "NCDHW" || layout_value == "NDHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "The normalized dimension (normalized_dim) must be less than 5 for layouts "
+        DRIVER_THROW("The normalized dimension (normalized_dim) must be less than 5 for layouts "
                      "NCDHW and NDHWC");
     }
     else if(normalized_dim >= 4 && (layout_value == "NCHW" || layout_value == "NHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "The normalized dimension (normalized_dim) must be less than 4 for layouts "
+        DRIVER_THROW("The normalized dimension (normalized_dim) must be less than 4 for layouts "
                      "NCHW and NHWC");
     }
     else if(normalized_dim >= 2 && layout_value == "NW")
     {
-        MIOPEN_THROW(miopenStatusBadParm,
-                     "The normalized dimension (normalized_dim) must be less than 2 for layout NW");
+        DRIVER_THROW("The normalized dimension (normalized_dim) must be less than 2 for layout NW");
     }
 }
 

@@ -28,17 +28,17 @@
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 #include "random.hpp"
+#include "driver_tensor_view.hpp"
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <vector>
 #include <../test/tensor_holder.hpp>
 #include <../test/verify.hpp>
-#include <miopen/tensor_view_utils.hpp>
 
 template <typename Tgpu, typename Tcheck>
 int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,
@@ -53,10 +53,10 @@ int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,
                                          const Tgpu* weight,
                                          Tcheck* ref_output)
 {
-    auto I_tv = miopen::get_inner_expanded_tv<2>(miopen::deref(iDesc));
-    auto T_tv = miopen::get_inner_expanded_tv<1>(miopen::deref(tDesc));
-    auto W_tv = miopen::get_inner_expanded_tv<1>(miopen::deref(wDesc));
-    auto O_tv = miopen::get_inner_expanded_tv<1>(miopen::deref(oDesc));
+    auto I_tv = get_inner_expanded_tv<2>(iDesc);
+    auto T_tv = get_inner_expanded_tv<1>(tDesc);
+    auto W_tv = get_inner_expanded_tv<1>(wDesc);
+    auto O_tv = get_inner_expanded_tv<1>(oDesc);
     auto N = I_tv.size[0], C = I_tv.size[1];
 
     int32_t ret     = miopenStatusSuccess;
@@ -293,7 +293,7 @@ int MultiMarginLossDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     {
         I[i] = prng::gen_A_to_B<Tgpu>(static_cast<Tgpu>(-1), static_cast<Tgpu>(1));
     }
-    int C = miopen::deref(iDesc).GetLengths()[1];
+    int C = driver_tensor::GetLengths(iDesc)[1];
     // 0 to C - 1
     for(int i = 0; i < t_sz; i++)
     {
@@ -378,7 +378,7 @@ int MultiMarginLossDriver<Tgpu, Tref>::RunForwardGPU()
             workspace_dev == nullptr ? nullptr : workspace_dev->GetMem(),
             ws_sizeInBytes);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenMultiMarginLossForward");
+        DRIVER_THROW_IF(status != miopenStatusSuccess, "Error in miopenMultiMarginLossForward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);

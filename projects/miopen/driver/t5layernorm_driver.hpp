@@ -33,6 +33,8 @@
 #include "random.hpp"
 #include "tensor_driver.hpp"
 #include "timer.hpp"
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
@@ -49,7 +51,7 @@ int32_t mloT5LayerNormForwardRunHost(miopenTensorDescriptor_t xDesc,
                                      miopenNormMode_t mode,
                                      bool use_multithread)
 {
-    auto dims         = miopen::deref(xDesc).GetLengths();
+    auto dims         = driver_tensor::GetLengths(xDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -61,7 +63,7 @@ int32_t mloT5LayerNormForwardRunHost(miopenTensorDescriptor_t xDesc,
     int32_t ret      = 0;
     size_t min_grain = use_multithread ? 8 : outer_size;
 
-    miopen::par_for(outer_size, min_grain, [&](int32_t o) {
+    driver_ford::par_for(outer_size, min_grain, [&](int32_t o) {
         Tcheck pvar = static_cast<Tcheck>(0);
         for(int32_t i = 0; i < inner_size; i++)
         {
@@ -96,7 +98,7 @@ int32_t mloT5LayerNormBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                       miopenNormMode_t mode,
                                       bool use_multithread)
 {
-    auto dims         = miopen::deref(dyDesc).GetLengths();
+    auto dims         = driver_tensor::GetLengths(dyDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -108,7 +110,7 @@ int32_t mloT5LayerNormBackwardRunHost(miopenTensorDescriptor_t dyDesc,
     int32_t ret      = 0;
     size_t min_grain = use_multithread ? 8 : outer_size;
 
-    miopen::par_for(outer_size, min_grain, [&](int32_t o) {
+    driver_ford::par_for(outer_size, min_grain, [&](int32_t o) {
         Tcheck sum = static_cast<Tcheck>(0);
         for(int32_t i = 0; i < inner_size; i++)
         {
@@ -147,7 +149,7 @@ int32_t mloT5LayerNormBackwardweightRunHost(miopenTensorDescriptor_t dyDesc,
                                             Tcheck* dwhost,
                                             bool use_multithread)
 {
-    auto dims         = miopen::deref(dyDesc).GetLengths();
+    auto dims         = driver_tensor::GetLengths(dyDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -159,7 +161,7 @@ int32_t mloT5LayerNormBackwardweightRunHost(miopenTensorDescriptor_t dyDesc,
     int32_t ret      = 0;
     size_t min_grain = use_multithread ? 8 : inner_size;
 
-    miopen::par_for(inner_size, min_grain, [&](int32_t o) {
+    driver_ford::par_for(inner_size, min_grain, [&](int32_t o) {
         Tcheck sum = static_cast<Tcheck>(0);
         for(uint64_t i = 0; i < outer_size; ++i)
         {
@@ -294,32 +296,32 @@ int T5LayerNormDriver<Tgpu, Tref>::GetandSetData()
 
     inner_len = {in_len[in_len.size() - 1]};
 
-    MIOPEN_THROW_IF(inner_len[0] == 0, "Final dimension must be nonzero");
+    DRIVER_THROW_IF(inner_len[0] == 0, "Final dimension must be nonzero");
 
     std::vector<int> outer_len;
 
     outer_len = {in_len.begin(), in_len.end() - 1};
 
     if(SetTensorNd(xDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        DRIVER_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(weightDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting weight tensor.");
+        DRIVER_THROW("Error setting weight tensor.");
 
     if(SetTensorNd(yDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        DRIVER_THROW("Error setting output tensor.");
 
     if(SetTensorNd(rstdDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting rstd tensor.");
+        DRIVER_THROW("Error setting rstd tensor.");
 
     if(SetTensorNd(dyDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dy tensor.");
+        DRIVER_THROW("Error setting dy tensor.");
 
     if(SetTensorNd(dxDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dx tensor.");
+        DRIVER_THROW("Error setting dx tensor.");
 
     if(SetTensorNd(dwDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dw tensor.");
+        DRIVER_THROW("Error setting dw tensor.");
 
     eps  = static_cast<double>(inflags.GetValueDouble("eps"));
     mode = miopenNormMode_t(inflags.GetValueInt("mode"));

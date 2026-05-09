@@ -30,6 +30,8 @@
 #include "driver.hpp"
 #include "random.hpp"
 #include "tensor_driver.hpp"
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
 #include "timer.hpp"
 
 #include "../test/verify.hpp"
@@ -405,7 +407,7 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardCPU()
     const auto exp_avg_sqs = exp_avg_sq_host.data();
     const auto step        = iter;
 
-    const size_t numel = miopen::deref(paramDesc).GetElementSize();
+    const size_t numel = driver_tensor::GetElementSize(paramDesc);
 
     const float bias_correction1 = 1.0 - pow(beta1, step);
     const float bias_correction2 = 1.0 - pow(beta2, step);
@@ -418,7 +420,7 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardCPU()
     const float one_minus_beta2 = 1.0 - beta2;
     const size_t min_grain      = use_multithread ? 8 : numel;
 
-    miopen::par_for(numel, min_grain, [&](int i) {
+    driver_ford::par_for(numel, min_grain, [&](int i) {
         Tref exp_avg_val    = exp_avgs[i];
         Tref exp_avg_sq_val = exp_avg_sqs[i];
 

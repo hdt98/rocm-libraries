@@ -40,7 +40,9 @@
 #include <type_traits>
 
 #include "calcerr.hpp"
-#include <miopen/bfloat16.hpp>
+#include "driver_errors.hpp"
+#include "driver_ford.hpp"
+#include "driver_tensor.hpp"
 
 #if 0
 template<typename _T>
@@ -111,13 +113,29 @@ struct TensorDimsStrides
 
     TensorDimsStrides() {}
 
-    TensorDimsStrides(int spatial_dim, const miopen::TensorDescriptor& desc)
+    TensorDimsStrides(int spatial_dim, const std::vector<int>& lengths, const std::vector<int>& strides)
     {
-        std::tie(n_batchs, n_outputs, depth, height, width) =
-            miopen::GetNCDHW(spatial_dim, desc.GetLengths());
+        if(spatial_dim == 3)
+        {
+            std::tie(n_batchs, n_outputs, depth, height, width) =
+                driver_tensor::Tien<5>(lengths);
+            std::tie(n_stride, c_stride, d_stride, h_stride, w_stride) =
+                driver_tensor::Tien<5>(strides);
+        }
+        else
+        {
+            n_batchs  = lengths[0];
+            n_outputs = lengths[1];
+            depth     = 1;
+            height    = lengths[2];
+            width     = lengths[3];
 
-        std::tie(n_stride, c_stride, d_stride, h_stride, w_stride) =
-            miopen::GetNCDHW(spatial_dim, desc.GetStrides());
+            n_stride = strides[0];
+            c_stride = strides[1];
+            d_stride = 1;
+            h_stride = strides[2];
+            w_stride = strides[3];
+        }
     }
 };
 
@@ -186,7 +204,7 @@ void fwd_pooling_compute_verify(const TensorDimsStrides& bot_dims_strides,
                       "'match' has to be std::atomic_bool when running in multi-threaded mode");
         if(!stats_mutex.has_value())
         {
-            MIOPEN_THROW(
+            DRIVER_THROW(
                 "'std::mutex' is needed as last parameter when running in multi-threaded mode");
         }
     }
@@ -379,12 +397,14 @@ bool mloPoolingForwardRunHostAndVerify(PoolingConfig poolConf,
                                        pooling_math_stats& stats,
                                        int index_position = 1)
 {
-    const miopen::TensorDescriptor& bot = miopen::deref(bot_);
-    const miopen::TensorDescriptor& top = miopen::deref(top_);
+    const auto bot_lens = driver_tensor::GetLengths(bot_);
+    const auto bot_strs = driver_tensor::GetStrides(bot_);
+    const auto top_lens = driver_tensor::GetLengths(top_);
+    const auto top_strs = driver_tensor::GetStrides(top_);
 
-    const auto spatial_dim = bot.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot);
-    TensorDimsStrides top_dims_strides(spatial_dim, top);
+    const auto spatial_dim = bot_lens.size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_lens, bot_strs);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_lens, top_strs);
 
     // Mask data is always NCDHW
     std::array<int, 5> mask_strides;
@@ -441,12 +461,14 @@ bool mloPoolingForwardRunHostAndVerify_mt(PoolingConfig poolConf,
                                           pooling_math_stats& stats,
                                           int index_position = 1)
 {
-    const miopen::TensorDescriptor& bot = miopen::deref(bot_);
-    const miopen::TensorDescriptor& top = miopen::deref(top_);
+    const auto bot_lens = driver_tensor::GetLengths(bot_);
+    const auto bot_strs = driver_tensor::GetStrides(bot_);
+    const auto top_lens = driver_tensor::GetLengths(top_);
+    const auto top_strs = driver_tensor::GetStrides(top_);
 
-    const auto spatial_dim = bot.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot);
-    TensorDimsStrides top_dims_strides(spatial_dim, top);
+    const auto spatial_dim = bot_lens.size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_lens, bot_strs);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_lens, top_strs);
 
     // Mask data is always NCDHW
     std::array<int, 5> mask_strides;
@@ -460,7 +482,7 @@ bool mloPoolingForwardRunHostAndVerify_mt(PoolingConfig poolConf,
     Tcheck_ MAX_VAL(3.402823466e+38);
     Tgpu_ G_MAX_VAL = std::numeric_limits<Tgpu_>::max();
     std::mutex stats_mutex;
-    miopen::par_ford(bot_dims_strides.n_batchs, bot_dims_strides.n_outputs)([&](int b, int o) {
+    driver_ford::par_ford(bot_dims_strides.n_batchs, bot_dims_strides.n_outputs)([&](int b, int o) {
         fwd_pooling_compute_verify<true>(bot_dims_strides,
                                          top_dims_strides,
                                          poolConf,
@@ -625,13 +647,15 @@ void mloPoolingBackwardRunHost(
     const size_t* mask_ptr,
     pooling_math_stats& stats)
 {
-    const miopen::TensorDescriptor& bot_df = miopen::deref(bot_df_);
-    const miopen::TensorDescriptor& top_df = miopen::deref(top_df_);
+    const auto bot_df_lens = driver_tensor::GetLengths(bot_df_);
+    const auto bot_df_strs = driver_tensor::GetStrides(bot_df_);
+    const auto top_df_lens = driver_tensor::GetLengths(top_df_);
+    const auto top_df_strs = driver_tensor::GetStrides(top_df_);
 
-    const auto spatial_dim = bot_df.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df);
-    TensorDimsStrides top_dims_strides(spatial_dim, top_df);
-    std::vector<int> num_flops(bot_df.GetElementSize(), 0);
+    const auto spatial_dim = bot_df_lens.size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df_lens, bot_df_strs);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_df_lens, top_df_strs);
+    std::vector<int> num_flops(driver_tensor::GetElementSize(bot_df_), 0);
 
     for(int b = 0; b < bot_dims_strides.n_batchs; b++)
     {
@@ -662,16 +686,18 @@ void mloPoolingBackwardRunHost_mt(
     const size_t* mask_ptr,
     pooling_math_stats& stats)
 {
-    const miopen::TensorDescriptor& bot_df = miopen::deref(bot_df_);
-    const miopen::TensorDescriptor& top_df = miopen::deref(top_df_);
+    const auto bot_df_lens = driver_tensor::GetLengths(bot_df_);
+    const auto bot_df_strs = driver_tensor::GetStrides(bot_df_);
+    const auto top_df_lens = driver_tensor::GetLengths(top_df_);
+    const auto top_df_strs = driver_tensor::GetStrides(top_df_);
 
-    const auto spatial_dim = bot_df.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df);
-    TensorDimsStrides top_dims_strides(spatial_dim, top_df);
+    const auto spatial_dim = bot_df_lens.size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df_lens, bot_df_strs);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_df_lens, top_df_strs);
 
-    std::vector<int> num_flops(bot_df.GetElementSize(), 0);
+    std::vector<int> num_flops(driver_tensor::GetElementSize(bot_df_), 0);
 
-    miopen::par_ford(bot_dims_strides.n_batchs, bot_dims_strides.n_outputs)([&](int b, int o) {
+    driver_ford::par_ford(bot_dims_strides.n_batchs, bot_dims_strides.n_outputs)([&](int b, int o) {
         bwd_pooling_compute<true>(bot_dims_strides,
                                   top_dims_strides,
                                   poolConf,
