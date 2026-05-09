@@ -26,7 +26,6 @@
 #ifndef MLO_GROUPNORMHOST_H_
 #define MLO_GROUPNORMHOST_H_
 
-#include <miopen/tensor.hpp>
 
 ////////////////////////////////////////////////////////////
 //
@@ -44,9 +43,9 @@ int32_t mloGroupNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                    miopenNormMode_t mode,
                                    bool use_multithread)
 {
-    auto dims = miopen::deref(inputDesc).GetLengths();
+    auto dims = tensor_utils::GetLengths(inputDesc);
 
-    size_t numel             = miopen::deref(inputDesc).GetElementSize();
+    size_t numel             = tensor_utils::GetElementSize(inputDesc);
     size_t numel_per_channel = numel / dims[0] / dims[1];
     size_t num_channels      = dims[1];
 

@@ -36,7 +36,7 @@
 
 #include <miopen_utils/verify.hpp>
 
-#include <miopen/dropout.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 
 #include <algorithm>
@@ -254,19 +254,19 @@ int DropoutDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     reservespace_dev =
         std::unique_ptr<GPUMem>(new GPUMem(ctx, reserveSpaceSize, sizeof(unsigned char)));
 
-    in   = tensor<Tgpu>(miopen::deref(inputTensor).GetLengths(),
-                      miopen::deref(inputTensor).GetStrides());
-    din  = tensor<Tgpu>(miopen::deref(inputTensor).GetLengths(),
-                       miopen::deref(inputTensor).GetStrides());
-    out  = tensor<Tgpu>(miopen::deref(outputTensor).GetLengths(),
-                       miopen::deref(outputTensor).GetStrides());
-    dout = tensor<Tgpu>(miopen::deref(outputTensor).GetLengths(),
-                        miopen::deref(outputTensor).GetStrides());
+    in   = tensor<Tgpu>(tensor_utils::GetLengths(inputTensor),
+                      tensor_utils::GetStrides(inputTensor));
+    din  = tensor<Tgpu>(tensor_utils::GetLengths(inputTensor),
+                       tensor_utils::GetStrides(inputTensor));
+    out  = tensor<Tgpu>(tensor_utils::GetLengths(outputTensor),
+                       tensor_utils::GetStrides(outputTensor));
+    dout = tensor<Tgpu>(tensor_utils::GetLengths(outputTensor),
+                        tensor_utils::GetStrides(outputTensor));
 
-    outhost  = tensor<Tref>(miopen::deref(outputTensor).GetLengths(),
-                           miopen::deref(outputTensor).GetStrides());
-    din_host = tensor<Tref>(miopen::deref(inputTensor).GetLengths(),
-                            miopen::deref(inputTensor).GetStrides());
+    outhost  = tensor<Tref>(tensor_utils::GetLengths(outputTensor),
+                           tensor_utils::GetStrides(outputTensor));
+    din_host = tensor<Tref>(tensor_utils::GetLengths(inputTensor),
+                            tensor_utils::GetStrides(inputTensor));
 
     reservespace      = std::vector<unsigned char>(reserveSpaceSize, static_cast<unsigned char>(1));
     reservespace_host = std::vector<unsigned char>(reserveSpaceSize, static_cast<unsigned char>(1));
@@ -362,7 +362,7 @@ int DropoutDriver<Tgpu, Tref>::RunForwardGPU()
 template <typename Tgpu, typename Tref>
 int DropoutDriver<Tgpu, Tref>::RunForwardCPU()
 {
-    InitKernelStateEmulator(states_host, DropoutDesc);
+    InitKernelStateEmulator(states_host, DropoutDesc, GetHandle());
 
     RunDropoutForwardEmulator<Tgpu, Tref>(GetHandle(),
                                           DropoutDesc,
@@ -436,6 +436,7 @@ int DropoutDriver<Tgpu, Tref>::RunBackwardCPU()
         if(multithread)
         {
             RunDropoutBackwardEmulatorMT<Tgpu, Tref>(DropoutDesc,
+                                                     GetHandle(),
                                                      outputTensor,
                                                      dout.data,
                                                      inputTensor,
@@ -445,6 +446,7 @@ int DropoutDriver<Tgpu, Tref>::RunBackwardCPU()
         else
         {
             RunDropoutBackwardEmulator<Tgpu, Tref>(DropoutDesc,
+                                                   GetHandle(),
                                                    outputTensor,
                                                    dout.data,
                                                    inputTensor,

@@ -40,9 +40,8 @@
 #include <miopen_utils/fusionHost.hpp>
 
 #include <common_utils/errors.hpp>
-#include <miopen/handle.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include "miopen/batch_norm.hpp"
 
 #include <algorithm>
@@ -1308,7 +1307,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
         iteration = i; // Modifies the captured reference for the case of not using HIP graph
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -1354,9 +1353,9 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(in.GetTensor().desc.GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(in.GetTensor().desc.GetLengths());
         size_t M                         = in_n * in_c * in_h * in_w;
-        size_t dataSz = (M + 2 * in_c) * miopen::GetTypeSize(in.GetTensor().desc.GetType());
+        size_t dataSz = (M + 2 * in_c) * tensor_utils::GetTypeSize(in.GetTensor().desc.GetType());
         float rdCnt   = -1.0;
         float wrCnt   = 1.0;
         if(forw == 1)
@@ -1692,7 +1691,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
 
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -1718,9 +1717,9 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                 avgtime += time;
 
             int in_n, in_c, in_h, in_w;
-            std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(in.GetTensor().desc.GetLengths());
+            std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(in.GetTensor().desc.GetLengths());
             size_t M                         = in_n * in_c * in_h * in_w;
-            size_t dataSz = (M + 2 * in_c) * miopen::GetTypeSize(in.GetTensor().desc.GetType());
+            size_t dataSz = (M + 2 * in_c) * tensor_utils::GetTypeSize(in.GetTensor().desc.GetType());
             float rdCnt   = 2.0;
             float wrCnt   = 1.0;
             // layer, flopCnt, reads, writes, GFLOPS, GB/s, timeMs

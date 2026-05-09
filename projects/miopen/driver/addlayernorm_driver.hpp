@@ -38,7 +38,6 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 
@@ -56,7 +55,7 @@ int32_t mloAddLayerNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                       miopenNormMode_t mode,
                                       bool use_multithread)
 {
-    auto dims         = miopen::deref(inputDesc).GetLengths();
+    auto dims         = tensor_utils::GetLengths(inputDesc);
     size_t outer_size = 1;
     size_t inner_size = 1;
     size_t norm_dim   = static_cast<size_t>(normalized_dim);

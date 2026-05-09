@@ -36,6 +36,7 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 #include <miopen/tensor_view_utils.hpp>
@@ -60,10 +61,10 @@ int32_t mloGetitemBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                   int32_t* slices,
                                   uint32_t /*offset*/)
 {
-    auto dy_dims  = miopen::deref(dyDesc).GetLengths();
+    auto dy_dims  = tensor_utils::GetLengths(dyDesc);
     auto dy_numel = std::accumulate(dy_dims.begin(), dy_dims.end(), 1L, std::multiplies<int64_t>());
-    auto dx_dims  = miopen::deref(dxDesc).GetLengths();
-    auto index_dims = miopen::deref(indexDescs[0]).GetLengths();
+    auto dx_dims  = tensor_utils::GetLengths(dxDesc);
+    auto index_dims = tensor_utils::GetLengths(indexDescs[0]);
     auto index_numel =
         std::accumulate(index_dims.begin(), index_dims.end(), 1L, std::multiplies<int64_t>());
     auto element_index = std::vector<int32_t>(indexCount * index_numel + indexCount);

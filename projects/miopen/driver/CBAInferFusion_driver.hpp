@@ -42,7 +42,7 @@
 #include <miopen_utils/cpu_bias.hpp>
 
 #include <common_utils/errors.hpp>
-#include <miopen/handle.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 
@@ -175,7 +175,7 @@ public:
                 avgtime += time;
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
 
         if(WALL_CLOCK)
@@ -672,7 +672,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
 template <typename Tgpu, typename Tref>
 std::vector<int> CBAInferFusionDriver<Tgpu, Tref>::GetOutputTensorLengths()
 {
-    int ndim = miopen::deref(inputTensor).GetNumDims();
+    int ndim = tensor_utils::GetNumDims(inputTensor);
 
     std::vector<int> out_lens(ndim);
 
@@ -1285,14 +1285,31 @@ void CBAInferFusionDriver<Tgpu, Tref>::runCPUConvFwdInference()
     in_local_host.data  = in_host;
     wei_local_host.data = wei_host;
     outhost_local_host.data.resize(outhost_local_host.desc.GetElementSpace());
-    cpu_convolution_forward(miopen::deref(convDesc).GetSpatialDimension(),
+
+    int cba_spatial_dim = 0;
+    miopenGetConvolutionSpatialDim(convDesc, &cba_spatial_dim);
+    std::vector<int> cba_pads(cba_spatial_dim);
+    std::vector<int> cba_strides(cba_spatial_dim);
+    std::vector<int> cba_dilations(cba_spatial_dim);
+    miopenConvolutionMode_t cba_mode_unused;
+    miopenGetConvolutionNdDescriptor(convDesc,
+                                     cba_spatial_dim,
+                                     &cba_spatial_dim,
+                                     cba_pads.data(),
+                                     cba_strides.data(),
+                                     cba_dilations.data(),
+                                     &cba_mode_unused);
+    int cba_group_count = 0;
+    miopenGetConvolutionGroupCount(convDesc, &cba_group_count);
+
+    cpu_convolution_forward(cba_spatial_dim,
                             in_local_host,
                             wei_local_host,
                             outhost_local_host,
-                            miopen::deref(convDesc).GetConvPads(),
-                            miopen::deref(convDesc).GetConvStrides(),
-                            miopen::deref(convDesc).GetConvDilations(),
-                            miopen::deref(convDesc).GetGroupCount());
+                            cba_pads,
+                            cba_strides,
+                            cba_dilations,
+                            cba_group_count);
 
     if constexpr(!std::is_same_v<Tgpu, Tref>)
     {
@@ -1305,8 +1322,8 @@ void CBAInferFusionDriver<Tgpu, Tref>::runCPUConvFwdInference()
 
     if(bias_mode)
     {
-        tensor<Tref> bias_local_host(miopen::deref(biasTensor).GetLengths(),
-                                     miopen::deref(biasTensor).GetStrides());
+        tensor<Tref> bias_local_host(tensor_utils::GetLengths(biasTensor),
+                                     tensor_utils::GetStrides(biasTensor));
         bias_local_host.data = bias_host;
         cpu_bias_forward(outhost_local_host, bias_local_host);
     }

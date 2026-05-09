@@ -29,9 +29,9 @@
 
 #include "mloNeuronHost.hpp"
 
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/convolution.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <miopen/tensor_extra.hpp>
 
 #include <cmath>
@@ -49,7 +49,7 @@ int miopenBNSpatialFwdInferHost(miopenTensorDescriptor_t& inputTensor,
 {
     int nIn, cIn, hIn, wIn;
     miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
-    const auto tensorLayout = miopen::deref(inputTensor).GetLayout_t();
+    const auto tensorLayout = tensor_utils::GetLayout(inputTensor);
 
     int n_batchs = nIn;
     int channels = cIn;
@@ -106,7 +106,7 @@ int miopenBNPerActivFwdInferHost(miopenTensorDescriptor_t& inputTensor,
 
     int nIn, cIn, hIn, wIn;
     miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
-    const auto tensorLayout = miopen::deref(inputTensor).GetLayout_t();
+    const auto tensorLayout = tensor_utils::GetLayout(inputTensor);
 
     int n_batchs = nIn;
     int channels = cIn;
@@ -299,7 +299,8 @@ int ConvForwardCPU(const std::vector<Tref>& in,
 
     int stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w;
     miopenConvolutionMode_t mode;
-    miopenPaddingMode_t pmode = miopen::deref(convDesc).paddingMode;
+    miopenPaddingMode_t pmode;
+    miopenGetConvolutionPaddingMode(convDesc, &pmode);
     miopenGetConvolutionDescriptor(
         convDesc, &mode, &pad_h, &pad_w, &stride_h, &stride_w, &dilation_h, &dilation_w);
 

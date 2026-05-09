@@ -36,7 +36,7 @@
 
 #include <common_utils/float_equal.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
+#include <common_utils/tensor_utils.hpp>
 
 template <typename Tgpu, typename Tref>
 class TensorOpDriver : public Driver
@@ -280,7 +280,7 @@ int TensorOpDriver<Tgpu, Tref>::RunForwardGPU()
         else if(is_scale)
             miopenScaleTensor(GetHandle(), aTensor, a_dev->GetMem(), &ftensor_val);
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
 
         STOP_TIME
         if(WALL_CLOCK)
@@ -312,9 +312,9 @@ int TensorOpDriver<Tgpu, Tref>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(aTensor).GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(aTensor));
         size_t dataSz =
-            in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(aTensor).GetType());
+            in_n * in_c * in_h * in_w * tensor_utils::GetTypeSize(tensor_utils::GetType(aTensor));
 
         printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
         printf("stats: tensor op, %zu, %zu, %f, %f\n",

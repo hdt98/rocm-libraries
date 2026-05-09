@@ -33,6 +33,7 @@
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
 
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/tensor_view_utils.hpp>
 #include <miopen/miopen.h>
 #include <common_utils/errors.hpp>
@@ -241,9 +242,9 @@ int KthvalueDriver<TIO>::AddCmdLineArgs()
 template <typename TIO>
 int KthvalueDriver<TIO>::AllocateBuffersAndCopy()
 {
-    size_t in_sz  = miopen::deref(inputDesc).GetElementSize();
-    size_t idx_sz = miopen::deref(indicesDesc).GetElementSize();
-    size_t out_sz = miopen::deref(outputDesc).GetElementSize();
+    size_t in_sz  = tensor_utils::GetElementSize(inputDesc);
+    size_t idx_sz = tensor_utils::GetElementSize(indicesDesc);
+    size_t out_sz = tensor_utils::GetElementSize(outputDesc);
 
     uint32_t ctx = 0;
 

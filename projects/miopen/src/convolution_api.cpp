@@ -181,6 +181,15 @@ extern "C" miopenStatus_t miopenGetConvolutionGroupCount(miopenConvolutionDescri
     return miopen::try_([&] { miopen::deref(groupCount) = miopen::deref(convDesc).group_count; });
 }
 
+MIOPEN_EXPORT extern "C" miopenStatus_t
+miopenGetConvolutionPaddingMode(miopenConvolutionDescriptor_t convDesc,
+                                miopenPaddingMode_t* paddingMode)
+{
+    MIOPEN_LOG_FUNCTION(convDesc);
+    return miopen::try_(
+        [&] { miopen::deref(paddingMode) = miopen::deref(convDesc).paddingMode; });
+}
+
 MIOPEN_EXPORT
 extern "C" miopenStatus_t miopenSetConvolutionGroupCount(miopenConvolutionDescriptor_t convDesc,
                                                          int groupCount)

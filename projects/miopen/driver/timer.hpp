@@ -28,7 +28,29 @@
 
 #include <chrono>
 #include <cassert>
-#include <miopen/handle.hpp>
+#include <memory>
+#include <hip/hip_runtime_api.h>
+
+namespace driver_timer_detail {
+
+struct HipEventDeleter
+{
+    void operator()(hipEvent_t e) const
+    {
+        if(e != nullptr)
+            (void)hipEventDestroy(e);
+    }
+};
+using HipEventPtr = std::unique_ptr<ihipEvent_t, HipEventDeleter>;
+
+inline HipEventPtr make_hip_event()
+{
+    hipEvent_t e = nullptr;
+    (void)hipEventCreateWithFlags(&e, hipEventDefault);
+    return HipEventPtr{e};
+}
+
+} // namespace driver_timer_detail
 
 #define WALL_CLOCK inflags.GetValueInt("wall")
 
@@ -154,8 +176,8 @@ public:
             endEvent.reserve(size);
             for(auto i = size; i > 0; --i)
             {
-                startEvent.push_back(miopen::make_hip_event());
-                endEvent.push_back(miopen::make_hip_event());
+                startEvent.push_back(driver_timer_detail::make_hip_event());
+                endEvent.push_back(driver_timer_detail::make_hip_event());
             }
         }
     }
@@ -276,8 +298,8 @@ public:
 private:
     std::vector<float> hostTimePerLaunch;
 
-    std::vector<miopen::HipEventPtr> startEvent;
-    std::vector<miopen::HipEventPtr> endEvent;
+    std::vector<driver_timer_detail::HipEventPtr> startEvent;
+    std::vector<driver_timer_detail::HipEventPtr> endEvent;
 
     hipStream_t stream;
     std::chrono::time_point<std::chrono::steady_clock> st;

@@ -33,6 +33,7 @@
 #include "random.hpp"
 #include <cstdlib>
 #include <memory>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 #include <vector>
@@ -49,7 +50,7 @@ int32_t mloSoftMarginLossForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                         Tcheck* outputhost,
                                         miopenLossReductionMode_t reduction_mode)
 {
-    auto input_numel = miopen::deref(inputDesc).GetElementSize();
+    auto input_numel = tensor_utils::GetElementSize(inputDesc);
     auto i_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
     auto t_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(targetDesc));
     auto o_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(outputDesc));
@@ -87,7 +88,7 @@ int32_t mloSoftMarginLossBackwardRunHost(miopenTensorDescriptor_t inputDesc,
                                          Tcheck* dIhost,
                                          miopenLossReductionMode_t reduction_mode)
 {
-    auto input_numel = miopen::deref(inputDesc).GetElementSize();
+    auto input_numel = tensor_utils::GetElementSize(inputDesc);
     auto i_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
     auto t_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(targetDesc));
     auto dO_tv       = miopen::get_inner_expanded_tv<5>(miopen::deref(dODesc));

@@ -858,7 +858,7 @@ int RNNDriver<Tgpu, Tref>::RunForwardGPU()
         time_logger.StopAndPush();
     }
 
-    miopen::deref(GetHandle()).Finish();
+    (void)hipStreamSynchronize(GetStream());
     if(inflags.GetValueInt("time") == 1)
     {
         printf("Forward RNN time results:\n");
@@ -1134,7 +1134,7 @@ int RNNDriver<Tgpu, Tref>::RunBackwardGPU()
             time_logger.StopAndPush();
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         if(inflags.GetValueInt("time") == 1)
         {
             printf("Backward Data RNN time results:\n");
@@ -1174,7 +1174,7 @@ int RNNDriver<Tgpu, Tref>::RunBackwardGPU()
                                            reservespace_dev->GetSize());
             time_logger.StopAndPush();
         }
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
 
         if(inflags.GetValueInt("time") == 1)
         {

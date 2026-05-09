@@ -34,8 +34,8 @@
 #include "timer.hpp"
 #include "util_driver.hpp"
 
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 
 #include <algorithm>
 #include <cfloat>
@@ -329,7 +329,7 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
 
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -373,9 +373,9 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(inputTensor));
         size_t dataSz =
-            in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
+            in_n * in_c * in_h * in_w * tensor_utils::GetTypeSize(tensor_utils::GetType(inputTensor));
 
         // layer, readbytes, writebytes, BG/s, timeMS
         printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
@@ -432,7 +432,7 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
 
         ExecuteKernel();
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         STOP_TIME
         if(WALL_CLOCK)
         {
@@ -476,9 +476,9 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(inputTensor));
         size_t dataSz =
-            in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
+            in_n * in_c * in_h * in_w * tensor_utils::GetTypeSize(tensor_utils::GetType(inputTensor));
 
         // layer, readbytes, writebytes, BG/s, timeMS
         printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
