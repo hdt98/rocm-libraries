@@ -28,7 +28,7 @@
 
 #include "get_handle.hpp"
 #include "tensor_util.hpp"
-#include "verify.hpp"
+#include <miopen_utils/verify.hpp>
 
 #define PERF_ENABLE 0
 #if PERF_ENABLE

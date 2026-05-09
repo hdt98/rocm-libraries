@@ -38,8 +38,7 @@
 
 #include <miopen_utils/verify.hpp>
 
-#include <miopen/errors.hpp>
-#include <miopen/logger.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/miopen.h>
 #include <miopen/rnn.hpp>
 #include <miopen/tensor.hpp>
@@ -295,19 +294,19 @@ int RNNSeqDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     int nn_dir = inflags.GetValueInt("forw");
     if(inflags.GetValueInt("fwdtype") == 1 && !(nn_dir == 0 || nn_dir == 1))
     {
-        MIOPEN_THROW(
+        COMMON_THROW(
             "Incorrect input, In Inference only fwd direction is allowed ((forw=0) OR (forw=1)).");
     }
 
     if(inflags.GetValueInt("iter") > 1 && inflags.GetValueInt("verify") != 0)
-        MIOPEN_THROW(
+        COMMON_THROW(
             "To use non default Number of Iterations >1 need to disable Verification -V 0.");
 
     if((nn_dir & 4) && !(nn_dir & 2) && !(nn_dir & 1))
-        MIOPEN_THROW("Incorrect input, calculation of BackwardWeights require BackwardData and "
+        COMMON_THROW("Incorrect input, calculation of BackwardWeights require BackwardData and "
                      "ForwardData.");
     if((nn_dir & 2) && !(nn_dir & 1))
-        MIOPEN_THROW("Incorrect input, calculation of BackwardData require ForwardData.");
+        COMMON_THROW("Incorrect input, calculation of BackwardData require ForwardData.");
 
     return miopenStatusSuccess;
 }
@@ -507,7 +506,7 @@ miopenRNNBaseLayout_t RNNSeqDriver<Tgpu, Tref>::GetIODataLayoutFromCmdLine()
     case 1: return miopenRNNDataSeqMajorNotPadded;
     case 2: return miopenRNNDataSeqMajorPadded;
     case 3: return miopenRNNDataBatchMajorPadded;
-    default: MIOPEN_THROW("Incorrect input, unsupported RNNLayout.");
+    default: COMMON_THROW("Incorrect input, unsupported RNNLayout.");
     }
 }
 
@@ -519,7 +518,7 @@ miopenRNNFWDMode_t RNNSeqDriver<Tgpu, Tref>::GetRNNFwdModeFromCmdLine()
     {
     case 0: return miopenRNNFWDMode_t::miopenRNNTraining;
     case 1: return miopenRNNFWDMode_t::miopenRNNInference;
-    default: MIOPEN_THROW("Incorrect input, unsupported fwdtype.");
+    default: COMMON_THROW("Incorrect input, unsupported fwdtype.");
     }
 }
 
@@ -540,10 +539,10 @@ std::vector<int> RNNSeqDriver<Tgpu, Tref>::GetSeqLengthsFromCmdLine()
     while(ss >> element)
     {
         if(seq_it == data_seq_lens.end())
-            MIOPEN_THROW("Incorrect input, seq_len_array bigger than provided batch_size.\n");
+            COMMON_THROW("Incorrect input, seq_len_array bigger than provided batch_size.\n");
 
         if(element > seq_len_max)
-            MIOPEN_THROW("Length of data sequence is longer than required unrolled time sequence "
+            COMMON_THROW("Length of data sequence is longer than required unrolled time sequence "
                          "provided.\n"
                          "The data sequence will be truncated to match unrolled time sequence.\n");
 
@@ -558,7 +557,7 @@ std::vector<int> RNNSeqDriver<Tgpu, Tref>::GetSeqLengthsFromCmdLine()
     if(io_layout == miopenRNNDataSeqMajorNotPadded && (seq_it != data_seq_lens.begin()) &&
        (!std::is_sorted(data_seq_lens.begin(), seq_it, std::greater<>{})))
     {
-        MIOPEN_THROW("Incorrect input, seq_lens should not to increase with "
+        COMMON_THROW("Incorrect input, seq_lens should not to increase with "
                      "miopenRNNDataSeqMajorNotPadded layout\n");
     }
 
@@ -639,7 +638,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect RNN Mode");
+        COMMON_THROW("Incorrect RNN Mode");
     }
 
     miopenRNNBiasMode_t biasMode;
@@ -653,7 +652,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect bias Mode");
+        COMMON_THROW("Incorrect bias Mode");
     }
 
     miopenRNNDirectionMode_t directionMode;
@@ -667,7 +666,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect direction Mode");
+        COMMON_THROW("Incorrect direction Mode");
     }
 
     miopenRNNInputMode_t inMode;
@@ -681,7 +680,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect input Mode");
+        COMMON_THROW("Incorrect input Mode");
     }
 
     miopenRNNAlgo_t algo;
@@ -699,7 +698,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect RNN algorithm");
+        COMMON_THROW("Incorrect RNN algorithm");
     }
 
     if(inflags.GetValueInt("use_dropout"))

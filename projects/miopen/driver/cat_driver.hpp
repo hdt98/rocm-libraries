@@ -14,13 +14,13 @@
 #include <cstdlib>
 #include <memory>
 #include <miopen/miopen.h>
-#include <miopen/float_equal.hpp>
+#include <common_utils/float_equal.hpp>
 #include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
-#include <miopen/ford.hpp>
+#include <common_utils/ford.hpp>
 
 #ifndef MLO_CATHOST_H_
 #define MLO_CATHOST_H_

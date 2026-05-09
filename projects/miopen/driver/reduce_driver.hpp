@@ -39,7 +39,7 @@
 
 #include <miopen/miopen.h>
 #include <memory>
-#include <miopen/reduce_common.hpp>
+#include <common_utils/reduce_common.hpp>
 #include <miopen/tensor.hpp>
 
 #include <half/half.hpp>

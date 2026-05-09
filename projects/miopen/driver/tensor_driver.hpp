@@ -28,6 +28,7 @@
 
 #define UNPACK_VEC4(v) (v[0]), (v[1]), (v[2]), (v[3])
 
+#include <common_utils/errors.hpp>
 #include <algorithm>
 #include <iterator>
 #include <miopen/miopen.h>
@@ -66,7 +67,7 @@ inline miopenTensorLayout_t StringToLayoutType(std::string layout_str)
     }
     else
     {
-        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
+        COMMON_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
                      "vectorized tensor layout.");
         return default_layout;
     }
@@ -178,7 +179,7 @@ inline int SetTensorNdVector(miopenTensorDescriptor_t t,
     }
     else
     {
-        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
+        COMMON_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
                      "vectorized tensor layout.");
         return -1;
     }
@@ -227,7 +228,7 @@ inline int SetTensorNd(miopenTensorDescriptor_t t,
 
     if(layout.size() != len.size() && layout.find('c') == std::string::npos)
     {
-        MIOPEN_THROW("unmatched layout and dimension size");
+        COMMON_THROW("unmatched layout and dimension size");
     }
 
     if(layout.find('c') != std::string::npos)

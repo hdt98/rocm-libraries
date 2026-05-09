@@ -12,18 +12,18 @@
 
 #include <miopen/activ.hpp>
 #include <miopen/batch_norm.hpp>
-#include <miopen/ford.hpp>
+#include <common_utils/ford.hpp>
 #include <miopen/miopen.h>
-#include <miopen/par_for.hpp>
+#include <common_utils/par_for.hpp>
 #include <miopen/tensor.hpp>
 
 #include "get_handle.hpp"
 #include "gtest_common.hpp"
-#include "random.hpp"
-#include "tensor_holder.hpp"
+#include <miopen_utils/random.hpp>
+#include <miopen_utils/tensor_holder.hpp>
 #include "test.hpp"
 #include "test_parameter_name_generator.hpp"
-#include "verify.hpp"
+#include <miopen_utils/verify.hpp>
 
 #define MIO_BN_TEST_EXPAVGFACTOR 0.1
 #define MIO_BN_TEST_EPSILON 1e-5

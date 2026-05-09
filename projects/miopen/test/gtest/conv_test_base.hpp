@@ -25,11 +25,11 @@
  *******************************************************************************/
 #pragma once
 
-#include <miopen/bfloat16.hpp>
+#include <common_utils/bfloat16.hpp>
 #include <miopen/miopen.h>
 #include <iostream>
 
-#include "tensor_holder.hpp"
+#include <miopen_utils/tensor_holder.hpp>
 #include "conv_common.hpp"
 #include "conv_tensor_gen.hpp"
 

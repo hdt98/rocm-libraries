@@ -26,6 +26,7 @@
 #ifndef GUARD_MIOPEN_ADDLAYERNORM_DRIVER_HPP
 #define GUARD_MIOPEN_ADDLAYERNORM_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
 #include "InputFlags.hpp"
@@ -214,7 +215,7 @@ int AddLayerNormDriver<Tgpu, Tref>::GetandSetData()
 
     dim = inflags.GetValueInt("normalized_dim");
 
-    MIOPEN_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
+    COMMON_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
                     "normalized_dim out of range");
 
     std::vector<int> inner_len;
@@ -230,25 +231,25 @@ int AddLayerNormDriver<Tgpu, Tref>::GetandSetData()
         outer_len = {in_len.begin(), in_len.end() - (in_len.size() - dim)};
 
     if(SetTensorNd(inputDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(input2Desc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input2 tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing input2 tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(weightDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting weight tensor.");
+        COMMON_THROW("Error setting weight tensor.");
 
     if(SetTensorNd(biasDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting bias tensor.");
+        COMMON_THROW("Error setting bias tensor.");
 
     if(SetTensorNd(outputDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting doutput tensor.");
+        COMMON_THROW("Error setting doutput tensor.");
 
     if(SetTensorNd(meanDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting mean tensor.");
+        COMMON_THROW("Error setting mean tensor.");
 
     if(SetTensorNd(rstdDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting rstd tensor.");
+        COMMON_THROW("Error setting rstd tensor.");
 
     eps  = static_cast<double>(inflags.GetValueDouble("eps"));
     mode = miopenNormMode_t(inflags.GetValueInt("mode"));

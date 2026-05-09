@@ -30,7 +30,7 @@
 #include <miopen/fusion/solvers.hpp>
 #include <miopen/find_solution.hpp>
 
-#include "tensor_holder.hpp"
+#include <miopen_utils/tensor_holder.hpp>
 #include "get_handle.hpp"
 #include "cba.hpp"
 #include "gtest_desc_guard.hpp"

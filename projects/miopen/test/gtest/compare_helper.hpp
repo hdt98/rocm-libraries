@@ -10,7 +10,7 @@
 
 #include <iostream>
 
-#include "verify.hpp"
+#include <miopen_utils/verify.hpp>
 #include "../tensor_holder.hpp"
 
 namespace test_helpers {

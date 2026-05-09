@@ -27,11 +27,11 @@
 #include <gtest/gtest.h>
 #include <miopen/groupnorm.hpp>
 
-#include "tensor_holder.hpp"
+#include <miopen_utils/tensor_holder.hpp>
 #include "cpu_groupnorm.hpp"
 #include "get_handle.hpp"
-#include "random.hpp"
-#include "verify.hpp"
+#include <miopen_utils/random.hpp>
+#include <miopen_utils/verify.hpp>
 #include <random>
 
 struct GroupNormTestCase

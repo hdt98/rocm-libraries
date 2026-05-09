@@ -39,7 +39,7 @@
 #include <miopen_utils/random.hpp>
 #include <miopen_utils/fusionHost.hpp>
 
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
@@ -306,7 +306,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::GetandSetData()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Unknown batch norm state");
+        COMMON_THROW("Unknown batch norm state");
     }
     return miopenStatusSuccess;
 }
@@ -425,7 +425,7 @@ bool BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::ChkLayout_ShortName(
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid Short Name for layout!");
+        COMMON_THROW("Invalid Short Name for layout!");
     }
 }
 
@@ -435,13 +435,13 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::ValidateLayoutInputP
 {
     if(!ChkLayout_ShortName())
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      std::string("Invalid Layout Short Name = ") + inflags.FindShortName("layout"));
     }
     if((layout_value.compare("NCHW") != 0) && (layout_value.compare("NHWC") != 0) &&
        (layout_value.compare("NCDHW") != 0) && (layout_value.compare("NDHWC") != 0))
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid Layout Parameter Value - " + layout_value);
+        COMMON_THROW("Invalid Layout Parameter Value - " + layout_value);
     }
 }
 
@@ -487,7 +487,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Cannot handle layout: " + layout);
+        COMMON_THROW("Cannot handle layout: " + layout);
     }
 
     // batch norm mode type
@@ -501,7 +501,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Mode");
+        COMMON_THROW("Incorrect Batch Normalization Mode");
     }
 
     // save off mean and variance?
@@ -515,7 +515,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Save mode");
+        COMMON_THROW("Incorrect Batch Normalization Save mode");
     }
 
     // keep running mean and variance
@@ -529,19 +529,19 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization Running mode");
+        COMMON_THROW("Incorrect Batch Normalization Running mode");
     }
 
     forw = inflags.GetValueInt("forw");
     if(forw > 2)
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Batch Normalization forward mode");
+        COMMON_THROW("Incorrect Batch Normalization forward mode");
     }
 
     back = inflags.GetValueInt("back");
     if(back > 1)
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "Incorrect Batch Normalization backwards propagation mode");
     }
 
@@ -582,7 +582,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::SetBNParametersFromCm
     {
         if(forw != 1 || !keepRunningMeanVar)
         {
-            MIOPEN_THROW(miopenStatusBadParm,
+            COMMON_THROW(
                          "Ping-pong buffers are only supported in forward training when running "
                          "mean and variance are kept");
         }
@@ -1430,7 +1430,7 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdInference(T
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
+        COMMON_THROW(
                      "Bad batch normalization mode in host kernel selection");
     }
     return;
@@ -1508,7 +1508,7 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdTrain(Tref 
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
+        COMMON_THROW(
                      "Bad batch normalization mode in host kernel selection");
     }
 }
@@ -1535,7 +1535,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardCPU()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Unsupported forward cpu run state");
+        COMMON_THROW("Unsupported forward cpu run state");
     }
 
     return miopenStatusSuccess;
@@ -2058,7 +2058,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardCPU()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusInternalError,
+        COMMON_THROW(
                      "Bad batch normalization mode in host kernel selection");
     }
 

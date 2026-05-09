@@ -11,7 +11,7 @@
 // half from half.hpp, while rocrand uses definition of half type from HIP headers, i.e. the
 // definitions are different.
 
-#include <miopen/demangle.hpp>
+#include <common_utils/type_name.hpp>
 #include <half/half.hpp>
 
 #include <iostream>
@@ -28,7 +28,7 @@ int gen_0_1(T* buf, size_t sz)
 {
     std::cout << "Warning: gpumemrand functions are supported only for double, float and half. GPU "
                  "buffer { "
-              << static_cast<void*>(buf) << ", " << sz << ", " << miopen::demangle(typeid(T).name())
+              << static_cast<void*>(buf) << ", " << sz << ", " << miopen::get_type_name<T>()
               << " } remains uninitialized." << std::endl;
     return 0;
 }

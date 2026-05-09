@@ -26,9 +26,9 @@
 
 #include "test.hpp"
 #include "driver.hpp"
-#include "fusionHost.hpp"
-#include "random.hpp"
-#include <miopen/stringutils.hpp>
+#include <miopen_utils/fusionHost.hpp>
+#include <miopen_utils/random.hpp>
+#include <common_utils/stringutils.hpp>
 
 using ptr_FusionPlanDesc = MIOPEN_MANAGE_PTR(miopenFusionPlanDescriptor_t, miopenDestroyFusionPlan);
 using ptr_FusionPlanArgs = MIOPEN_MANAGE_PTR(miopenOperatorArgs_t, miopenDestroyOperatorArgs);

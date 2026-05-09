@@ -26,24 +26,28 @@
 #ifndef GUARD_RANDOM_GEN_
 #define GUARD_RANDOM_GEN_
 
-#include <miopen/env.hpp>
-
 #include <cassert>
+#include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <random>
-
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_DRIVER_PRNG_SEED, 12345678)
-
-namespace env = miopen::env;
 
 namespace prng {
 namespace details {
 using glibc_gen = std::linear_congruential_engine<std::uint32_t, 1103515245, 12345, 2147483648>;
 
+inline uint64_t get_env_seed()
+{
+    const char* val = std::getenv("MIOPEN_DEBUG_DRIVER_PRNG_SEED");
+    if(val == nullptr || val[0] == '\0')
+        return 12345678;
+    return std::strtoull(val, nullptr, 0);
+}
+
 inline std::random_device::result_type get_default_seed()
 {
     static std::random_device::result_type seed{[] {
-        auto external_seed = env::value(MIOPEN_DEBUG_DRIVER_PRNG_SEED);
+        auto external_seed = get_env_seed();
 
         auto seed_ = external_seed == 0
                          ? std::random_device{}()

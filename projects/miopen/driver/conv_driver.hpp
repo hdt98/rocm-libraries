@@ -8,6 +8,7 @@
 #include "conv_verify.hpp"
 #include "conv_common.hpp"
 #include "driver.hpp"
+#include "driver_env.hpp"
 #include "mloConvHost.hpp"
 #include "random.hpp"
 #include "rocrand_wrapper.hpp"
@@ -16,14 +17,12 @@
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
-#include <miopen/algorithm.hpp>
+#include <common_utils/algorithm.hpp>
 #include <miopen/conv_algo_name.hpp>
 #include <miopen/convolution.hpp>
-#include <miopen/env.hpp>
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/find_controls.hpp>
-#include <miopen/logger.hpp>
 #include <miopen/miopen.h>
 #include <miopen/conv/solvers.hpp>
 #include <miopen/tensor.hpp>
@@ -49,16 +48,6 @@ extern "C" MIOPEN_EXPORT miopenStatus_t
 miopenHiddenSetConvolutionFindMode(miopenConvolutionDescriptor_t convDesc, int findMode);
 
 #define WORKAROUND_ISSUE_2176 1 // https://github.com/AMDComputeLibraries/MLOpen/issues/2176
-
-MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DRIVER_PAD_BUFFERS_2M)
-MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DRIVER_USE_GPU_REFERENCE)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DRIVER_SUBNORM_PERCENTAGE)
-
-// 0 - Allocate WS size as reported by the library (default)
-// 1 - Do not allocate workspace.
-// 2...16 - Allocate smaller WS. Size = default/value.
-// Other - The driver allocates workspace size equal to the value of the variable (in bytes).
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DRIVER_CONV_WORKSPACE_SIZE_ADJUST)
 
 // Support in the library discontinued, but left in the driver
 // for reference in the future.
@@ -116,9 +105,14 @@ private:
     bool quiet_prev;
 };
 
+// MIOPEN_DRIVER_CONV_WORKSPACE_SIZE_ADJUST:
+// 0 - Allocate WS size as reported by the library (default)
+// 1 - Do not allocate workspace.
+// 2...16 - Allocate smaller WS. Size = default/value.
+// Other - The driver allocates workspace size equal to the value of the variable (in bytes).
 static inline void AdjustWorkspacesizeVariableFromEnv(std::size_t& sz)
 {
-    auto adj = env::value(MIOPEN_DRIVER_CONV_WORKSPACE_SIZE_ADJUST);
+    auto adj = driver_env::value_uint64("MIOPEN_DRIVER_CONV_WORKSPACE_SIZE_ADJUST");
     if(adj == 0ULL)
         return; // nop
     auto sz_save = sz;
@@ -128,8 +122,7 @@ static inline void AdjustWorkspacesizeVariableFromEnv(std::size_t& sz)
         sz /= adj;
     else
         sz = adj;
-    MIOPEN_LOG_CUSTOM(
-        miopen::LoggingLevel::Info2, "MIOpenDriver", "From " << sz_save << " to " << sz);
+    DRIVER_LOG_INFO2("From " << sz_save << " to " << sz);
     return;
 }
 
@@ -149,7 +142,7 @@ static inline miopenDataType_t DataTypeFromShortString(const std::string& type)
     }
     else
     {
-        MIOPEN_THROW("Invalid compute/cast type short hand supplied");
+        COMMON_THROW("Invalid compute/cast type short hand supplied");
     }
 }
 
@@ -171,7 +164,7 @@ public:
     std::vector<Tgpu>& GetVector()
     {
         if(is_gpualloc)
-            MIOPEN_THROW("[MIOpenDriver] GpumemVector::GetVector should not be called in "
+            COMMON_THROW("[MIOpenDriver] GpumemVector::GetVector should not be called in "
                          "'--gpualloc 1' mode");
         return host;
     }
@@ -459,9 +452,7 @@ private:
 
     void DebugPrintWorkspaceDev() const
     {
-        MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Info2,
-                          "MIOpenDriver",
-                          "ptr=" << (workspace_dev != nullptr ? workspace_dev->GetMem() : nullptr)
+        DRIVER_LOG_INFO2("ptr=" << (workspace_dev != nullptr ? workspace_dev->GetMem() : nullptr)
                                  << " size="
                                  << (workspace_dev != nullptr ? workspace_dev->GetSize() : 0ULL));
     }
@@ -669,7 +660,7 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
 
     if(is_gpualloc && inflags.GetValueInt("verify") == 1)
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "'--gpualloc 1' should not be used with enabled verification. "
                      "Add '--verify 0' to options.");
     }
@@ -704,7 +695,7 @@ void ConvDriver<Tgpu, Tref>::ValidateLayoutInputParameters(std::string layout_va
 {
     if((ChkLayout_ShortName()))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "Invalid Layout Short Name = " + std::to_string(ChkLayout_ShortName()));
     }
     else
@@ -717,7 +708,7 @@ void ConvDriver<Tgpu, Tref>::ValidateLayoutInputParameters(std::string layout_va
         }
         else
         {
-            MIOPEN_THROW(miopenStatusBadParm, "Invalid Layout Parameter Value - " + layout_value);
+            COMMON_THROW("Invalid Layout Parameter Value - " + layout_value);
         }
     }
 }
@@ -732,7 +723,7 @@ void ConvDriver<Tgpu, Tref>::ValidateVectorizedParameters(int vector_dim, int ve
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "Invalid Tensor Vectorization Parameter Value - vector_dim:" +
                          std::to_string(vector_dim) +
                          ", vector_length:" + std::to_string(vector_length));
@@ -752,7 +743,7 @@ int ConvDriver<Tgpu, Tref>::ChkLayout_ShortName()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid Short Name!");
+        COMMON_THROW("Invalid Short Name!");
     }
 }
 
@@ -1037,7 +1028,7 @@ std::vector<int> ConvDriver<Tgpu, Tref>::GetInputTensorLengthsFromCmdLine()
     }
     else
     {
-        MIOPEN_THROW("unsupported convolution dimension");
+        COMMON_THROW("unsupported convolution dimension");
     }
 
     return in_lens;
@@ -1071,7 +1062,7 @@ std::vector<int> ConvDriver<Tgpu, Tref>::GetWeightTensorLengthsFromCmdLine()
     }
     else
     {
-        MIOPEN_THROW("unsupported convolution dimension");
+        COMMON_THROW("unsupported convolution dimension");
     }
 
     if(group_count > 1)
@@ -1079,7 +1070,7 @@ std::vector<int> ConvDriver<Tgpu, Tref>::GetWeightTensorLengthsFromCmdLine()
         if(wei_c_len % group_count != 0 || wei_k_len % group_count != 0 ||
            group_count > wei_c_len || group_count > wei_k_len)
         {
-            MIOPEN_THROW("Invalid group number\n");
+            COMMON_THROW("Invalid group number\n");
         }
     }
 
@@ -1159,7 +1150,7 @@ int ConvDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW("unsupported convolution dimension");
+        COMMON_THROW("unsupported convolution dimension");
     }
 
     int out_c       = inflags.GetValueInt("out_channels");
@@ -1171,7 +1162,7 @@ int ConvDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
         if(in_c % group_count != 0 || out_c % group_count != 0 || group_count > in_c ||
            group_count > out_c)
         {
-            MIOPEN_THROW(miopenStatusBadParm, "Invalid group number");
+            COMMON_THROW("Invalid group number");
         }
     }
 
@@ -1286,12 +1277,12 @@ int ConvDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     size_t in_sz            = GetTensorSize(inputTensor);
     size_t wei_sz           = GetTensorSize(weightTensor);
     size_t out_sz           = GetTensorSize(outputTensor);
-    auto subnorm_percentage = env::value(MIOPEN_DRIVER_SUBNORM_PERCENTAGE);
+    auto subnorm_percentage = driver_env::value_uint64("MIOPEN_DRIVER_SUBNORM_PERCENTAGE");
     if(subnorm_percentage != 0)
         std::cout << "MIOPEN_DRIVER_SUBNORM_PERCENTAGE = " << subnorm_percentage << std::endl;
 
     // Workaround: Pad buffers allocations to be a multiple of 2M
-    if(env::enabled(MIOPEN_DRIVER_PAD_BUFFERS_2M))
+    if(driver_env::enabled("MIOPEN_DRIVER_PAD_BUFFERS_2M"))
     {
         // PadBufferSize(in_sz, sizeof(Tgpu));
         PadBufferSize(wei_sz, sizeof(Tgpu));
@@ -1314,7 +1305,7 @@ int ConvDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
             size_t warmup_in_sz  = GetTensorSize(warmupInputTensor);
             size_t warmup_wei_sz = GetTensorSize(warmupWeightTensor);
             size_t warmup_out_sz = GetTensorSize(warmupOutputTensor);
-            if(env::enabled(MIOPEN_DRIVER_PAD_BUFFERS_2M))
+            if(driver_env::enabled("MIOPEN_DRIVER_PAD_BUFFERS_2M"))
             {
                 PadBufferSize(warmup_wei_sz, sizeof(warmup_Tgpu));
                 PadBufferSize(warmup_out_sz, sizeof(warmup_Tgpu));
@@ -1633,7 +1624,7 @@ int ConvDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
 template <typename Tgpu, typename Tref>
 bool ConvDriver<Tgpu, Tref>::UseGPUReference()
 {
-    if(!env::disabled(MIOPEN_DRIVER_USE_GPU_REFERENCE))
+    if(!driver_env::disabled("MIOPEN_DRIVER_USE_GPU_REFERENCE"))
     {
         if((miopen_type<Tref>{} == miopenFloat &&
             (miopen_type<Tgpu>{} == miopenFloat || miopen_type<Tgpu>{} == miopenHalf ||
@@ -2008,7 +1999,7 @@ void ConvDriver<Tgpu, Tref>::GetSolutionAfterFind(
         found_algo = static_cast<miopenConvAlgorithm_t>(found.bwd_weights_algo);
         break;
     case Direction::BwdBias: // nop
-        MIOPEN_THROW("BwdBias is not supported");
+        COMMON_THROW("BwdBias is not supported");
     }
     std::size_t immed_count = 0;
     miopenStatus_t rc       = miopenStatusUnknownError;
@@ -2079,9 +2070,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
 
     if(ws_size > ws_sizeof_find_fwd)
     {
-        MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Error,
-                          "MIOpenDriver",
-                          "Find returns bigger workspace than provided " << ws_sizeof_find_fwd
+        DRIVER_LOG_ERROR("Find returns bigger workspace than provided " << ws_sizeof_find_fwd
                                                                          << " < " << ws_size);
         return miopenStatusInternalError;
     }
@@ -2620,9 +2609,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
 
     if(ws_size > ws_sizeof_find_bwd)
     {
-        MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Error,
-                          "MIOpenDriver",
-                          "Find returns bigger workspace than provided " << ws_sizeof_find_bwd
+        DRIVER_LOG_ERROR("Find returns bigger workspace than provided " << ws_sizeof_find_bwd
                                                                          << " < " << ws_size);
         return miopenStatusInternalError;
     }
@@ -2849,9 +2836,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
 
     if(ws_size > ws_sizeof_find_wrw)
     {
-        MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Error,
-                          "MIOpenDriver",
-                          "Find returns bigger workspace than provided " << ws_sizeof_find_wrw
+        DRIVER_LOG_ERROR("Find returns bigger workspace than provided " << ws_sizeof_find_wrw
                                                                          << " < " << ws_size);
         return miopenStatusInternalError;
     }
@@ -3591,7 +3576,7 @@ std::string ConvDriver<Tgpu, Tref>::GetVerificationCacheFileName(
         }
         else
         {
-            MIOPEN_THROW("unknown data type");
+            COMMON_THROW("unknown data type");
         }
     };
 
@@ -3658,7 +3643,7 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     if(!is_fwd)
         return 0;
 
-    MIOPEN_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
+    COMMON_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
 
     if(!is_fwd_run_failed)
         if(!TryReadVerificationCache(Direction::Fwd, outputTensor, outhost.data.data()))
@@ -3704,7 +3689,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
     if(!(is_bwd || is_wrw))
         return 0;
 
-    MIOPEN_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
+    COMMON_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
 
     int cumulative_rc = 0;
     if(is_bwd)

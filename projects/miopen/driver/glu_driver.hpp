@@ -40,7 +40,7 @@
 
 #include <miopen_utils/verify.hpp>
 
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/miopen.h>
 
 template <typename T>
@@ -182,7 +182,7 @@ int GLUDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
 
     if(forw != 0 && forw != 1)
     {
-        MIOPEN_THROW("Invalid Forward Mode");
+        COMMON_THROW("Invalid Forward Mode");
     }
 
     return miopenStatusSuccess;
@@ -340,7 +340,7 @@ int GLUDriver<Tgpu, Tref>::RunForwardGPU()
         miopenStatus_t status = miopenGLUForward(
             GetHandle(), inputTensor, in_dev->GetMem(), outputTensor, out_dev->GetMem(), dim);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenGLUForward");
+        COMMON_THROW_IF(status != miopenStatusSuccess, "Error in miopenGLUForward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);
@@ -371,7 +371,7 @@ int GLUDriver<Tgpu, Tref>::RunForwardGPU()
 template <typename Tgpu, typename Tref>
 int GLUDriver<Tgpu, Tref>::RunForwardCPU()
 {
-    MIOPEN_THROW_IF(dim != 0, "This driver only supports dim = 0");
+    COMMON_THROW_IF(dim != 0, "This driver only supports dim = 0");
     mloGLUForwardContiguousDim0RunHost<Tgpu, Tref>(in.data(), outputTensor, outhost.data());
 
     return miopenStatusSuccess;
@@ -395,7 +395,7 @@ int GLUDriver<Tgpu, Tref>::RunBackwardGPU()
                                                   inGrad_dev->GetMem(),
                                                   dim);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenGLUBackward");
+        COMMON_THROW_IF(status != miopenStatusSuccess, "Error in miopenGLUBackward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);
@@ -454,7 +454,7 @@ int GLUDriver<Tgpu, Tref>::VerifyForward()
 template <typename Tgpu, typename Tref>
 int GLUDriver<Tgpu, Tref>::RunBackwardCPU()
 {
-    MIOPEN_THROW_IF(dim != 0, "This driver only supports dim = 0");
+    COMMON_THROW_IF(dim != 0, "This driver only supports dim = 0");
     mloGLUBackwardCongiguousDim0RunHost<Tgpu, Tref>(
         in.data(), outputTensorGrad, outGrad.data(), inGradhost.data());
 

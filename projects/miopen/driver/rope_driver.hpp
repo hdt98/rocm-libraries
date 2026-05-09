@@ -26,6 +26,7 @@
 #ifndef GUARD_MIOPEN_ROPE_DRIVER_HPP
 #define GUARD_MIOPEN_ROPE_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
@@ -200,16 +201,16 @@ int RoPEDriver<Tgpu, Tref>::GetandSetData()
     std::vector<uint64_t> rotary_dim = {in_len[1], in_len[2], in_len[3]};
 
     if(SetTensorNd(x_dyDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(cosDesc, rotary_dim, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting cos tensor.");
+        COMMON_THROW("Error setting cos tensor.");
 
     if(SetTensorNd(sinDesc, rotary_dim, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting sin tensor.");
+        COMMON_THROW("Error setting sin tensor.");
 
     if(SetTensorNd(y_dxDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        COMMON_THROW("Error setting output tensor.");
 
     return 0;
 }

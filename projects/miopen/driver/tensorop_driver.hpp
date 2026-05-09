@@ -34,7 +34,7 @@
 #include "timer.hpp"
 #include "util_driver.hpp"
 
-#include <miopen/float_equal.hpp>
+#include <common_utils/float_equal.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 

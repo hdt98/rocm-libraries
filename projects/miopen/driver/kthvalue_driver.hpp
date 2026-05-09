@@ -35,7 +35,7 @@
 
 #include <miopen/tensor_view_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 
 #include <vector>
 
@@ -161,7 +161,7 @@ int KthvalueDriver<TIO>::ParseCmdLineArgs(int argc, char* argv[])
     int num_dim  = inDims.size();
     if(dim < -num_dim || dim >= num_dim)
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Kthvalue: dim doesn't not exist");
+        COMMON_THROW("Kthvalue: dim doesn't not exist");
     }
 
     if(inflags.GetValueInt("time") == 1)

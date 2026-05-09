@@ -38,7 +38,7 @@
 
 #include <miopen/gemm_v2.hpp>
 #include <miopen/miopen.h>
-#include <miopen/ford.hpp>
+#include <common_utils/ford.hpp>
 
 #include <algorithm>
 #include <cstdlib>

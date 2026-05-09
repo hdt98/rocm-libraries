@@ -32,7 +32,7 @@
 
 #include "tensor_util.hpp"
 #include "get_handle.hpp"
-#include "random.hpp"
+#include <miopen_utils/random.hpp>
 
 struct BNTestCase
 {

@@ -34,8 +34,8 @@
 
 #include <miopen_utils/verify.hpp>
 
-#include <miopen/float_equal.hpp>
-#include <miopen/ford.hpp>
+#include <common_utils/float_equal.hpp>
+#include <common_utils/ford.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 

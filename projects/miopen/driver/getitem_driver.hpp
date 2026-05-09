@@ -26,6 +26,7 @@
 #ifndef GUARD_MIOPEN_GETITEM_DRIVER_HPP
 #define GUARD_MIOPEN_GETITEM_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
@@ -230,13 +231,13 @@ int GetitemDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     }
 
     if(inflags.GetValueInt("indexcount") < 0)
-        MIOPEN_THROW("Index count is negative: " + inflags.GetValueStr("indexcount") + ".");
+        COMMON_THROW("Index count is negative: " + inflags.GetValueStr("indexcount") + ".");
 
     if(inflags.GetValueInt("dimcount") < 0)
-        MIOPEN_THROW("Dim count is negative: " + inflags.GetValueStr("dimcount") + ".");
+        COMMON_THROW("Dim count is negative: " + inflags.GetValueStr("dimcount") + ".");
 
     if(inflags.GetValueInt("slicecount") < 0)
-        MIOPEN_THROW("Slice count is negative: " + inflags.GetValueStr("slicecount") + ".");
+        COMMON_THROW("Slice count is negative: " + inflags.GetValueStr("slicecount") + ".");
 
     return miopenStatusSuccess;
 }
@@ -253,11 +254,11 @@ int GetitemDriver<Tgpu, Tref>::GetandSetData()
 
     auto indexTensorLengths = inflags.GetValue2dVectorInt("indexs");
     if(indexTensorLengths.size() != indexCountParam)
-        MIOPEN_THROW("Error parsing indexs tensor: " + inflags.GetValueStr("indexs") + ".");
+        COMMON_THROW("Error parsing indexs tensor: " + inflags.GetValueStr("indexs") + ".");
 
     dims = inflags.GetValueVectorInt("dims");
     if(dims.size() != dimCountParam)
-        MIOPEN_THROW("Error parsing dims tensor: " + inflags.GetValueStr("dims") + ".");
+        COMMON_THROW("Error parsing dims tensor: " + inflags.GetValueStr("dims") + ".");
 
     for(auto dim : dims)
     {
@@ -266,7 +267,7 @@ int GetitemDriver<Tgpu, Tref>::GetandSetData()
 
     slices = inflags.GetValue2dVectorInt("slices");
     if(slices.size() != sliceCountParam)
-        MIOPEN_THROW("Error parsing slices: " + inflags.GetValueStr("slices") + ".");
+        COMMON_THROW("Error parsing slices: " + inflags.GetValueStr("slices") + ".");
 
     for(auto slice : slices)
     {
@@ -277,24 +278,24 @@ int GetitemDriver<Tgpu, Tref>::GetandSetData()
     }
 
     if(SetTensorNd(dyDesc, dyTensorParam.lengths, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing doutput tensor: " + inflags.GetValueStr("doutput") + ".");
+        COMMON_THROW("Error parsing doutput tensor: " + inflags.GetValueStr("doutput") + ".");
 
     for(auto indexTensorLength : indexTensorLengths)
     {
         miopenTensorDescriptor_t indexDesc;
         miopenCreateTensorDescriptor(&indexDesc);
         if(SetTensorNd(indexDesc, indexTensorLength, miopenInt32) != miopenStatusSuccess)
-            MIOPEN_THROW("Error parsing indexs tensor: " + inflags.GetValueStr("indexs") + ".");
+            COMMON_THROW("Error parsing indexs tensor: " + inflags.GetValueStr("indexs") + ".");
         indexDescs.push_back(indexDesc);
     }
 
     if(SetTensorNd(dxDesc, dxTensorParam.lengths, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing dinput tensor: " + inflags.GetValueStr("dinput") + ".");
+        COMMON_THROW("Error parsing dinput tensor: " + inflags.GetValueStr("dinput") + ".");
 
     std::vector<int32_t> error_length;
     error_length.push_back(indexCountParam);
     if(SetTensorNd(errorDesc, error_length, miopen_type<int32_t>{}) != miopenStatusSuccess)
-        MIOPEN_THROW("Error making error tensor: " + inflags.GetValueStr("indexcount") + ".");
+        COMMON_THROW("Error making error tensor: " + inflags.GetValueStr("indexcount") + ".");
 
     return 0;
 }
