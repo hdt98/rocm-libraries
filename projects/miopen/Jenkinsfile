@@ -224,11 +224,24 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                         export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
                         . /opt/venv/bin/activate
                         cd /TheRock
-                        THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
-                        AMDGPU_FAMILIES=${gfxFamily} \\
-                        TEST_TYPE=full \\
-                        python build_tools/github_actions/test_executable_scripts/test_miopen.py
+                        SHARD_LOGS_DIR=${env.WORKSPACE}/shard_logs
+                        mkdir -p \$SHARD_LOGS_DIR
+                        (
+                            trap 'kill 0' EXIT
+                            for i in \$(seq 1 4); do
+                                (
+                                    THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
+                                    AMDGPU_FAMILIES=${gfxFamily} \\
+                                    TEST_TYPE=full \\
+                                    SHARD_INDEX=\$i \\
+                                    TOTAL_SHARDS=4 \\
+                                    python build_tools/github_actions/test_executable_scripts/test_miopen.py
+                                ) > \$SHARD_LOGS_DIR/asan_shard_\$i.log 2>&1 &
+                            done
+                            wait
+                        )
                     """.stripIndent()
+                    archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
                     // Make workspace files writable by the Jenkins agent user before the container exits,
                     // so cleanWs() can delete root-owned files written during the build.
                     sh "chmod -R a+w ${env.WORKSPACE} || true"
