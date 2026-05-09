@@ -33,3 +33,12 @@ add_library(MIOpen::common_utils ALIAS miopen_common_utils)
 target_include_directories(miopen_common_utils INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
+
+# bfloat16.hpp needs to know the rounding mode.
+# This option is also defined in src/CMakeLists.txt for backward compatibility.
+option(MIOPEN_USE_RNE_BFLOAT16 "Sets rounding scheme for bfloat16 type" ON)
+if(MIOPEN_USE_RNE_BFLOAT16)
+    target_compile_definitions(miopen_common_utils INTERFACE MIOPEN_USE_RNE_BFLOAT16=1)
+else()
+    target_compile_definitions(miopen_common_utils INTERFACE MIOPEN_USE_RNE_BFLOAT16=0)
+endif()
