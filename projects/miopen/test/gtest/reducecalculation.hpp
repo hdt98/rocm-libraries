@@ -24,13 +24,13 @@
  *
  *******************************************************************************/
 
+#include <miopen/miopen.h>
 #include "../src/kernels/MIOpenReduceCalculation.hpp"
 #include "get_handle.hpp"
 #include "random.hpp"
 #include "tensor_holder.hpp"
 #include "verify.hpp"
 #include <gtest/gtest.h>
-#include <miopen/miopen.h>
 #include <miopen/reducecalculation.hpp>
 
 template <typename T, ReduceCalculationOp_t op>
