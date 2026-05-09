@@ -37,6 +37,8 @@
 
 #include <vector>
 
+using float16 = half_float::half;
+
 namespace {
 
 template <typename T>
