@@ -28,10 +28,10 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/tensor.hpp>
 
-#include <../test/cpu_bias.hpp>
-#include <../test/cpu_conv.hpp>
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
+#include <miopen_utils/cpu_bias.hpp>
+#include <miopen_utils/cpu_conv.hpp>
+#include <miopen_utils/tensor_holder.hpp>
+#include <miopen_utils/verify.hpp>
 
 #include <algorithm>
 #include <cstdlib>

@@ -30,8 +30,8 @@
 #include "timer.hpp"
 #include "random.hpp"
 
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
+#include <miopen_utils/tensor_holder.hpp>
+#include <miopen_utils/verify.hpp>
 
 #include <miopen/tensor_view_utils.hpp>
 #include <miopen/miopen.h>

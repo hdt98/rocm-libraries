@@ -31,7 +31,7 @@
 #include "tensor_driver.hpp"
 #include "timer.hpp"
 
-#include <../test/verify.hpp>
+#include <miopen_utils/verify.hpp>
 
 #include <miopen/miopen.h>
 

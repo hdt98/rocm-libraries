@@ -26,9 +26,9 @@
 #ifndef GUARD_MIOPEN_LAYERNORM_DRIVER_HPP
 #define GUARD_MIOPEN_LAYERNORM_DRIVER_HPP
 
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
-#include <../test/cpu_layernorm.hpp>
+#include <miopen_utils/tensor_holder.hpp>
+#include <miopen_utils/verify.hpp>
+#include <miopen_utils/cpu_layernorm.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "miopen/miopen.h"

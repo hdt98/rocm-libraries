@@ -39,7 +39,7 @@
 #include <miopen/miopen.h>
 #include <miopen/bfloat16.hpp>
 #include <miopen/handle.hpp>
-#include <../test/tensor_holder.hpp>
+#include <miopen_utils/tensor_holder.hpp>
 #include "util_driver.hpp"
 #include "rocrand_wrapper.hpp"
 using half         = half_float::half;

@@ -36,9 +36,9 @@
 #include "util_driver.hpp"
 #include "conv_common.hpp"
 
-#include "../test/verify.hpp"
-#include "../test/cpu_conv.hpp"
-#include "../test/cpu_bias.hpp"
+#include <miopen_utils/verify.hpp>
+#include <miopen_utils/cpu_conv.hpp>
+#include <miopen_utils/cpu_bias.hpp>
 
 #include <miopen/env.hpp>
 #include <miopen/errors.hpp>

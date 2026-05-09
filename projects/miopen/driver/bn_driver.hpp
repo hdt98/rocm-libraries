@@ -35,9 +35,9 @@
 #include "util_driver.hpp"
 #include "rocrand_wrapper.hpp"
 
-#include "../test/verify.hpp"
-#include "../test/random.hpp"
-#include "../test/fusionHost.hpp"
+#include <miopen_utils/verify.hpp>
+#include <miopen_utils/random.hpp>
+#include <miopen_utils/fusionHost.hpp>
 
 #include <miopen/errors.hpp>
 #include <miopen/handle.hpp>
