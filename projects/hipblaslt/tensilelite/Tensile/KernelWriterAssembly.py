@@ -17822,17 +17822,41 @@ class KernelWriterAssembly(KernelWriter):
 
     return mod
 
+  def tdmMxSwizzledKIterIncrement(self, kernel, tP, dst) -> Module:
+    mod = Module("TDM MX swizzled K-iteration increment")
+    tc: str = tP["tensorChar"]
+    assert "MXS" in tc
+    scaleDepthU = kernel["DepthU"] // kernel["ProblemType"][f"MXBlock{tc[3]}"]
+    incElements = int(scaleDepthU * tP["bpeGR"])
+    sizeName = "Size%s" % INDEX_CHARS[tP["idx"]]
+    mod.add(SMulI32(dst=sgpr(dst), src0=sgpr(sizeName), src1=incElements,
+                    comment=f"{tc} StreamK/TDM increment = {sizeName} * scaleDepthU({scaleDepthU}) * bpe({tP['bpeGR']})"))
+    return mod
+
   def tdmSetupIncrementWaveSeparated(self, kernel, tpA, tpB) -> Module:
     mod = Module()
     tcA: str = tpA["tensorChar"]
     tcB: str = tpB["tensorChar"]
     wavelen: int = kernel["WavefrontSize"]
     incSgprName = f"tdm{tcA}{tcB}Incs"
-    mod.add(VReadfirstlaneB32(sgpr(incSgprName), vgpr("Serial"), "first tId"))
-    mod.add(SLShiftRightB32(sgpr(incSgprName), ceil(log2(wavelen)), sgpr(incSgprName), "wId=fTid // wavelen"))
-    mod.add(SBitcmp1B32(sgpr(incSgprName), 0, "Check parity of wId"))
-    #TODO: should not directly use GRIA and GRIB
-    mod.add(SCSelectB32(sgpr(incSgprName), sgpr(f"GlobalReadIncs{tcB}"), sgpr(f"GlobalReadIncs{tcA}")))
+    isMXS = "MXS" in tcA or "MXS" in tcB
+    if isMXS:
+      assert "MXS" in tcA and "MXS" in tcB
+      with self.allocTmpSgpr(2) as tmpSgprRes:
+        incA = tmpSgprRes.idx
+        incB = tmpSgprRes.idx + 1
+        mod.add(self.tdmMxSwizzledKIterIncrement(kernel, tpA, incA))
+        mod.add(self.tdmMxSwizzledKIterIncrement(kernel, tpB, incB))
+        mod.add(VReadfirstlaneB32(sgpr(incSgprName), vgpr("Serial"), "first tId"))
+        mod.add(SLShiftRightB32(sgpr(incSgprName), ceil(log2(wavelen)), sgpr(incSgprName), "wId=fTid // wavelen"))
+        mod.add(SBitcmp1B32(sgpr(incSgprName), 0, "Check parity of wId"))
+        mod.add(SCSelectB32(sgpr(incSgprName), sgpr(incB), sgpr(incA)))
+    else:
+      mod.add(VReadfirstlaneB32(sgpr(incSgprName), vgpr("Serial"), "first tId"))
+      mod.add(SLShiftRightB32(sgpr(incSgprName), ceil(log2(wavelen)), sgpr(incSgprName), "wId=fTid // wavelen"))
+      mod.add(SBitcmp1B32(sgpr(incSgprName), 0, "Check parity of wId"))
+      #TODO: should not directly use GRIA and GRIB
+      mod.add(SCSelectB32(sgpr(incSgprName), sgpr(f"GlobalReadIncs{tcB}"), sgpr(f"GlobalReadIncs{tcA}")))
     return mod
 
   def resetTDMDescriptorForTail(self, kernel: Mapping, tP: Mapping, tmpSgprWaveOffset = None) -> Module:
