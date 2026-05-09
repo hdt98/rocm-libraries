@@ -29,10 +29,10 @@
 #define UNPACK_VEC4(v) (v[0]), (v[1]), (v[2]), (v[3])
 
 #include <common_utils/errors.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <algorithm>
 #include <iterator>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <miopen/tensor_extra.hpp>
 #include <miopen/tensor_layout.hpp>
 #include <numeric>
@@ -119,7 +119,7 @@ inline std::vector<int> GetTensorLengths(const miopenTensorDescriptor_t& tensor)
     }
 
     std::vector<int> tensor_len;
-    tensor_len.resize(miopen::deref(tensor).GetNumDims());
+    tensor_len.resize(tensor_utils::GetNumDims(tensor));
     miopenGetTensorDescriptor(tensor, nullptr, tensor_len.data(), nullptr);
 
     return tensor_len;
@@ -149,7 +149,7 @@ inline std::vector<int> GetTensorStrides(const miopenTensorDescriptor_t& tensor)
     }
 
     std::vector<int> tensor_strides;
-    tensor_strides.resize(miopen::deref(tensor).GetNumDims());
+    tensor_strides.resize(tensor_utils::GetNumDims(tensor));
 
     miopenGetTensorDescriptor(tensor, nullptr, nullptr, tensor_strides.data());
 
@@ -255,7 +255,7 @@ inline int SetTensorNd(miopenTensorDescriptor_t t,
 // The implementation is a copy-paste from miopen::TensorDescriptor.
 inline size_t GetTensorSize(const miopenTensorDescriptor_t& tensor)
 {
-    assert(miopen::deref(tensor).IsPacked() &&
+    assert(tensor_utils::IsPacked(tensor) &&
            "GetTensorSize should not be used on an unpacked tensor.");
     const auto len            = GetTensorLengths(tensor);
     const size_t vectorLength = GetTensorVectorLength(tensor);
@@ -269,7 +269,7 @@ inline size_t GetTensorSize(const miopenTensorDescriptor_t& tensor)
 // GetTensorSize. Unless, of course, there is absolutely zero chance to receive an unpacked tensor.
 inline size_t GetTensorSpace(const miopenTensorDescriptor_t& tensor)
 {
-    return miopen::deref(tensor).GetElementSpace();
+    return tensor_utils::GetElementSpace(tensor);
 }
 
 #endif // GUARD_MIOPEN_TENSOR_DRIVER_HPP

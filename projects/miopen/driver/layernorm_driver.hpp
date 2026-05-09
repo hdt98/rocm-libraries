@@ -39,7 +39,7 @@
 #include <cstdlib>
 #include <memory>
 #include <common_utils/errors.hpp>
-#include <miopen/tensor.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <vector>
 
 template <typename T>
@@ -308,22 +308,22 @@ int LayerNormDriver<T>::AllocateBuffersAndCopy()
     db_dev        = std::unique_ptr<GPUMem>(new GPUMem(ctx, db_sz, sizeof(T)));
     workspace_dev = std::unique_ptr<GPUMem>(new GPUMem(ctx, ws_sizeInBytes, sizeof(std::byte)));
 
-    in       = tensor<T>(miopen::deref(inputDesc)).generate(genT0val);
-    weight   = tensor<T>(miopen::deref(weightDesc)).generate(genT0val);
-    bias     = tensor<T>(miopen::deref(biasDesc)).generate(genT0val);
-    out      = tensor<T>(miopen::deref(outputDesc)).generate(genT0val);
-    mean     = tensor<T>(miopen::deref(meanDesc)).generate(genT0val);
-    rstd     = tensor<T>(miopen::deref(rstdDesc)).generate(genT0val);
-    dy       = tensor<T>(miopen::deref(dyDesc)).generate(genT0val);
-    dx       = tensor<T>(miopen::deref(dxDesc)).generate(genT0val);
-    dw       = tensor<T>(miopen::deref(dwDesc)).generate(genT0val);
-    db       = tensor<T>(miopen::deref(dbDesc)).generate(genT0val);
-    outhost  = tensor<T>(miopen::deref(outputDesc)).generate(genT0val);
-    meanhost = tensor<T>(miopen::deref(meanDesc)).generate(genT0val);
-    rstdhost = tensor<T>(miopen::deref(rstdDesc)).generate(genT0val);
-    dxhost   = tensor<T>(miopen::deref(dxDesc)).generate(genT0val);
-    dwhost   = tensor<T>(miopen::deref(dwDesc)).generate(genT0val);
-    dbhost   = tensor<T>(miopen::deref(dbDesc)).generate(genT0val);
+    in       = tensor<T>(tensor_utils::GetLengths(inputDesc), tensor_utils::GetStrides(inputDesc)).generate(genT0val);
+    weight   = tensor<T>(tensor_utils::GetLengths(weightDesc), tensor_utils::GetStrides(weightDesc)).generate(genT0val);
+    bias     = tensor<T>(tensor_utils::GetLengths(biasDesc), tensor_utils::GetStrides(biasDesc)).generate(genT0val);
+    out      = tensor<T>(tensor_utils::GetLengths(outputDesc), tensor_utils::GetStrides(outputDesc)).generate(genT0val);
+    mean     = tensor<T>(tensor_utils::GetLengths(meanDesc), tensor_utils::GetStrides(meanDesc)).generate(genT0val);
+    rstd     = tensor<T>(tensor_utils::GetLengths(rstdDesc), tensor_utils::GetStrides(rstdDesc)).generate(genT0val);
+    dy       = tensor<T>(tensor_utils::GetLengths(dyDesc), tensor_utils::GetStrides(dyDesc)).generate(genT0val);
+    dx       = tensor<T>(tensor_utils::GetLengths(dxDesc), tensor_utils::GetStrides(dxDesc)).generate(genT0val);
+    dw       = tensor<T>(tensor_utils::GetLengths(dwDesc), tensor_utils::GetStrides(dwDesc)).generate(genT0val);
+    db       = tensor<T>(tensor_utils::GetLengths(dbDesc), tensor_utils::GetStrides(dbDesc)).generate(genT0val);
+    outhost  = tensor<T>(tensor_utils::GetLengths(outputDesc), tensor_utils::GetStrides(outputDesc)).generate(genT0val);
+    meanhost = tensor<T>(tensor_utils::GetLengths(meanDesc), tensor_utils::GetStrides(meanDesc)).generate(genT0val);
+    rstdhost = tensor<T>(tensor_utils::GetLengths(rstdDesc), tensor_utils::GetStrides(rstdDesc)).generate(genT0val);
+    dxhost   = tensor<T>(tensor_utils::GetLengths(dxDesc), tensor_utils::GetStrides(dxDesc)).generate(genT0val);
+    dwhost   = tensor<T>(tensor_utils::GetLengths(dwDesc), tensor_utils::GetStrides(dwDesc)).generate(genT0val);
+    dbhost   = tensor<T>(tensor_utils::GetLengths(dbDesc), tensor_utils::GetStrides(dbDesc)).generate(genT0val);
 
     for(int i = 0; i < in_sz; i++)
     {

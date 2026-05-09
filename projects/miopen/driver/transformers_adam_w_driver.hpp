@@ -34,8 +34,8 @@
 
 #include <miopen_utils/verify.hpp>
 
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 
 #include <algorithm>
 #include <cfloat>
@@ -405,7 +405,7 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardCPU()
     const auto exp_avg_sqs = exp_avg_sq_host.data();
     const auto step        = iter;
 
-    const size_t numel = miopen::deref(paramDesc).GetElementSize();
+    const size_t numel = tensor_utils::GetElementSize(paramDesc);
 
     const float bias_correction1 = 1.0 - pow(beta1, step);
     const float bias_correction2 = 1.0 - pow(beta2, step);

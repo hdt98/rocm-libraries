@@ -37,7 +37,6 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <miopen/tensor.hpp>
 #include <vector>
 
 template <typename Tgpu, typename Tcheck>
@@ -50,7 +49,7 @@ int32_t mloT5LayerNormForwardRunHost(miopenTensorDescriptor_t xDesc,
                                      miopenNormMode_t mode,
                                      bool use_multithread)
 {
-    auto dims         = miopen::deref(xDesc).GetLengths();
+    auto dims         = tensor_utils::GetLengths(xDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -97,7 +96,7 @@ int32_t mloT5LayerNormBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                       miopenNormMode_t mode,
                                       bool use_multithread)
 {
-    auto dims         = miopen::deref(dyDesc).GetLengths();
+    auto dims         = tensor_utils::GetLengths(dyDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -148,7 +147,7 @@ int32_t mloT5LayerNormBackwardweightRunHost(miopenTensorDescriptor_t dyDesc,
                                             Tcheck* dwhost,
                                             bool use_multithread)
 {
-    auto dims         = miopen::deref(dyDesc).GetLengths();
+    auto dims         = tensor_utils::GetLengths(dyDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 

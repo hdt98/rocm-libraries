@@ -36,8 +36,8 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
@@ -59,12 +59,12 @@ int32_t mloReduceExtremeForwardRunHost(miopenTensorDescriptor_t xDesc,
                                        int32_t* indicehost,
                                        int32_t dim)
 {
-    auto x_dims = miopen::deref(xDesc).GetLengths();
+    auto x_dims = tensor_utils::GetLengths(xDesc);
     std::vector<std::size_t> indice_dims;
     if(yhost)
-        indice_dims = miopen::deref(yDesc).GetLengths();
+        indice_dims = tensor_utils::GetLengths(yDesc);
     else
-        indice_dims = miopen::deref(indiceDesc).GetLengths();
+        indice_dims = tensor_utils::GetLengths(indiceDesc);
 
     int32_t reduce_size = static_cast<int32_t>(x_dims[dim]);
     auto indice_numel =

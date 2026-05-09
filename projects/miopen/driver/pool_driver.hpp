@@ -37,9 +37,8 @@
 #include "util_file.hpp"
 
 #include <common_utils/errors.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/pooling.hpp>
-#include <miopen/tensor.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -190,7 +189,8 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
     int nOutStride, cOutStride, dOutStride, hOutStride, wOutStride;
     int nOut, cOut, dOut, hOut, wOut;
     miopenPoolingMode_t mode  = miopenPoolingMax;
-    miopenPaddingMode_t pmode = miopen::deref(poolDesc).pmode;
+    miopenPaddingMode_t pmode;
+    miopenGetPoolingPaddingMode(poolDesc, &pmode);
     int windowDepth, windowHeight, windowWidth;
     int pad_d, pad_h, pad_w;
     int stride_d, stride_h, stride_w;
@@ -229,9 +229,9 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
 
         miopenGetNdPoolingDescriptor(
             poolDesc, spatial_dim, &mode, nullptr, winV.data(), padV.data(), strV.data());
-        std::tie(windowDepth, windowHeight, windowWidth) = miopen::tien<3>(winV);
-        std::tie(pad_d, pad_h, pad_w)                    = miopen::tien<3>(padV);
-        std::tie(stride_d, stride_h, stride_w)           = miopen::tien<3>(strV);
+        std::tie(windowDepth, windowHeight, windowWidth) = tensor_utils::Tien<3>(winV);
+        std::tie(pad_d, pad_h, pad_w)                    = tensor_utils::Tien<3>(padV);
+        std::tie(stride_d, stride_h, stride_w)           = tensor_utils::Tien<3>(strV);
     }
     else
     {
@@ -400,17 +400,19 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     out_filename = inflags.GetValueStr("out_data");
     dump_root    = inflags.GetValueStr("dump_root");
 
-    std::initializer_list<int> lens    = {win_d, win_h, win_w};
-    std::initializer_list<int> pads    = {pad_d, pad_h, pad_w};
-    std::initializer_list<int> strides = {stride_d, stride_h, stride_w};
-    miopen::deref(poolDesc)            = miopen::PoolingDescriptor(mode,
-                                                        pmode,
-                                                        lens.begin() + 3 - spatial_dim,
-                                                        pads.begin() + 3 - spatial_dim,
-                                                        strides.begin() + 3 - spatial_dim,
-                                                        spatial_dim);
+    std::vector<int> lens_v    = {win_d, win_h, win_w};
+    std::vector<int> pads_v    = {pad_d, pad_h, pad_w};
+    std::vector<int> strides_v = {stride_d, stride_h, stride_w};
+    // Trim to spatial_dim elements from the end (skip leading 3d-only values for 2d)
+    int offset = 3 - spatial_dim;
+    miopenSetNdPoolingDescriptor(poolDesc,
+                                 mode,
+                                 spatial_dim,
+                                 lens_v.data() + offset,
+                                 pads_v.data() + offset,
+                                 strides_v.data() + offset);
 
-    miopen::deref(poolDesc).SetIndexType(index_type);
+    miopenSetPoolingIndexType(poolDesc, index_type);
 
     miopenSetPoolingWorkSpaceIndexMode(
         poolDesc,

@@ -36,8 +36,8 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
@@ -53,8 +53,8 @@ int32_t mloRoPEForwardRunHost(miopenTensorDescriptor_t xDesc,
                               Tgpu* sin,
                               Tcheck* yhost)
 {
-    auto x_dims   = miopen::deref(xDesc).GetLengths();
-    auto cos_dims = miopen::deref(cosDesc).GetLengths();
+    auto x_dims   = tensor_utils::GetLengths(xDesc);
+    auto cos_dims = tensor_utils::GetLengths(cosDesc);
     auto input_numel =
         std::accumulate(x_dims.begin(), x_dims.end(), 1LL, std::multiplies<int64_t>());
     auto rotary_numel =
@@ -90,10 +90,10 @@ int32_t mloRoPEBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                Tgpu* sin,
                                Tcheck* dxhost)
 {
-    auto dy_dims = miopen::deref(dyDesc).GetLengths();
+    auto dy_dims = tensor_utils::GetLengths(dyDesc);
     auto input_numel =
         std::accumulate(dy_dims.begin(), dy_dims.end(), 1LL, std::multiplies<int64_t>());
-    auto cos_dims = miopen::deref(cosDesc).GetLengths();
+    auto cos_dims = tensor_utils::GetLengths(cosDesc);
     auto rotary_numel =
         std::accumulate(cos_dims.begin(), cos_dims.end(), 1LL, std::multiplies<int64_t>());
 

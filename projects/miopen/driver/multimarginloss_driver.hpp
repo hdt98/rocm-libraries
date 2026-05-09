@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 #include <vector>
@@ -294,7 +295,7 @@ int MultiMarginLossDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     {
         I[i] = prng::gen_A_to_B<Tgpu>(static_cast<Tgpu>(-1), static_cast<Tgpu>(1));
     }
-    int C = miopen::deref(iDesc).GetLengths()[1];
+    int C = tensor_utils::GetLengths(iDesc)[1];
     // 0 to C - 1
     for(int i = 0; i < t_sz; i++)
     {

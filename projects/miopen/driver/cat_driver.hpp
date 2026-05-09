@@ -13,9 +13,9 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 #include <common_utils/float_equal.hpp>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
@@ -33,7 +33,7 @@ int32_t mloCatForwardRunHost(const std::vector<miopenTensorDescriptor_t>& inputD
                              uint32_t dim,
                              bool multi_threaded)
 {
-    const auto& shape            = miopen::deref(outputDesc).GetLengths();
+    const auto& shape            = tensor_utils::GetLengths(outputDesc);
     const size_t output_dim_size = shape[dim];
     size_t outer_size            = 1;
     size_t inner_size            = 1;
@@ -61,12 +61,12 @@ int32_t mloCatForwardRunHost(const std::vector<miopenTensorDescriptor_t>& inputD
     copy_sizes.reserve(n);
     output_start_offsets.reserve(n);
 
-    copy_sizes.emplace_back(inner_size * miopen::deref(inputDescs[0]).GetLengths()[dim]);
+    copy_sizes.emplace_back(inner_size * tensor_utils::GetLengths(inputDescs[0])[dim]);
     output_start_offsets.emplace_back(0);
 
     for(size_t i{1}; i < n; ++i)
     {
-        const size_t dim_size = miopen::deref(inputDescs[i]).GetLengths()[dim];
+        const size_t dim_size = tensor_utils::GetLengths(inputDescs[i])[dim];
 
         output_start_offsets.emplace_back(output_start_offsets.back() + copy_sizes.back());
         copy_sizes.emplace_back(inner_size * dim_size);

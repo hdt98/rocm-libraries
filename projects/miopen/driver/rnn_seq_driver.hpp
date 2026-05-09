@@ -39,9 +39,9 @@
 #include <miopen_utils/verify.hpp>
 
 #include <common_utils/errors.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
 #include <miopen/rnn.hpp>
-#include <miopen/tensor.hpp>
 #include <miopen/tensor_ops.hpp>
 
 #include <algorithm>
@@ -760,7 +760,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
 // GetTensorSize broken So this is WA
 inline size_t Get3DNoVECTensorSize(miopenTensorDescriptor_t& tensor)
 {
-    assert(miopen::deref(tensor).IsPacked() &&
+    assert(tensor_utils::IsPacked(tensor) &&
            "GetTensorSize should not be used on an unpacked tensor.");
     const auto len = GetTensorLengths(tensor);
     size_t sz      = std::accumulate(len.begin(), len.end(), 1ULL, std::multiplies<size_t>());
@@ -1109,7 +1109,7 @@ int RNNSeqDriver<Tgpu, Tref>::RunForwardGPU()
         time_logger.StopAndPush();
     }
 
-    miopen::deref(GetHandle()).Finish();
+    (void)hipStreamSynchronize(GetStream());
     if(inflags.GetValueInt("time") == 1)
     {
         printf("Forward RNN time results:\n");
@@ -1207,7 +1207,7 @@ int RNNSeqDriver<Tgpu, Tref>::RunBackwardGPU()
             time_logger.StopAndPush();
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
         if(inflags.GetValueInt("time") == 1)
         {
             printf("Backward Data RNN time results:\n");
@@ -1279,7 +1279,7 @@ int RNNSeqDriver<Tgpu, Tref>::RunBackwardGPU()
             time_logger.StopAndPush();
         }
 
-        miopen::deref(GetHandle()).Finish();
+        (void)hipStreamSynchronize(GetStream());
 
         if(inflags.GetValueInt("time") == 1)
         {
