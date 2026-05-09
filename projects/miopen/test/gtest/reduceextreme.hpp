@@ -24,6 +24,7 @@
  *
  *******************************************************************************/
 
+#include <miopen/miopen.h>
 #include "../src/kernels/MIOpenReduceExtreme.hpp"
 #include "get_handle.hpp"
 #include <miopen_utils/random.hpp>
@@ -31,7 +32,6 @@
 #include <miopen_utils/verify.hpp>
 #include <gtest/gtest.h>
 #include <miopen/reduceextreme.hpp>
-#include <miopen/miopen.h>
 
 template <typename T>
 bool compare_equal(T r1, T r2)
