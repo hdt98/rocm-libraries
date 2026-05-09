@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,25 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-// Forwarding header -- implementation moved to common_utils.
-#ifndef GUARD_MIOPEN_RANK_HPP
-#define GUARD_MIOPEN_RANK_HPP
-#include <common_utils/rank.hpp>
+#ifndef GUARD_MLOPEN_ALGORITHM_HPP
+#define GUARD_MLOPEN_ALGORITHM_HPP
+
+#include <algorithm>
+
+namespace miopen {
+
+template <typename Range, typename Predicate>
+bool any_of(const Range& r, Predicate p)
+{
+    return std::any_of(r.begin(), r.end(), p);
+}
+
+template <typename Range, typename Predicate>
+bool all_of(const Range& r, Predicate p)
+{
+    return std::all_of(r.begin(), r.end(), p);
+}
+
+} // namespace miopen
+
 #endif

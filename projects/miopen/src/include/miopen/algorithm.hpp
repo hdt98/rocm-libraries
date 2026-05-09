@@ -23,25 +23,8 @@
  * SOFTWARE.
  *
  *******************************************************************************/
+// Forwarding header -- implementation moved to common_utils.
 #ifndef GUARD_MLOPEN_ALGORITHM_HPP
 #define GUARD_MLOPEN_ALGORITHM_HPP
-
-#include <algorithm>
-
-namespace miopen {
-
-template <typename Range, typename Predicate>
-bool any_of(const Range& r, Predicate p)
-{
-    return std::any_of(r.begin(), r.end(), p);
-}
-
-template <typename Range, typename Predicate>
-bool all_of(const Range& r, Predicate p)
-{
-    return std::all_of(r.begin(), r.end(), p);
-}
-
-} // namespace miopen
-
+#include <common_utils/algorithm.hpp>
 #endif

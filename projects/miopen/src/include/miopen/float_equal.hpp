@@ -23,67 +23,8 @@
  * SOFTWARE.
  *
  *******************************************************************************/
+// Forwarding header -- implementation moved to common_utils.
 #ifndef GUARD_MLOPEN_FLOAT_EQUAL_HPP
 #define GUARD_MLOPEN_FLOAT_EQUAL_HPP
-
-#include <algorithm>
-#include <cmath>
-#include <limits>
-#include <numeric>
-
-namespace miopen {
-
-template <class... Ts>
-using common_type = typename std::common_type<Ts...>::type;
-
-struct float_equal_fn
-{
-    template <class T>
-    static bool apply(T x, T y)
-    {
-        // The standard library from MSVC does not implement std::isfinite() for integer
-        // types - no additional overloads are provided. According to the documentation,
-        // integer types should be treaded as doubles.
-        // Refer to https://en.cppreference.com/w/cpp/numeric/math/isfinite for more information.
-        return std::isfinite(static_cast<double>(x)) and std::isfinite(static_cast<double>(y)) and
-               std::nextafter(x, std::numeric_limits<T>::lowest()) <= y and
-               std::nextafter(x, std::numeric_limits<T>::max()) >= y;
-    }
-
-    template <class T, class U>
-    bool operator()(T x, U y) const
-    {
-        return float_equal_fn::apply<common_type<T, U>>(x, y);
-    }
-};
-
-static constexpr float_equal_fn float_equal{};
-
-/// Special case for comparing with a sentinel value
-struct float_equal_sentinel_fn
-{
-    template <class T>
-    static bool apply(T x, T y)
-    {
-// In this case we have to ignore this warning, because we intend to compare with the exact value
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wfloat-equal"
-        bool equals_sentinel = x == y;
-#pragma clang diagnostic pop
-
-        return std::isfinite(static_cast<double>(x)) and std::isfinite(static_cast<double>(y)) and
-               equals_sentinel;
-    }
-
-    template <class T, class U>
-    bool operator()(T x, U y) const
-    {
-        return float_equal_sentinel_fn::apply<common_type<T, U>>(x, y);
-    }
-};
-
-static constexpr float_equal_sentinel_fn float_equal_sentinel{};
-
-} // namespace miopen
-
+#include <common_utils/float_equal.hpp>
 #endif

@@ -23,16 +23,8 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-
+// Forwarding header -- implementation moved to common_utils.
 #ifndef GUARD_MIOPEN_RETURNS_HPP
 #define GUARD_MIOPEN_RETURNS_HPP
-
-#define MIOPEN_RETURNS(...) \
-    ->decltype(__VA_ARGS__) { return __VA_ARGS__; }
-
-#define MIOPEN_BODY_RETURNS(...) \
-    {                            \
-        return __VA_ARGS__;      \
-    }
-
+#include <common_utils/returns.hpp>
 #endif

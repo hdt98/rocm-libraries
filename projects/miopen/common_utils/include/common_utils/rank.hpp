@@ -23,8 +23,20 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-// Forwarding header -- implementation moved to common_utils.
 #ifndef GUARD_MIOPEN_RANK_HPP
 #define GUARD_MIOPEN_RANK_HPP
-#include <common_utils/rank.hpp>
+
+namespace miopen {
+
+template <int N>
+struct rank : rank<N - 1>
+{
+};
+
+template <>
+struct rank<0>
+{
+};
+} // namespace miopen
+
 #endif
