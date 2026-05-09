@@ -236,7 +236,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                                     SHARD_INDEX=\$i \\
                                     TOTAL_SHARDS=4 \\
                                     python build_tools/github_actions/test_executable_scripts/test_miopen.py
-                                ) > \$SHARD_LOGS_DIR/asan_shard_\$i.log 2>&1 &
+                                ) 2>&1 | tee \$SHARD_LOGS_DIR/asan_shard_\$i.log | sed "s/^/[shard \$i] /" &
                             done
                             wait
                         )
