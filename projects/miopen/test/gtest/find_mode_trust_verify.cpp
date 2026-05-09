@@ -26,7 +26,7 @@
 
 #include <gtest/group_conv.hpp>
 #include <miopen/datatype.hpp>
-#include "../../driver/driver.hpp"
+#include <miopen_utils/gpu_mem.hpp>
 
 namespace miopen {
 std::vector<solver::ConvSolution>

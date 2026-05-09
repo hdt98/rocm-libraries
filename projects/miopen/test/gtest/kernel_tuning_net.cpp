@@ -30,7 +30,7 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/conv/heuristics/ai_heuristics.hpp>
 #include <miopen/datatype.hpp>
-#include "../../driver/driver.hpp"
+#include <miopen_utils/gpu_mem.hpp>
 
 struct KernelTuningNetTestCase : AIModelTestCase
 {
