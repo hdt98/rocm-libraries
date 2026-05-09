@@ -32,6 +32,7 @@
 #pragma clang diagnostic ignored "-Wfloat-equal"
 #endif
 
+#include <common_utils/errors.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -40,7 +41,7 @@
 #include <type_traits>
 
 #include "calcerr.hpp"
-#include <miopen/bfloat16.hpp>
+#include <common_utils/bfloat16.hpp>
 
 #if 0
 template<typename _T>
@@ -186,7 +187,7 @@ void fwd_pooling_compute_verify(const TensorDimsStrides& bot_dims_strides,
                       "'match' has to be std::atomic_bool when running in multi-threaded mode");
         if(!stats_mutex.has_value())
         {
-            MIOPEN_THROW(
+            COMMON_THROW(
                 "'std::mutex' is needed as last parameter when running in multi-threaded mode");
         }
     }

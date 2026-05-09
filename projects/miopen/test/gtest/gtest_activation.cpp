@@ -31,11 +31,11 @@
 #include <memory>
 #include <miopen/activ.hpp>
 #include <miopen/miopen.h>
-#include <miopen/stringutils.hpp>
+#include <common_utils/stringutils.hpp>
 #include <miopen/tensor.hpp>
 #include <utility>
 #include <fusionHost.hpp>
-#include "verify.hpp"
+#include <miopen_utils/verify.hpp>
 #include "gtest/gtest.h"
 #include <half/half.hpp>
 

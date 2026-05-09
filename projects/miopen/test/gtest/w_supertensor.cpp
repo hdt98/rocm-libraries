@@ -27,13 +27,13 @@
 #include <array>
 #include <vector>
 
-#include <miopen/float_equal.hpp>
+#include <common_utils/float_equal.hpp>
 #include <miopen/miopen.h>
 
 #include "gtest_common.hpp"
 #include "gtest_desc_guard.hpp"
 #include "test_parameter_name_generator.hpp"
-#include "verify.hpp"
+#include <miopen_utils/verify.hpp>
 
 namespace {
 

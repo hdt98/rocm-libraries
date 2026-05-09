@@ -36,7 +36,7 @@
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/miopen.h>
 #include <miopen/pooling.hpp>
 #include <miopen/tensor.hpp>
@@ -164,11 +164,11 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
     spatial_dim = input.lengths.size() - 2;
 
     if(input.SetTensordDescriptor(inputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     auto dinput = inflags.GetValueTensor("dinput").FillMissing(input);
     if(dinput.SetTensordDescriptor(dInputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing dinput tensor: " + inflags.GetValueStr("dinput") + ".");
+        COMMON_THROW("Error parsing dinput tensor: " + inflags.GetValueStr("dinput") + ".");
 
     SetPoolDescriptorFromCmdLineArgs();
 
@@ -179,11 +179,11 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
         output.layout = input.layout;
 
     if(output.SetTensordDescriptor(outputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing output tensor: " + inflags.GetValueStr("output") + ".");
+        COMMON_THROW("Error parsing output tensor: " + inflags.GetValueStr("output") + ".");
 
     auto doutput = inflags.GetValueTensor("doutput").FillMissing(output);
     if(doutput.SetTensordDescriptor(dOutputTensor, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing doutput tensor: " + inflags.GetValueStr("doutput") + ".");
+        COMMON_THROW("Error parsing doutput tensor: " + inflags.GetValueStr("doutput") + ".");
 
     int nInStride, cInStride, dInStride, hInStride, wInStride;
     int nIn, cIn, dIn, hIn, wIn;
@@ -235,7 +235,7 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
     }
     else
     {
-        MIOPEN_THROW("Unsupported spatial dimension");
+        COMMON_THROW("Unsupported spatial dimension");
     }
 
     if(pmode == miopenPaddingSame)
@@ -355,7 +355,7 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Pooling Mode");
+        COMMON_THROW("Incorrect Pooling Mode");
     }
 
     if((inflags.GetValueStr("pad_mode")) == "same")
@@ -372,7 +372,7 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Padding Mode");
+        COMMON_THROW("Incorrect Padding Mode");
     }
 
     if((inflags.GetValueStr("index_type")) == "miopenIndexUint8")
@@ -393,7 +393,7 @@ int PoolDriver_impl<Tgpu, Tref, Index>::SetPoolDescriptorFromCmdLineArgs()
     }
     else
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Incorrect Index Data Type");
+        COMMON_THROW("Incorrect Index Data Type");
     }
 
     in_filename  = inflags.GetValueStr("in_data");

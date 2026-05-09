@@ -28,8 +28,7 @@
 
 #include "sys_info.hpp"
 #include <miopen/config.h>
-#include <miopen/errors.hpp>
-#include <miopen/stringutils.hpp>
+#include <common_utils/errors.hpp>
 
 #include <cstdio>
 #include <iostream>
@@ -65,7 +64,7 @@ int main(int argc, char* argv[])
         }
         if(drv == nullptr)
         {
-            MIOPEN_THROW(miopenStatusBadParm, "Incorrect BaseArg");
+            COMMON_THROW("Incorrect BaseArg");
         }
 
         drv->name = base_arg;
@@ -96,10 +95,10 @@ int main(int argc, char* argv[])
         }
 
         int fargval =
-            !(miopen::StartsWith(base_arg, "CBAInfer") || miopen::StartsWith(base_arg, "CAInfer"))
+            !(base_arg.starts_with("CBAInfer") || base_arg.starts_with("CAInfer"))
                 ? drv->GetInputFlags().GetValueInt("forw")
                 : 1;
-        bool bnFwdInVer   = (fargval == 2 && miopen::StartsWith(base_arg, "bnorm"));
+        bool bnFwdInVer   = (fargval == 2 && base_arg.starts_with("bnorm"));
         bool verifyarg    = (drv->GetInputFlags().GetValueInt("verify") == 1);
         int cumulative_rc = 0; // Do not stop running tests in case of errors.
 
@@ -126,11 +125,6 @@ int main(int argc, char* argv[])
         }
 
         return cumulative_rc;
-    }
-    catch(const miopen::Exception& ex)
-    {
-        std::cerr << "Error: " << ex.what() << std::endl;
-        return EXIT_FAILURE;
     }
     catch(const std::exception& ex)
     {

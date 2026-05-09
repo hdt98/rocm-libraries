@@ -26,6 +26,7 @@
 #ifndef GUARD_MIOPEN_REDUCE_CALCULATION_DRIVER_HPP
 #define GUARD_MIOPEN_REDUCE_CALCULATION_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
@@ -167,7 +168,7 @@ int ReduceCalculationDriver<Tgpu, Tref>::GetandSetData()
     auto in_len        = inTensorParam.lengths;
 
     if(SetTensorNd(inputDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     std::vector<int> out_len;
 
@@ -183,7 +184,7 @@ int ReduceCalculationDriver<Tgpu, Tref>::GetandSetData()
         out_len.push_back(1);
 
     if(SetTensorNd(outputDesc, out_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        COMMON_THROW("Error setting output tensor.");
 
     nanPropagation =
         static_cast<miopenReduceCalculationNanPropagation_t>(inflags.GetValueInt("NanPropagation"));

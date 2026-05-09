@@ -28,9 +28,9 @@
 
 #include "tensor_driver.hpp"
 
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/tensor.hpp>
-#include <miopen/stringutils.hpp>
+#include <common_utils/stringutils.hpp>
 
 #include <iomanip>
 #include <iostream>
@@ -52,13 +52,13 @@ int TensorParameters::SetTensordDescriptor(miopenTensorDescriptor_t result,
 void TensorParameters::CalculateStrides()
 {
     if(layout.empty())
-        MIOPEN_THROW("Attempt to calculate strides without layout.");
+        COMMON_THROW("Attempt to calculate strides without layout.");
     if(layout.size() != lengths.size())
-        MIOPEN_THROW("Unmatched layout and lengths sizes.");
+        COMMON_THROW("Unmatched layout and lengths sizes.");
 
     const auto len_layout = miopen::tensor_layout_get_default(layout.size());
     if(len_layout.empty())
-        MIOPEN_THROW("Invalid tensor lengths dimentions.");
+        COMMON_THROW("Invalid tensor lengths dimentions.");
 
     strides = {};
     miopen::tensor_layout_to_strides(lengths, len_layout, layout, strides);
@@ -145,7 +145,7 @@ char InputFlags::FindShortName(const std::string& long_name) const
     }
     if(short_name == '\0')
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Long Name: " + long_name + " Not Found!");
+        COMMON_THROW("Long Name: " + long_name + " Not Found!");
     }
     return short_name;
 }
@@ -183,7 +183,7 @@ void InputFlags::Parse(int argc, char* argv[])
             char short_name = temp[1];
             if(MapInputs.find(short_name) == MapInputs.end())
             {
-                MIOPEN_THROW(miopenStatusBadParm,
+                COMMON_THROW(
                              std::string("Input Flag: ") + short_name + " Not Found!");
             }
             if(short_name == 'h')
@@ -267,7 +267,7 @@ TensorParameters InputFlags::GetValueTensor(const std::string& long_name) const
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                COMMON_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }
@@ -290,7 +290,7 @@ TensorParameters InputFlags::GetValueTensor(const std::string& long_name) const
     if(components.size() == 2)
         return {lens, strides, layout};
 
-    MIOPEN_THROW("Too many tensor descriptor parameters.");
+    COMMON_THROW("Too many tensor descriptor parameters.");
 }
 
 TensorParametersUint64 InputFlags::GetValueTensorUint64(const std::string& long_name) const
@@ -311,7 +311,7 @@ TensorParametersUint64 InputFlags::GetValueTensorUint64(const std::string& long_
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                COMMON_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }
@@ -334,7 +334,7 @@ TensorParametersUint64 InputFlags::GetValueTensorUint64(const std::string& long_
     if(components.size() == 2)
         return {lens, strides, layout};
 
-    MIOPEN_THROW("Too many tensor descriptor parameters.");
+    COMMON_THROW("Too many tensor descriptor parameters.");
 }
 
 std::vector<int32_t> InputFlags::GetValueVectorInt(const std::string& long_name) const
@@ -351,7 +351,7 @@ std::vector<int32_t> InputFlags::GetValueVectorInt(const std::string& long_name)
         ss >> elem;
 
         if(ss.bad() || ss.fail())
-            MIOPEN_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
+            COMMON_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
 
         ret.push_back(elem);
     }
@@ -373,7 +373,7 @@ std::vector<uint64_t> InputFlags::GetValueVectorUint64(const std::string& long_n
         ss >> elem;
 
         if(ss.bad() || ss.fail())
-            MIOPEN_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
+            COMMON_THROW("Invalid tensor component " + str + " in " + input.value.c_str() + ".");
 
         ret.push_back(elem);
     }
@@ -401,7 +401,7 @@ InputFlags::GetValue2dVectorInt(const std::string& long_name) const
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                COMMON_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }
@@ -435,7 +435,7 @@ InputFlags::GetValue2dVectorUint64(const std::string& long_name) const
             ss >> elem;
 
             if(ss.bad() || ss.fail())
-                MIOPEN_THROW("Invalid tensor component " + str + " in " + line + ".");
+                COMMON_THROW("Invalid tensor component " + str + " in " + line + ".");
 
             ret.push_back(elem);
         }

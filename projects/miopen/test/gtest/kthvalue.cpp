@@ -25,8 +25,8 @@
  *******************************************************************************/
 
 #include "kthvalue.hpp"
-#include "tensor_holder.hpp"
-#include <miopen/bfloat16.hpp>
+#include <miopen_utils/tensor_holder.hpp>
+#include <common_utils/bfloat16.hpp>
 
 namespace kthvalue {
 

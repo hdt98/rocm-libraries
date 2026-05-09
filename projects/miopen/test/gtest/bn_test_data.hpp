@@ -24,7 +24,7 @@
  *
  *******************************************************************************/
 #pragma once
-#include "random.hpp"
+#include <miopen_utils/random.hpp>
 
 #include <miopen/miopen.h>
 #include <miopen/solver_id.hpp>

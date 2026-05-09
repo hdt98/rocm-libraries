@@ -26,6 +26,7 @@
 #ifndef GUARD_MIOPEN_REDUCEEXTREME_DRIVER_HPP
 #define GUARD_MIOPEN_REDUCEEXTREME_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
@@ -208,13 +209,13 @@ int ReduceExtremeDriver<Tgpu, Tref>::GetandSetData()
         out_len.push_back(1);
 
     if(SetTensorNd(xDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing x tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing x tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(yDesc, out_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting y tensor.");
+        COMMON_THROW("Error setting y tensor.");
 
     if(SetTensorNd(indiceDesc, out_len, indice_data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting indice tensor.");
+        COMMON_THROW("Error setting indice tensor.");
 
     return 0;
 }

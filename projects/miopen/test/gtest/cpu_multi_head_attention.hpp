@@ -27,7 +27,7 @@
 
 #include "mha_helper.hpp"
 #include "attention_golden.hpp"
-#include "verify.hpp"
+#include <miopen_utils/verify.hpp>
 
 namespace test {
 namespace cpu {

@@ -25,6 +25,7 @@
  *******************************************************************************/
 #pragma once
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
@@ -412,7 +413,7 @@ int SoftMarginLossDriver<Tgpu, Tref>::RunForwardGPU()
             (workspace_dev == nullptr) ? nullptr : workspace_dev->GetMem(),
             ws_sizeInBytes);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossForward");
+        COMMON_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossForward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);
@@ -478,7 +479,7 @@ int SoftMarginLossDriver<Tgpu, Tref>::RunBackwardGPU()
                                                              dI_dev->GetMem(),
                                                              reduction_mode);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossBackward");
+        COMMON_THROW_IF(status != miopenStatusSuccess, "Error in miopenSoftMarginLossBackward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);

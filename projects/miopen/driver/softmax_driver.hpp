@@ -3,6 +3,7 @@
 #ifndef GUARD_MIOPEN_SOFTMAX_DRIVER_HPP
 #define GUARD_MIOPEN_SOFTMAX_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "mloSoftmaxHost.hpp"
@@ -118,23 +119,23 @@ int SoftmaxDriver<Tgpu, Tref>::GetandSetData()
     if(SetTensorNd(inputTensor, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
     {
-        MIOPEN_THROW("Error setting input tensor.");
+        COMMON_THROW("Error setting input tensor.");
     }
     if(SetTensorNd(outputTensor, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
     {
-        MIOPEN_THROW("Error setting output tensor.");
+        COMMON_THROW("Error setting output tensor.");
     }
 
     if(SetTensorNd(dInputTensor, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
     {
-        MIOPEN_THROW("Error setting dinput tensor.");
+        COMMON_THROW("Error setting dinput tensor.");
     }
     if(SetTensorNd(dOutputTensor, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
     {
-        MIOPEN_THROW("Error setting doutput tensor.");
+        COMMON_THROW("Error setting doutput tensor.");
     }
 
     alpha = static_cast<float>(inflags.GetValueDouble("alpha"));
@@ -195,7 +196,7 @@ void SoftmaxDriver<Tgpu, Tref>::ValidateLayout()
     }
     else if(layout_value != "NCHW" && layout_value != "NHWC")
     {
-        MIOPEN_THROW(miopenStatusInvalidValue, "Invalid layout parameter value: " + layout_value);
+        COMMON_THROW("Invalid layout parameter value: " + layout_value);
     }
 }
 

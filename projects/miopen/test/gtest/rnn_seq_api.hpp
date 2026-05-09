@@ -31,14 +31,14 @@
 #include "../dropout_util.hpp"
 #include "get_handle.hpp"
 
-#include "random.hpp"
+#include <miopen_utils/random.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <algorithm>
 
 #include <miopen/rnn.hpp>
 #include <miopen/miopen.h>
-#include <miopen/float_equal.hpp>
+#include <common_utils/float_equal.hpp>
 
 //
 // Native rnn tensor format

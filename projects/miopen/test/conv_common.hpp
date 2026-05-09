@@ -47,16 +47,16 @@
 #include <utility>
 #include "driver.hpp"
 #include "get_handle.hpp"
-#include "tensor_holder.hpp"
-#include "verify.hpp"
-#include <miopen/stringutils.hpp>
+#include <miopen_utils/tensor_holder.hpp>
+#include <miopen_utils/verify.hpp>
+#include <common_utils/stringutils.hpp>
 #include "tensor_util.hpp"
-#include <miopen/algorithm.hpp>
-#include "cpu_conv.hpp"
+#include <common_utils/algorithm.hpp>
+#include <miopen_utils/cpu_conv.hpp>
 #include "gpu_conv.hpp"
-#include "network_data.hpp"
+#include <miopen_utils/network_data.hpp>
 #include "miopen/find_db.hpp"
-#include "random.hpp"
+#include <miopen_utils/random.hpp>
 
 #define TEST_DIRECT_SUPPORTED_CONFIG_ONLY (!MIOPEN_USE_ROCBLAS)
 

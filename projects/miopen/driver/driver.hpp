@@ -29,15 +29,16 @@
 #include <half/half.hpp>
 #include "../driver/random.hpp"
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
+#include "driver_log.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cfloat>
 #include <memory>
-#include <miopen/logger.hpp>
 #include <miopen/miopen.h>
-#include <miopen/bfloat16.hpp>
+#include <common_utils/bfloat16.hpp>
 #include <miopen/handle.hpp>
 #include <miopen_utils/tensor_holder.hpp>
 #include "util_driver.hpp"
@@ -119,12 +120,10 @@ struct GPUMem
     {
         auto status = hipMalloc(static_cast<void**>(&buf), GetTotalSize(GetSize()));
         if(status != hipSuccess)
-            MIOPEN_THROW_HIP_STATUS(status,
+            COMMON_THROW_HIP_STATUS(status,
                                     "[MIOpenDriver] hipMalloc " + std::to_string(GetSize()));
         buf = static_cast<char*>(buf) + GetOffsetToUserBuffer();
-        MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Info2,
-                          "MIOpenDriver",
-                          "hipMalloc " << GetSize() << " at " << buf << " Ok");
+        DRIVER_LOG_INFO2("hipMalloc " << GetSize() << " at " << buf << " Ok");
     }
 
     int ToGPU(hipStream_t q, void* p)
@@ -195,20 +194,14 @@ struct GPUMem
         size_t size = 0;
         auto status = hipMemPtrGetInfo(buf, &size);
         if(status != hipSuccess)
-            MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Warning,
-                              "MIOpenDriver",
-                              "hipMemPtrGetInfo at " << buf << ' '
-                                                     << miopen::HIPErrorMessage(status, ""));
+            DRIVER_LOG_WARNING("hipMemPtrGetInfo at " << buf << ' '
+                                                     << hipGetErrorString(status));
         status = hipFree(buf);
         if(status != hipSuccess)
-            MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Error,
-                              "MIOpenDriver",
-                              "hipFree " << size << " at " << buf << ' '
-                                         << miopen::HIPErrorMessage(status, ""));
+            DRIVER_LOG_ERROR("hipFree " << size << " at " << buf << ' '
+                                         << hipGetErrorString(status));
         else
-            MIOPEN_LOG_CUSTOM(miopen::LoggingLevel::Info2,
-                              "MIOpenDriver",
-                              "hipFree " << size << " at " << buf << " Ok");
+            DRIVER_LOG_INFO2("hipFree " << size << " at " << buf << " Ok");
     }
 
     hipStream_t _q; // Place holder for opencl context
@@ -250,7 +243,7 @@ public:
     std::vector<Tgpu>& GetVector()
     {
         if(is_gpualloc)
-            MIOPEN_THROW("[MIOpenDriver] GpumemTensor::GetVector should not be called in "
+            COMMON_THROW("[MIOpenDriver] GpumemTensor::GetVector should not be called in "
                          "'--gpualloc 1' mode");
         return host.data;
     }

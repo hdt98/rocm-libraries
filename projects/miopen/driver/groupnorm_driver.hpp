@@ -23,6 +23,7 @@
  * SOFTWARE.
  *
  *******************************************************************************/
+#include <common_utils/errors.hpp>
 #include <miopen/miopen.h>
 #ifndef GUARD_MIOPEN_GROUPNORM_DRIVER_HPP
 #define GUARD_MIOPEN_GROUPNORM_DRIVER_HPP
@@ -212,7 +213,7 @@ std::vector<int> GroupNormDriver<Tgpu, Tref>::GetInputTensorLengthsFromCmdLine()
     }
     else
     {
-        MIOPEN_THROW("Error Input Tensor Lengths");
+        COMMON_THROW("Error Input Tensor Lengths");
     }
 }
 

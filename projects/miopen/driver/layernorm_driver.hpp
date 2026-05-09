@@ -38,7 +38,7 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <miopen/errors.hpp>
+#include <common_utils/errors.hpp>
 #include <miopen/tensor.hpp>
 #include <vector>
 
@@ -172,7 +172,7 @@ int LayerNormDriver<T>::GetandSetData()
 
     dim = inflags.GetValueInt("normalized_dim");
 
-    MIOPEN_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
+    COMMON_THROW_IF(dim < 0 || static_cast<size_t>(dim) >= in_len.size(),
                     "normalized_dim out of range");
 
     std::vector<int> inner_len;
@@ -189,35 +189,35 @@ int LayerNormDriver<T>::GetandSetData()
 
     if(SetTensorNd(inputDesc, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor.");
+        COMMON_THROW("Error parsing input tensor.");
 
     if(SetTensorNd(weightDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting weight tensor.");
+        COMMON_THROW("Error setting weight tensor.");
 
     if(SetTensorNd(biasDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting bias tensor.");
+        COMMON_THROW("Error setting bias tensor.");
 
     if(SetTensorNd(outputDesc, in_len, inflags.GetValueStr("layout"), data_type) !=
        miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        COMMON_THROW("Error setting output tensor.");
 
     if(SetTensorNd(meanDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting mean tensor.");
+        COMMON_THROW("Error setting mean tensor.");
 
     if(SetTensorNd(rstdDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting rstd tensor.");
+        COMMON_THROW("Error setting rstd tensor.");
 
     if(SetTensorNd(dyDesc, in_len, inflags.GetValueStr("layout"), data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dy tensor.");
+        COMMON_THROW("Error setting dy tensor.");
 
     if(SetTensorNd(dxDesc, in_len, inflags.GetValueStr("layout"), data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dx tensor.");
+        COMMON_THROW("Error setting dx tensor.");
 
     if(SetTensorNd(dwDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dw tensor.");
+        COMMON_THROW("Error setting dw tensor.");
 
     if(SetTensorNd(dbDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting db tensor.");
+        COMMON_THROW("Error setting db tensor.");
 
     eps  = inflags.GetValueDouble("eps");
     mode = miopenNormMode_t(inflags.GetValueInt("mode"));
@@ -661,7 +661,7 @@ std::vector<int> LayerNormDriver<T>::GetInputTensorLengthsFromCmdLine()
     }
     else
     {
-        MIOPEN_THROW("Invalid tensor sizes");
+        COMMON_THROW("Invalid tensor sizes");
     }
 }
 
@@ -690,24 +690,24 @@ void LayerNormDriver<T>::ValidateLayout()
     else if(layout_value != "NCHW" && layout_value != "NHWC" && layout_value != "NCDHW" &&
             layout_value != "NDHWC" && layout_value != "NW")
     {
-        MIOPEN_THROW(miopenStatusBadParm, "Invalid layout parameter value: " + layout_value);
+        COMMON_THROW("Invalid layout parameter value: " + layout_value);
     }
     else if((in_d == 0 || in_c == 0 || in_h == 0) &&
             (layout_value == "NCDHW" || layout_value == "NDHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "The input depth (in_d), channels (in_c) and height (in_h) must be greater "
                      "than zero for layouts NCDHW and NDHWC");
     }
     else if(in_d != 0 && (layout_value == "NCHW" || layout_value == "NHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "The input depth (in_d) must be zero and the input channels (in_c) and height "
                      "(in_h) must be greater than zero for layouts NCHW and NHWC");
     }
     else if((in_d != 0 || in_c != 0 || in_h != 0) && layout_value == "NW")
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "The input depth (in_d), channels (in_c) and height (in_h) must be zero for "
                      "layout NW");
     }
@@ -715,19 +715,19 @@ void LayerNormDriver<T>::ValidateLayout()
     int normalized_dim = inflags.GetValueInt("normalized_dim");
     if(normalized_dim >= 5 && (layout_value == "NCDHW" || layout_value == "NDHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "The normalized dimension (normalized_dim) must be less than 5 for layouts "
                      "NCDHW and NDHWC");
     }
     else if(normalized_dim >= 4 && (layout_value == "NCHW" || layout_value == "NHWC"))
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "The normalized dimension (normalized_dim) must be less than 4 for layouts "
                      "NCHW and NHWC");
     }
     else if(normalized_dim >= 2 && layout_value == "NW")
     {
-        MIOPEN_THROW(miopenStatusBadParm,
+        COMMON_THROW(
                      "The normalized dimension (normalized_dim) must be less than 2 for layout NW");
     }
 }

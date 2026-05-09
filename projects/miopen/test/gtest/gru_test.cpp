@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 #include <miopen/rnn.hpp>
 #include <miopen/miopen.h>
-#include "tensor_holder.hpp"
+#include <miopen_utils/tensor_holder.hpp>
 
 #include "compare_helper.hpp"
 #include "gtest_desc_guard.hpp"

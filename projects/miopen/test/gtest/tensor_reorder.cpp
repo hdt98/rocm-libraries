@@ -29,7 +29,7 @@
 #include <miopen/tensor_layout.hpp>
 
 #include "gtest_common.hpp"
-#include "random.hpp"
+#include <miopen_utils/random.hpp>
 #include "test_parameter_name_generator.hpp"
 #include "workspace.hpp"
 

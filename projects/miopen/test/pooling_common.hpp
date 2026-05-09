@@ -38,17 +38,17 @@
 #include <miopen/logger.hpp>
 #include <miopen/miopen.h>
 #include <miopen/pooling.hpp>
-#include <miopen/stringutils.hpp>
+#include <common_utils/stringutils.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/tensor_layout.hpp>
 #include <utility>
 
-// #include "network_data.hpp"
+// #include <miopen_utils/network_data.hpp>
 #include "driver.hpp"
 #include "get_handle.hpp"
-#include "tensor_holder.hpp"
-#include "verify.hpp"
-#include "cpu_conv.hpp"
+#include <miopen_utils/tensor_holder.hpp>
+#include <miopen_utils/verify.hpp>
+#include <miopen_utils/cpu_conv.hpp>
 #include "workspace.hpp"
 
 #define TEST_PADDING_MODE 0

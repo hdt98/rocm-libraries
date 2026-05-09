@@ -3,9 +3,9 @@
 
 #include "compare_helper.hpp"
 #include "get_handle.hpp"
-#include "tensor_holder.hpp"
-#include "verify.hpp"
-#include "random.hpp"
+#include <miopen_utils/tensor_holder.hpp>
+#include <miopen_utils/verify.hpp>
+#include <miopen_utils/random.hpp>
 #include "../network_data.hpp"
 
 #include <miopen/batch_norm.hpp>

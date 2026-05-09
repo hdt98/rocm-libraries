@@ -26,6 +26,7 @@
 #ifndef GUARD_MIOPEN_T5LAYERNORM_DRIVER_HPP
 #define GUARD_MIOPEN_T5LAYERNORM_DRIVER_HPP
 
+#include <common_utils/errors.hpp>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
 #include "InputFlags.hpp"
@@ -294,32 +295,32 @@ int T5LayerNormDriver<Tgpu, Tref>::GetandSetData()
 
     inner_len = {in_len[in_len.size() - 1]};
 
-    MIOPEN_THROW_IF(inner_len[0] == 0, "Final dimension must be nonzero");
+    COMMON_THROW_IF(inner_len[0] == 0, "Final dimension must be nonzero");
 
     std::vector<int> outer_len;
 
     outer_len = {in_len.begin(), in_len.end() - 1};
 
     if(SetTensorNd(xDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
+        COMMON_THROW("Error parsing input tensor: " + inflags.GetValueStr("input") + ".");
 
     if(SetTensorNd(weightDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting weight tensor.");
+        COMMON_THROW("Error setting weight tensor.");
 
     if(SetTensorNd(yDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting output tensor.");
+        COMMON_THROW("Error setting output tensor.");
 
     if(SetTensorNd(rstdDesc, outer_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting rstd tensor.");
+        COMMON_THROW("Error setting rstd tensor.");
 
     if(SetTensorNd(dyDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dy tensor.");
+        COMMON_THROW("Error setting dy tensor.");
 
     if(SetTensorNd(dxDesc, in_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dx tensor.");
+        COMMON_THROW("Error setting dx tensor.");
 
     if(SetTensorNd(dwDesc, inner_len, data_type) != miopenStatusSuccess)
-        MIOPEN_THROW("Error setting dw tensor.");
+        COMMON_THROW("Error setting dw tensor.");
 
     eps  = static_cast<double>(inflags.GetValueDouble("eps"));
     mode = miopenNormMode_t(inflags.GetValueInt("mode"));

@@ -25,6 +25,7 @@
  *******************************************************************************/
 #pragma once
 
+#include <common_utils/errors.hpp>
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "tensor_driver.hpp"
@@ -378,7 +379,7 @@ int MultiMarginLossDriver<Tgpu, Tref>::RunForwardGPU()
             workspace_dev == nullptr ? nullptr : workspace_dev->GetMem(),
             ws_sizeInBytes);
 
-        MIOPEN_THROW_IF(status != miopenStatusSuccess, "Error in miopenMultiMarginLossForward");
+        COMMON_THROW_IF(status != miopenStatusSuccess, "Error in miopenMultiMarginLossForward");
 
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);
