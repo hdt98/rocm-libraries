@@ -80,14 +80,23 @@ def _getVersion(executable: str, versionFlag: str, regex: str) -> str:
 
 
 def get_rocm_version() -> str:
-    """Compute the ROCm version string using hipconfig.
+    """Compute the ROCm version string from the ROCm version file.
+
+    Reads $ROCM_PATH/.info/version directly instead of calling hipconfig
+    (hipconfig is deprecated; use amdclang++ directly).
 
     Raises:
-        RuntimeError: If hipconfig fails to execute.
+        RuntimeError: If the version file cannot be found or read.
     Return:
         ROCm version string
     """
-    return _getVersion(ToolchainDefaults.HIP_CONFIG, "--version", r'(.+)')
+    rocm_path = environ.get("ROCM_PATH", "/opt/rocm")
+    version_file = Path(rocm_path) / ".info" / "version"
+    try:
+        version_str = version_file.read_text().strip()
+        return SemanticVersion(*[int(c.split("-")[0]) for c in version_str.split(".")[:3]])
+    except OSError as e:
+        raise RuntimeError(f"Failed to get ROCm version from {version_file}: {e}")
 
 
 class Component:
