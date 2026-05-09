@@ -145,7 +145,7 @@ foreach(gpu_target IN LISTS _CK_FILTERED_TARGETS)
     target_link_libraries(${lib_name} PRIVATE hip::device)
 
     # Link against MIOpen for shared types (ConvSolution, InvokerFactory, etc.)
-    target_link_libraries(${lib_name} PRIVATE MIOpen)
+    target_link_libraries(${lib_name} PRIVATE MIOpen miopen_common_utils)
 
     # Install alongside MIOpen
     install(TARGETS ${lib_name}
