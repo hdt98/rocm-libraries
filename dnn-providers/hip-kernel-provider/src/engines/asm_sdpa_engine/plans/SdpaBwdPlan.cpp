@@ -111,6 +111,10 @@ struct MhaBwdArgs
     unsigned int stride_dq_acc;
     int64_t nhead_stride_dq_acc;
     int64_t batch_stride_dq_acc;
+
+    // K/V tile size for the DQDKDV kernel (CSV column 'ts').  Used to compute
+    // the per-tile byte stride passed to the kernel as `Ts`.
+    unsigned int ts_dqdkdv;
 };
 // NOLINTEND(readability-identifier-naming)
 
@@ -121,11 +125,6 @@ struct MhaBwdArgs
 constexpr unsigned int K_BF16_SIZE = 2;
 constexpr unsigned int K_FP32_SIZE = 4;
 
-// Kernel tile sizes from AITER CSV metadata (commit 9522048).
-// TODO(Task I8.3): Production should read these from AITER CSV metadata per kernel config.
-constexpr unsigned int K_TS_ODO = 128; // fmha_bwd_odo.csv
-constexpr unsigned int K_TS_KV = 192; // fmha_bwd_dqdkdv.csv
-constexpr unsigned int K_TS_DQ = 64; // fmha_bwd_dq_convert.csv (hd128, rtne)
 constexpr unsigned int K_BWD_BLOCK_DIM = 256;
 
 // AITER reference: mha_bwd.cu::run_fmha_bwd_odo() (commit 9522048)
@@ -182,7 +181,7 @@ asm_sdpa_engine::fmha_bwd_dqdkdv_args buildDqdkdvArgs(const MhaBwdArgs& a)
     dqdkdv.nhead_q = a.nhead_q;
 
     // Tile size: ts_kv * stride_k * sizeof(BF16)
-    dqdkdv.Ts = K_TS_KV * a.stride_k * K_BF16_SIZE;
+    dqdkdv.Ts = a.ts_dqdkdv * a.stride_k * K_BF16_SIZE;
 
     // Q strides (bytes)
     dqdkdv.Hs_q = a.nhead_stride_q * K_BF16_SIZE;
@@ -344,6 +343,10 @@ MhaBwdArgs buildMhaBwdArgs(const asm_sdpa_engine::SdpaBwdParams& p,
     a.batch_stride_dq_acc
         = static_cast<int64_t>(p.numHeadsQ) * p.seqLenQ * p.headDimQk; // H_q * S_q * D_qk
 
+    // K/V tile size for the DQDKDV kernel; resolved from the CSV by the builder
+    // and consumed both for the per-tile byte stride and grid-dim ceil-div.
+    a.ts_dqdkdv = p.dqdkdvTiles.ts;
+
     // The kernel args structs use uint32_t for byte strides.  Verify that
     // stride_in_elements * K_FP32_SIZE fits before we silently truncate
     // in buildPostArgs().  Overflow would cause the DQ_CONVERT kernel to
@@ -448,7 +451,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     // 6a. Build args and launch kernel 1: ODO
     auto odoArgs = buildOdoArgs(mhaArgs);
 
-    unsigned int gdxOdo = (mhaArgs.seqlen_q + K_TS_ODO - 1) / K_TS_ODO;
+    unsigned int gdxOdo = _params.odoTiles.gridDim(mhaArgs.seqlen_q);
 
     if(!launchKernel("SDPA backward ODO",
                      _odoKernel.function(),
@@ -466,7 +469,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     // 6b. Build args and launch kernel 2: DQDKDV
     auto dqdkdvArgs = buildDqdkdvArgs(mhaArgs);
 
-    unsigned int gdxDqdkdv = (mhaArgs.seqlen_k + K_TS_KV - 1) / K_TS_KV;
+    unsigned int gdxDqdkdv = _params.dqdkdvTiles.gridDim(mhaArgs.seqlen_k);
 
     if(!launchKernel("SDPA backward DQDKDV",
                      _dqdkdvKernel.function(),
@@ -484,7 +487,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     // 6c. Build args and launch kernel 3: DQ_CONVERT (FP32 → BF16)
     auto postArgs = buildPostArgs(mhaArgs);
 
-    unsigned int gdxPost = (mhaArgs.seqlen_q + K_TS_DQ - 1) / K_TS_DQ;
+    unsigned int gdxPost = _params.dqConvertTiles.gridDim(mhaArgs.seqlen_q);
 
     if(!launchKernel("SDPA backward DQ_CONVERT",
                      _postKernel.function(),
