@@ -172,17 +172,17 @@ TEST_F(TestSdpaBwdPlanBuilder, BackwardWorkspaceSizeLarge)
 // CSV-derived constants used by the registry-lookup tests.
 namespace
 {
-constexpr int kMaskNone = 0; // MaskType::NO_MASK
-constexpr int kMaskTopLeftCausal = 1; // MaskType::TOP_LEFT_CAUSAL
-constexpr int kModeBatch = 0; // BatchMode::BATCH
-constexpr int kAtomicA32 = 1; // AccumulatorMode::A32
-constexpr int kAtomicNone = 0; // odo / dq_convert use atomic32=0
-constexpr int kPsskOn = 1;
-constexpr int kPddvOn = 1;
-constexpr int kPsskOff = 0;
-constexpr int kPddvOff = 0;
-constexpr int kBf16CvtRtne = 0; // RoundingMode::RTNE
-constexpr int kBf16CvtFp16Sentinel = 3; // CSV sentinel for fp16 rows
+constexpr int MASK_NONE = 0; // MaskType::NO_MASK
+constexpr int MASK_TOP_LEFT_CAUSAL = 1; // MaskType::TOP_LEFT_CAUSAL
+constexpr int MODE_BATCH = 0; // BatchMode::BATCH
+constexpr int ATOMIC_A32 = 1; // AccumulatorMode::A32
+constexpr int ATOMIC_NONE = 0; // odo / dq_convert use atomic32=0
+constexpr int PSSK_ON = 1;
+constexpr int PDDV_ON = 1;
+constexpr int PSSK_OFF = 0;
+constexpr int PDDV_OFF = 0;
+constexpr int BF16_CVT_RTNE = 0; // RoundingMode::RTNE
+constexpr int BF16_CVT_FP16_SENTINEL = 3; // CSV sentinel for fp16 rows
 } // namespace
 
 // POC config: hd128 / bf16 / NO_MASK / BATCH must still resolve across all
@@ -196,12 +196,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd128Bf16NoMaskBatch)
                                       "bf16",
                                       /*hdimQ=*/128,
                                       /*hdimV=*/128,
-                                      kMaskNone,
-                                      kAtomicNone,
-                                      kPsskOff,
-                                      kPddvOff,
-                                      kModeBatch,
-                                      kBf16CvtFp16Sentinel);
+                                      MASK_NONE,
+                                      ATOMIC_NONE,
+                                      PSSK_OFF,
+                                      PDDV_OFF,
+                                      MODE_BATCH,
+                                      BF16_CVT_FP16_SENTINEL);
     EXPECT_FALSE(odoKey.empty()) << "odo lookup should resolve";
 
     auto dqdkdvKey = lookupKernelNameKey(PipelineStage::DQDKDV,
@@ -209,12 +209,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd128Bf16NoMaskBatch)
                                          "bf16",
                                          /*hdimQ=*/128,
                                          /*hdimV=*/128,
-                                         kMaskNone,
-                                         kAtomicA32,
-                                         kPsskOn,
-                                         kPddvOn,
-                                         kModeBatch,
-                                         kBf16CvtRtne);
+                                         MASK_NONE,
+                                         ATOMIC_A32,
+                                         PSSK_ON,
+                                         PDDV_ON,
+                                         MODE_BATCH,
+                                         BF16_CVT_RTNE);
     EXPECT_FALSE(dqdkdvKey.empty()) << "dqdkdv lookup should resolve";
 
     auto dqConvertKey = lookupKernelNameKey(PipelineStage::DQ_CONVERT,
@@ -222,12 +222,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd128Bf16NoMaskBatch)
                                             "bf16",
                                             /*hdimQ=*/128,
                                             /*hdimV=*/128,
-                                            kMaskNone,
-                                            kAtomicNone,
-                                            kPsskOff,
-                                            kPddvOff,
-                                            kModeBatch,
-                                            kBf16CvtRtne);
+                                            MASK_NONE,
+                                            ATOMIC_NONE,
+                                            PSSK_OFF,
+                                            PDDV_OFF,
+                                            MODE_BATCH,
+                                            BF16_CVT_RTNE);
     EXPECT_FALSE(dqConvertKey.empty()) << "dq_convert lookup should resolve";
 }
 
@@ -244,12 +244,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd64Fp16NoMaskBatch)
                                       "fp16",
                                       /*hdimQ=*/64,
                                       /*hdimV=*/64,
-                                      kMaskNone,
-                                      kAtomicNone,
-                                      kPsskOff,
-                                      kPddvOff,
-                                      kModeBatch,
-                                      kBf16CvtFp16Sentinel);
+                                      MASK_NONE,
+                                      ATOMIC_NONE,
+                                      PSSK_OFF,
+                                      PDDV_OFF,
+                                      MODE_BATCH,
+                                      BF16_CVT_FP16_SENTINEL);
     EXPECT_FALSE(odoKey.empty());
 
     // hd64 dqdkdv is registered with pssk=1, pddv=0 (no padded-D variant).
@@ -258,12 +258,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd64Fp16NoMaskBatch)
                                          "fp16",
                                          /*hdimQ=*/64,
                                          /*hdimV=*/64,
-                                         kMaskNone,
-                                         kAtomicA32,
-                                         kPsskOn,
-                                         kPddvOff,
-                                         kModeBatch,
-                                         kBf16CvtFp16Sentinel);
+                                         MASK_NONE,
+                                         ATOMIC_A32,
+                                         PSSK_ON,
+                                         PDDV_OFF,
+                                         MODE_BATCH,
+                                         BF16_CVT_FP16_SENTINEL);
     EXPECT_FALSE(dqdkdvKey.empty());
 
     auto dqConvertKey = lookupKernelNameKey(PipelineStage::DQ_CONVERT,
@@ -271,12 +271,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd64Fp16NoMaskBatch)
                                             "fp16",
                                             /*hdimQ=*/64,
                                             /*hdimV=*/64,
-                                            kMaskNone,
-                                            kAtomicNone,
-                                            kPsskOff,
-                                            kPddvOff,
-                                            kModeBatch,
-                                            kBf16CvtFp16Sentinel);
+                                            MASK_NONE,
+                                            ATOMIC_NONE,
+                                            PSSK_OFF,
+                                            PDDV_OFF,
+                                            MODE_BATCH,
+                                            BF16_CVT_FP16_SENTINEL);
     EXPECT_FALSE(dqConvertKey.empty());
 }
 
@@ -286,18 +286,18 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd192Bf16CausalBatch)
 {
     using namespace bwd_dispatch;
 
-    // Causal kernels in the registry are pssk=1, pddv=0 for hd192.
+    // Causal hd192/bf16 dqdkdv batch kernels are pssk=1, pddv=1 in the registry.
     auto dqdkdvKey = lookupKernelNameKey(PipelineStage::DQDKDV,
                                          "gfx942",
                                          "bf16",
                                          /*hdimQ=*/192,
                                          /*hdimV=*/192,
-                                         kMaskTopLeftCausal,
-                                         kAtomicA32,
-                                         kPsskOn,
-                                         kPddvOff,
-                                         kModeBatch,
-                                         kBf16CvtRtne);
+                                         MASK_TOP_LEFT_CAUSAL,
+                                         ATOMIC_A32,
+                                         PSSK_ON,
+                                         PDDV_ON,
+                                         MODE_BATCH,
+                                         BF16_CVT_RTNE);
     EXPECT_FALSE(dqdkdvKey.empty()) << "hd192 bf16 causal_tl dqdkdv lookup should resolve";
 
     // odo is mask-agnostic.
@@ -306,12 +306,12 @@ TEST(SdpaBwdRegistryLookup, RegistryLookup_Hd192Bf16CausalBatch)
                                       "bf16",
                                       /*hdimQ=*/192,
                                       /*hdimV=*/192,
-                                      kMaskNone,
-                                      kAtomicNone,
-                                      kPsskOff,
-                                      kPddvOff,
-                                      kModeBatch,
-                                      kBf16CvtFp16Sentinel);
+                                      MASK_NONE,
+                                      ATOMIC_NONE,
+                                      PSSK_OFF,
+                                      PDDV_OFF,
+                                      MODE_BATCH,
+                                      BF16_CVT_FP16_SENTINEL);
     EXPECT_FALSE(odoKey.empty()) << "hd192 bf16 odo lookup should resolve";
 }
 

@@ -50,30 +50,30 @@ SdpaBwdParams makePocParams(unsigned int seqLenQ, unsigned int seqLenKv)
 
 TEST(TestSdpaBwdKernelTiles, GridDimExactMultipleProducesNoRemainder)
 {
-    constexpr SdpaBwdParams::KernelTiles tiles{0U, 64U};
-    EXPECT_EQ(tiles.gridDim(64U), 1U);
-    EXPECT_EQ(tiles.gridDim(128U), 2U);
-    EXPECT_EQ(tiles.gridDim(2048U), 32U);
+    constexpr SdpaBwdParams::KernelTiles TILES{0U, 64U};
+    EXPECT_EQ(TILES.gridDim(64U), 1U);
+    EXPECT_EQ(TILES.gridDim(128U), 2U);
+    EXPECT_EQ(TILES.gridDim(2048U), 32U);
 }
 
 TEST(TestSdpaBwdKernelTiles, GridDimRoundsUpForPartialTile)
 {
-    constexpr SdpaBwdParams::KernelTiles tiles{0U, 192U};
-    EXPECT_EQ(tiles.gridDim(1U), 1U);
-    EXPECT_EQ(tiles.gridDim(191U), 1U);
-    EXPECT_EQ(tiles.gridDim(193U), 2U);
+    constexpr SdpaBwdParams::KernelTiles TILES{0U, 192U};
+    EXPECT_EQ(TILES.gridDim(1U), 1U);
+    EXPECT_EQ(TILES.gridDim(191U), 1U);
+    EXPECT_EQ(TILES.gridDim(193U), 2U);
 }
 
 TEST(TestSdpaBwdKernelTiles, GridDimZeroExtentReturnsZero)
 {
-    constexpr SdpaBwdParams::KernelTiles tiles{0U, 128U};
-    EXPECT_EQ(tiles.gridDim(0U), 0U);
+    constexpr SdpaBwdParams::KernelTiles TILES{0U, 128U};
+    EXPECT_EQ(TILES.gridDim(0U), 0U);
 }
 
 TEST(TestSdpaBwdKernelTiles, GridDimZeroTileReturnsZeroInsteadOfDividingByZero)
 {
-    constexpr SdpaBwdParams::KernelTiles tiles{0U, 0U};
-    EXPECT_EQ(tiles.gridDim(2048U), 0U);
+    constexpr SdpaBwdParams::KernelTiles TILES{0U, 0U};
+    EXPECT_EQ(TILES.gridDim(2048U), 0U);
 }
 
 // =============================================================================
@@ -102,9 +102,9 @@ TEST(TestSdpaBwdPlanGridMath, PocHd128Bf16Seq2048MatchesHistoricalConstants)
 
 TEST(TestSdpaBwdPlanGridMath, PocHd128Bf16Seq2048MatchesCsvDerivedExpectedDims)
 {
-    // 2048 / 128 = 16 odo tiles
-    // 2048 / 192 = ceil(10.66) = 11 dqdkdv tiles
-    // 2048 / 64  = 32 dq_convert tiles
+    // 2048 / 128 = 16 odo TILES
+    // 2048 / 192 = ceil(10.66) = 11 dqdkdv TILES
+    // 2048 / 64  = 32 dq_convert TILES
     const auto params = makePocParams(2048U, 2048U);
     EXPECT_EQ(params.odoTiles.gridDim(params.seqLenQ), 16U);
     EXPECT_EQ(params.dqdkdvTiles.gridDim(params.seqLenKv), 11U);

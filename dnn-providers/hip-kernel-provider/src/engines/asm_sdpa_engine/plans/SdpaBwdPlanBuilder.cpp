@@ -159,21 +159,37 @@ std::string findKey(const std::unordered_map<std::string, fmha_v3_bwdConfig>& re
     {
         const auto& cfg = el.second;
         if(cfg.arch != archId)
+        {
             continue;
+        }
         if(cfg.dtype != dataType)
+        {
             continue;
+        }
         if(cfg.hdim_q != hdimQ || cfg.hdim_v != hdimV)
+        {
             continue;
+        }
         if(cfg.mask != mask)
+        {
             continue;
+        }
         if(cfg.atomic32 != atomic32)
+        {
             continue;
+        }
         if(cfg.pssk != pssk || cfg.pddv != pddv)
+        {
             continue;
+        }
         if(cfg.mode != mode)
+        {
             continue;
+        }
         if(cfg.bf16_cvt != bf16Cvt)
+        {
             continue;
+        }
         return el.first;
     }
     return {};
@@ -245,8 +261,9 @@ std::string lookupKernelNameKey(PipelineStage stage,
                        pddv,
                        mode,
                        bf16Cvt);
+    default:
+        return {};
     }
-    return {};
 }
 
 int computePssk(unsigned int seqLenKv, unsigned int tsKv)
