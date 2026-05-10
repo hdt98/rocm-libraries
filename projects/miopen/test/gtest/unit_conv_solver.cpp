@@ -420,8 +420,8 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
     auto input   = tensor<Tin>{conv_config.GetXTensorDescriptor()};
     auto weights = tensor<Twei>{conv_config.GetWTensorDescriptor()};
 
-    if(weights.desc.GetLayoutEnum() == miopenTensorCHWNc4 ||
-       weights.desc.GetLayoutEnum() == miopenTensorCHWNc8)
+    if(weights.desc.GetLayout() == miopenTensorCHWNc4 ||
+       weights.desc.GetLayout() == miopenTensorCHWNc8)
     {
         throw std::runtime_error("GenConvData do not support CHWNc filter layout");
     }
@@ -554,8 +554,8 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
     auto input   = tensor<Tin>{conv_config.GetXTensorDescriptor()};
     auto weights = tensor<Twei>{conv_config.GetWTensorDescriptor()};
 
-    if(weights.desc.GetLayoutEnum() == miopenTensorCHWNc4 ||
-       weights.desc.GetLayoutEnum() == miopenTensorCHWNc8)
+    if(weights.desc.GetLayout() == miopenTensorCHWNc4 ||
+       weights.desc.GetLayout() == miopenTensorCHWNc8)
     {
         throw std::runtime_error("GenConvData do not support CHWNc filter layout");
     }
@@ -685,8 +685,8 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
     const auto output_desc =
         conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<Tout>{});
 
-    if(output_desc.GetLayoutEnum() == miopenTensorCHWNc4 ||
-       output_desc.GetLayoutEnum() == miopenTensorCHWNc8)
+    if(output_desc.GetLayout() == miopenTensorCHWNc4 ||
+       output_desc.GetLayout() == miopenTensorCHWNc8)
     {
         throw std::runtime_error("GenConvData do not support CHWNc filter layout");
     }

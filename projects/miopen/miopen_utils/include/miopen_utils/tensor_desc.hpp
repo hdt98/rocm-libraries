@@ -308,6 +308,37 @@ public:
     }
 
     // ---------------------------------------------------------------
+    // Reshape operations
+    // ---------------------------------------------------------------
+
+    /// Collapse a 5D tensor descriptor (NCDHW or NDHWC) to 4D (NCHW or NHWC)
+    /// by merging the D and H dimensions: [N,C,D,H,W] -> [N,C,D*H,W].
+    /// Used by batch normalization to handle 3D spatial inputs.
+    TensorDesc Reshaped5Dto4D() const
+    {
+        auto dims   = GetLengths();
+        auto layout = GetLayout();
+        auto dt     = GetType();
+
+        assert(dims.size() == 5);
+
+        miopenTensorLayout_t layout4d;
+        if(layout == miopenTensorNCDHW)
+            layout4d = miopenTensorNCHW;
+        else if(layout == miopenTensorNDHWC)
+            layout4d = miopenTensorNHWC;
+        else
+            throw std::runtime_error("Reshaped5Dto4D: unsupported layout");
+
+        // Merge D*H: [N, C, D, H, W] -> [N, C, D*H, W]
+        dims[2] *= dims[3];
+        dims[3] = dims[4];
+        dims.pop_back();
+
+        return TensorDesc(dt, layout4d, dims);
+    }
+
+    // ---------------------------------------------------------------
     // Comparison
     // ---------------------------------------------------------------
 

@@ -27,9 +27,10 @@
 #define GUARD_TENSOR_HOLDER_HPP
 
 #include <miopen_utils/network_data.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <common_utils/ford.hpp>
-#include <miopen/tensor.hpp>
 #include <common_utils/functional.hpp>
+#include <common_utils/tensor_utils.hpp>
 #include <common_utils/type_name.hpp>
 #include <common_utils/each_args.hpp>
 #include <common_utils/bfloat16.hpp>
@@ -146,76 +147,59 @@ template <class T>
 struct tensor
 {
     using value_type = T;
-    miopen::TensorDescriptor desc;
+    TensorDesc desc;
     std::vector<T> data;
 
-#if defined(__clang__) || defined(__GNUG__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-    tensor() : desc(miopen_type<T>{}) {}
-
-#if defined(__clang__) || defined(__GNUG__)
-#pragma GCC diagnostic pop
-#endif
+    tensor() {}
 
     template <class X>
-    tensor(const std::vector<X>& dims) : desc(miopen_type<T>{}, dims), data(desc.GetElementSpace())
+    tensor(const std::vector<X>& dims)
+        : desc(miopen_type<T>{}, std::vector<size_t>(dims.begin(), dims.end())),
+          data(desc.GetElementSpace())
     {
     }
 
     template <class X>
     tensor(const std::vector<X>& dims, const std::vector<X>& strides)
-        : desc(miopen_type<T>{}, dims, strides), data(desc.GetElementSpace())
+        : desc(miopen_type<T>{},
+               std::vector<size_t>(dims.begin(), dims.end()),
+               std::vector<size_t>(strides.begin(), strides.end())),
+          data(desc.GetElementSpace())
     {
         assert(dims.size() == strides.size());
     }
 
     template <class X>
     tensor(miopenTensorLayout_t layout, const std::vector<X>& dims)
-        : desc(miopen_type<T>{}, layout, dims), data(desc.GetElementSpace())
+        : desc(miopen_type<T>{}, layout, std::vector<size_t>(dims.begin(), dims.end())),
+          data(desc.GetElementSpace())
     {
-    }
-
-    template <class X>
-    tensor(miopenTensorLayout_t layout, const std::vector<X>& dims, const std::vector<X>& strides)
-        : tensor(layout,
-                 std::vector<std::size_t>(dims.begin(), dims.end()),
-                 std::vector<std::size_t>(strides.begin(), strides.end()))
-    {
-    }
-
-    tensor(miopenTensorLayout_t layout,
-           const std::vector<std::size_t>& dims,
-           const std::vector<std::size_t>& strides)
-        : desc(miopen_type<T>{}, layout, dims, strides), data(desc.GetElementSpace())
-    {
-        assert(dims.size() == strides.size());
     }
 
     tensor(std::size_t n, std::size_t c, std::size_t h, std::size_t w)
-        : desc(miopen_type<T>{}, {n, c, h, w}), data(n * c * h * w)
+        : desc(miopen_type<T>{}, std::vector<size_t>{n, c, h, w}), data(n * c * h * w)
     {
     }
 
     tensor(miopenTensorLayout_t layout, std::size_t n, std::size_t c, std::size_t h, std::size_t w)
-        : desc(miopen_type<T>{}, layout, {n, c, h, w}), data(desc.GetElementSpace())
+        : desc(miopen_type<T>{}, layout, std::vector<size_t>{n, c, h, w}),
+          data(desc.GetElementSpace())
     {
     }
 
     tensor(std::size_t n, std::size_t c, std::size_t d, std::size_t h, std::size_t w)
-        : desc(miopen_type<T>{}, {n, c, d, h, w}), data(n * c * d * h * w)
+        : desc(miopen_type<T>{}, std::vector<size_t>{n, c, d, h, w}), data(n * c * d * h * w)
     {
     }
 
-    tensor(std::size_t n) : desc(miopen_type<T>{}, {n}), data(n) {}
+    tensor(std::size_t n) : desc(miopen_type<T>{}, std::vector<size_t>{n}), data(n) {}
 
-    tensor(miopen::TensorDescriptor rhs) : desc(std::move(rhs))
+    /// Construct from an opaque tensor descriptor handle (deep copy).
+    explicit tensor(miopenTensorDescriptor_t rhs) : desc(rhs)
     {
         assert(desc.GetType() == miopen_type<T>{}
                /// In the driver, T is input tensor type, but output tensor holders
-               /// are instantiatied with T as well. This leads to false assertion
+               /// are instantiated with T as well. This leads to false assertion
                /// failures when T is INT8 because output type is different.
                /// \todo Get rid of this hack when the driver is improved:
                || (miopen_type<T>{} == miopenInt8 && desc.GetType() == miopenInt32));
@@ -337,7 +321,7 @@ struct tensor
         template <class Self, class Loop, class F, class Size>
         void operator()(Self* self, Loop loop, F f, Size size) const
         {
-            auto dims = miopen::tien<size>(self->desc.GetLengths());
+            auto dims = tensor_utils::Tien<Size::value>(self->desc.GetLengths());
             miopen::unpack(for_each_unpacked<Loop, F>{loop, std::move(f)}, dims);
         }
     };
@@ -395,7 +379,7 @@ struct tensor
 
     friend std::ostream& operator<<(std::ostream& stream, const tensor& t)
     {
-        return stream << t.desc;
+        return stream << t.desc.ToString();
     }
 
     template <size_t N, typename Stream>
@@ -470,15 +454,15 @@ void serialize(std::istream& s, tensor<T>& x)
     serialize(s, lens);
     std::vector<std::size_t> strides;
     serialize(s, strides);
-    x.desc = miopen::TensorDescriptor{miopen_type<T>{}, lens, strides};
+    x.desc = TensorDesc{miopen_type<T>{}, lens, strides};
     serialize(s, x.data);
 }
 
 template <class T>
 void serialize(std::ostream& s, const tensor<T>& x)
 {
-    const auto& lens    = x.desc.GetLengths();
-    const auto& strides = x.desc.GetStrides();
+    auto lens    = x.desc.GetLengths();
+    auto strides = x.desc.GetStrides();
     serialize(s, lens);
     serialize(s, strides);
     serialize(s, x.data);

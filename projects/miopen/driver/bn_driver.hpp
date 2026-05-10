@@ -42,7 +42,6 @@
 #include <common_utils/errors.hpp>
 #include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include "miopen/batch_norm.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -216,8 +215,8 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::GetandSetData()
     // 0.0 to 2.0
     in.GetTensor().generate(uniform_unsigned_initializer<TInput>(2e-3 /*scale*/, 1000 /*range*/));
 
-    auto derivedBnDesc = miopen::TensorDescriptor{};
-    miopen::DeriveBNTensorDescriptor(derivedBnDesc, in.GetTensor().desc, bn_mode);
+    TensorDesc derivedBnDesc;
+    miopenDeriveBNTensorDescriptor(derivedBnDesc, in.GetTensor().desc, bn_mode);
 
     if(isFwdInfer || isFwdTrain)
     {
@@ -603,85 +602,85 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::AllocateBuffersAndCop
 #if MIOPEN_BACKEND_OPENCL
     clGetCommandQueueInfo(q, CL_QUEUE_CONTEXT, sizeof(cl_context), &ctx, nullptr);
 #endif
-    status |= in.AllocOnDeviceAndInit(q, ctx, GetTensorSize(&in.GetTensor().desc), buffer_check);
+    status |= in.AllocOnDeviceAndInit(q, ctx, GetTensorSize(in.GetTensor().desc), buffer_check);
 
     if(isFwdInfer || isFwdTrain)
     {
         status |=
-            out.AllocOnDeviceAndInit(q, ctx, GetTensorSize(&out.GetTensor().desc), buffer_check);
+            out.AllocOnDeviceAndInit(q, ctx, GetTensorSize(out.GetTensor().desc), buffer_check);
         out_ref =
-            tensor<Tref>{out.GetTensor().desc.GetLayout_t(), out.GetTensor().desc.GetLengths()};
+            tensor<Tref>{out.GetTensor().desc.GetLayout(), out.GetTensor().desc.GetLengths()};
         status |= scale.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&scale.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(scale.GetTensor().desc), buffer_check);
         status |=
-            bias.AllocOnDeviceAndInit(q, ctx, GetTensorSize(&bias.GetTensor().desc), buffer_check);
+            bias.AllocOnDeviceAndInit(q, ctx, GetTensorSize(bias.GetTensor().desc), buffer_check);
     }
     if(isFwdInfer)
     {
         status |= estMean.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&estMean.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(estMean.GetTensor().desc), buffer_check);
         status |= estVariance.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&estVariance.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(estVariance.GetTensor().desc), buffer_check);
     }
     if(isFwdTrain)
     {
         status |= savedMean.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&savedMean.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(savedMean.GetTensor().desc), buffer_check);
         status |= savedVariance.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&savedVariance.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(savedVariance.GetTensor().desc), buffer_check);
         status |= runMean.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&runMean.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(runMean.GetTensor().desc), buffer_check);
         status |= runVariance.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&runVariance.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(runVariance.GetTensor().desc), buffer_check);
         if(usePingPongBuffers)
         {
             status |= prevRunMean.AllocOnDeviceAndInit(
-                q, ctx, GetTensorSize(&prevRunMean.GetTensor().desc), buffer_check);
+                q, ctx, GetTensorSize(prevRunMean.GetTensor().desc), buffer_check);
             status |= prevRunVariance.AllocOnDeviceAndInit(
-                q, ctx, GetTensorSize(&prevRunVariance.GetTensor().desc), buffer_check);
+                q, ctx, GetTensorSize(prevRunVariance.GetTensor().desc), buffer_check);
         }
 
-        savedMean_ref = tensor<Tref>{savedMean.GetTensor().desc.GetLayout_t(),
+        savedMean_ref = tensor<Tref>{savedMean.GetTensor().desc.GetLayout(),
                                      savedMean.GetTensor().desc.GetLengths()};
 
-        savedVariance_ref = tensor<Tref>{savedVariance.GetTensor().desc.GetLayout_t(),
+        savedVariance_ref = tensor<Tref>{savedVariance.GetTensor().desc.GetLayout(),
                                          savedVariance.GetTensor().desc.GetLengths()};
 
-        runMean_ref = tensor<Tref>{runMean.GetTensor().desc.GetLayout_t(),
+        runMean_ref = tensor<Tref>{runMean.GetTensor().desc.GetLayout(),
                                    runMean.GetTensor().desc.GetLengths()};
 
-        runVariance_ref = tensor<Tref>{runVariance.GetTensor().desc.GetLayout_t(),
+        runVariance_ref = tensor<Tref>{runVariance.GetTensor().desc.GetLayout(),
                                        runVariance.GetTensor().desc.GetLengths()};
     }
     if(isBwd)
     {
         status |= out_bwd.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&out_bwd.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(out_bwd.GetTensor().desc), buffer_check);
 
-        out_ref = tensor<Tref>{out_bwd.GetTensor().desc.GetLayout_t(),
+        out_ref = tensor<Tref>{out_bwd.GetTensor().desc.GetLayout(),
                                out_bwd.GetTensor().desc.GetLengths()};
 
         status |= bnScale.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&bnScale.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(bnScale.GetTensor().desc), buffer_check);
         status |= bnBias.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&bnBias.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(bnBias.GetTensor().desc), buffer_check);
         status |=
-            dy.AllocOnDeviceAndInit(q, ctx, GetTensorSize(&dy.GetTensor().desc), buffer_check);
+            dy.AllocOnDeviceAndInit(q, ctx, GetTensorSize(dy.GetTensor().desc), buffer_check);
 
         status |= dScale.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&dScale.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(dScale.GetTensor().desc), buffer_check);
         status |= dBias.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&dBias.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(dBias.GetTensor().desc), buffer_check);
         status |= savedMean.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&savedMean.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(savedMean.GetTensor().desc), buffer_check);
         status |= savedInvVar.AllocOnDeviceAndInit(
-            q, ctx, GetTensorSize(&savedInvVar.GetTensor().desc), buffer_check);
+            q, ctx, GetTensorSize(savedInvVar.GetTensor().desc), buffer_check);
 
-        dScale_ref = tensor<Tref>{dScale.GetTensor().desc.GetLayout_t(),
+        dScale_ref = tensor<Tref>{dScale.GetTensor().desc.GetLayout(),
                                   dScale.GetTensor().desc.GetLengths()};
 
         dBias_ref =
-            tensor<Tref>{dBias.GetTensor().desc.GetLayout_t(), dBias.GetTensor().desc.GetLengths()};
+            tensor<Tref>{dBias.GetTensor().desc.GetLayout(), dBias.GetTensor().desc.GetLengths()};
     }
 
     for(size_t i = 0; i < runMean.GetVector().size(); ++i)
@@ -717,14 +716,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInference(T
                                                         bn_mode,
                                                         &alpha,
                                                         &beta,
-                                                        &in.GetTensor().desc,
+                                                        in.GetTensor().desc,
                                                         in.GetDevicePtr(),
-                                                        &out.GetTensor().desc,
+                                                        out.GetTensor().desc,
                                                         out.GetDevicePtr(),
-                                                        &scale.GetTensor().desc,
-                                                        &bias.GetTensor().desc,
-                                                        &estMean.GetTensor().desc,
-                                                        &estVariance.GetTensor().desc,
+                                                        scale.GetTensor().desc,
+                                                        bias.GetTensor().desc,
+                                                        estMean.GetTensor().desc,
+                                                        estVariance.GetTensor().desc,
                                                         scale.GetDevicePtr(),
                                                         bias.GetDevicePtr(),
                                                         estMean.GetDevicePtr(),
@@ -737,14 +736,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInference(T
                                                                 bn_mode,
                                                                 &alpha,
                                                                 &beta,
-                                                                &in.GetTensor().desc,
+                                                                in.GetTensor().desc,
                                                                 in.GetDevicePtr(),
-                                                                &out.GetTensor().desc,
+                                                                out.GetTensor().desc,
                                                                 out.GetDevicePtr(),
-                                                                &scale.GetTensor().desc,
-                                                                &bias.GetTensor().desc,
-                                                                &estMean.GetTensor().desc,
-                                                                &estVariance.GetTensor().desc,
+                                                                scale.GetTensor().desc,
+                                                                bias.GetTensor().desc,
+                                                                estMean.GetTensor().desc,
+                                                                estVariance.GetTensor().desc,
                                                                 scale.GetDevicePtr(),
                                                                 bias.GetDevicePtr(),
                                                                 estMean.GetDevicePtr(),
@@ -759,14 +758,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInference(T
                                                         bn_mode,
                                                         &alpha,
                                                         &beta,
-                                                        &in.GetTensor().desc,
+                                                        in.GetTensor().desc,
                                                         in.GetDevicePtr(),
-                                                        &out.GetTensor().desc,
+                                                        out.GetTensor().desc,
                                                         out.GetDevicePtr(),
-                                                        &scale.GetTensor().desc,
-                                                        &bias.GetTensor().desc,
-                                                        &estMean.GetTensor().desc,
-                                                        &estVariance.GetTensor().desc,
+                                                        scale.GetTensor().desc,
+                                                        bias.GetTensor().desc,
+                                                        estMean.GetTensor().desc,
+                                                        estVariance.GetTensor().desc,
                                                         scale.GetDevicePtr(),
                                                         bias.GetDevicePtr(),
                                                         nullptr,
@@ -779,14 +778,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInference(T
                                                                 bn_mode,
                                                                 &alpha,
                                                                 &beta,
-                                                                &in.GetTensor().desc,
+                                                                in.GetTensor().desc,
                                                                 in.GetDevicePtr(),
-                                                                &out.GetTensor().desc,
+                                                                out.GetTensor().desc,
                                                                 out.GetDevicePtr(),
-                                                                &scale.GetTensor().desc,
-                                                                &bias.GetTensor().desc,
-                                                                &estMean.GetTensor().desc,
-                                                                &estVariance.GetTensor().desc,
+                                                                scale.GetTensor().desc,
+                                                                bias.GetTensor().desc,
+                                                                estMean.GetTensor().desc,
+                                                                estVariance.GetTensor().desc,
                                                                 scale.GetDevicePtr(),
                                                                 bias.GetDevicePtr(),
                                                                 nullptr,
@@ -813,14 +812,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInferenceAc
                                                       bn_mode,
                                                       &alpha,
                                                       &beta,
-                                                      &in.GetTensor().desc,
+                                                      in.GetTensor().desc,
                                                       in.GetDevicePtr(),
-                                                      &out.GetTensor().desc,
+                                                      out.GetTensor().desc,
                                                       out.GetDevicePtr(),
-                                                      &scale.GetTensor().desc,
-                                                      &bias.GetTensor().desc,
-                                                      &estMean.GetTensor().desc,
-                                                      &estVariance.GetTensor().desc,
+                                                      scale.GetTensor().desc,
+                                                      bias.GetTensor().desc,
+                                                      estMean.GetTensor().desc,
+                                                      estVariance.GetTensor().desc,
                                                       scale.GetDevicePtr(),
                                                       bias.GetDevicePtr(),
                                                       estMean.GetDevicePtr(),
@@ -834,14 +833,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInferenceAc
                                                                  bn_mode,
                                                                  &alpha,
                                                                  &beta,
-                                                                 &in.GetTensor().desc,
+                                                                 in.GetTensor().desc,
                                                                  in.GetDevicePtr(),
-                                                                 &out.GetTensor().desc,
+                                                                 out.GetTensor().desc,
                                                                  out.GetDevicePtr(),
-                                                                 &scale.GetTensor().desc,
-                                                                 &bias.GetTensor().desc,
-                                                                 &estMean.GetTensor().desc,
-                                                                 &estVariance.GetTensor().desc,
+                                                                 scale.GetTensor().desc,
+                                                                 bias.GetTensor().desc,
+                                                                 estMean.GetTensor().desc,
+                                                                 estVariance.GetTensor().desc,
                                                                  scale.GetDevicePtr(),
                                                                  bias.GetDevicePtr(),
                                                                  estMean.GetDevicePtr(),
@@ -857,14 +856,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInferenceAc
                                                       bn_mode,
                                                       &alpha,
                                                       &beta,
-                                                      &in.GetTensor().desc,
+                                                      in.GetTensor().desc,
                                                       in.GetDevicePtr(),
-                                                      &out.GetTensor().desc,
+                                                      out.GetTensor().desc,
                                                       out.GetDevicePtr(),
-                                                      &scale.GetTensor().desc,
-                                                      &bias.GetTensor().desc,
-                                                      &estMean.GetTensor().desc,
-                                                      &estVariance.GetTensor().desc,
+                                                      scale.GetTensor().desc,
+                                                      bias.GetTensor().desc,
+                                                      estMean.GetTensor().desc,
+                                                      estVariance.GetTensor().desc,
                                                       scale.GetDevicePtr(),
                                                       bias.GetDevicePtr(),
                                                       nullptr,
@@ -878,14 +877,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdInferenceAc
                                                                  bn_mode,
                                                                  &alpha,
                                                                  &beta,
-                                                                 &in.GetTensor().desc,
+                                                                 in.GetTensor().desc,
                                                                  in.GetDevicePtr(),
-                                                                 &out.GetTensor().desc,
+                                                                 out.GetTensor().desc,
                                                                  out.GetDevicePtr(),
-                                                                 &scale.GetTensor().desc,
-                                                                 &bias.GetTensor().desc,
-                                                                 &estMean.GetTensor().desc,
-                                                                 &estVariance.GetTensor().desc,
+                                                                 scale.GetTensor().desc,
+                                                                 bias.GetTensor().desc,
+                                                                 estMean.GetTensor().desc,
+                                                                 estVariance.GetTensor().desc,
                                                                  scale.GetDevicePtr(),
                                                                  bias.GetDevicePtr(),
                                                                  nullptr,
@@ -922,14 +921,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                        bn_mode,
                                                        &alpha,
                                                        &beta,
-                                                       &in.GetTensor().desc,
+                                                       in.GetTensor().desc,
                                                        in.GetDevicePtr(),
-                                                       &out.GetTensor().desc,
+                                                       out.GetTensor().desc,
                                                        out.GetDevicePtr(),
-                                                       &scale.GetTensor().desc,
-                                                       &bias.GetTensor().desc,
-                                                       &savedMean.GetTensor().desc,
-                                                       &savedVariance.GetTensor().desc,
+                                                       scale.GetTensor().desc,
+                                                       bias.GetTensor().desc,
+                                                       savedMean.GetTensor().desc,
+                                                       savedVariance.GetTensor().desc,
                                                        scale.GetDevicePtr(),
                                                        bias.GetDevicePtr(),
                                                        eAF,
@@ -947,14 +946,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                        bn_mode,
                                                        &alpha,
                                                        &beta,
-                                                       &in.GetTensor().desc,
+                                                       in.GetTensor().desc,
                                                        in.GetDevicePtr(),
-                                                       &out.GetTensor().desc,
+                                                       out.GetTensor().desc,
                                                        out.GetDevicePtr(),
-                                                       &scale.GetTensor().desc,
-                                                       &bias.GetTensor().desc,
-                                                       &savedMean.GetTensor().desc,
-                                                       &savedVariance.GetTensor().desc,
+                                                       scale.GetTensor().desc,
+                                                       bias.GetTensor().desc,
+                                                       savedMean.GetTensor().desc,
+                                                       savedVariance.GetTensor().desc,
                                                        scale.GetDevicePtr(),
                                                        bias.GetDevicePtr(),
                                                        eAF,
@@ -971,14 +970,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                    bn_mode,
                                                    &alpha,
                                                    &beta,
-                                                   &in.GetTensor().desc,
+                                                   in.GetTensor().desc,
                                                    in.GetDevicePtr(),
-                                                   &out.GetTensor().desc,
+                                                   out.GetTensor().desc,
                                                    out.GetDevicePtr(),
-                                                   &scale.GetTensor().desc,
-                                                   &bias.GetTensor().desc,
-                                                   &savedMean.GetTensor().desc,
-                                                   &savedVariance.GetTensor().desc,
+                                                   scale.GetTensor().desc,
+                                                   bias.GetTensor().desc,
+                                                   savedMean.GetTensor().desc,
+                                                   savedVariance.GetTensor().desc,
                                                    scale.GetDevicePtr(),
                                                    bias.GetDevicePtr(),
                                                    eAF,
@@ -1008,14 +1007,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                        bn_mode,
                                                        &alpha,
                                                        &beta,
-                                                       &in.GetTensor().desc,
+                                                       in.GetTensor().desc,
                                                        in.GetDevicePtr(),
-                                                       &out.GetTensor().desc,
+                                                       out.GetTensor().desc,
                                                        out.GetDevicePtr(),
-                                                       &scale.GetTensor().desc,
-                                                       &bias.GetTensor().desc,
-                                                       &savedMean.GetTensor().desc,
-                                                       &savedVariance.GetTensor().desc,
+                                                       scale.GetTensor().desc,
+                                                       bias.GetTensor().desc,
+                                                       savedMean.GetTensor().desc,
+                                                       savedVariance.GetTensor().desc,
                                                        scale.GetDevicePtr(),
                                                        bias.GetDevicePtr(),
                                                        eAF,
@@ -1033,14 +1032,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                        bn_mode,
                                                        &alpha,
                                                        &beta,
-                                                       &in.GetTensor().desc,
+                                                       in.GetTensor().desc,
                                                        in.GetDevicePtr(),
-                                                       &out.GetTensor().desc,
+                                                       out.GetTensor().desc,
                                                        out.GetDevicePtr(),
-                                                       &scale.GetTensor().desc,
-                                                       &bias.GetTensor().desc,
-                                                       &savedMean.GetTensor().desc,
-                                                       &savedVariance.GetTensor().desc,
+                                                       scale.GetTensor().desc,
+                                                       bias.GetTensor().desc,
+                                                       savedMean.GetTensor().desc,
+                                                       savedVariance.GetTensor().desc,
                                                        scale.GetDevicePtr(),
                                                        bias.GetDevicePtr(),
                                                        eAF,
@@ -1057,14 +1056,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                    bn_mode,
                                                    &alpha,
                                                    &beta,
-                                                   &in.GetTensor().desc,
+                                                   in.GetTensor().desc,
                                                    in.GetDevicePtr(),
-                                                   &out.GetTensor().desc,
+                                                   out.GetTensor().desc,
                                                    out.GetDevicePtr(),
-                                                   &scale.GetTensor().desc,
-                                                   &bias.GetTensor().desc,
-                                                   &savedMean.GetTensor().desc,
-                                                   &savedVariance.GetTensor().desc,
+                                                   scale.GetTensor().desc,
+                                                   bias.GetTensor().desc,
+                                                   savedMean.GetTensor().desc,
+                                                   savedVariance.GetTensor().desc,
                                                    scale.GetDevicePtr(),
                                                    bias.GetDevicePtr(),
                                                    eAF,
@@ -1080,14 +1079,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrain(Tref 
                                                bn_mode,
                                                &alpha,
                                                &beta,
-                                               &in.GetTensor().desc,
+                                               in.GetTensor().desc,
                                                in.GetDevicePtr(),
-                                               &out.GetTensor().desc,
+                                               out.GetTensor().desc,
                                                out.GetDevicePtr(),
-                                               &scale.GetTensor().desc,
-                                               &bias.GetTensor().desc,
-                                               &savedMean.GetTensor().desc,
-                                               &savedVariance.GetTensor().desc,
+                                               scale.GetTensor().desc,
+                                               bias.GetTensor().desc,
+                                               savedMean.GetTensor().desc,
+                                               savedVariance.GetTensor().desc,
                                                scale.GetDevicePtr(),
                                                bias.GetDevicePtr(),
                                                eAF,
@@ -1116,14 +1115,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrainActiva
                                                  bn_mode,
                                                  &alpha,
                                                  &beta,
-                                                 &in.GetTensor().desc,
+                                                 in.GetTensor().desc,
                                                  in.GetDevicePtr(),
-                                                 &out.GetTensor().desc,
+                                                 out.GetTensor().desc,
                                                  out.GetDevicePtr(),
-                                                 &scale.GetTensor().desc,
-                                                 &bias.GetTensor().desc,
-                                                 &savedMean.GetTensor().desc,
-                                                 &savedVariance.GetTensor().desc,
+                                                 scale.GetTensor().desc,
+                                                 bias.GetTensor().desc,
+                                                 savedMean.GetTensor().desc,
+                                                 savedVariance.GetTensor().desc,
                                                  scale.GetDevicePtr(),
                                                  bias.GetDevicePtr(),
                                                  eAF,
@@ -1140,14 +1139,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrainActiva
                                                  bn_mode,
                                                  &alpha,
                                                  &beta,
-                                                 &in.GetTensor().desc,
+                                                 in.GetTensor().desc,
                                                  in.GetDevicePtr(),
-                                                 &out.GetTensor().desc,
+                                                 out.GetTensor().desc,
                                                  out.GetDevicePtr(),
-                                                 &scale.GetTensor().desc,
-                                                 &bias.GetTensor().desc,
-                                                 &savedMean.GetTensor().desc,
-                                                 &savedVariance.GetTensor().desc,
+                                                 scale.GetTensor().desc,
+                                                 bias.GetTensor().desc,
+                                                 savedMean.GetTensor().desc,
+                                                 savedVariance.GetTensor().desc,
                                                  scale.GetDevicePtr(),
                                                  bias.GetDevicePtr(),
                                                  eAF,
@@ -1164,14 +1163,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrainActiva
                                                  bn_mode,
                                                  &alpha,
                                                  &beta,
-                                                 &in.GetTensor().desc,
+                                                 in.GetTensor().desc,
                                                  in.GetDevicePtr(),
-                                                 &out.GetTensor().desc,
+                                                 out.GetTensor().desc,
                                                  out.GetDevicePtr(),
-                                                 &scale.GetTensor().desc,
-                                                 &bias.GetTensor().desc,
-                                                 &savedMean.GetTensor().desc,
-                                                 &savedVariance.GetTensor().desc,
+                                                 scale.GetTensor().desc,
+                                                 bias.GetTensor().desc,
+                                                 savedMean.GetTensor().desc,
+                                                 savedVariance.GetTensor().desc,
                                                  scale.GetDevicePtr(),
                                                  bias.GetDevicePtr(),
                                                  eAF,
@@ -1188,14 +1187,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrainActiva
                                                  bn_mode,
                                                  &alpha,
                                                  &beta,
-                                                 &in.GetTensor().desc,
+                                                 in.GetTensor().desc,
                                                  in.GetDevicePtr(),
-                                                 &out.GetTensor().desc,
+                                                 out.GetTensor().desc,
                                                  out.GetDevicePtr(),
-                                                 &scale.GetTensor().desc,
-                                                 &bias.GetTensor().desc,
-                                                 &savedMean.GetTensor().desc,
-                                                 &savedVariance.GetTensor().desc,
+                                                 scale.GetTensor().desc,
+                                                 bias.GetTensor().desc,
+                                                 savedMean.GetTensor().desc,
+                                                 savedVariance.GetTensor().desc,
                                                  scale.GetDevicePtr(),
                                                  bias.GetDevicePtr(),
                                                  eAF,
@@ -1212,14 +1211,14 @@ void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runGPUFwdTrainActiva
                                              bn_mode,
                                              &alpha,
                                              &beta,
-                                             &in.GetTensor().desc,
+                                             in.GetTensor().desc,
                                              in.GetDevicePtr(),
-                                             &out.GetTensor().desc,
+                                             out.GetTensor().desc,
                                              out.GetDevicePtr(),
-                                             &scale.GetTensor().desc,
-                                             &bias.GetTensor().desc,
-                                             &savedMean.GetTensor().desc,
-                                             &savedVariance.GetTensor().desc,
+                                             scale.GetTensor().desc,
+                                             bias.GetTensor().desc,
+                                             savedMean.GetTensor().desc,
+                                             savedVariance.GetTensor().desc,
                                              scale.GetDevicePtr(),
                                              bias.GetDevicePtr(),
                                              eAF,
@@ -1380,18 +1379,18 @@ template <typename TInput, typename Tref, typename TAcc, typename TScaleBias, ty
 void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdInference(Tref epsilon)
 {
     int size{0};
-    miopenGetTensorDescriptorSize(&in.GetTensor().desc, &size);
+    miopenGetTensorDescriptorSize(in.GetTensor().desc, &size);
 
     if(size == 5)
     {
-        in.GetTensor().desc    = miopen::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
-        out_ref.desc           = miopen::BuildReshaped4DTensorDescriptor(out_ref.desc);
-        scale.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(scale.GetTensor().desc);
-        bias.GetTensor().desc  = miopen::BuildReshaped4DTensorDescriptor(bias.GetTensor().desc);
+        in.GetTensor().desc    = in.GetTensor().desc.Reshaped5Dto4D();
+        out_ref.desc           = out_ref.desc.Reshaped5Dto4D();
+        scale.GetTensor().desc = scale.GetTensor().desc.Reshaped5Dto4D();
+        bias.GetTensor().desc  = bias.GetTensor().desc.Reshaped5Dto4D();
         estMean.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(estMean.GetTensor().desc);
+            estMean.GetTensor().desc.Reshaped5Dto4D();
         estVariance.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(estVariance.GetTensor().desc);
+            estVariance.GetTensor().desc.Reshaped5Dto4D();
     }
 
     if(bn_mode == miopenBNPerActivation)
@@ -1439,17 +1438,17 @@ template <typename TInput, typename Tref, typename TAcc, typename TScaleBias, ty
 void BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::runCPUFwdTrain(Tref epsilon, Tref eAF)
 {
     int size{0};
-    miopenGetTensorDescriptorSize(&in.GetTensor().desc, &size);
+    miopenGetTensorDescriptorSize(in.GetTensor().desc, &size);
     if(size == 5)
     {
-        in.GetTensor().desc    = miopen::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
-        out_ref.desc           = miopen::BuildReshaped4DTensorDescriptor(out_ref.desc);
-        scale.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(scale.GetTensor().desc);
-        bias.GetTensor().desc  = miopen::BuildReshaped4DTensorDescriptor(bias.GetTensor().desc);
-        savedMean_ref.desc     = miopen::BuildReshaped4DTensorDescriptor(savedMean_ref.desc);
-        savedVariance_ref.desc = miopen::BuildReshaped4DTensorDescriptor(savedVariance_ref.desc);
-        runMean_ref.desc       = miopen::BuildReshaped4DTensorDescriptor(runMean_ref.desc);
-        runVariance_ref.desc   = miopen::BuildReshaped4DTensorDescriptor(runVariance_ref.desc);
+        in.GetTensor().desc    = in.GetTensor().desc.Reshaped5Dto4D();
+        out_ref.desc           = out_ref.desc.Reshaped5Dto4D();
+        scale.GetTensor().desc = scale.GetTensor().desc.Reshaped5Dto4D();
+        bias.GetTensor().desc  = bias.GetTensor().desc.Reshaped5Dto4D();
+        savedMean_ref.desc     = savedMean_ref.desc.Reshaped5Dto4D();
+        savedVariance_ref.desc = savedVariance_ref.desc.Reshaped5Dto4D();
+        runMean_ref.desc       = runMean_ref.desc.Reshaped5Dto4D();
+        runVariance_ref.desc   = runVariance_ref.desc.Reshaped5Dto4D();
     }
     if(bn_mode == miopenBNPerActivation)
     { // 1xCxHxW
@@ -1576,16 +1575,16 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                                                     &betaDataDiff,
                                                     &alphaParamDiff,
                                                     &betaParamDiff,
-                                                    &in.GetTensor().desc,
+                                                    in.GetTensor().desc,
                                                     in.GetDevicePtr(),
-                                                    &dy.GetTensor().desc,
+                                                    dy.GetTensor().desc,
                                                     dy.GetDevicePtr(),
-                                                    &out_bwd.GetTensor().desc,
+                                                    out_bwd.GetTensor().desc,
                                                     out_bwd.GetDevicePtr(),
-                                                    &bnScale.GetTensor().desc,
-                                                    &dBias.GetTensor().desc,
-                                                    &savedMean.GetTensor().desc,
-                                                    &savedInvVar.GetTensor().desc,
+                                                    bnScale.GetTensor().desc,
+                                                    dBias.GetTensor().desc,
+                                                    savedMean.GetTensor().desc,
+                                                    savedInvVar.GetTensor().desc,
                                                     bnScale.GetDevicePtr(),
                                                     dScale.GetDevicePtr(),
                                                     dBias.GetDevicePtr(),
@@ -1601,16 +1600,16 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                                                   &betaDataDiff,
                                                   &alphaParamDiff,
                                                   &betaParamDiff,
-                                                  &in.GetTensor().desc,
+                                                  in.GetTensor().desc,
                                                   in.GetDevicePtr(),
-                                                  &dy.GetTensor().desc,
+                                                  dy.GetTensor().desc,
                                                   dy.GetDevicePtr(),
-                                                  &out_bwd.GetTensor().desc,
+                                                  out_bwd.GetTensor().desc,
                                                   out_bwd.GetDevicePtr(),
-                                                  &bnScale.GetTensor().desc,
-                                                  &dBias.GetTensor().desc,
-                                                  &savedMean.GetTensor().desc,
-                                                  &savedInvVar.GetTensor().desc,
+                                                  bnScale.GetTensor().desc,
+                                                  dBias.GetTensor().desc,
+                                                  savedMean.GetTensor().desc,
+                                                  savedInvVar.GetTensor().desc,
                                                   bnScale.GetDevicePtr(),
                                                   bnBias.GetDevicePtr(),
                                                   dScale.GetDevicePtr(),
@@ -1631,16 +1630,16 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                                                     &betaDataDiff,
                                                     &alphaParamDiff,
                                                     &betaParamDiff,
-                                                    &in.GetTensor().desc,
+                                                    in.GetTensor().desc,
                                                     in.GetDevicePtr(),
-                                                    &dy.GetTensor().desc,
+                                                    dy.GetTensor().desc,
                                                     dy.GetDevicePtr(),
-                                                    &out_bwd.GetTensor().desc,
+                                                    out_bwd.GetTensor().desc,
                                                     out_bwd.GetDevicePtr(),
-                                                    &bnScale.GetTensor().desc,
-                                                    &dBias.GetTensor().desc,
-                                                    &savedMean.GetTensor().desc,
-                                                    &savedInvVar.GetTensor().desc,
+                                                    bnScale.GetTensor().desc,
+                                                    dBias.GetTensor().desc,
+                                                    savedMean.GetTensor().desc,
+                                                    savedInvVar.GetTensor().desc,
                                                     bnScale.GetDevicePtr(),
                                                     dScale.GetDevicePtr(),
                                                     dBias.GetDevicePtr(),
@@ -1656,16 +1655,16 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                                                   &betaDataDiff,
                                                   &alphaParamDiff,
                                                   &betaParamDiff,
-                                                  &in.GetTensor().desc,
+                                                  in.GetTensor().desc,
                                                   in.GetDevicePtr(),
-                                                  &dy.GetTensor().desc,
+                                                  dy.GetTensor().desc,
                                                   dy.GetDevicePtr(),
-                                                  &out_bwd.GetTensor().desc,
+                                                  out_bwd.GetTensor().desc,
                                                   out_bwd.GetDevicePtr(),
-                                                  &bnScale.GetTensor().desc,
-                                                  &dBias.GetTensor().desc,
-                                                  &savedMean.GetTensor().desc,
-                                                  &savedInvVar.GetTensor().desc,
+                                                  bnScale.GetTensor().desc,
+                                                  dBias.GetTensor().desc,
+                                                  savedMean.GetTensor().desc,
+                                                  savedInvVar.GetTensor().desc,
                                                   bnScale.GetDevicePtr(),
                                                   bnBias.GetDevicePtr(),
                                                   dScale.GetDevicePtr(),
@@ -1975,23 +1974,23 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardCPU()
     // float alphaDataDiff = static_cast<float>(1), betaDataDiff = static_cast<float>(0);
     // float alphaParamDiff = static_cast<float>(1), betaParamDiff = static_cast<float>(0);
     int size{0};
-    miopenGetTensorDescriptorSize(&in.GetTensor().desc, &size);
+    miopenGetTensorDescriptorSize(in.GetTensor().desc, &size);
     if(size == 5)
     {
-        in.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(in.GetTensor().desc);
-        dy.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(dy.GetTensor().desc);
+        in.GetTensor().desc = in.GetTensor().desc.Reshaped5Dto4D();
+        dy.GetTensor().desc = dy.GetTensor().desc.Reshaped5Dto4D();
         out_bwd.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(out_bwd.GetTensor().desc);
-        out_ref.desc = miopen::BuildReshaped4DTensorDescriptor(out_ref.desc);
+            out_bwd.GetTensor().desc.Reshaped5Dto4D();
+        out_ref.desc = out_ref.desc.Reshaped5Dto4D();
         bnScale.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(bnScale.GetTensor().desc);
-        dBias.GetTensor().desc = miopen::BuildReshaped4DTensorDescriptor(dBias.GetTensor().desc);
-        dScale_ref.desc        = miopen::BuildReshaped4DTensorDescriptor(dScale_ref.desc);
-        dBias_ref.desc         = miopen::BuildReshaped4DTensorDescriptor(dBias_ref.desc);
+            bnScale.GetTensor().desc.Reshaped5Dto4D();
+        dBias.GetTensor().desc = dBias.GetTensor().desc.Reshaped5Dto4D();
+        dScale_ref.desc        = dScale_ref.desc.Reshaped5Dto4D();
+        dBias_ref.desc         = dBias_ref.desc.Reshaped5Dto4D();
         savedMean.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(savedMean.GetTensor().desc);
+            savedMean.GetTensor().desc.Reshaped5Dto4D();
         savedInvVar.GetTensor().desc =
-            miopen::BuildReshaped4DTensorDescriptor(savedInvVar.GetTensor().desc);
+            savedInvVar.GetTensor().desc.Reshaped5Dto4D();
     }
 
     if(bn_mode == miopenBNPerActivation)

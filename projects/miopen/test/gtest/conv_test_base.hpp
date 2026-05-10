@@ -391,7 +391,7 @@ protected:
 
     void TearDownConv()
     {
-        ref_out = tensor<Tref>{output.desc.GetLayout_t(), output.desc.GetLengths()};
+        ref_out = tensor<Tref>{output.desc.GetLayout(), output.desc.GetLengths()};
         if(use_cpu_ref)
         {
             cpu_convolution_forward(conv_desc.GetSpatialDimension(),

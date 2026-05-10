@@ -1439,15 +1439,9 @@ int ConvDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
             new GPUMem(ctx, GetTensorSize(weightTensor_vect4), sizeof(Tgpu), buffer_check));
     }
 
-    outhost   = tensor<Tref>(tensor_utils::GetLayout(outputTensor),
-                           tensor_utils::GetLengths(outputTensor),
-                           tensor_utils::GetStrides(outputTensor));
-    din_host  = tensor<Tref>(tensor_utils::GetLayout(inputTensor),
-                            tensor_utils::GetLengths(inputTensor),
-                            tensor_utils::GetStrides(inputTensor));
-    dwei_host = tensor<Tref>(tensor_utils::GetLayout(weightTensor),
-                             tensor_utils::GetLengths(weightTensor),
-                             tensor_utils::GetStrides(weightTensor));
+    outhost   = tensor<Tref>(outputTensor);
+    din_host  = tensor<Tref>(inputTensor);
+    dwei_host = tensor<Tref>(weightTensor);
 
     std::string inFileName   = inflags.GetValueStr("in_data");
     std::string weiFileName  = inflags.GetValueStr("weights");

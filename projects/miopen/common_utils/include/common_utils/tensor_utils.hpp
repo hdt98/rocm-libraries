@@ -116,7 +116,11 @@ template <std::size_t N, typename T>
 auto Tien(const std::vector<T>& v)
 {
     assert(v.size() >= N);
-    if constexpr(N == 2)
+    if constexpr(N == 0)
+        return std::make_tuple();
+    else if constexpr(N == 1)
+        return std::make_tuple(v[0]);
+    else if constexpr(N == 2)
         return std::make_tuple(v[0], v[1]);
     else if constexpr(N == 3)
         return std::make_tuple(v[0], v[1], v[2]);

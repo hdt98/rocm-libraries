@@ -17,10 +17,9 @@ void cpu_layernorm_forward(tensor<T> input,
                            miopenNormMode_t mode,
                            bool use_multithread = false)
 {
-    auto layout   = input.desc.GetLayoutEnum();
+    auto layout   = input.desc.GetLayout();
     size_t stride = 1;
-    if(dim > 1 && layout.has_value() &&
-       (layout.value() == miopenTensorNHWC || layout.value() == miopenTensorNDHWC))
+    if(dim > 1 && (layout == miopenTensorNHWC || layout == miopenTensorNDHWC))
     {
         stride = input.desc.GetLengths()[1]; // stride = C
     }
@@ -89,7 +88,7 @@ void cpu_layernorm_backward(tensor<T> dy,
                             miopenNormMode_t mode,
                             bool use_multithread = false)
 {
-    auto layout   = dy.desc.GetLayoutEnum();
+    auto layout   = dy.desc.GetLayout();
     size_t stride = 1;
     if(dim > 1 && (layout == miopenTensorNHWC || layout == miopenTensorNDHWC))
     {
@@ -164,7 +163,7 @@ void cpu_layernorm_backward_weight_bias(tensor<T> dy,
                                         int32_t dim,
                                         bool use_multithread = false)
 {
-    auto layout   = dy.desc.GetLayoutEnum();
+    auto layout   = dy.desc.GetLayout();
     size_t stride = 1;
     if(dim > 1 && (layout == miopenTensorNHWC || layout == miopenTensorNDHWC))
     {

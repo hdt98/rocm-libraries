@@ -106,7 +106,7 @@ public:
     template <typename T>
     void AllocOnHost(tensor<T> t)
     {
-        AllocOnHost(&t.desc);
+        AllocOnHost(t.desc);
     }
 
     std::vector<Tgpu>& GetVector()

@@ -1274,17 +1274,12 @@ int CBAInferFusionDriver<Tgpu, Tref>::RunForwardGPU()
 template <typename Tgpu, typename Tref>
 void CBAInferFusionDriver<Tgpu, Tref>::runCPUConvFwdInference()
 {
-    tensor<Tref> in_local_host;
-    tensor<Tref> wei_local_host;
-    tensor<Tref> outhost_local_host;
-
-    in_local_host.desc      = miopen::deref(inputTensor);
-    wei_local_host.desc     = miopen::deref(weightTensor);
-    outhost_local_host.desc = miopen::deref(outputTensor);
+    tensor<Tref> in_local_host(inputTensor);
+    tensor<Tref> wei_local_host(weightTensor);
+    tensor<Tref> outhost_local_host(outputTensor);
 
     in_local_host.data  = in_host;
     wei_local_host.data = wei_host;
-    outhost_local_host.data.resize(outhost_local_host.desc.GetElementSpace());
 
     int cba_spatial_dim = 0;
     miopenGetConvolutionSpatialDim(convDesc, &cba_spatial_dim);
