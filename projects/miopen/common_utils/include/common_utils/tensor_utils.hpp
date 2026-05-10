@@ -162,4 +162,42 @@ std::ostream& LogRange(std::ostream& os, const Container& c, const char* sep)
 
 } // namespace tensor_utils
 
+// tensor_view_t utilities -- provide handle-based wrappers for building
+// tensor views without requiring miopen::TensorDescriptor internals.
+#include "../../src/kernels/tensor_view.hpp"
+
+namespace tensor_utils {
+
+// Build a tensor_view_t<N> from an opaque tensor descriptor handle.
+// Replacement for miopen::get_inner_expanded_tv<N>(miopen::deref(desc)).
+template <int N>
+inline tensor_view_t<N> GetInnerExpandedTv(miopenTensorDescriptor_t desc)
+{
+    auto dims    = GetLengths(desc);
+    auto strides = GetStrides(desc);
+
+    tensor_view_t<N> tv{};
+    for(int i = 0; i < N; ++i)
+    {
+        if(dims.empty())
+        {
+            tv.stride[i] = 0;
+            tv.size[i]   = 0;
+        }
+        else if(static_cast<size_t>(i) < dims.size())
+        {
+            tv.stride[i] = strides[i];
+            tv.size[i]   = dims[i];
+        }
+        else
+        {
+            tv.stride[i] = strides.back();
+            tv.size[i]   = 1;
+        }
+    }
+    return tv;
+}
+
+} // namespace tensor_utils
+
 #endif // GUARD_COMMON_UTILS_TENSOR_UTILS_HPP

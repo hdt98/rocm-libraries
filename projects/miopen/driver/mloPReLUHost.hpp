@@ -42,9 +42,9 @@ int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
                                 Tcheck* dinput_host,
                                 Tcheck* dweight_host)
 {
-    auto input_tv   = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
-    auto doutput_tv = miopen::get_inner_expanded_tv<5>(miopen::deref(doutputDesc));
-    auto dinput_tv  = miopen::get_inner_expanded_tv<5>(miopen::deref(dinputDesc));
+    auto input_tv   = tensor_utils::GetInnerExpandedTv<5>(inputDesc);
+    auto doutput_tv = tensor_utils::GetInnerExpandedTv<5>(doutputDesc);
+    auto dinput_tv  = tensor_utils::GetInnerExpandedTv<5>(dinputDesc);
 
     auto input_sz              = tensor_utils::GetElementSize(inputDesc);
     auto weight_sz             = tensor_utils::GetElementSize(weightDesc);

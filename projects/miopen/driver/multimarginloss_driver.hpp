@@ -55,10 +55,10 @@ int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,
                                          const Tgpu* weight,
                                          Tcheck* ref_output)
 {
-    auto I_tv = miopen::get_inner_expanded_tv<2>(miopen::deref(iDesc));
-    auto T_tv = miopen::get_inner_expanded_tv<1>(miopen::deref(tDesc));
-    auto W_tv = miopen::get_inner_expanded_tv<1>(miopen::deref(wDesc));
-    auto O_tv = miopen::get_inner_expanded_tv<1>(miopen::deref(oDesc));
+    auto I_tv = tensor_utils::GetInnerExpandedTv<2>(iDesc);
+    auto T_tv = tensor_utils::GetInnerExpandedTv<1>(tDesc);
+    auto W_tv = tensor_utils::GetInnerExpandedTv<1>(wDesc);
+    auto O_tv = tensor_utils::GetInnerExpandedTv<1>(oDesc);
     auto N = I_tv.size[0], C = I_tv.size[1];
 
     int32_t ret     = miopenStatusSuccess;

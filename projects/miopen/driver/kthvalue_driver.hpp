@@ -54,10 +54,10 @@ void mloKthvalueFwdRunHost(TIO* input,
     size_t inputSize       = inputDesc.GetElementSize();
     size_t dimSize         = inputDesc.GetLengths()[dim];
     size_t dimStride       = inputDesc.GetStrides()[dim];
-    auto inputTv           = miopen::get_inner_expanded_tv<5>(miopen::deref(pInputDesc));
+    auto inputTv           = tensor_utils::GetInnerExpandedTv<5>(pInputDesc);
     auto inputTvWithoutDim = miopen::get_tv_without_dim<5>(inputTv, dim);
-    auto outputTv          = miopen::get_inner_expanded_tv<5>(miopen::deref(outputDesc));
-    auto indicesTv         = miopen::get_inner_expanded_tv<5>(miopen::deref(indicesDesc));
+    auto outputTv          = tensor_utils::GetInnerExpandedTv<5>(outputDesc);
+    auto indicesTv         = tensor_utils::GetInnerExpandedTv<5>(indicesDesc);
 
     size_t numSlice = inputSize / dimSize;
 

@@ -51,9 +51,9 @@ int32_t mloSoftMarginLossForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                         miopenLossReductionMode_t reduction_mode)
 {
     auto input_numel = tensor_utils::GetElementSize(inputDesc);
-    auto i_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
-    auto t_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(targetDesc));
-    auto o_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(outputDesc));
+    auto i_tv        = tensor_utils::GetInnerExpandedTv<5>(inputDesc);
+    auto t_tv        = tensor_utils::GetInnerExpandedTv<5>(targetDesc);
+    auto o_tv        = tensor_utils::GetInnerExpandedTv<5>(outputDesc);
 
     int32_t ret = miopenStatusSuccess;
 
@@ -89,10 +89,10 @@ int32_t mloSoftMarginLossBackwardRunHost(miopenTensorDescriptor_t inputDesc,
                                          miopenLossReductionMode_t reduction_mode)
 {
     auto input_numel = tensor_utils::GetElementSize(inputDesc);
-    auto i_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(inputDesc));
-    auto t_tv        = miopen::get_inner_expanded_tv<5>(miopen::deref(targetDesc));
-    auto dO_tv       = miopen::get_inner_expanded_tv<5>(miopen::deref(dODesc));
-    auto dI_tv       = miopen::get_inner_expanded_tv<5>(miopen::deref(dIDesc));
+    auto i_tv        = tensor_utils::GetInnerExpandedTv<5>(inputDesc);
+    auto t_tv        = tensor_utils::GetInnerExpandedTv<5>(targetDesc);
+    auto dO_tv       = tensor_utils::GetInnerExpandedTv<5>(dODesc);
+    auto dI_tv       = tensor_utils::GetInnerExpandedTv<5>(dIDesc);
 
     int32_t ret = miopenStatusSuccess;
 

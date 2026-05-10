@@ -6,6 +6,7 @@
 
 #include <miopen/tensor.hpp>
 #include <miopen/tensor_extra.hpp>
+#include <common_utils/tensor_utils.hpp>
 
 ////////////////////////////////////////////////////////////
 //
@@ -87,7 +88,7 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
             if(algo == MIOPEN_SOFTMAX_LOG)
             {
                 Tcheck neg_inf = static_cast<Tcheck>(
-                    miopen::deref(inputTensor).GetType() == miopenHalf ? NEGATIVE_INF_FP16
+                    tensor_utils::GetType(inputTensor) == miopenHalf ? NEGATIVE_INF_FP16
                                                                        : NEGATIVE_INF_FP32);
                 channel_max[i] = neg_inf;
                 for(int j = 0; j < c; j++)
@@ -172,7 +173,7 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                     if(algo == MIOPEN_SOFTMAX_LOG)
                     {
                         Tcheck neg_inf = static_cast<Tcheck>(
-                            miopen::deref(inputTensor).GetType() == miopenHalf ? NEGATIVE_INF_FP16
+                            tensor_utils::GetType(inputTensor) == miopenHalf ? NEGATIVE_INF_FP16
                                                                                : NEGATIVE_INF_FP32);
                         channel_max[i * h * w + s0 * w + s1] = results[i * c * h * w + s0 * w + s1];
                         for(int j = 1; j < c; j++)
