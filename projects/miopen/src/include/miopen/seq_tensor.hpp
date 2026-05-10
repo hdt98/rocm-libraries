@@ -147,7 +147,7 @@ struct SeqTensorDescriptor : miopenSeqTensorDescriptor
 private:
     std::size_t GetTensorRealByteSpaceSeqPacked() const;
 
-    static std::vector<unsigned int> GetDefaultLayoutVector(int dims)
+    static std::vector<unsigned int> GetDefaultLayoutVector(uint32_t dims)
     {
         std::vector<unsigned int> layout_default(dims);
         std::iota(layout_default.begin(), layout_default.end(), 0);

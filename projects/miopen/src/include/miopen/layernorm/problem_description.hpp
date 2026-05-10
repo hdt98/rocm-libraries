@@ -199,7 +199,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
                              {},
                              {},
                              epsilon_,
-                             xDesc_.GetLengths().size() - 1)
+                             int(xDesc_.GetLengths().size()) - 1)
     {
     }
 
@@ -224,7 +224,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
                              dwDesc_,
                              {},
                              {},
-                             xDesc_.GetLengths().size() - 1)
+                             int(xDesc_.GetLengths().size()) - 1)
     {
     }
 
@@ -356,7 +356,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
     NetworkConfig MakeNetworkConfig() const override;
 
     template <class Self>
-    static void Visit(Self&& self, std::function<void(int64_t, std::string)> f)
+    static void Visit(Self&& self, std::function<void(uint64_t, std::string)> f)
     {
         // The column names match the driver command line argument names
         f(static_cast<uint64_t>(self.direction), "direction");
@@ -365,7 +365,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
         f(self.GetDepth(), "in_d");
         f(self.GetHeight(), "in_h");
         f(self.GetWidth(), "in_w");
-        f(self.normalized_dim, "normalized_dim");
+        f(static_cast<uint64_t>(self.normalized_dim), "normalized_dim");
         f(static_cast<uint64_t>(self.mode), "mode");
 
         f(self.stride, "stride");
@@ -380,7 +380,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
     template <class Self, class Visitor>
     static void VisitAll(Self&& self, const Visitor& f)
     {
-        Visit(std::forward<Self>(self), [&](int64_t value, std::string name) { f(value, name); });
+        Visit(std::forward<Self>(self), [&](uint64_t value, std::string name) { f(value, name); });
         Visit(std::forward<Self>(self),
               [&](std::string value, std::string name) { f(value, name); });
     }

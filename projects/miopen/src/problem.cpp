@@ -512,7 +512,7 @@ std::vector<Solution> Problem::FindSolutionsImpl(const Handle& handle,
         MakeConvInvokeParams(x_desc, x, w_desc, w, y_desc, y, workspace, workspace_size);
 
     auto results =
-        FindConvolution(ctx, conv_problem, invoke_ctx, max_solutions, options.attach_binaries);
+        FindConvolution(ctx, conv_problem, invoke_ctx, int(max_solutions), options.attach_binaries);
     auto db = MakeConvDbGetter(ctx);
 
     for(auto& result : results)
@@ -654,7 +654,7 @@ namespace {
 inline bool IsValidFilterChannelNumber(const TensorDescriptor& x,
                                        const TensorDescriptor& w,
                                        const std::optional<miopenTensorLayout_t>& layout,
-                                       const int groups)
+                                       const size_t groups)
 {
     if(layout == miopenTensorNCHW      //
        || layout == miopenTensorNCHWc4 //
@@ -675,7 +675,7 @@ inline bool IsValidFilterChannelNumber(const TensorDescriptor& x,
 inline bool IsValidGroupCount(const TensorDescriptor& x,
                               const TensorDescriptor& w,
                               const std::optional<miopenTensorLayout_t>& layout,
-                              const int groups)
+                              const size_t groups)
 {
     if(groups > 1) // Optimize for speed
     {
@@ -699,9 +699,9 @@ void Problem::ValidateGroupCount(const TensorDescriptor& x,
                                  const TensorDescriptor& w,
                                  const ConvolutionDescriptor& conv)
 {
+    assert(conv.group_count > 0);
     const auto layout = w.GetLayoutEnum();
-    const auto groups = conv.group_count;
-    assert(groups > 0);
+    const size_t groups = static_cast<size_t>(conv.group_count);
 
     const auto ok_c = IsValidFilterChannelNumber(x, w, layout, groups);
     const auto ok_g = IsValidGroupCount(x, w, layout, groups);
@@ -711,7 +711,7 @@ void Problem::ValidateGroupCount(const TensorDescriptor& x,
 
     MIOPEN_LOG_W(w.GetLayout_str() << "w {" << w.ToString() << "}, " //
                                    << "x {" << x.ToString() << "}, " //
-                                   << "groups = " << conv.group_count);
+                                   << "groups = " << groups);
     if(!ok_c)
         MIOPEN_THROW(miopenStatusBadParm, "Invalid filter channel number");
     if(!ok_g)
@@ -942,7 +942,7 @@ miopenTensorArgumentId_t Problem::GetOutputId() const
 
 void FusedProblem::PropagateDescriptors()
 {
-    for(auto i = 0; i < problems.size(); ++i)
+    for(size_t i = 0; i < problems.size(); ++i)
     {
         auto& cur = problems[i];
 

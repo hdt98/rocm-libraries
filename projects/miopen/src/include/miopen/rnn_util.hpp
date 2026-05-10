@@ -341,7 +341,7 @@ inline size_t ReductionWorkspaceSize(const Handle& handle,
             miopenReduceTensorIndices_t::MIOPEN_REDUCE_TENSOR_NO_INDICES,
             miopenIndicesType_t::MIOPEN_32BIT_INDICES};
 
-        int bidirect_mp = is_bidirect ? 2 : 1;
+        size_t bidirect_mp = is_bidirect ? 2 : 1;
 
         size_t hy_stride = hsize * bidirect_mp * workspaceScale;
 

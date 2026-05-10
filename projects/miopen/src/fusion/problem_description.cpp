@@ -41,7 +41,7 @@ conv::ProblemDescription FusionDescription::GetConvProblem(conv::Direction dir, 
         case conv::Direction::BackwardWeights: MIOPEN_THROW(miopenStatusNotImplemented);
         }
     }();
-    return GetConvProblem(idx, dir, bias);
+    return GetConvProblem(size_t(idx), dir, bias);
 }
 
 } // namespace miopen

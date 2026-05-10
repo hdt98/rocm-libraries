@@ -116,9 +116,9 @@ miopenStatus_t ConvBiasActivFusion(const Handle& handle,
     MIOPEN_CHECK(fusePlanDesc.Compile(handle));
     float alpha       = 1.0f;
     float beta        = 0.0f;
-    float activ_alpha = activationDesc.GetAlpha();
-    float activ_beta  = activationDesc.GetBeta();
-    float activ_gamma = activationDesc.GetGamma();
+    float activ_alpha = float(activationDesc.GetAlpha());
+    float activ_beta  = float(activationDesc.GetBeta());
+    float activ_gamma = float(activationDesc.GetGamma());
 
     // Set the Args
     MIOPEN_CHECK(convOp->SetArgs(fusionArgs, &falpha1, &beta, w));
@@ -164,8 +164,8 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
 
     if(conv_id != -1)
     {
-        const auto conv_problem =
-            problem.GetConvProblem(conv_id, conv::Direction::Forward, bias_id != -1 ? 1 : 0);
+        const auto conv_problem = problem.GetConvProblem(
+            size_t(conv_id), conv::Direction::Forward, bias_id != -1 ? 1 : 0);
         gfx90aaltimpl = conv_problem.GetConv().attribute.gfx90aFp16alt.GetFwd();
 
         in_desc  = conv_problem.GetIn();
@@ -176,11 +176,13 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
             bias_ptr = allocate_buffer(conv_problem.GetBiasSize());
 
             MIOPEN_LOG_I("bias addr: " << bias_ptr << ", size: " << conv_problem.GetBiasSize());
-            params.SetArg(bias_id, std::make_unique<miopen::fusion::BiasOpInvokeParam>(bias_ptr));
+            params.SetArg(size_t(bias_id),
+                          std::make_unique<miopen::fusion::BiasOpInvokeParam>(bias_ptr));
         }
 
         auto wei_ptr = allocate_buffer(conv_problem.GetWeightsSize());
-        params.SetArg(conv_id, std::make_unique<miopen::fusion::ConvolutionOpInvokeParam>(wei_ptr));
+        params.SetArg(size_t(conv_id),
+                      std::make_unique<miopen::fusion::ConvolutionOpInvokeParam>(wei_ptr));
 
         MIOPEN_LOG_I("weight addr: " << wei_ptr << ", size: " << conv_problem.GetWeightsSize());
     }
@@ -194,22 +196,22 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
         if(activ_fwd_id != -1)
         {
             const auto& activ_op =
-                dynamic_cast<ActivFwdFusionOpDescriptor&>(*plan.op_map[activ_fwd_id]);
+                dynamic_cast<ActivFwdFusionOpDescriptor&>(*plan.op_map[size_t(activ_fwd_id)]);
 
-            params.SetArg(activ_fwd_id,
+            params.SetArg(size_t(activ_fwd_id),
                           std::make_unique<miopen::fusion::ActivationOpInvokeParam>(
                               alpha, beta, gamma, activ_op.activMode));
         }
         else if(activ_bwd_id != -1)
         {
             const auto& activ_op =
-                dynamic_cast<ActivBwdFusionOpDescriptor&>(*plan.op_map[activ_bwd_id]);
+                dynamic_cast<ActivBwdFusionOpDescriptor&>(*plan.op_map[size_t(activ_bwd_id)]);
 
             const auto space = activ_op.input_desc.GetNumBytes();
             auto x           = allocate_buffer(space);
             auto y           = allocate_buffer(space);
 
-            params.SetArg(activ_bwd_id,
+            params.SetArg(size_t(activ_bwd_id),
                           std::make_unique<miopen::fusion::ActivationBwdOpInvokeParam>(
                               y, x, alpha, beta, gamma));
         }
@@ -218,14 +220,14 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
     if(tensor_add_op_id != -1)
     {
         const auto& tensor_add_op =
-            dynamic_cast<const TensorScaleAddOpDescriptor&>(*plan.op_map[tensor_add_op_id]);
+            dynamic_cast<const TensorScaleAddOpDescriptor&>(*plan.op_map[size_t(tensor_add_op_id)]);
         assert(&tensor_add_op);
 
         float alpha      = 1.0f;
         const auto space = tensor_add_op.tensor_desc.GetNumBytes();
         auto ptr         = allocate_buffer(space);
 
-        params.SetArg(tensor_add_op_id,
+        params.SetArg(size_t(tensor_add_op_id),
                       std::make_unique<miopen::fusion::TensorScaleAddOpInvokeParam>(alpha, ptr));
     }
 
@@ -238,8 +240,8 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
 
         if(bn_inf_id != -1)
         {
-            const auto& bn_op =
-                dynamic_cast<BatchNormInferenceFusionOpDescriptor&>(*plan.op_map[bn_inf_id]);
+            const auto& bn_op = dynamic_cast<BatchNormInferenceFusionOpDescriptor&>(
+                *plan.op_map[size_t(bn_inf_id)]);
 
             out_desc = in_desc = bn_op.input_desc;
 
@@ -259,7 +261,7 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
         else if(bn_fwd_id != -1)
         {
             const auto& bn_op =
-                dynamic_cast<BatchNormFwdTrainFusionOpDescriptor&>(*plan.op_map[bn_fwd_id]);
+                dynamic_cast<BatchNormFwdTrainFusionOpDescriptor&>(*plan.op_map[size_t(bn_fwd_id)]);
 
             out_desc = in_desc = bn_op.input_desc;
 
@@ -291,7 +293,7 @@ AllocateBuffersAndMakeFusionInvokeParams(const Handle& handle,
         else if(bn_bwd_id != -1)
         {
             const auto& bn_op =
-                dynamic_cast<BatchNormBwdTrainFusionOpDescriptor&>(*plan.op_map[bn_bwd_id]);
+                dynamic_cast<BatchNormBwdTrainFusionOpDescriptor&>(*plan.op_map[size_t(bn_bwd_id)]);
 
             out_desc = in_desc = bn_op.input_desc;
 
@@ -482,7 +484,7 @@ miopenStatus_t FusionPlanDescriptor::GetOp(int op_idx, std::shared_ptr<FusionOpD
         MIOPEN_THROW(miopenStatusBadParm, "Operator index out of bounds");
     }
 
-    desc = op_map.at(op_idx);
+    desc = op_map.at(size_t(op_idx));
     return err;
 }
 
@@ -516,7 +518,7 @@ miopenStatus_t FusionPlanDescriptor::GetConvAlgos(int reqAlgoCount,
     const std::vector<miopenConvFwdAlgorithm_t> algos = {miopenConvolutionFwdAlgoDirect,
                                                          miopenConvolutionFwdAlgoWinograd};
     retAlgoCount = std::min(reqAlgoCount, static_cast<int>(algos.size()));
-    for(auto idx = 0; idx < retAlgoCount; idx++)
+    for(size_t idx = 0; idx < retAlgoCount; idx++)
     {
         ptrAlgos[idx] = algos[idx];
     }
@@ -561,7 +563,7 @@ miopenStatus_t ConvForwardOpDescriptor::SetArgs(OperatorArgs& args,
     float falpha = alpha != nullptr ? *reinterpret_cast<const float*>(alpha) : 1.0f;
     float fbeta  = beta != nullptr ? *reinterpret_cast<const float*>(beta) : 0.0f;
     auto op_args = std::make_unique<fusion::ConvolutionOpInvokeParam>(falpha, fbeta, w);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -576,7 +578,7 @@ miopenStatus_t ActivFwdFusionOpDescriptor::SetArgs(OperatorArgs& args,
 {
     auto op_args = std::make_unique<fusion::ActivationOpInvokeParam>(
         activAlpha, activBeta, activGamma, activMode);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -598,7 +600,7 @@ miopenStatus_t ActivBwdFusionOpDescriptor::SetArgs(OperatorArgs& args,
 {
     auto op_args = std::make_unique<fusion::ActivationBwdOpInvokeParam>(
         y, x, activAlpha, activBeta, activGamma);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -621,7 +623,7 @@ miopenStatus_t BatchNormInferenceFusionOpDescriptor::SetArgs(OperatorArgs& args,
 {
     auto op_args = std::make_unique<fusion::BatchNormInferenceOpInvokeParam>(
         bnScale, bnBias, estimatedMean, estimatedVariance, epsilon);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -659,7 +661,7 @@ miopenStatus_t BatchNormFwdTrainFusionOpDescriptor::SetArgs(OperatorArgs& args,
                                                                                bnBias,
                                                                                expAvgFactor,
                                                                                epsilon);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -686,7 +688,7 @@ miopenStatus_t BatchNormBwdTrainFusionOpDescriptor::SetArgs(OperatorArgs& args,
 {
     auto op_args = std::make_unique<fusion::BatchNormBwdTrainingOpInvokeParam>(
         x, bnScale, bnBias, resBnScaleDiff, resBnBiasDiff, savedMean, savedInvVariance);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 miopenStatus_t
@@ -711,7 +713,7 @@ miopenStatus_t BiasFusionOpDescriptor::SetArgs(OperatorArgs& args,
                                                ConstData_t bdata)
 {
     auto op_args = std::make_unique<fusion::BiasOpInvokeParam>(bdata);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -725,7 +727,7 @@ miopenStatus_t
 TensorScaleAddOpDescriptor::SetArgs(OperatorArgs& args, float alpha, ConstData_t tensor_ptr)
 {
     auto op_args = std::make_unique<fusion::TensorScaleAddOpInvokeParam>(alpha, tensor_ptr);
-    args.SetArg(GetIdx(), std::move(op_args));
+    args.SetArg(size_t(GetIdx()), std::move(op_args));
     return miopenStatusSuccess;
 }
 
@@ -989,7 +991,7 @@ std::vector<miopenConvSolution_t> GetSolutions(const FusionContext& ctx,
 
         // algorithm doesn't matter for our purpose here, so we stub it out
         interim.emplace_back(miopenConvSolution_t{pair.second.time,
-                                                  pair.second.workspace,
+                                                  size_t(pair.second.workspace),
                                                   solver_id.Value(),
                                                   miopenConvolutionAlgoDirect});
     }

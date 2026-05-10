@@ -58,7 +58,7 @@ size_t GetOuterSize(const TensorDescriptor& xDesc, int32_t normalized_dim, size_
     return outer_size;
 }
 
-size_t GetInnerSize(const TensorDescriptor& xDesc, int32_t normalized_dim)
+size_t GetInnerSize(const TensorDescriptor& xDesc, uint32_t normalized_dim)
 {
     size_t inner_size = 1;
     for(size_t i = normalized_dim; i < xDesc.GetLengths().size(); ++i)

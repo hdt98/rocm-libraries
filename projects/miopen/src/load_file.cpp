@@ -22,7 +22,7 @@ std::vector<char> LoadFile(const fs::path& path)
     if(!in.is_open())
         MIOPEN_THROW(path.string() + ": file opening error");
     std::vector<char> v(size);
-    if(in.read(v.data(), v.size()).fail())
+    if(in.read(v.data(), std::streamsize(v.size())).fail())
         MIOPEN_THROW(path.string() + ": file reading error");
     return v;
 }

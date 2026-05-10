@@ -363,7 +363,7 @@ struct ProblemDescription : ProblemDescriptionBase
     }
 
     template <class Self>
-    static void Visit(Self&& self, std::function<void(int64_t, std::string)> f)
+    static void Visit(Self&& self, std::function<void(size_t, std::string)> f)
     {
         // The column names match the driver command line argument names
         f(self.GetSpatialDims(), "spatial_dim");
@@ -376,17 +376,17 @@ struct ProblemDescription : ProblemDescriptionBase
         f(self.GetWeightsDepth(), "fil_d");
         f(self.GetOutChannels(), "out_channels");
         f(self.GetBatchSize(), "batchsize");
-        f(self.GetPadH(), "pad_h");
-        f(self.GetPadW(), "pad_w");
-        f(self.GetPadD(), "pad_d");
-        f(self.GetKernelStrideH(), "conv_stride_h");
-        f(self.GetKernelStrideW(), "conv_stride_w");
-        f(self.GetKernelStrideD(), "conv_stride_d");
-        f(self.GetDilationH(), "dilation_h");
-        f(self.GetDilationW(), "dilation_w");
-        f(self.GetDilationD(), "dilation_d");
-        f(self.GetBias(), "bias");
-        f(self.GetGroupCount(), "group_count");
+        f(size_t(self.GetPadH()), "pad_h");
+        f(size_t(self.GetPadW()), "pad_w");
+        f(size_t(self.GetPadD()), "pad_d");
+        f(size_t(self.GetKernelStrideH()), "conv_stride_h");
+        f(size_t(self.GetKernelStrideW()), "conv_stride_w");
+        f(size_t(self.GetKernelStrideD()), "conv_stride_d");
+        f(size_t(self.GetDilationH()), "dilation_h");
+        f(size_t(self.GetDilationW()), "dilation_w");
+        f(size_t(self.GetDilationD()), "dilation_d");
+        f(size_t(self.GetBias()), "bias");
+        f(size_t(self.GetGroupCount()), "group_count");
     }
 
     template <class Self>
@@ -404,7 +404,7 @@ struct ProblemDescription : ProblemDescriptionBase
     template <class Self, class Visitor>
     static void VisitAll(Self&& self, const Visitor& f)
     {
-        Visit(std::forward<Self>(self), [&](int64_t value, std::string name) { f(value, name); });
+        Visit(std::forward<Self>(self), [&](size_t value, std::string name) { f(value, name); });
         Visit(std::forward<Self>(self),
               [&](std::string value, std::string name) { f(value, name); });
     }

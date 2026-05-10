@@ -66,7 +66,7 @@ struct ProblemDescription : ProblemDescriptionBase
         IsValidSlices();
     }
 
-    ProblemDescription(const int32_t indexCount_, const TensorDescriptor* const* indexDescs_)
+    ProblemDescription(const uint32_t indexCount_, const TensorDescriptor* const* indexDescs_)
         : indexCount(indexCount_), indexDescs(indexDescs_)
     {
         IsValidIndexsLength();
@@ -74,7 +74,7 @@ struct ProblemDescription : ProblemDescriptionBase
     }
 
     const TensorDescriptor& GetDYDesc() const { return dyDesc; }
-    int32_t GetIndexCount() const { return indexCount; }
+    uint32_t GetIndexCount() const { return indexCount; }
     const TensorDescriptor& GetIndexDesc(int i) const
     {
         if(i >= indexCount)
@@ -85,7 +85,7 @@ struct ProblemDescription : ProblemDescriptionBase
     }
     const TensorDescriptor& GetDXDesc() const { return dxDesc; }
     const TensorDescriptor& GetErrorDesc() const { return errorDesc; }
-    int32_t GetDimCount() const { return dimCount; }
+    uint32_t GetDimCount() const { return dimCount; }
     int32_t GetDim(int i) const
     {
         if(i >= indexCount)
@@ -94,7 +94,7 @@ struct ProblemDescription : ProblemDescriptionBase
         }
         return dims[i];
     }
-    int32_t GetSliceCount() const { return sliceCount; }
+    uint32_t GetSliceCount() const { return sliceCount; }
     int32_t GetSlice(int i) const
     {
         if(i >= sliceCount)
@@ -103,7 +103,7 @@ struct ProblemDescription : ProblemDescriptionBase
         }
         return slices[i];
     }
-    int32_t GetOffset() const { return offset; }
+    uint32_t GetOffset() const { return offset; }
 
     bool IsValidIndexsLength() const
     {

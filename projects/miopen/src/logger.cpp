@@ -279,7 +279,7 @@ bool IsLoggingToRoctx()
 
 bool IsLogging(const LoggingLevel level, const bool disableQuieting)
 {
-    auto enabled_level = env::value(MIOPEN_LOG_LEVEL);
+    auto enabled_level = static_cast<int>(env::value(MIOPEN_LOG_LEVEL));
     if(IsLoggingDebugQuiet() && !disableQuieting)
     {
         // Disable all levels higher than fatal.
