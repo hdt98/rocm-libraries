@@ -304,8 +304,8 @@ bool SdpaBwdPlanBuilder::isApplicable(
         return false;
     }
 
-    // gfx950 backward enablement is owned by I8.6; the registry contains
-    // gfx950 rows but isApplicable rejects them here.
+    // The codegen-generated registry contains both gfx942 and gfx950 rows;
+    // only gfx942 is dispatched here.
     HIP_KERNEL_RETURN_FALSE_IF(deviceString != "gfx942",
                                "Device string does not match gfx942 (Actual value: " + deviceString
                                    + ")");
@@ -317,7 +317,7 @@ bool SdpaBwdPlanBuilder::isApplicable(
 
     const auto& attrs = nodeWrappers.front()->attributesAs<SdpaBackwardAttributes>();
 
-    // Unsupported graph features (carried forward from POC; deferred to other I8.x tasks)
+    // Graph features the engine does not currently dispatch.
     HIP_KERNEL_RETURN_FALSE_IF(attrs.dropout_probability().has_value()
                                    && attrs.dropout_probability().value() != 0.f,
                                "dropout_probability must be unset or zero (Actual value: "
@@ -405,14 +405,12 @@ bool SdpaBwdPlanBuilder::isApplicable(
 
     auto maskType = getMaskType(attrs);
     HIP_KERNEL_RETURN_FALSE_IF(maskType != MaskType::NO_MASK,
-                               "Masked attention deferred to I8.4.2 (Mask type ordinal: "
+                               "Masked attention not currently dispatched (Mask type ordinal: "
                                    + std::to_string(static_cast<int>(maskType)) + ")");
 
-    // Day-one dispatch for the dqdkdv stage forces atomic32 = 1 (a32
-    // accumulator), pssk = 1 and pddv = 1 to match the POC kernarg layout
-    // (Risk #3 in the plan). The a16 accumulator path requires a workspace
-    // change owned by I8.2; pssk=0/pddv=0 variants use a different kernarg
-    // shape that the plan does not yet abstract.
+    // The dqdkdv stage hardcodes atomic32 = 1, pssk = 1, pddv = 1. Other
+    // combinations live in the registry but require a different kernarg
+    // layout than the engine currently builds.
     int bf16CvtValue = (dataTypeId == "fp16") ? BF16_CVT_FP16_SENTINEL
                                               : static_cast<int>(getRoundingMode(attrs));
 

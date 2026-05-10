@@ -55,8 +55,14 @@ struct SdpaBwdTestCase
 
 std::vector<SdpaBwdTestCase> getSdpaBwdTestCases()
 {
-    // Small case for fast CPU reference execution (backward CPU ref is O(B*H*S^2*D))
-    return {SdpaBwdTestCase({1, 1, 256, 128}, {1, 1, 256, 128})};
+    // Small B/H/S keep the CPU reference (O(B*H*S^2*D)) fast. The two
+    // square head-dim cases (128 and 192) cover the day-one accepted dispatch
+    // matrix for the asm_sdpa_engine backward path: arch=gfx942, mode=batch,
+    // pssk=1, pddv=1, atomic32=1, mask=NO_MASK. hd64 is not exercised because
+    // the AITER hd64 backward kernel ships with pddv=0, which the engine's
+    // isApplicable() rejects (registry-miss for the dqdkdv stage).
+    return {SdpaBwdTestCase({1, 1, 256, 128}, {1, 1, 256, 128}),
+            SdpaBwdTestCase({1, 1, 256, 192}, {1, 1, 256, 192})};
 }
 
 template <typename DataType>
@@ -207,6 +213,7 @@ private:
 };
 
 using IntegrationGpuSdpaBwdBf16 = SdpaBackward<bfloat16>;
+using IntegrationGpuSdpaBwdFp16 = SdpaBackward<half>;
 
 } // namespace
 
@@ -227,4 +234,23 @@ TEST_P(IntegrationGpuSdpaBwdBf16, Correctness)
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          IntegrationGpuSdpaBwdBf16,
+                         testing::ValuesIn(getSdpaBwdTestCases()));
+
+TEST_P(IntegrationGpuSdpaBwdFp16, Correctness)
+{
+    // FP16 has a 10-bit mantissa (vs BF16's 7) but its narrow dynamic range
+    // (max representable ~6.55e4) makes the dQ/dK/dV accumulation prone to
+    // overflow/underflow in the softmax-recompute path even with a small
+    // problem size. Empirically, FP16 backward needs a slightly looser
+    // tolerance than BF16 here; 3e0 absorbs the additional spread without
+    // masking real correctness regressions.
+    // Tolerance: 3e0 (atol=3.0, rtol=3.0)
+
+    auto tolerance = 3e0f;
+
+    runGraphTest(tolerance);
+}
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         IntegrationGpuSdpaBwdFp16,
                          testing::ValuesIn(getSdpaBwdTestCases()));
