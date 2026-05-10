@@ -4,7 +4,6 @@
 #ifndef MLO_SOFTMAXHOST_H_
 #define MLO_SOFTMAXHOST_H_
 
-#include <miopen/tensor_extra.hpp>
 #include <common_utils/tensor_utils.hpp>
 
 ////////////////////////////////////////////////////////////
@@ -34,11 +33,12 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                              miopenSoftmaxAlgorithm_t algo,
                              miopenSoftmaxMode_t mode)
 {
-    int n, c, h, w, in_nstr, in_cstr, in_hstr, in_wstr;
-    int out_nstr, out_cstr, out_hstr, out_wstr;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &n, &c, &h, &w);
-    miopenGet4dTensorDescriptorStrides(inputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
-    miopenGet4dTensorDescriptorStrides(outputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
+    auto lens    = tensor_utils::GetLengths(inputTensor);
+    auto in_str  = tensor_utils::GetStrides(inputTensor);
+    auto out_str = tensor_utils::GetStrides(outputTensor);
+    auto [n, c, h, w]                                 = tensor_utils::Tien<4>(lens);
+    auto [in_nstr, in_cstr, in_hstr, in_wstr]         = tensor_utils::Tien<4>(in_str);
+    auto [out_nstr, out_cstr, out_hstr, out_wstr]      = tensor_utils::Tien<4>(out_str);
 
     Tcheck max_val = (sizeof(Tgpu) == 4) ? 3.402823466e+38f : 65504.;
     std::vector<Tcheck> channel_max((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
@@ -231,11 +231,12 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                               miopenSoftmaxAlgorithm_t algo,
                               miopenSoftmaxMode_t mode)
 {
-    int n, c, h, w, in_nstr, in_cstr, in_hstr, in_wstr;
-    int out_nstr, out_cstr, out_hstr, out_wstr;
-    miopenGet4dTensorDescriptorLengths(dOutputTensor, &n, &c, &h, &w);
-    miopenGet4dTensorDescriptorStrides(dInputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
-    miopenGet4dTensorDescriptorStrides(dOutputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
+    auto lens    = tensor_utils::GetLengths(dOutputTensor);
+    auto in_str  = tensor_utils::GetStrides(dInputTensor);
+    auto out_str = tensor_utils::GetStrides(dOutputTensor);
+    auto [n, c, h, w]                                 = tensor_utils::Tien<4>(lens);
+    auto [in_nstr, in_cstr, in_hstr, in_wstr]         = tensor_utils::Tien<4>(in_str);
+    auto [out_nstr, out_cstr, out_hstr, out_wstr]      = tensor_utils::Tien<4>(out_str);
 
     std::vector<Tcheck> channel_dot((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
                                     static_cast<Tcheck>(0.0));
