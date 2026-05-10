@@ -399,9 +399,20 @@ bool SdpaBwdPlanBuilder::isApplicable(
                                "Asymmetric head dimensions not supported (D_qk = "
                                    + std::to_string(headDimQk)
                                    + ", D_v = " + std::to_string(headDimV) + ")");
+    // The codegen-generated registry carries hd64, hd128, and hd192 rows, but
+    // only hd128 has a CPU backward reference that has been calibrated against
+    // the in-tree kernels. Other head dims are reachable infrastructure but
+    // gated here until I8.4.x extends correctness coverage.
+    HIP_KERNEL_RETURN_FALSE_IF(headDimQk != 128,
+                               "Head dimension currently dispatched is 128 only (Actual value: "
+                                   + std::to_string(headDimQk) + ")");
+
+    // Likewise, only BF16 has a verified CPU reference path today. FP16
+    // backward kernels exist in the registry but are not yet correctness-
+    // validated against the CPU reference.
     HIP_KERNEL_RETURN_FALSE_IF(
-        headDimQk != 64 && headDimQk != 128 && headDimQk != 192,
-        "Head dimension must be 64, 128, or 192 (Actual value: " + std::to_string(headDimQk) + ")");
+        dataTypeId != "bf16",
+        "Backward dispatch currently restricted to BF16 (Actual dtype: " + dataTypeId + ")");
 
     auto maskType = getMaskType(attrs);
     HIP_KERNEL_RETURN_FALSE_IF(maskType != MaskType::NO_MASK,

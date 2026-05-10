@@ -87,17 +87,23 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicableSdpaBwdVariations)
     }
 
     std::vector<std::pair<GraphTest, bool>> applicabilityTests = {
-        // Valid backward graph: BF16, HD=128, FP32 stats, no masking
+        // Valid backward graph: BF16, HD=128, FP32 stats, no masking — only
+        // configuration with a calibrated CPU reference today.
         {GraphTest{createSdpaBwdGraph(), "Valid BF16 HD128 backward"}, true},
 
-        // HD=64 has no kernel matching the day-one (pssk=1, pddv=1) kernarg
-        // layout — the registry only carries hd64 with pddv=0.
+        // HD=64: rejected — registry has only pddv=0 rows for hd64, and the
+        // CPU reference is not calibrated for the kernel anyway.
         {GraphTest{createSdpaBwdGraph({4, 8, 256, 64}), "Head dimension 64"}, false},
 
-        // FP16 HD=128 is part of the day-one accepted matrix.
-        {GraphTest{createSdpaBwdGraph({4, 8, 256, 128}, DataType::HALF), "FP16 tensors"}, true},
+        // HD=192: dispatch infrastructure exists but CPU reference correctness
+        // has not been verified. Gated until I8.4.x.
+        {GraphTest{createSdpaBwdGraph({4, 8, 256, 192}), "Head dimension 192"}, false},
 
-        // Causal mask deferred to I8.4.2.
+        // FP16: dispatch infrastructure exists but CPU reference correctness
+        // has not been verified. Gated until I8.4.x.
+        {GraphTest{createSdpaBwdGraph({4, 8, 256, 128}, DataType::HALF), "FP16 tensors"}, false},
+
+        // Causal mask not currently dispatched.
         {GraphTest{
              createSdpaBwdGraph({4, 8, 256, 128}, DataType::BFLOAT16, false, false, false, true),
              "causal_mask = true"},
