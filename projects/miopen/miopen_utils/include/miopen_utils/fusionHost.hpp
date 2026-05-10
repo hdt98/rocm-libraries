@@ -68,7 +68,8 @@ void convHostForward(const tensor<T>& input,
 
     int stride_h, stride_w, pad_h, pad_w, dilation_h, dilation_w;
     miopenConvolutionMode_t mode;
-    miopenPaddingMode_t pmode = miopen::deref(convDesc).paddingMode;
+    miopenPaddingMode_t pmode;
+    miopenGetConvolutionPaddingMode(convDesc, &pmode);
     miopenGetConvolutionDescriptor(
         convDesc, &mode, &pad_h, &pad_w, &stride_h, &stride_w, &dilation_h, &dilation_w);
 

@@ -78,8 +78,8 @@ int32_t mloGetitemBackwardRunHost(miopenTensorDescriptor_t dyDesc,
     auto dim_info_offset = indexCount > 0 ? indexCount * index_dims[0] : 0;
     auto start_dim       = dims[0];
 
-    auto dy_tv     = miopen::get_inner_expanded_tv<5>(miopen::deref(dyDesc));
-    auto dxhost_tv = miopen::get_inner_expanded_tv<5>(miopen::deref(dxDesc));
+    auto dy_tv     = tensor_utils::GetInnerExpandedTv<5>(dyDesc);
+    auto dxhost_tv = tensor_utils::GetInnerExpandedTv<5>(dxDesc);
     miopen::slice_tv<5>(dxhost_tv, sliceCount, slices);
 
     int32_t ret = 0;
