@@ -432,6 +432,7 @@ defaultBenchmarkCommonParameters = [
     {"KRingShift": [False]},
     {"DirectToLds": [0]},
     {"UseSubtileImpl": [False]},
+    {"DirectToLdsMetadata": [0]},
     {"UseSgprForGRO": [-1]},
     {"UseInstOffsetForGRO": [0]},
     {"AssertSummationElementMultiple": [1]},

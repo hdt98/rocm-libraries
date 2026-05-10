@@ -572,6 +572,7 @@ class Solution(collections.abc.Mapping):
     # Use nonDTL loads in DTL tail loop
     state["NonDTLTailLoopA"] = False
     state["NonDTLTailLoopB"] = False
+    state["NonDTLTailLoopMetadata"] = False
     if state["ProblemType"]["MXBlockA"]:
       state["NonDTLTailLoopMXSA"] = False
     if state["ProblemType"]["MXBlockB"]:
@@ -607,6 +608,8 @@ class Solution(collections.abc.Mapping):
         if state["ProblemType"]["MXBlockB"]:
           state["NonDTLTailLoopMXSB"] = True
           state["tailLoopOptMXSB"] = False
+    if state["ProblemType"]["Sparse"] and state["DirectToLdsMetadata"]:
+      state["NonDTLTailLoopMetadata"] = True
 
     if (state["ISA"] != (9, 4, 2) and state["ISA"] != (9, 5, 0)) or \
        (state["ProblemType"]["Sparse"]) or \
@@ -1546,24 +1549,27 @@ class Solution(collections.abc.Mapping):
           state["SubGroupMetadata"] = state["SubGroupB"]
           state["MacroTileMetadata"] = state["MacroTileB"]
           state["WaveSeparateGlobalReadMetadata"] = state["WaveSeparateGlobalReadB"]
-          state["DirectToLdsMetadata"] = False
           state["ProblemType"]["MirrorDimsMetadata"]  = list(state["ProblemType"]["MirrorDimsB"])
           state["VectorWidthMetadata"] = state["VectorWidthB"]
         if state["EnableMatrixInstruction"]:
           state["MIWaveTileMetadata"] = state["MIWaveTileB"]
+        if state["DirectToLdsMetadata"] and not state["DirectToLdsB"]:
+          state["DirectToLdsMetadata"] = False
       else:
         if not state["DirectToVgprSparseMetadata"]:
           state["ThreadTileMetadata"] = state["ThreadTileA"]
           state["SubGroupMetadata"] = state["SubGroupA"]
           state["MacroTileMetadata"] = state["MacroTileA"]
           state["WaveSeparateGlobalReadMetadata"] = state["WaveSeparateGlobalReadA"]
-          state["DirectToLdsMetadata"] = False
           state["ProblemType"]["MirrorDimsMetadata"]  = list(state["ProblemType"]["MirrorDimsA"])
           state["VectorWidthMetadata"] = state["VectorWidthA"]
         if state["EnableMatrixInstruction"]:
           state["MIWaveTileMetadata"] = state["MIWaveTileA"]
+        if state["DirectToLdsMetadata"] and not state["DirectToLdsA"]:
+          state["DirectToLdsMetadata"] = False
     elif not state["ProblemType"]["Sparse"]:
       state["DirectToVgprSparseMetadata"] = False
+      state["DirectToLdsMetadata"] = False
       state["MIWaveTileMetadata"] = 0
 
     if state["NonTemporal"] != -1:
@@ -1578,12 +1584,14 @@ class Solution(collections.abc.Mapping):
     # set True for DTL
     state["UseGeneralizedNLCOneA"] = state["DirectToLdsA"]
     state["UseGeneralizedNLCOneB"] = state["DirectToLdsB"]
+    state["UseGeneralizedNLCOneMetadata"] = state["ProblemType"]["Sparse"] and state["DirectToLdsMetadata"]
 
     state["UseGeneralizedNLCOneMXSA"] = False
     state["UseGeneralizedNLCOneMXSB"] = False
 
     state["LocalWriteUseSgprA"] = False
     state["LocalWriteUseSgprB"] = False
+    state["LocalWriteUseSgprMetadata"] = False
     state["StoreSwapAddr"] = False
 
     if state["WorkGroupMappingXCC"] == -1:
@@ -3625,6 +3633,17 @@ class Solution(collections.abc.Mapping):
           if not isDtlDoable:
             if state["UseGeneralizedNLCOne%s"%tc]:
               reject(state, printRejectionReason, "DirectToLds%s not doable, but GNLC%s enabled, rejecting"%(tc, tc))
+    if state["ProblemType"]["Sparse"] and state["DirectToLdsMetadata"]:
+      sparseTc = 'B' if state["ProblemType"]["Sparse"] == 2 else 'A'
+      # DirectToLdsMetadata requires GRVWMetadata ∈ {4, 16} (dword/dwordx4), similar to isDirectToLdsDoable
+      grvwm = state["GlobalReadVectorWidthMetadata"]
+      grvwmCheck = (grvwm == 4) or (grvwm == 16 and isaInfoMap[state["ISA"]].asmCaps["HasDirectToLdsx4"])
+      if state["DirectToLds%s"%sparseTc] and (not state["DirectToVgprSparseMetadata"]) and grvwmCheck:
+        state["DirectToLdsMetadata"] = True
+        state["LocalWriteUseSgprMetadata"] = True
+      else:
+        state["DirectToLdsMetadata"] = False
+        state["LocalWriteUseSgprMetadata"] = False
 
     # Update parent variable so kernel display is accurate
     if state["DirectToLdsA"] and state["DirectToLdsB"]:
@@ -3862,7 +3881,8 @@ class Solution(collections.abc.Mapping):
 
     # set NoLdsWriteCode if (DirectToVgpr or DirectToLds)A+B is enabled
     state["NoLdsWriteCode"] = False
-    if (state["DirectToVgprA"] or state["DirectToLdsA"]) and (state["DirectToVgprB"] or state["DirectToLdsB"]):
+    if (state["DirectToVgprA"] or state["DirectToLdsA"]) and (state["DirectToVgprB"] or state["DirectToLdsB"]) \
+      and (not state["ProblemType"]["Sparse"] or state["DirectToLdsMetadata"] or state["DirectToVgprSparseMetadata"]):
       state["NoLdsWriteCode"] = True
       # MX case
       if state["ProblemType"]["MXBlockA"]:
