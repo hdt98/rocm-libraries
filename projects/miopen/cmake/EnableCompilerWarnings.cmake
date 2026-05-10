@@ -48,6 +48,9 @@ if(WIN32)
     list(APPEND __clang_cxx_compile_options
         -fms-extensions
         -fms-compatibility)
+    # External headers on Windows are not consistently marked as system
+    # includes, so -Wundef triggers on HIP/rocRAND headers
+    list(APPEND __cxx_compile_options -Wno-undef)
 endif()
 
 add_compile_options(
