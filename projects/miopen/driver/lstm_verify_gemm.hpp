@@ -727,6 +727,7 @@ void RunLSTMBackwardDataGEMMCPUVerify(
     std::vector<Tref>& wkspace_host,
     bool use_dropout,
     miopenDropoutDescriptor_t dropoutDesc,
+    miopenHandle_t handle,
     bool cx_is_null  = false,
     bool dhy_is_null = false,
     bool dcy_is_null = false)

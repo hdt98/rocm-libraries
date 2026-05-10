@@ -36,6 +36,11 @@
 #include <cmath>
 #include <vector>
 
+// Maximum PRNG states for dropout emulation (matches kernel definition).
+#ifndef MAX_PRNG_STATE
+#define MAX_PRNG_STATE (256 * 64)
+#endif
+
 // disable __device__ qualifiers
 #ifdef FQUALIFIERS
 #error rocrand FQUALIFIERS defined externally, probably one of rocrand device header included prior to this

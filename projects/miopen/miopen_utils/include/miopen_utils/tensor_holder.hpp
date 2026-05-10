@@ -180,6 +180,15 @@ struct tensor
 
     template <class X>
     tensor(miopenTensorLayout_t layout, const std::vector<X>& dims, const std::vector<X>& strides)
+        : tensor(layout,
+                 std::vector<std::size_t>(dims.begin(), dims.end()),
+                 std::vector<std::size_t>(strides.begin(), strides.end()))
+    {
+    }
+
+    tensor(miopenTensorLayout_t layout,
+           const std::vector<std::size_t>& dims,
+           const std::vector<std::size_t>& strides)
         : desc(miopen_type<T>{}, layout, dims, strides), data(desc.GetElementSpace())
     {
         assert(dims.size() == strides.size());

@@ -825,6 +825,25 @@ MIOPEN_EXPORT miopenStatus_t miopenGetTensorDescriptor(miopenTensorDescriptor_t 
                                                        int* dimsA,
                                                        int* stridesA);
 
+#ifdef MIOPEN_BETA_API
+/*! @brief Get the details of the tensor descriptor
+ *
+ * Returns the same information as miopenGetTensorDescriptor() but uses size_t
+ * arrays, matching miopenSetTensorDescriptorV2(). This avoids truncation for
+ * tensors whose strides exceed INT_MAX.
+ *
+ * @param tensorDesc Tensor descriptor (input)
+ * @param dataType   MIOpen datatype (output)
+ * @param dimsA      Array containing the size of dimensions (output)
+ * @param stridesA   Array containing the size of stride (output)
+ * @return           miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetTensorDescriptorV2(miopenTensorDescriptor_t tensorDesc,
+                                                         miopenDataType_t* dataType,
+                                                         size_t* dimsA,
+                                                         size_t* stridesA);
+#endif
+
 /*! @brief Destroys the tensor descriptor
  *
  * @param tensorDesc Tensor descriptor (input)

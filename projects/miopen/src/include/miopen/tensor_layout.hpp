@@ -27,11 +27,12 @@
 #define GUARD_TENSOR_LAYOUT_HPP
 
 #include <miopen/errors.hpp>
-#include <map>
 #include <algorithm>
-#include <vector>
-#include <string>
 #include <iterator>
+#include <map>
+#include <numeric>
+#include <string>
+#include <vector>
 
 namespace miopen {
 
