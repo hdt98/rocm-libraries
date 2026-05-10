@@ -146,7 +146,7 @@ enum InMemoryDataOperationEnum_t
 };
 
 // index type
-using index_t = int32_t;
+using index_t = uint32_t;
 
 } // namespace ck
 #endif

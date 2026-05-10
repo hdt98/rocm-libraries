@@ -357,7 +357,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
     NetworkConfig MakeNetworkConfig() const override;
 
     template <class Self>
-    static void Visit(Self&& self, std::function<void(int64_t, std::string)> f)
+    static void Visit(Self&& self, std::function<void(uint64_t, std::string)> f)
     {
         // The column names match the driver command line argument names
         f(self.spatial_dim, "spatial_dim");
@@ -425,8 +425,8 @@ private:
     std::string in_layout      = "NCHW";
     std::string out_layout     = "NCHW";
     std::string din_layout     = "NCHW";
-    std::size_t spatial_dim    = 2;
-    std::size_t min_workgroups = 1;
+    unsigned spatial_dim  = 2;
+    size_t min_workgroups = 1;
 
     ActivationDescriptor activDesc;
 
@@ -435,7 +435,7 @@ private:
     std::string ComputeOutLayout() const { return ComputeLayout(yOrDyDesc); }
     std::string ComputeDinLayout() const { return ComputeLayout(dxDesc); }
 
-    size_t GetSpatialDims() const { return spatial_dim; }
+    unsigned GetSpatialDims() const { return spatial_dim; }
 
     std::size_t GetBatchSize() const { return GetN5(GetSpatialDims(), xDesc.GetLengths()); }
     std::size_t GetChannel() const { return GetC5(GetSpatialDims(), xDesc.GetLengths()); }

@@ -117,7 +117,7 @@ inline static uint32_t GetEPackLength(const ExecutionContext& ctx,
                                       bool isXdlopsInvoked)
 {
     // Based on data type, Es are packed
-    int EPACK = 1;
+    uint32_t EPACK = 1;
     if(problem.IsFp16()) // for fp16, either 2 or 4 Es could be packed
     {
         if(IsXdlopsSupport(ctx) && isXdlopsInvoked)
@@ -163,11 +163,11 @@ static inline size_t ComputeLDSRequiredSize(const miopen::conv::ProblemDescripti
 
     // Multiplied worst_case_alignment_adjustment by 2 as
     // Both A and B matrix LDS size is increased.
-    const std::size_t lds_size = (static_cast<std::size_t>(BPerBlock) + KPerBlock) * EPerBlock *
-                                     EPACKSize * GetTypeSize(problem.GetInDataType()) * 2 +
-                                 2 * static_cast<std::size_t>(worst_case_alignment_adjustment);
+    const auto lds_size = static_cast<unsigned>((BPerBlock + KPerBlock) * EPerBlock) *
+                            EPACKSize * GetTypeSize(problem.GetInDataType()) * 2 +
+                                2 * worst_case_alignment_adjustment;
 
-    return lds_size;
+    return static_cast<size_t>(lds_size);
 }
 
 template <typename T>

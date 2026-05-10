@@ -54,7 +54,7 @@ NetworkConfig ProblemDescription::MakeNetworkConfig() const
 
     const auto read_len = (packed) ? x_elem_sz : x_width2D;
 
-    const auto read_unit = (read_len % 4 == 0) ? 4 : (read_len % 2 == 0) ? 2 : 1;
+    const auto read_unit = (read_len % 4u == 0) ? 4u : (read_len % 2u == 0) ? 2u : 1u;
     const auto MAP_RD    = read_len / read_unit;
 
     std::ostringstream ss;

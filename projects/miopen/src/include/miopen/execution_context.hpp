@@ -137,9 +137,9 @@ struct ExecutionContext
             else
             {
                 MIOPEN_LOG_I2("inexact embedded perf database search");
-                const auto db_id        = GetStream().GetTargetProperties().DbId();
-                const int real_cu_count = GetStream().GetMaxComputeUnits();
-                int closest_cu          = std::numeric_limits<int>::max();
+                const auto db_id         = GetStream().GetTargetProperties().DbId();
+                const auto real_cu_count = GetStream().GetMaxComputeUnits();
+                int closest_cu           = std::numeric_limits<int>::max();
                 fs::path best_path;
                 for(auto const& entry : miopen_data())
                 {
@@ -207,7 +207,7 @@ struct ExecutionContext
             {
                 MIOPEN_LOG_I2("inexact perf database search");
                 const auto db_id        = GetStream().GetTargetProperties().DbId();
-                const int real_cu_count = GetStream().GetMaxComputeUnits();
+                const int real_cu_count = static_cast<int>(GetStream().GetMaxComputeUnits());
                 if(fs::is_directory(pdb_path))
                 {
                     MIOPEN_LOG_I2("Iterating over perf db directory " << pdb_path);

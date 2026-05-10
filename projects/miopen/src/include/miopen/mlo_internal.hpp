@@ -136,25 +136,25 @@ struct AnyInvokeParams;
 MIOPEN_INTERNALS_EXPORT miopen::PerformanceDb GetDb(const miopen::ExecutionContext& ctx);
 
 template <class TTo>
-size_t setTopDescFromMLDesc(int spatial_dims, TTo& to, const TensorDescriptor& tensor)
+size_t setTopDescFromMLDesc(unsigned spatial_dims, TTo& to, const TensorDescriptor& tensor)
 {
     return SetDescFromMLDesc(spatial_dims, to, tensor, &TTo::setTopDescr);
 }
 
 template <class TTo>
-size_t setBotDescFromMLDesc(int spatial_dims, TTo& to, const TensorDescriptor& tensor)
+size_t setBotDescFromMLDesc(unsigned spatial_dims, TTo& to, const TensorDescriptor& tensor)
 {
     return SetDescFromMLDesc(spatial_dims, to, tensor, &TTo::setBotDescr);
 }
 
 template <class TTo>
-size_t setTopDfDescFromMLDesc(int spatial_dims, TTo& to, const TensorDescriptor& tensor)
+size_t setTopDfDescFromMLDesc(unsigned spatial_dims, TTo& to, const TensorDescriptor& tensor)
 {
     return SetDescFromMLDesc(spatial_dims, to, tensor, &TTo::setTopDfDescr);
 }
 
 template <class TTo>
-size_t setBotDfDescFromMLDesc(int spatial_dims, TTo& to, const TensorDescriptor& tensor)
+size_t setBotDfDescFromMLDesc(unsigned spatial_dims, TTo& to, const TensorDescriptor& tensor)
 {
     return SetDescFromMLDesc(spatial_dims, to, tensor, &TTo::setBotDfDescr);
 }
@@ -408,8 +408,8 @@ struct mlo_construct_activ_lrn_pooling_common : mlo_construct_base
                                stride,
                                w_stride);
 
-        const int data_len = miopen::GetTypeSize(data_type);
-        const size_t size =
+        const int data_len = static_cast<int>(miopen::GetTypeSize(data_type));
+        const int size =
             (layout == "NCHW")
                 ? batch * channels * depth * height * width * data_len
                 : batch * batch_stride * channel_stride * stride * w_stride * data_len;
@@ -419,7 +419,7 @@ struct mlo_construct_activ_lrn_pooling_common : mlo_construct_base
         _out_df_batch_stride   = batch_stride;
         _out_df_channel_stride = channel_stride;
         _out_df_stride         = stride;
-        _top_df_sz             = size;
+        _top_df_sz             = size_t(size);
         _out_df_layout         = layout;
         _out_df_data_type      = miopen::GetDataTypeName(data_type);
     }
@@ -451,8 +451,8 @@ struct mlo_construct_activ_lrn_pooling_common : mlo_construct_base
                                stride,
                                w_stride);
 
-        const int data_len = miopen::GetTypeSize(data_type);
-        const size_t size =
+        const int data_len = static_cast<int>(miopen::GetTypeSize(data_type));
+        const int size =
             (layout == "NCHW")
                 ? batch * channels * depth * height * width * data_len
                 : batch * batch_stride * channel_stride * stride * w_stride * data_len;
@@ -462,7 +462,7 @@ struct mlo_construct_activ_lrn_pooling_common : mlo_construct_base
         _in_df_batch_stride   = batch_stride;
         _in_df_channel_stride = channel_stride;
         _in_df_stride         = stride;
-        _bot_df_sz            = size;
+        _bot_df_sz            = size_t(size);
         _in_df_layout         = layout;
         _in_df_data_type      = miopen::GetDataTypeName(data_type);
     }

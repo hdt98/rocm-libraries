@@ -69,7 +69,7 @@ ConvSolution PoolingBackwardNd::GetSolution(const ExecutionContext&,
     const auto& top = problem.GetYDesc();
 
     std::size_t batch_sz, n_inputs, in_height, in_width;
-    std::tie(batch_sz, n_inputs, in_height, in_width) = miopen::tien<4>(bot.GetLengths(), 1);
+    std::tie(batch_sz, n_inputs, in_height, in_width) = miopen::tien<4>(bot.GetLengths(), 1u);
 
     const int pooling_method = (problem.GetPooling().GetMode() == miopenPoolingMax)
                                    ? MLO_POOLING_OP_MAX

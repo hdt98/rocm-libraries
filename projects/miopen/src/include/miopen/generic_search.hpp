@@ -489,11 +489,11 @@ auto GenericSearch(const Solver s,
     // terminate search when perf is less than cutoff
     float cutoff_time = context.generic_search_worst_time;
     if(cutoff_time < std::numeric_limits<float>::max())
-        cutoff_time *= env::value(MIOPEN_SEARCH_CUTOFF_MUL);
+        cutoff_time *= float(env::value(MIOPEN_SEARCH_CUTOFF_MUL));
     // skip detailed measurement for configs slower than skip_time
     float skip_time = context.generic_search_best_time;
     if(skip_time < std::numeric_limits<float>::max())
-        skip_time *= env::value(MIOPEN_SEARCH_SKIP_PCT) / 100.0f;
+        skip_time *= float(env::value(MIOPEN_SEARCH_SKIP_PCT)) / 100.0f;
 
     bool rec_results = perf_solsp || using_search_cutoff;
 

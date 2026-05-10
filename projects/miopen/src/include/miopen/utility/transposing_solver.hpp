@@ -557,20 +557,20 @@ private:
         const auto& lens     = desc.GetLengths();
         constexpr int n_dims = BatchedTransposeTraits<TransposeSolution>::ndims;
 
-        const uint32_t n = static_cast<uint32_t>(lens[0]);
-        const uint32_t c = static_cast<uint32_t>(lens[1]);
+        const auto n = static_cast<uint32_t>(lens[0]);
+        const auto c = static_cast<uint32_t>(lens[1]);
 
         if constexpr(n_dims == 4)
         {
-            const uint32_t h = static_cast<uint32_t>(lens[2]);
-            const uint32_t w = static_cast<uint32_t>(lens[3]);
+            const auto h = static_cast<uint32_t>(lens[2]);
+            const auto w = static_cast<uint32_t>(lens[3]);
             return TransposeSolution(ctx, desc.GetType(), n, c, h, w);
         }
         else // n_dims == 5
         {
-            const uint32_t d = static_cast<uint32_t>(lens[2]);
-            const uint32_t h = static_cast<uint32_t>(lens[3]);
-            const uint32_t w = static_cast<uint32_t>(lens[4]);
+            const auto d = static_cast<uint32_t>(lens[2]);
+            const auto h = static_cast<uint32_t>(lens[3]);
+            const auto w = static_cast<uint32_t>(lens[4]);
             return TransposeSolution(ctx, desc.GetType(), n, c, d, h, w);
         }
     }
@@ -984,7 +984,7 @@ struct TransposingSolver : TransposingSolverGetSolution<Derived, Base, Problem, 
     {
         // NOLINTNEXTLINE (bugprone-unchecked-optional-access)
         auto old_factory             = sln.invoker_factory.value();
-        const auto old_kernels_end   = sln.construction_params.size();
+        const auto old_kernels_end   = int64_t(sln.construction_params.size());
         const auto transpose_solvers = Derived::GetTransposeSolvers();
 
         std::vector<std::tuple<TransposeDescriptor, InvokerFactory>> in_transpose_ifs,

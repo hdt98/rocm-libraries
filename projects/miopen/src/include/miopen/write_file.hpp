@@ -35,21 +35,24 @@ namespace miopen {
 inline void WriteFile(std::string_view content, const fs::path& name)
 {
     std::ofstream f{name};
-    if(f.write(content.data(), content.size()).fail())
+    auto content_size = std::streamsize(content.size());
+    if(f.write(content.data(), content_size).fail())
         MIOPEN_THROW("Failed to write to file");
 }
 
 inline void WriteFile(const std::vector<char>& content, const fs::path& name)
 {
     std::ofstream f{name, std::ios::binary};
-    if(f.write(content.data(), content.size()).fail())
+    auto content_size = std::streamsize(content.size());
+    if(f.write(content.data(), content_size).fail())
         MIOPEN_THROW("Failed to write to file");
 }
 
 inline void WriteFile(const std::vector<uint8_t>& content, const fs::path& name)
 {
     std::ofstream f{name, std::ios::binary};
-    if(f.write(reinterpret_cast<const char*>(content.data()), content.size()).fail())
+    auto content_size = std::streamsize(content.size());
+    if(f.write(reinterpret_cast<const char*>(content.data()), content_size).fail())
         MIOPEN_THROW("Failed to write to file");
 }
 

@@ -161,15 +161,16 @@ extern "C" miopenStatus_t miopenInitConvolutionNdDescriptor(miopenConvolutionDes
     const auto dilations = std::vector<int>(dilationA, dilationA + spatialDim);
     MIOPEN_LOG_FUNCTION(convDesc, spatialDim, pads, strides, dilations, c_mode);
     return miopen::try_([&] {
-        miopen::deref(convDesc) = miopen::ConvolutionDescriptor(spatialDim,
-                                                                c_mode,
-                                                                miopenPaddingDefault,
-                                                                pads,
-                                                                strides,
-                                                                dilations,
-                                                                std::vector<int>(spatialDim, 0),
-                                                                1,
-                                                                1.0);
+        miopen::deref(convDesc) =
+            miopen::ConvolutionDescriptor(size_t(spatialDim),
+                                          c_mode,
+                                          miopenPaddingDefault,
+                                          pads,
+                                          strides,
+                                          dilations,
+                                          std::vector<int>(unsigned(spatialDim), 0),
+                                          1,
+                                          1.0);
     });
 }
 
@@ -233,9 +234,9 @@ miopenConvolutionABBackwardWeightsGetWorkSpaceSize(const miopenAlphaBetaCase_t a
 
     return miopen::try_([&] {
         miopenDataType_t data_type = miopen::deref(outputTensorDesc).GetType();
-        size_t spatial_dims        = miopen::deref(convDesc).GetSpatialDimension();
+        unsigned spatial_dims      = unsigned(miopen::deref(convDesc).GetSpatialDimension());
 
-        int G    = miopen::deref(convDesc).GetGroupCount();
+        size_t G = size_t(miopen::deref(convDesc).GetGroupCount());
         size_t K = std::get<1>(
             miopen::GetNCDHW(spatial_dims, miopen::deref(inputTensorDesc).GetLengths()));
         size_t C = std::get<1>(
@@ -246,7 +247,7 @@ miopenConvolutionABBackwardWeightsGetWorkSpaceSize(const miopenAlphaBetaCase_t a
                                          size_t K_,
                                          miopenDataType_t data_type_,
                                          miopenAlphaBetaCase_t alpha_beta_case_) {
-            auto is_odd        = [](int num) { return num % 2 != 0; };
+            auto is_odd        = [](size_t num) { return num % 2 != 0; };
             size_t C_per_group = C_ / G_;
             size_t K_per_group = K_ / G_;
 
@@ -383,7 +384,7 @@ extern "C" miopenStatus_t miopenGetConvolutionNdDescriptor(miopenConvolutionDesc
 {
     MIOPEN_LOG_FUNCTION(convDesc, requestedSpatialDim);
     return miopen::try_([&] {
-        int spatial_dim = miopen::deref(convDesc).GetSpatialDimension();
+        int spatial_dim = int(miopen::deref(convDesc).GetSpatialDimension());
         if(spatial_dim < requestedSpatialDim)
         {
             MIOPEN_THROW("requestedSpatialDim is larger than actual spatial dimension");
@@ -409,7 +410,7 @@ extern "C" miopenStatus_t miopenGetConvolutionSpatialDim(miopenConvolutionDescri
 {
     MIOPEN_LOG_FUNCTION(convDesc);
     return miopen::try_(
-        [&] { miopen::deref(spatialDim) = miopen::deref(convDesc).GetSpatialDimension(); });
+        [&] { miopen::deref(spatialDim) = int(miopen::deref(convDesc).GetSpatialDimension()); });
 }
 
 MIOPEN_EXPORT extern "C" miopenStatus_t
@@ -447,11 +448,11 @@ miopenGetConvolutionNdForwardOutputDim(miopenConvolutionDescriptor_t convDesc,
         auto out_desc = miopen::deref(convDesc).GetForwardOutputTensor(
             miopen::deref(inputTensorDesc), miopen::deref(filterDesc));
 
-        miopen::deref(nDim) = out_desc.GetNumDims();
+        miopen::deref(nDim) = int(out_desc.GetNumDims());
 
         for(unsigned i = 0; i < out_desc.GetNumDims(); ++i)
         {
-            outputTensorDimA[i] = out_desc.GetLengths()[i];
+            outputTensorDimA[i] = int(out_desc.GetLengths()[i]);
         }
     });
 }
@@ -757,7 +758,7 @@ static inline void ReturnSolutions(const std::vector<miopenConvSolution_t>& solu
         *solution_count_ret = solutions.size();
     if(solutions_ret != nullptr)
     {
-        for(auto i = 0; i < solutions.size(); ++i)
+        for(size_t i = 0; i < solutions.size(); ++i)
             solutions_ret[i] = solutions[i];
     }
 }

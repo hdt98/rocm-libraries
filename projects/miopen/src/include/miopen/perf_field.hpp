@@ -48,12 +48,12 @@ struct PerfField
 struct FindDbData : solver::Serializable<FindDbData>
 {
     float time;
-    std::size_t workspace;
+    int64_t workspace;
     std::string algorithm;
 
     FindDbData() : time(-1), workspace(-1), algorithm("<invalid>") {}
 
-    FindDbData(float time_, std::size_t workspace_, const std::string& algorithm_)
+    FindDbData(float time_, int64_t workspace_, const std::string& algorithm_)
         : time(time_), workspace(workspace_), algorithm(algorithm_)
     {
     }

@@ -46,7 +46,6 @@ set(__clang_cxx_compile_options
     -Weverything
     -Wno-c++98-compat
     -Wno-c++98-compat-pedantic
-    -Wno-conversion
     -Wno-double-promotion
     -Wno-exit-time-destructors
     -Wno-extra-semi
@@ -71,7 +70,6 @@ set(__clang_cxx_compile_options
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "19")
     list(APPEND __clang_cxx_compile_options
-        -Wno-unique-object-duplication
         -Wno-switch-default)
 endif()
 
@@ -85,6 +83,8 @@ endif()
 
 if(WIN32)
     list(APPEND __clang_cxx_compile_options
+        -Wno-ignored-attributes
+        -Wno-language-extension-token
         -fms-extensions
         -fms-compatibility)
 endif()

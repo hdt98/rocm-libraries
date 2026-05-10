@@ -251,7 +251,7 @@ ConvolutionDescriptor::GetForwardOutputTensorWithLayout(const TensorDescriptor& 
     }
     else if(mode == miopenTranspose)
     {
-        if(in_c != wei_k || (group_count > 1 && (wei_k % group_count != 0)))
+        if(in_c != wei_k || (group_count > 1 && (wei_k % size_t(group_count) != 0)))
         {
             MIOPEN_THROW(miopenStatusBadParm, "Channels do not match for the filter");
         }
@@ -284,7 +284,8 @@ ConvolutionDescriptor::GetForwardOutputTensorWithLayout(const TensorDescriptor& 
 
         for(int i = 0; i < spatial_dim; ++i)
         {
-            out_spatial[i] = miopen::integer_division_ceil(in_spatial[i], GetConvStrides()[i]);
+            out_spatial[i] =
+                size_t(miopen::integer_division_ceil(in_spatial[i], GetConvStrides()[unsigned(i)]));
         }
     }
     else if(paddingMode == miopenPaddingValid && mode == miopenConvolution &&
@@ -294,8 +295,8 @@ ConvolutionDescriptor::GetForwardOutputTensorWithLayout(const TensorDescriptor& 
 
         for(int i = 0; i < spatial_dim; ++i)
         {
-            out_spatial[i] = miopen::integer_division_ceil(
-                std::ptrdiff_t(in_spatial[i]) - wei_spatial[i] + 1, GetConvStrides()[i]);
+            out_spatial[i] = size_t(miopen::integer_division_ceil(
+                std::ptrdiff_t(in_spatial[i] - wei_spatial[i] + 1), GetConvStrides()[unsigned(i)]));
         }
     }
     else if(paddingMode == miopenPaddingDefault || paddingMode == miopenPaddingSame ||
@@ -303,31 +304,31 @@ ConvolutionDescriptor::GetForwardOutputTensorWithLayout(const TensorDescriptor& 
     {
         if(mode == miopenTranspose)
         {
-            out_c = wei_c * group_count;
+            out_c = wei_c * size_t(group_count);
 
-            for(int i = 0; i < spatial_dim; ++i)
+            for(unsigned i = 0; i < spatial_dim; ++i)
             {
-                out_spatial[i] = std::max<std::ptrdiff_t>(
+                out_spatial[i] = size_t(std::max<std::ptrdiff_t>(
                     1,
                     GetConvStrides()[i] * (std::ptrdiff_t(in_spatial[i]) - 1) + 1 +
                         GetConvDilations()[i] * (std::ptrdiff_t(wei_spatial[i]) - 1) -
                         2 * static_cast<std::ptrdiff_t>(GetConvPads()[i]) +
-                        GetTransposeConvPads()[i]);
+                        GetTransposeConvPads()[i]));
             }
         }
         else
         {
             out_c = wei_k / wDesc.GetVectorLength();
 
-            for(int i = 0; i < spatial_dim; ++i)
+            for(unsigned i = 0; i < spatial_dim; ++i)
             {
-                out_spatial[i] = std::max<std::ptrdiff_t>(
+                out_spatial[i] = size_t(std::max<std::ptrdiff_t>(
                     1,
                     (ptrdiff_t(in_spatial[i]) -
                      (1 + GetConvDilations()[i] * (std::ptrdiff_t(wei_spatial[i]) - 1)) +
                      2 * static_cast<std::ptrdiff_t>(GetConvPads()[i])) /
                             GetConvStrides()[i] +
-                        1);
+                        1));
             }
         }
     }
@@ -346,7 +347,7 @@ ConvolutionDescriptor::GetForwardOutputTensorWithLayout(const TensorDescriptor& 
                  : xDesc.GetType()), // TODO: This function overrides the output type with
                                      // essentially the input which is incorrect.
             TensorDescriptor::StringToLayoutType(
-                yLayout, xDesc.IsVectorized(), xDesc.GetVectorLength()),
+                yLayout, xDesc.IsVectorized(), int(xDesc.GetVectorLength())),
             out_lens,
             out_strides};
 }

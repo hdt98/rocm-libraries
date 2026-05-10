@@ -47,7 +47,7 @@
 class Timer
 {
 public:
-    Timer(){};
+    Timer() {};
     void start(const bool enabled = true)
     {
         if(!enabled)
@@ -80,7 +80,7 @@ private:
 class Timer2
 {
 public:
-    Timer2(){};
+    Timer2() {};
     void start(const bool enabled = true)
     {
         if(!enabled)
@@ -262,7 +262,7 @@ public:
 
         printf("GPU Kernel Time Elapsed: %f ms\n", n_iter > 1 ? gpu_avg / (n_iter - 1) : gpu_time);
         printf("Wall-clock Time Elapsed: %f ms\n",
-               n_iter > 1 ? host_avg / (n_iter - 1) : hostTimePerLaunch[0]);
+               n_iter > 1 ? host_avg / float(n_iter - 1) : hostTimePerLaunch[0]);
     }
 
     enum class ClockMode

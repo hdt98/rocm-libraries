@@ -168,13 +168,13 @@ HeuristicInitMacroTileNoPadGemmK(size_t gemm_m,
                                  size_t gemm_k,
                                  const std::vector<std::tuple<int, int, int>>& tile_list)
 {
-    int m_per_block, n_per_block, k_per_block;
+    size_t m_per_block, n_per_block, k_per_block;
     bool found = false;
 
     // find exact divide
     for(const auto& tile : tile_list)
     {
-        int mpb, npb, kpb;
+        size_t mpb, npb, kpb;
         std::tie(mpb, npb, kpb) = tile;
         if(gemm_m % mpb == 0 && gemm_n % npb == 0 && gemm_k % kpb == 0)
         {
@@ -189,12 +189,12 @@ HeuristicInitMacroTileNoPadGemmK(size_t gemm_m,
     if(!found)
     {
         size_t min_pad_pixel = std::numeric_limits<std::size_t>::max();
-        int mpb_pad          = 0;
-        int npb_pad          = 0;
+        size_t mpb_pad{0};
+        size_t npb_pad{0};
         // first try gemm_m, gemm_n padding
         for(const auto& tile : tile_list)
         {
-            int mpb, npb, kpb;
+            size_t mpb, npb, kpb;
             std::tie(mpb, npb, kpb) = tile;
             if(gemm_k % kpb != 0)
                 continue;
@@ -212,7 +212,7 @@ HeuristicInitMacroTileNoPadGemmK(size_t gemm_m,
         // second, we need find the max k_per_block among the same mpb/npb per block
         for(const auto& tile : tile_list)
         {
-            int mpb, npb, kpb;
+            size_t mpb, npb, kpb;
             std::tie(mpb, npb, kpb) = tile;
             if(mpb == mpb_pad && npb == npb_pad)
             {
@@ -245,8 +245,8 @@ static inline int igemm_split_batch_size(const int hi,
                                          const int c,
                                          const int data_byte)
 {
-    size_t image_size_input          = static_cast<size_t>(c) * hi * wi * data_byte;
-    size_t image_size_output         = static_cast<size_t>(k) * ho * wo * data_byte;
+    size_t image_size_input          = static_cast<size_t>(c * hi * wi * data_byte);
+    size_t image_size_output         = static_cast<size_t>(k * ho * wo * data_byte);
     constexpr size_t max_tensor_size = 0xffffffffUL;
 
     size_t image_size = std::max(image_size_input, image_size_output);
@@ -257,7 +257,7 @@ static inline int igemm_split_batch_size(const int hi,
 
     // Round up splits: we must find the largest multiple of n, max_n, s.t.
     // max_n * image_size <= max_tensor_size
-    size_t max_n = max_tensor_size / image_size;
+    int max_n = static_cast<int>(max_tensor_size / image_size);
     if(max_n > n)
     {
         max_n = n % max_n;
@@ -266,8 +266,8 @@ static inline int igemm_split_batch_size(const int hi,
     {
         // find the smallest multiple m of n such that (n / m) * image_size <= max_tensor_size.
         // once m is known, max_n := (n / m)
-        size_t m       = std::ceil(n / max_n); // m >= n * (image_size / max_tensor_size)
-        size_t _sqrt_n = std::sqrt(n);
+        int m       = int(std::ceil(n / max_n)); // m >= n * (image_size / max_tensor_size)
+        int _sqrt_n = int(std::sqrt(n));
         while(n % max_n != 0)
         {
             if(n % m == 0)

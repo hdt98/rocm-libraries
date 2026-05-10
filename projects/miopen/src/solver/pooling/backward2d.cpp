@@ -45,7 +45,7 @@ struct kernel_params
         kernel_stride_h = pd.strides[0];
 
         std::tie(batch_sz, n_inputs, in_height, in_width) =
-            miopen::tien<4>(problem.GetXDesc().GetLengths(), 1);
+            miopen::tien<4>(problem.GetXDesc().GetLengths(), 1u);
 
         out_pix_tile0 = config.out_pix_tile0;
         out_pix_tile1 = config.out_pix_tile1;

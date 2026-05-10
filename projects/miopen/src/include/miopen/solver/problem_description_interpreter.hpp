@@ -46,7 +46,7 @@ struct ProblemInterpreter
 
     static int GetBatchN(const miopen::conv::ProblemDescription& problem)
     {
-        return problem.GetBatchSize();
+        return static_cast<int>(problem.GetBatchSize());
     }
 
     static auto GetOutputLayout(const miopen::conv::ProblemDescription& problem)
@@ -60,9 +60,9 @@ struct ProblemInterpreter
     static int GetOutputChannelK(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetOutChannels();
+            return static_cast<int>(problem.GetOutChannels());
         else
-            return problem.GetInChannels();
+            return static_cast<int>(problem.GetInChannels());
     }
 
     static auto GetInputLayout(const miopen::conv::ProblemDescription& problem)
@@ -76,33 +76,33 @@ struct ProblemInterpreter
     static int GetInputChannelC(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetInChannels();
+            return static_cast<int>(problem.GetInChannels());
         else
-            return problem.GetOutChannels();
+            return static_cast<int>(problem.GetOutChannels());
     }
 
     static int GetInputDepthDi(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetInDepth();
+            return static_cast<int>(problem.GetInDepth());
         else
-            return problem.GetOutDepth();
+            return static_cast<int>(problem.GetOutDepth());
     }
 
     static int GetInputHeightHi(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetInHeight();
+            return static_cast<int>(problem.GetInHeight());
         else
-            return problem.GetOutHeight();
+            return static_cast<int>(problem.GetOutHeight());
     }
 
     static int GetInputWidthWi(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetInWidth();
+            return static_cast<int>(problem.GetInWidth());
         else
-            return problem.GetOutWidth();
+            return static_cast<int>(problem.GetOutWidth());
     }
 
     static auto GetInputCastType(const miopen::conv::ProblemDescription& problem)
@@ -116,25 +116,25 @@ struct ProblemInterpreter
     static int GetOutputDepthDo(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetOutDepth();
+            return static_cast<int>(problem.GetOutDepth());
         else
-            return problem.GetInDepth();
+            return static_cast<int>(problem.GetInDepth());
     }
 
     static int GetOutputHeightHo(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetOutHeight();
+            return static_cast<int>(problem.GetOutHeight());
         else
-            return problem.GetInHeight();
+            return static_cast<int>(problem.GetInHeight());
     }
 
     static int GetOutputWidthWo(const miopen::conv::ProblemDescription& problem)
     {
         if(problem.IsDirectionForward())
-            return problem.GetOutWidth();
+            return static_cast<int>(problem.GetOutWidth());
         else
-            return problem.GetInWidth();
+            return static_cast<int>(problem.GetInWidth());
     }
 
     static auto GetOutputCastType(const miopen::conv::ProblemDescription& problem)
@@ -162,7 +162,7 @@ struct ProblemInterpreter
 
     static int GetFilterDepthZ(const miopen::conv::ProblemDescription& problem)
     {
-        return problem.GetWeightsDepth();
+        return static_cast<int>(problem.GetWeightsDepth());
     }
 
     static auto GetFilterLayout(const miopen::conv::ProblemDescription& problem)
@@ -172,12 +172,12 @@ struct ProblemInterpreter
 
     static int GetFilterHeightY(const miopen::conv::ProblemDescription& problem)
     {
-        return problem.GetWeightsHeight();
+        return static_cast<int>(problem.GetWeightsHeight());
     }
 
     static int GetFilterWidthX(const miopen::conv::ProblemDescription& problem)
     {
-        return problem.GetWeightsWidth();
+        return static_cast<int>(problem.GetWeightsWidth());
     }
 
     // adjust conv_stride_d to 1 if Do is 1

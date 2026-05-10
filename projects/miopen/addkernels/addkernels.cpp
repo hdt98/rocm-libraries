@@ -41,16 +41,16 @@ void Bin2Hex(std::istream& source,
 
     while(blockStart < sourceSize)
     {
-        source.read(reinterpret_cast<char*>(buffer.get()), bufferSize);
+        source.read(reinterpret_cast<char*>(buffer.get()), std::streamsize(bufferSize));
 
-        const std::streamoff pos       = source.tellg();
-        const std::streamoff blockSize = (pos < 0 ? sourceSize : pos) - blockStart;
-        std::streamoff i               = 0;
+        const std::streamoff pos = source.tellg();
+        const auto blockSize = (pos < 0 ? sourceSize : pos) - blockStart;
 
+        size_t i = 0;
         while(i < blockSize)
         {
-            size_t j         = i;
-            const size_t end = std::min<size_t>(i + lineSize, blockSize);
+            size_t j = i;
+            const auto end = std::min<size_t>(i + lineSize, size_t(blockSize));
 
             for(; j < end; j++)
                 target << "0x" << std::setw(2) << static_cast<unsigned>(buffer[j]) << ",";
@@ -98,7 +98,7 @@ void Bin2Asm(std::istream& source,
     // Write binary data
     for(std::streamoff blockStart = 0; blockStart < sourceSize; blockStart += bufferSize)
     {
-        source.read(buffer.get(), bufferSize);
+        source.read(buffer.get(), std::streamsize(bufferSize));
 
         const auto pos       = source.tellg();
         const auto blockSize = (pos < 0 ? sourceSize : pos) - blockStart;
@@ -329,11 +329,11 @@ int main(int argc, char* argv[])
         }
         else if(arg == "-l" || arg == "-line-size")
         {
-            lineSize = std::stol(argv[++i]);
+            lineSize = std::stoul(argv[++i]);
         }
         else if(arg == "-b" || arg == "-buffer")
         {
-            bufferSize = std::stol(argv[++i]);
+            bufferSize = std::stoul(argv[++i]);
         }
         else if(arg == "-g" || arg == "-guard")
         {
@@ -446,7 +446,7 @@ int main(int argc, char* argv[])
             std::cerr << "failure opening file: " << targetFile << "\n";
             return 1;
         }
-        file.write(sourceCode.data(), sourceCode.length());
+        file.write(sourceCode.data(), std::streamsize(sourceCode.length()));
     }
 
     return 0;

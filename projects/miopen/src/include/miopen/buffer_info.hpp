@@ -68,15 +68,22 @@ enum class LPart_t
 struct BuffInfo
 {
     size_t total_byte_size = 0;
-    int element_size       = 4;
+    size_t element_size  = 4;
 
     struct
     {
         unsigned int nk = 0, g = 0, c = 0, h = 0, w = 0;
     } stride{}, byte_stride{}, size{};
     BuffInfo() {}
-    BuffInfo(MemLayout_t layout, int nk, int c, int h, int w, int g, int _element_size);
-    BuffInfo(MemLayout_t layout, int nk, int c, int h, int w, int _element_size)
+    BuffInfo(MemLayout_t layout,
+             unsigned nk,
+             unsigned c,
+             unsigned h,
+             unsigned w,
+             unsigned g,
+             size_t _element_size);
+    BuffInfo(
+        MemLayout_t layout, unsigned nk, unsigned c, unsigned h, unsigned w, size_t _element_size)
         : BuffInfo(layout, nk, c, h, w, 1, _element_size)
     {
     }
@@ -95,7 +102,7 @@ template <>
 inline unsigned int FillStride<LPart_t::H>(BuffInfo* b, unsigned int cum_stride)
 {
     b->stride.h      = cum_stride;
-    b->byte_stride.h = cum_stride * b->element_size;
+    b->byte_stride.h = static_cast<unsigned int>(cum_stride * b->element_size);
     return b->size.h * cum_stride;
 }
 
@@ -103,7 +110,7 @@ template <>
 inline unsigned int FillStride<LPart_t::W>(BuffInfo* b, unsigned int cum_stride)
 {
     b->stride.w      = cum_stride;
-    b->byte_stride.w = cum_stride * b->element_size;
+    b->byte_stride.w = static_cast<unsigned int>(cum_stride * b->element_size);
     return b->size.w * cum_stride;
 }
 
@@ -111,7 +118,7 @@ template <>
 inline unsigned int FillStride<LPart_t::C>(BuffInfo* b, unsigned int cum_stride)
 {
     b->stride.c      = cum_stride;
-    b->byte_stride.c = cum_stride * b->element_size;
+    b->byte_stride.c = static_cast<unsigned int>(cum_stride * b->element_size);
     return b->size.c * cum_stride;
 }
 
@@ -119,7 +126,7 @@ template <>
 inline unsigned int FillStride<LPart_t::N>(BuffInfo* b, unsigned int cum_stride)
 {
     b->stride.nk      = cum_stride;
-    b->byte_stride.nk = cum_stride * b->element_size;
+    b->byte_stride.nk = static_cast<unsigned int>(cum_stride * b->element_size);
     return b->size.nk * cum_stride;
 }
 
@@ -127,7 +134,7 @@ template <>
 inline unsigned int FillStride<LPart_t::G>(BuffInfo* b, unsigned int cum_stride)
 {
     b->stride.g      = cum_stride;
-    b->byte_stride.g = cum_stride * b->element_size;
+    b->byte_stride.g = static_cast<unsigned int>(cum_stride * b->element_size);
     return b->size.g * cum_stride;
 }
 

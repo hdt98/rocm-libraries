@@ -275,7 +275,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                                                        << sol.solver_id);
                 continue;
             }
-            skip_time *= env::value(MIOPEN_FIND_SKIP_PCT) / 100.0f;
+            skip_time *= float(env::value(MIOPEN_FIND_SKIP_PCT)) / 100.0f;
         }
         MIOPEN_LOG_I("Evaluating Solver: " << algorithm_name.ToString() << ":" << sol.solver_id);
 

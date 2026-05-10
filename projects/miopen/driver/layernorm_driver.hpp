@@ -498,8 +498,9 @@ int LayerNormDriver<T>::RunBackwardGPU()
             std::cout << "Wall-clock Time Backward LayerNorm Elapsed: " << t.gettime_ms() / iter
                       << " ms\n";
 
-        float kernel_average_time =
-            iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
+        float kernel_average_time = iter > 1
+                                        ? (kernel_total_time - kernel_first_time) / float(iter - 1)
+                                        : kernel_first_time;
         std::cout << "GPU Kernel Time Backward LayerNorm Elapsed: " << kernel_average_time
                   << " ms\n";
     }

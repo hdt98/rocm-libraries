@@ -37,7 +37,7 @@ namespace miopen {
 
 bool CheckNumericsEnabled(const int bitMask)
 {
-    return (env::value(MIOPEN_CHECK_NUMERICS) & bitMask) != 0;
+    return (env::value(MIOPEN_CHECK_NUMERICS) & static_cast<unsigned>(bitMask)) != 0;
 }
 
 // Must keep this structure synchronized with one in MIOpenCheckNumerics
@@ -73,7 +73,7 @@ std::string GetKernelName(miopenDataType_t data_type)
 bool checkNumericsImpl(
     const Handle& handle, int mode, const TensorDescriptor& dDesc, ConstData_t data, bool isInput)
 {
-    int numElements = dDesc.GetElementSize();
+    size_t numElements = dDesc.GetElementSize();
     CheckNumericsResult abnormal_h;
     auto abnormal_d =
         handle.Create(sizeof(CheckNumericsResult)); // TODO - someday avoid slow malloc/free here
@@ -123,8 +123,8 @@ bool checkNumericsImpl(
         {
             assert(numElements != 0);
             MIOPEN_LOG((isAbnormal ? miopen::LoggingLevel::Warning : miopen::LoggingLevel::Info),
-                       "Stats: mean=" << (abnormal_h.sum / numElements)
-                                      << " absmean=" << (abnormal_h.absSum / numElements)
+                       "Stats: mean=" << (abnormal_h.sum / float(numElements))
+                                      << " absmean=" << (abnormal_h.absSum / float(numElements))
                                       << " min=" << abnormal_h.min << " max=" << abnormal_h.max);
         }
     }
@@ -158,7 +158,7 @@ bool checkNumericsImpl(
 // Returns: 1 if abnormal value (inf or nan) detected in specified data, 0 otherwise
 bool checkNumericsInput(const Handle& handle, const TensorDescriptor& dDesc, ConstData_t data)
 {
-    return checkNumericsImpl(handle, env::value(MIOPEN_CHECK_NUMERICS), dDesc, data, true);
+    return checkNumericsImpl(handle, (int)env::value(MIOPEN_CHECK_NUMERICS), dDesc, data, true);
 }
 
 // Synchronizes to wait for kernel to finish, then checks data for output:
@@ -166,7 +166,7 @@ bool checkNumericsInput(const Handle& handle, const TensorDescriptor& dDesc, Con
 bool checkNumericsOutput(const Handle& handle, const TensorDescriptor& dDesc, ConstData_t data)
 {
     handle.Finish();
-    return checkNumericsImpl(handle, env::value(MIOPEN_CHECK_NUMERICS), dDesc, data, false);
+    return checkNumericsImpl(handle, (int)env::value(MIOPEN_CHECK_NUMERICS), dDesc, data, false);
 }
 
 } // namespace miopen

@@ -40,8 +40,8 @@ T mean(const std::vector<T>& data)
     static_assert(std::is_floating_point_v<T>);
     MIOPEN_THROW_IF(data.size() == 0, "Cannot find Mean of 0 length data");
 
-    T sumOfValues = std::accumulate(data.begin(), data.end(), 0.0);
-    return sumOfValues / data.size();
+    T sumOfValues = std::accumulate(data.begin(), data.end(), T(0));
+    return sumOfValues / T(data.size());
 }
 
 template <typename T>
@@ -52,7 +52,7 @@ T medianOfSortedData(const std::vector<T>& sortedData)
 
     size_t size = sortedData.size();
 
-    T median = (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / 2.0
+    T median = (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / T(2)
                                : sortedData[size / 2];
 
     return median;

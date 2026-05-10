@@ -40,7 +40,7 @@ inline uint32_t RoundUpNearestPower2Positive(uint32_t v)
     v |= v >> 4;
     v |= v >> 8;
     v |= v >> 16;
-    return std::max(++v, 1U); // Shut clang-tidy.
+    return std::max(++v, 1u); // Shut clang-tidy.
 }
 #endif
 

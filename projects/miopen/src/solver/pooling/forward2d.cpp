@@ -154,7 +154,7 @@ ConvSolution PoolingForward2d::GetSolution(const ExecutionContext&,
 
         int batch_sz, n_outputs;
         std::tie(batch_sz, n_outputs, std::ignore, std::ignore) =
-            miopen::tien<4>(problem.GetYDesc().GetLengths(), 1);
+            miopen::tien<4>(problem.GetYDesc().GetLengths(), 1u);
 
         const auto& pool_d   = problem.GetPooling();
         const auto wsp_index = pool_d.GetWorkspaceIndexMode();

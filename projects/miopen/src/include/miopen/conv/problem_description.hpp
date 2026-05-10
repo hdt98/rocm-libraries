@@ -72,7 +72,7 @@ constexpr TElement GetW3(unsigned spatial_dims, const std::vector<TElement>& dat
 template <class TElement>
 constexpr auto GetCHWN(const std::vector<TElement>& data)
 {
-    return miopen::tien<4>(data, 1);
+    return miopen::tien<4>(data, 1u);
 }
 
 template <class TElement>
@@ -138,7 +138,7 @@ struct ProblemDescription : ProblemDescriptionBase
     }
 
     // Conv descriptor getters
-    unsigned GetSpatialDims() const { return conv.GetSpatialDimension(); }
+    unsigned GetSpatialDims() const { return static_cast<unsigned>(conv.GetSpatialDimension()); }
     int GetPadD() const { return GetD3(GetSpatialDims(), conv.GetConvPads()); }
     int GetPadH() const { return GetH3(GetSpatialDims(), conv.GetConvPads()); }
     int GetPadW() const { return GetW3(GetSpatialDims(), conv.GetConvPads()); }
@@ -149,7 +149,7 @@ struct ProblemDescription : ProblemDescriptionBase
     int GetDilationH() const { return GetH3(GetSpatialDims(), conv.GetConvDilations()); }
     int GetDilationW() const { return GetW3(GetSpatialDims(), conv.GetConvDilations()); }
     int GetGroupCount() const { return conv.GetGroupCount(); }
-    int GetVectorLength() const { return in.GetVectorLength(); }
+    int GetVectorLength() const { return static_cast<int>(in.GetVectorLength()); }
 
     // In getters
     miopenDataType_t GetInDataType() const { return in.GetType(); }
@@ -462,7 +462,7 @@ inline bool IsPointOutput3dStrideEqFilter(const ProblemDescription& problem,
     if(w_lens.size() != 5 || pads.size() != 3 || strides.size() != 3 || dilations.size() != 3)
         return false;
 
-    for(int i = 0; i < 3; ++i)
+    for(size_t i = 0; i < 3; ++i)
     {
         if(pads[i] != 0 || dilations[i] != 1)
             return false;

@@ -107,11 +107,16 @@ MemLayout_t GetGroupConvLayout(MemLayout_t layout, bool IsDataBuffer)
     MIOPEN_THROW(std::string("Internal error in GetGroupConvLayout: Unknown MemLayout_t "));
 }
 
-BuffInfo::BuffInfo(MemLayout_t layout, int nk, int c, int h, int w, int g, int _element_size)
+BuffInfo::BuffInfo(MemLayout_t layout,
+                   unsigned nk,
+                   unsigned c,
+                   unsigned h,
+                   unsigned w,
+                   unsigned g,
+                   size_t _element_size)
 {
-
     element_size       = _element_size;
-    const size_t count = static_cast<size_t>(nk) * c * h * w * g;
+    const size_t count = static_cast<size_t>(nk * c * h * w * g);
     total_byte_size    = count * element_size;
     size.nk            = nk;
     size.g             = g;

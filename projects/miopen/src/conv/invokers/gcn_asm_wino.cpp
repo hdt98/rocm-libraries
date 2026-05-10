@@ -113,13 +113,13 @@ InvokerFactory MakeGcnAsmWinoV2InvokerFactory(const WinoShaderArgsV2& args,
             uint64_t a_offset = 0;
 
             // activation parameters
-            float alpha = 0.0f;
-            float beta  = 0.0f;
+            double alpha = 0.0;
+            double beta  = 0.0;
 
             if(fused && (args.activation_mode != WinoShaderActivationModeV2_t::IDENTITY))
             {
                 const auto& invoke_ctx = primitive_params.CastTo<fusion::FusionInvokeParams>();
-                const int idx          = do_bias ? 2 : 1;
+                const size_t idx       = do_bias ? 2 : 1;
                 const auto& activ_args =
                     dynamic_cast<fusion::ActivationOpInvokeParam&>(*invoke_ctx.op_args.params[idx]);
                 if(args.activation_mode == WinoShaderActivationModeV2_t::SCALED_TANH)
@@ -187,8 +187,8 @@ InvokerFactory MakeGcnAsmWinoV2InvokerFactory(const WinoShaderArgsV2& args,
                 args.out_h,               // uint32_t,    output height
                 args.out_w,               // uint32_t,    output width
                 bias_addr,                // uint64_t,    address of bias buffer
-                alpha,                    // fp32,        activation parameter alpha
-                beta,                     // fp32,        activation parameter beta
+                float(alpha),             // fp32,        activation parameter alpha
+                float(beta),              // fp32,        activation parameter beta
                 d_offset,                 // uint64_t,    byte offset for buffer referenced by data_addr
                 f_offset,                 // uint64_t,    byte offset for buffer referenced by filter_addr
                 o_offset,                 // uint64_t,    byte offset for buffer referenced by output_addr

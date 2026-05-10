@@ -89,7 +89,7 @@ void IncludeInliner::ProcessCore(std::istream& input,
 
         if(!word.empty() && word == directive && recurse)
         {
-            auto first_quote_pos = line.find('"', static_cast<int>(line_parser.tellg()) + 1);
+            auto first_quote_pos = line.find('"', static_cast<size_t>(line_parser.tellg()) + 1);
             std::string::size_type second_quote_pos;
 
             if(first_quote_pos != std::string::npos)
@@ -103,7 +103,7 @@ void IncludeInliner::ProcessCore(std::istream& input,
                 if(!allow_angle_brackets)
                     throw WrongInlineDirectiveException(GetIncludeStackTrace(current_line));
 
-                first_quote_pos = line.find('<', static_cast<int>(line_parser.tellg()) + 1);
+                first_quote_pos = line.find('<', static_cast<size_t>(line_parser.tellg()) + 1);
                 if(first_quote_pos == std::string::npos)
                     throw WrongInlineDirectiveException(GetIncludeStackTrace(current_line));
 

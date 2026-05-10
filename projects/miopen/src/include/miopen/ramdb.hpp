@@ -164,7 +164,7 @@ class DbTimer<RamDb>
         if(logging)
         {
             const auto end = std::chrono::high_resolution_clock::now();
-            MIOPEN_LOG_I2("Db::" << funcName << " time: " << (end - start).count() * .000001f
+            MIOPEN_LOG_I2("Db::" << funcName << " time: " << float((end - start).count()) * .000001f
                                  << " ms");
         }
         return std::move(ret); // NOLINT(clang-analyzer-cplusplus.Move)

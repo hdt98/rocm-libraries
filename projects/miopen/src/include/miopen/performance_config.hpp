@@ -75,7 +75,7 @@ struct PerfConfigBaseCK : PerfConfig
     void Serialize(std::ostream& stream) const final
     {
         const Derived& self = static_cast<const Derived&>(*this);
-        stream.write(self.kernel_id.c_str(), self.kernel_id.length());
+        stream.write(self.kernel_id.c_str(), std::streamsize(self.kernel_id.length()));
     }
 
     bool Deserialize(const std::string& s) final

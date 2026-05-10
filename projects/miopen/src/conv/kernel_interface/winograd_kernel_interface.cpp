@@ -39,7 +39,7 @@ bool AssignAndCheck(Tdst& dst_v, Tsrc src_v) noexcept
     static_assert(std::is_integral_v<Tsrc>);
     static_assert(std::is_integral_v<Tdst>);
 
-    dst_v = src_v;
+    dst_v = static_cast<Tdst>(src_v);
 
     if(dst_v != src_v)
         return false;

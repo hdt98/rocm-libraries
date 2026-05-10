@@ -84,7 +84,7 @@ FindEnforceAction GetFindEnforceActionImpl()
     if(str.empty())
         return FindEnforceAction::Default_;
     for(auto& c : str)
-        c = toupper(static_cast<unsigned char>(c));
+        c = static_cast<char>(toupper(c));
     if(str == "NONE")
     {
         return FindEnforceAction::None;
@@ -125,7 +125,7 @@ std::optional<std::vector<solver::Id>> GetEnvFindOnlySolverImpl()
         const auto solver_list = miopen::SplitDelim(slv_str, ';');
         for(const auto& kinder : solver_list)
         {
-            auto numeric_id = std::strtoul(kinder.c_str(), nullptr, 10);
+            auto numeric_id = std::strtoull(kinder.c_str(), nullptr, 10);
             if(errno == ERANGE || numeric_id == 0)
             { // Assume string in the environment. Try to convert it to numeric id.
                 errno      = 0;
@@ -209,7 +209,7 @@ std::optional<FindMode::Values> GetFindModeValueImpl2(Variable variable)
     if(str.empty())
         return std::nullopt;
     for(auto& c : str)
-        c = toupper(static_cast<unsigned char>(c));
+        c = static_cast<char>(toupper(c));
     if(str == "NORMAL")
     {
         return FindMode::Values::Normal;

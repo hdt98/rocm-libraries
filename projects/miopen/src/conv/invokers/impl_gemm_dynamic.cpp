@@ -49,13 +49,13 @@ static float CallImplGemmDynamicForward1x1(const miopen::Handle& handle,
     MIOPEN_LOG_I(kernel.GetName());
 
     // clang-format off
-    int hi          = problem.GetInHeight();
-    int wi          = problem.GetInWidth();
-    int n           = problem.GetInBatchSize();
-    int k           = problem.GetOutChannels();
-    int c           = problem.GetInChannels();
-    int ho          = problem.GetOutHeight();
-    int wo          = problem.GetOutWidth();
+    int hi          = int(problem.GetInHeight());
+    int wi          = int(problem.GetInWidth());
+    int n           = int(problem.GetInBatchSize());
+    int k           = int(problem.GetOutChannels());
+    int c           = int(problem.GetInChannels());
+    int ho          = int(problem.GetOutHeight());
+    int wo          = int(problem.GetOutWidth());
     int stride_h    = problem.GetKernelStrideH();
     int stride_w    = problem.GetKernelStrideW();
     int dilation_h  = problem.GetDilationH();
@@ -173,10 +173,10 @@ InvokerFactory MakeImplGemmDynamicBackwardDataInvokerFactory(const ProblemDescri
     std::vector<int> y_dot_slice_gid;
     std::vector<int> x_dot_slice_gid;
     std::vector<bool> is_gemm_not_empty;
-    for(int gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
+    for(size_t gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
     {
-        dtile_iy_gid.emplace_back(gemm_id / x_tilda);
-        dtile_ix_gid.emplace_back(gemm_id % x_tilda);
+        dtile_iy_gid.emplace_back(gemm_id / size_t(x_tilda));
+        dtile_ix_gid.emplace_back(gemm_id % size_t(x_tilda));
         y_dot_slice_gid.emplace_back((dtile_iy_gid[gemm_id] + 1) * y_dot <= y ? y_dot : y % y_dot);
         x_dot_slice_gid.emplace_back((dtile_ix_gid[gemm_id] + 1) * x_dot <= x ? x_dot : x % x_dot);
         const int gemm_k_gid = k * y_dot_slice_gid[gemm_id] * x_dot_slice_gid[gemm_id];
@@ -198,7 +198,7 @@ InvokerFactory MakeImplGemmDynamicBackwardDataInvokerFactory(const ProblemDescri
                 if(handle.IsProfilingEnabled())
                     elapsed += handle.GetKernelTime();
             }
-            for(int gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
+            for(size_t gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
             {
                 if(is_gemm_not_empty[gemm_id])
                 {
@@ -309,44 +309,45 @@ MakeImplGemmDynamicBackwardDataInvokerFactory(const ProblemDescription& problem,
     std::vector<int> y_dot_slice_gid;
     std::vector<int> x_dot_slice_gid;
     std::vector<bool> is_gemm_not_empty;
-    for(int gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
+    for(size_t gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
     {
-        dtile_iy_gid.emplace_back(gemm_id / x_tilda);
-        dtile_ix_gid.emplace_back(gemm_id % x_tilda);
+        dtile_iy_gid.emplace_back(gemm_id / size_t(x_tilda));
+        dtile_ix_gid.emplace_back(gemm_id % size_t(x_tilda));
         y_dot_slice_gid.emplace_back((dtile_iy_gid[gemm_id] + 1) * y_dot <= y ? y_dot : y % y_dot);
         x_dot_slice_gid.emplace_back((dtile_ix_gid[gemm_id] + 1) * x_dot <= x ? x_dot : x % x_dot);
         const int gemm_k_gid = k * y_dot_slice_gid[gemm_id] * x_dot_slice_gid[gemm_id];
         is_gemm_not_empty.emplace_back(gemm_k_gid > 0);
     }
-    bool need_set_zero = true;
-    int nxb            = cfg.nxb;
-    int b              = h_tilda_slice * w_tilda_slice;
-    b = (cfg.nxe == 0) ? (b) : ((b + nxb - 1) / nxb) * nxb; // pad to nxb modulo when nxe != 0
+    bool need_set_zero{true};
+    int nxb = cfg.nxb;
+    int b   = h_tilda_slice * w_tilda_slice;
+    b       = (cfg.nxe == 0) ? (b) : ((b + nxb - 1) / nxb) * nxb; // pad to nxb modulo when nxe != 0
 
-    uint32_t nb_n0          = cfg.tensor_b_cluster_lengths[2] * cfg.tensor_b_thread_lengths[2];
-    uint32_t nb_n1b         = cfg.tensor_b_cluster_lengths[3] * cfg.tensor_b_thread_lengths[3];
-    uint32_t unmerge_sub_n  = cfg.gemm_n_per_block / cfg.nxb;
+    uint32_t nb_n0  = uint32_t(cfg.tensor_b_cluster_lengths[2] * cfg.tensor_b_thread_lengths[2]);
+    uint32_t nb_n1b = uint32_t(cfg.tensor_b_cluster_lengths[3] * cfg.tensor_b_thread_lengths[3]);
+
+    uint32_t unmerge_sub_n  = uint32_t(cfg.gemm_n_per_block / cfg.nxb);
     uint32_t unmerge_sub_n1 = unmerge_sub_n / nb_n0;
 
-    magic_div_u32_t mdiv_2 =
-        magic_div_u32_gen(((c / group) * n * b) / (cfg.gemm_m_per_block * cfg.gemm_n_per_block));
-    magic_div_u32_t mdiv_3 = magic_div_u32_gen((n * b) / cfg.gemm_n_per_block);
-    magic_div_u32_t mdiv_4 = magic_div_u32_gen(b * unmerge_sub_n1 / nb_n1b);
-    magic_div_u32_t mdiv_5 = magic_div_u32_gen(b);
-    magic_div_u32_t mdiv_6 = magic_div_u32_gen(w_tilda_slice);
+    magic_div_u32_t mdiv_2 = magic_div_u32_gen(
+        uint32_t(((c / group) * n * b) / (cfg.gemm_m_per_block * cfg.gemm_n_per_block)));
+    magic_div_u32_t mdiv_3 = magic_div_u32_gen(uint32_t((n * b) / cfg.gemm_n_per_block));
+    magic_div_u32_t mdiv_4 = magic_div_u32_gen(uint32_t(b) * unmerge_sub_n1 / nb_n1b);
+    magic_div_u32_t mdiv_5 = magic_div_u32_gen(uint32_t(b));
+    magic_div_u32_t mdiv_6 = magic_div_u32_gen(uint32_t(w_tilda_slice));
 
     std::vector<magic_div_u32_t> mdiv_0_vec;
     std::vector<magic_div_u32_t> mdiv_1_vec;
     std::vector<uint32_t> shift_pack_0_vec;
     uint32_t shift_pack_1;
 
-    for(int gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
+    for(size_t gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
     {
         if(is_gemm_not_empty[gemm_id])
         {
             mdiv_0_vec.push_back(
-                magic_div_u32_gen(y_dot_slice_gid[gemm_id] * x_dot_slice_gid[gemm_id]));
-            mdiv_1_vec.push_back(magic_div_u32_gen(x_dot_slice_gid[gemm_id]));
+                magic_div_u32_gen(uint32_t(y_dot_slice_gid[gemm_id] * x_dot_slice_gid[gemm_id])));
+            mdiv_1_vec.push_back(magic_div_u32_gen(uint32_t(x_dot_slice_gid[gemm_id])));
         }
         else
         {
@@ -374,7 +375,7 @@ MakeImplGemmDynamicBackwardDataInvokerFactory(const ProblemDescription& problem,
                 if(handle.IsProfilingEnabled())
                     elapsed += handle.GetKernelTime();
             }
-            for(int gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
+            for(size_t gemm_id = 0; gemm_id < num_of_gemms; gemm_id++)
             {
                 if(is_gemm_not_empty[gemm_id])
                 {
@@ -460,34 +461,36 @@ InvokerFactory MakeImplGemmDynamicForwardXdlopsNHWCInvokerFactory(
     int x_karg            = x;
 
     int splits_4G = solver::igemm_split_batch_size(
-        hi, wi, ho, wo, n, k, c, miopen::GetTypeSize(problem.GetInDataType()));
+        hi, wi, ho, wo, n, k, c, int(miopen::GetTypeSize(problem.GetInDataType())));
     splits_4G = splits_4G == 0 ? n : splits_4G;
 
-    uint32_t gemm_m = (n / splits_4G) * ho * wo;
-    uint32_t gemm_n = k / group;
+    auto gemm_m = (n / splits_4G) * ho * wo;
+    auto gemm_n = k / group;
     magic_div_u32_t mdiv_0, mdiv_1, mdiv_2, mdiv_3, mdiv_4, mdiv_5;
     uint32_t shift_pack_0, shift_pack_1;
     uint32_t pack0 = 0;
 
-    mdiv_0 = magic_div_u32_gen((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block);
-    mdiv_1 = magic_div_u32_gen(ho * wo);
-    mdiv_2 = magic_div_u32_gen(wo);
-    mdiv_3 = magic_div_u32_gen(((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block) *
-                               ((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block));
+    mdiv_0 = magic_div_u32_gen(
+        uint32_t((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block));
+    mdiv_1 = magic_div_u32_gen(uint32_t(ho * wo));
+    mdiv_2 = magic_div_u32_gen(uint32_t(wo));
+    mdiv_3 = magic_div_u32_gen(
+        uint32_t(((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block) *
+                 ((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block)));
 
     shift_pack_0 = magic_div_u32_pack_shift(mdiv_0.shift, mdiv_1.shift, mdiv_2.shift, mdiv_3.shift);
     if(config.merge_e != 0)
     {
-        mdiv_4       = magic_div_u32_gen(x * (c / group));
-        mdiv_5       = magic_div_u32_gen(c / group);
+        mdiv_4       = magic_div_u32_gen(uint32_t(x * (c / group)));
+        mdiv_5       = magic_div_u32_gen(uint32_t(c / group));
         shift_pack_1 = magic_div_u32_pack_shift(mdiv_4.shift, mdiv_5.shift, 0, 0);
 
-        uint32_t s_move_slice_k_y = (config.gemm_k_per_block / (x * (c / group))) % y;
-        uint32_t s_move_slice_k_x = (config.gemm_k_per_block / (c / group)) % x;
-        uint32_t s_move_slice_k_c = config.gemm_k_per_block % (c / group);
-        y_karg                    = static_cast<int>((s_move_slice_k_y << 24) | y);
-        x_karg                    = static_cast<int>((s_move_slice_k_x << 24) | x);
-        c_karg                    = static_cast<int>((s_move_slice_k_c << 24) | (c / group));
+        uint32_t s_move_slice_k_y = uint32_t((config.gemm_k_per_block / (x * (c / group))) % y);
+        uint32_t s_move_slice_k_x = uint32_t((config.gemm_k_per_block / (c / group)) % x);
+        uint32_t s_move_slice_k_c = uint32_t(config.gemm_k_per_block % (c / group));
+        y_karg                    = static_cast<int>((s_move_slice_k_y << 24) | uint32_t(y));
+        x_karg                    = static_cast<int>((s_move_slice_k_x << 24) | uint32_t(x));
+        c_karg = static_cast<int>((s_move_slice_k_c << 24) | uint32_t(c / group));
     }
     else
     {
@@ -565,14 +568,17 @@ InvokerFactory MakeImplGemmDynamicForwardXdlopsNHWCInvokerFactory(
 
     if(is_nchw)
     {
-        TransposeSolutionDefault2Nhwc trans_input(ctx, problem.GetInDataType(), n, c, hi, wi);
-        TransposeSolutionDefault2Nhwc trans_weight(ctx,
-                                                   problem.GetWeightsDataType(),
-                                                   k,
-                                                   c / group,
-                                                   y,
-                                                   x); // group * k_per_group as batch for weight
-        TransposeSolutionNhwc2Default trans_output(ctx, problem.GetOutDataType(), n, k, ho, wo);
+        TransposeSolutionDefault2Nhwc trans_input(
+            ctx, problem.GetInDataType(), uint32_t(n), uint32_t(c), uint32_t(hi), uint32_t(wi));
+        TransposeSolutionDefault2Nhwc trans_weight(
+            ctx,
+            problem.GetWeightsDataType(),
+            uint32_t(k),
+            uint32_t(c / group),
+            uint32_t(y),
+            uint32_t(x)); // group * k_per_group as batch for weight
+        TransposeSolutionNhwc2Default trans_output(
+            ctx, problem.GetOutDataType(), uint32_t(n), uint32_t(k), uint32_t(ho), uint32_t(wo));
 
         trans_input_skippable  = trans_input.IsSkippable();
         trans_weight_skippable = trans_weight.IsSkippable();
@@ -598,7 +604,8 @@ InvokerFactory MakeImplGemmDynamicForwardXdlopsNHWCInvokerFactory(
             trans_output_idx = idx++;
     }
 
-    const size_t cast_size = need_cast ? miopen::GetTypeSize(miopenFloat) * n * k * ho * wo : 0;
+    const auto cast_size =
+        need_cast ? miopen::GetTypeSize(miopenFloat) * size_t(n * k * ho * wo) : 0;
 
     MultiBufferWorkspaceTraits wt(
         {trans_input_size, trans_weight_size, trans_output_size, cast_size});
@@ -609,7 +616,7 @@ InvokerFactory MakeImplGemmDynamicForwardXdlopsNHWCInvokerFactory(
 
     const size_t cast_offset = wt.GetOffset(3);
 
-    const int kID_trans_start = isGfx90aFp16altSupport ? 2 : 1;
+    const size_t kID_trans_start = isGfx90aFp16altSupport ? 2 : 1;
 
     const TensorDescriptor cast_desc(
         miopenFloat, problem.GetOut().GetLengths(), problem.GetOut().GetStrides());
@@ -661,19 +668,19 @@ InvokerFactory MakeImplGemmDynamicForwardXdlopsNHWCInvokerFactory(
             {
                 if(!trans_input_skippable)
                 {
-                    auto& karg_input = opArgsTrans[trans_input_idx];
+                    auto& karg_input = opArgsTrans[size_t(trans_input_idx)];
                     karg_input[0]    = OpKernelArg(trans_input_buf.get());
                     karg_input[1]    = OpKernelArg(tensors.in);
-                    handle.Run(kernels[kID_trans_start + trans_input_idx])(karg_input);
+                    handle.Run(kernels[kID_trans_start + size_t(trans_input_idx)])(karg_input);
                     if(handle.IsProfilingEnabled())
                         elapsed += handle.GetKernelTime();
                 }
                 if(!trans_weight_skippable)
                 {
-                    auto& karg_weight = opArgsTrans[trans_weight_idx];
+                    auto& karg_weight = opArgsTrans[size_t(trans_weight_idx)];
                     karg_weight[0]    = OpKernelArg(trans_weight_buf.get());
                     karg_weight[1]    = OpKernelArg(tensors.w);
-                    handle.Run(kernels[kID_trans_start + trans_weight_idx])(karg_weight);
+                    handle.Run(kernels[kID_trans_start + size_t(trans_weight_idx)])(karg_weight);
                     if(handle.IsProfilingEnabled())
                         elapsed += handle.GetKernelTime();
                 }
@@ -710,10 +717,10 @@ InvokerFactory MakeImplGemmDynamicForwardXdlopsNHWCInvokerFactory(
 
             if(is_nchw && !trans_output_skippable)
             {
-                auto& karg_output = opArgsTrans[trans_output_idx];
+                auto& karg_output = opArgsTrans[size_t(trans_output_idx)];
                 karg_output[0]    = OpKernelArg(tensors.out);
                 karg_output[1]    = OpKernelArg(trans_output_buf.get());
-                handle.Run(kernels[kID_trans_start + trans_output_idx])(karg_output);
+                handle.Run(kernels[kID_trans_start + size_t(trans_output_idx)])(karg_output);
                 if(handle.IsProfilingEnabled())
                     elapsed += handle.GetKernelTime();
             }
@@ -769,25 +776,25 @@ InvokerFactory MakeImplGemmDynamicBackwardDataXdlopsNHWCInvokerFactory(
     int num_of_gemms = x_tilda * y_tilda;
 
     int splits_4G = solver::igemm_split_batch_size(
-        hi, wi, ho, wo, n, k, c, miopen::GetTypeSize(problem.GetInDataType()));
+        hi, wi, ho, wo, n, k, c, int(miopen::GetTypeSize(problem.GetInDataType())));
     int n_in_1_block = splits_4G == 0 ? 1 : (n / splits_4G);
 
-    uint32_t gemm_m = n_in_1_block * h_tilda_slice * w_tilda_slice;
-    uint32_t gemm_n = c / group;
+    auto gemm_m = n_in_1_block * h_tilda_slice * w_tilda_slice;
+    auto gemm_n = c / group;
 
-    magic_div_u32_t mdiv_x_tilda  = magic_div_u32_gen(x_tilda);
-    magic_div_u32_t mdiv_y_tilda  = magic_div_u32_gen(y_tilda);
+    magic_div_u32_t mdiv_x_tilda  = magic_div_u32_gen(uint32_t(x_tilda));
+    magic_div_u32_t mdiv_y_tilda  = magic_div_u32_gen(uint32_t(y_tilda));
     magic_div_u32_t mdiv_group_mn = magic_div_u32_gen(
-        group * ((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block) *
-        ((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block));
+        uint32_t(group * ((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block) *
+                 ((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block)));
 
-    magic_div_u32_t mdiv_0 =
-        magic_div_u32_gen((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block);
-    magic_div_u32_t mdiv_1 =
-        magic_div_u32_gen(((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block) *
-                          ((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block));
-    magic_div_u32_t mdiv_2 = magic_div_u32_gen(config.nxe != 0 ? w_tilda_slice : wi);
-    magic_div_u32_t mdiv_3 = magic_div_u32_gen(h_tilda_slice * w_tilda_slice);
+    magic_div_u32_t mdiv_0 = magic_div_u32_gen(
+        uint32_t((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block));
+    magic_div_u32_t mdiv_1 = magic_div_u32_gen(
+        uint32_t(((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block) *
+                 ((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block)));
+    magic_div_u32_t mdiv_2 = magic_div_u32_gen(uint32_t(config.nxe != 0 ? w_tilda_slice : wi));
+    magic_div_u32_t mdiv_3 = magic_div_u32_gen(uint32_t(h_tilda_slice * w_tilda_slice));
     uint32_t shift_pack_0 =
         magic_div_u32_pack_shift(mdiv_0.shift, mdiv_1.shift, mdiv_2.shift, mdiv_3.shift);
 
@@ -880,14 +887,17 @@ InvokerFactory MakeImplGemmDynamicBackwardDataXdlopsNHWCInvokerFactory(
 
     if(is_nchw)
     {
-        TransposeSolutionNhwc2Default trans_input(ctx, problem.GetOutDataType(), n, c, hi, wi);
-        TransposeSolutionDefault2Nhwc trans_weight(ctx,
-                                                   problem.GetWeightsDataType(),
-                                                   k,
-                                                   c / group,
-                                                   y,
-                                                   x); // group * k_per_group as batch for weight
-        TransposeSolutionDefault2Nhwc trans_output(ctx, problem.GetInDataType(), n, k, ho, wo);
+        TransposeSolutionNhwc2Default trans_input(
+            ctx, problem.GetOutDataType(), uint32_t(n), uint32_t(c), uint32_t(hi), uint32_t(wi));
+        TransposeSolutionDefault2Nhwc trans_weight(
+            ctx,
+            problem.GetWeightsDataType(),
+            uint32_t(k),
+            uint32_t(c / group),
+            uint32_t(y),
+            uint32_t(x)); // group * k_per_group as batch for weight
+        TransposeSolutionDefault2Nhwc trans_output(
+            ctx, problem.GetInDataType(), uint32_t(n), uint32_t(k), uint32_t(ho), uint32_t(wo));
 
         trans_input_skippable  = trans_input.IsSkippable();
         trans_weight_skippable = trans_weight.IsSkippable();
@@ -913,7 +923,8 @@ InvokerFactory MakeImplGemmDynamicBackwardDataXdlopsNHWCInvokerFactory(
             trans_output_idx = idx++;
     }
 
-    const size_t cast_size = need_cast ? miopen::GetTypeSize(miopenFloat) * n * c * hi * wi : 0;
+    const auto cast_size =
+        need_cast ? miopen::GetTypeSize(miopenFloat) * size_t(n * c * hi * wi) : 0;
 
     MultiBufferWorkspaceTraits wt(
         {trans_input_size, trans_weight_size, trans_output_size, cast_size});
@@ -924,7 +935,7 @@ InvokerFactory MakeImplGemmDynamicBackwardDataXdlopsNHWCInvokerFactory(
 
     const size_t cast_offset = wt.GetOffset(3);
 
-    const int kID_trans_start = isGfx90aFp16altSupport ? 2 : 1;
+    const size_t kID_trans_start = isGfx90aFp16altSupport ? 2 : 1;
 
     const TensorDescriptor cast_desc(
         miopenFloat, problem.GetOut().GetLengths(), problem.GetOut().GetStrides());
@@ -976,19 +987,19 @@ InvokerFactory MakeImplGemmDynamicBackwardDataXdlopsNHWCInvokerFactory(
             {
                 if(!trans_output_skippable)
                 {
-                    auto& karg_output = opArgsTrans[trans_output_idx];
+                    auto& karg_output = opArgsTrans[size_t(trans_output_idx)];
                     karg_output[0]    = OpKernelArg(trans_output_buf.get());
                     karg_output[1]    = OpKernelArg(tensors.in);
-                    handle.Run(kernels[kID_trans_start + trans_output_idx])(karg_output);
+                    handle.Run(kernels[kID_trans_start + size_t(trans_output_idx)])(karg_output);
                     if(handle.IsProfilingEnabled())
                         elapsed += handle.GetKernelTime();
                 }
                 if(!trans_weight_skippable)
                 {
-                    auto& karg_weight = opArgsTrans[trans_weight_idx];
+                    auto& karg_weight = opArgsTrans[size_t(trans_weight_idx)];
                     karg_weight[0]    = OpKernelArg(trans_weight_buf.get());
                     karg_weight[1]    = OpKernelArg(tensors.w);
-                    handle.Run(kernels[kID_trans_start + trans_weight_idx])(karg_weight);
+                    handle.Run(kernels[kID_trans_start + size_t(trans_weight_idx)])(karg_weight);
                     if(handle.IsProfilingEnabled())
                         elapsed += handle.GetKernelTime();
                 }
@@ -1024,10 +1035,10 @@ InvokerFactory MakeImplGemmDynamicBackwardDataXdlopsNHWCInvokerFactory(
             }
             if((is_nchw && !trans_input_skippable))
             {
-                auto& karg_input = opArgsTrans[trans_input_idx];
+                auto& karg_input = opArgsTrans[size_t(trans_input_idx)];
                 karg_input[0]    = OpKernelArg(tensors.out);
                 karg_input[1]    = OpKernelArg(trans_input_buf.get());
-                handle.Run(kernels[kID_trans_start + trans_input_idx])(karg_input);
+                handle.Run(kernels[kID_trans_start + size_t(trans_input_idx)])(karg_input);
                 if(handle.IsProfilingEnabled())
                     elapsed += handle.GetKernelTime();
             }
@@ -1045,23 +1056,24 @@ InvokerFactory MakeImplGemmDynamicForwardDlopsNCHWCInvokerFactory(
     const ProblemDescription& problem,
     const solver::conv::PerformanceConfigAsmImplicitGemmGTCFwdDlopsNCHWC& config)
 {
-    int hi         = problem.GetInHeight();
-    int wi         = problem.GetInWidth();
-    int n          = problem.GetInBatchSize();
-    int k          = problem.GetOutChannels() * config.vector_c;
-    int c          = problem.GetInChannels();
-    int ks         = 1;
-    int ho         = problem.GetOutHeight();
-    int wo         = problem.GetOutWidth();
-    int stride_h   = problem.GetKernelStrideH();
-    int stride_w   = problem.GetKernelStrideW();
-    int dilation_h = problem.GetDilationH();
-    int dilation_w = problem.GetDilationW();
-    int pad_h      = problem.GetPadH();
-    int pad_w      = problem.GetPadW();
-    int y          = problem.GetWeightsHeight();
-    int x          = problem.GetWeightsWidth();
-    int group      = problem.GetGroupCount();
+    int hi    = int(problem.GetInHeight());
+    int wi    = int(problem.GetInWidth());
+    int n     = int(problem.GetInBatchSize());
+    int k     = int(problem.GetOutChannels()) * config.vector_c;
+    int c     = int(problem.GetInChannels());
+    int ks    = 1;
+    int group = problem.GetGroupCount();
+
+    uint32_t ho         = uint32_t(problem.GetOutHeight());
+    uint32_t wo         = uint32_t(problem.GetOutWidth());
+    uint32_t stride_h   = uint32_t(problem.GetKernelStrideH());
+    uint32_t stride_w   = uint32_t(problem.GetKernelStrideW());
+    uint32_t dilation_h = uint32_t(problem.GetDilationH());
+    uint32_t dilation_w = uint32_t(problem.GetDilationW());
+    uint32_t pad_h      = uint32_t(problem.GetPadH());
+    uint32_t pad_w      = uint32_t(problem.GetPadW());
+    uint32_t y          = uint32_t(problem.GetWeightsHeight());
+    uint32_t x          = uint32_t(problem.GetWeightsWidth());
 
     // Currentlly we do not tile in H/W dimension, using tile H/W as Ho/Wo, Thus Number of Tile
     // equal to one
@@ -1081,42 +1093,45 @@ InvokerFactory MakeImplGemmDynamicForwardDlopsNCHWCInvokerFactory(
     else
         MIOPEN_THROW("tile_hw should not be zero");
 
-    int tile_hw  = (tile_h << 16) | tile_w;
-    int ntile_hw = (ntile_h << 16) | ntile_w;
+    uint32_t tile_hw  = (tile_h << 16) | tile_w;
+    uint32_t ntile_hw = (ntile_h << 16) | ntile_w;
     // Split K make no sense in vector format
-    int stride_hw   = (stride_h << 16) | stride_w;
-    int dilation_hw = (dilation_h << 16) | dilation_w;
-    int pad_hw      = (pad_h << 16) | pad_w;
-    int wei_hw      = (y << 16) | x;
+    uint32_t stride_hw   = (stride_h << 16) | stride_w;
+    uint32_t dilation_hw = (dilation_h << 16) | dilation_w;
+    uint32_t pad_hw      = (pad_h << 16) | pad_w;
+    uint32_t wei_hw      = (y << 16) | x;
     // Initialize here for better readibility
-    uint32_t s_move_slice_k_y = (config.gemm_k_per_block / config.vector_c / x) % y;
-    uint32_t s_move_slice_k_x = config.gemm_k_per_block / config.vector_c % x;
-    uint32_t s_move_slice_k_c = (config.gemm_k_per_block / config.vector_c / (x * y)) % (c / group);
-    int move_slice_k = (s_move_slice_k_y << 16) | (s_move_slice_k_x << 8) | s_move_slice_k_c;
+    uint32_t s_move_slice_k_y = (uint32_t(config.gemm_k_per_block / config.vector_c) / x) % y;
+    uint32_t s_move_slice_k_x = uint32_t(config.gemm_k_per_block / config.vector_c) % x;
+    uint32_t s_move_slice_k_c =
+        (uint32_t(config.gemm_k_per_block / config.vector_c) / (x * y)) % uint32_t(c / group);
+    uint32_t move_slice_k = (s_move_slice_k_y << 16) | (s_move_slice_k_x << 8) | s_move_slice_k_c;
 
     int splits_4G = solver::igemm_split_batch_size(
-        hi, wi, ho, wo, n, k, c, miopen::GetTypeSize(problem.GetInDataType()));
+        hi, wi, int(ho), int(wo), n, k, c, int(miopen::GetTypeSize(problem.GetInDataType())));
     splits_4G       = (splits_4G == 0 ? n : splits_4G);
     uint32_t gemm_n = 1;
     uint32_t gemm_m = 1;
     if(splits_4G != 0)
     {
-        gemm_n = (n / splits_4G) * tile_h * tile_w;
-        gemm_m = k / group;
+        gemm_n = uint32_t(n / splits_4G) * tile_h * tile_w;
+        gemm_m = uint32_t(k / group);
     }
     else
         MIOPEN_THROW("splits_4G should not be zero");
     magic_div_u32_t mdiv_0, mdiv_1, mdiv_2, mdiv_3, mdiv_4, mdiv_5, mdiv_6, mdiv_7;
     uint32_t shift_pack_0, shift_pack_1;
 
-    mdiv_0 = magic_div_u32_gen((gemm_n + config.gemm_n_per_block - 1) / config.gemm_n_per_block);
-    mdiv_1 = magic_div_u32_gen((gemm_m + config.gemm_m_per_block - 1) / config.gemm_m_per_block);
-    mdiv_2 = magic_div_u32_gen(tile_h);
-    mdiv_3 = magic_div_u32_gen(tile_w);
-    mdiv_4 = magic_div_u32_gen(y);
-    mdiv_5 = magic_div_u32_gen(x);
-    mdiv_6 = magic_div_u32_gen(ntile_h);
-    mdiv_7 = magic_div_u32_gen(ntile_w);
+    auto n_per_block = uint32_t(config.gemm_n_per_block);
+    auto m_per_block = uint32_t(config.gemm_m_per_block);
+    mdiv_0           = magic_div_u32_gen((gemm_n + n_per_block - 1) / n_per_block);
+    mdiv_1           = magic_div_u32_gen((gemm_m + m_per_block - 1) / m_per_block);
+    mdiv_2           = magic_div_u32_gen(tile_h);
+    mdiv_3           = magic_div_u32_gen(tile_w);
+    mdiv_4           = magic_div_u32_gen(y);
+    mdiv_5           = magic_div_u32_gen(x);
+    mdiv_6           = magic_div_u32_gen(ntile_h);
+    mdiv_7           = magic_div_u32_gen(ntile_w);
     shift_pack_0 = magic_div_u32_pack_shift(mdiv_0.shift, mdiv_1.shift, mdiv_2.shift, mdiv_3.shift);
     shift_pack_1 = magic_div_u32_pack_shift(mdiv_4.shift, mdiv_5.shift, mdiv_6.shift, mdiv_7.shift);
 

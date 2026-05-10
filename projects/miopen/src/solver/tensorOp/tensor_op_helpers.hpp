@@ -81,7 +81,7 @@ inline std::tuple<size_t, std::string> GetRDBLCKandREADTYPEHIP(size_t len, miope
 {
     if(type == miopenHalf)
     {
-        return (len % 2 == 0) ? std::make_tuple(2U, "half2") : std::make_tuple(1U, "half");
+        return (len % 2 == 0) ? std::make_tuple(2U, "half2") : std::make_tuple(1u, "half");
     }
     const std::string data_type = GetDataType(type);
     size_t RD_BLCK              = (len % 4 == 0) ? 4 : (len % 2 == 0) ? 2 : 1;

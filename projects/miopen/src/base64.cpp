@@ -55,8 +55,8 @@ std::string base64Encode(const uint8_t* data, std::size_t length)
         if(i == 3)
         {
             charArray4[0] = (charArray3[0] & 0xfc) >> 2;
-            charArray4[1] = ((charArray3[0] & 0x03) << 4) + ((charArray3[1] & 0xf0) >> 4);
-            charArray4[2] = ((charArray3[1] & 0x0f) << 2) + ((charArray3[2] & 0xc0) >> 6);
+            charArray4[1] = uint8_t((charArray3[0] & 0x03) << 4) + uint8_t((charArray3[1] & 0xf0) >> 4);
+            charArray4[2] = uint8_t((charArray3[1] & 0x0f) << 2) + uint8_t((charArray3[2] & 0xc0) >> 6);
             charArray4[3] = charArray3[2] & 0x3f;
 
             std::transform(std::begin(charArray4),
@@ -75,8 +75,8 @@ std::string base64Encode(const uint8_t* data, std::size_t length)
         }
 
         charArray4[0] = (charArray3[0] & 0xfc) >> 2;
-        charArray4[1] = ((charArray3[0] & 0x03) << 4) + ((charArray3[1] & 0xf0) >> 4);
-        charArray4[2] = ((charArray3[1] & 0x0f) << 2) + ((charArray3[2] & 0xc0) >> 6);
+        charArray4[1] = uint8_t((charArray3[0] & 0x03) << 4) + uint8_t((charArray3[1] & 0xf0) >> 4);
+        charArray4[2] = uint8_t((charArray3[1] & 0x0f) << 2) + uint8_t((charArray3[2] & 0xc0) >> 6);
         charArray4[3] = charArray3[2] & 0x3f;
 
         for(size_t j = 0; j < i + 1; j++)
@@ -123,9 +123,9 @@ std::vector<uint8_t> base64Decode(const std::string_view& encodedString)
         charArray4[i++] = static_cast<uint8_t>(std::distance(base64Chars.begin(), it));
         if(i == 4)
         {
-            charArray3[0] = (charArray4[0] << 2) + ((charArray4[1] & 0x30) >> 4);
-            charArray3[1] = ((charArray4[1] & 0xf) << 4) + ((charArray4[2] & 0x3c) >> 2);
-            charArray3[2] = ((charArray4[2] & 0x3) << 6) + charArray4[3];
+            charArray3[0] = uint8_t(charArray4[0] << 2) + uint8_t((charArray4[1] & 0x30) >> 4);
+            charArray3[1] = uint8_t((charArray4[1] & 0xf) << 4) + uint8_t((charArray4[2] & 0x3c) >> 2);
+            charArray3[2] = uint8_t((charArray4[2] & 0x3) << 6) + charArray4[3];
 
             decodedData.insert(decodedData.end(), charArray3, charArray3 + 3);
             i = 0;
@@ -139,9 +139,9 @@ std::vector<uint8_t> base64Decode(const std::string_view& encodedString)
             charArray4[j] = 0;
         }
 
-        charArray3[0] = (charArray4[0] << 2) + ((charArray4[1] & 0x30) >> 4);
-        charArray3[1] = ((charArray4[1] & 0xf) << 4) + ((charArray4[2] & 0x3c) >> 2);
-        charArray3[2] = ((charArray4[2] & 0x3) << 6) + charArray4[3];
+        charArray3[0] = uint8_t(charArray4[0] << 2) + uint8_t((charArray4[1] & 0x30) >> 4);
+        charArray3[1] = uint8_t((charArray4[1] & 0xf) << 4) + uint8_t((charArray4[2] & 0x3c) >> 2);
+        charArray3[2] = uint8_t((charArray4[2] & 0x3) << 6) + charArray4[3];
 
         for(size_t j = 0; j < i - 1; j++)
         {
