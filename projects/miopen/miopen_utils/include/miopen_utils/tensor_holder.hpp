@@ -27,12 +27,12 @@
 #define GUARD_TENSOR_HOLDER_HPP
 
 #include <miopen_utils/network_data.hpp>
-#include <miopen/ford.hpp>
+#include <common_utils/ford.hpp>
 #include <miopen/tensor.hpp>
-#include <miopen/functional.hpp>
-#include <miopen/type_name.hpp>
-#include <miopen/each_args.hpp>
-#include <miopen/bfloat16.hpp>
+#include <common_utils/functional.hpp>
+#include <common_utils/type_name.hpp>
+#include <common_utils/each_args.hpp>
+#include <common_utils/bfloat16.hpp>
 #include <common_utils/random.hpp>
 
 #include <miopen_utils/serialize.hpp>

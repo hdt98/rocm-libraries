@@ -36,8 +36,8 @@
 #include <utility>
 
 #include <miopen_utils/tensor_holder.hpp>
-#include <miopen/stringutils.hpp>
-#include <miopen/functional.hpp>
+#include <common_utils/stringutils.hpp>
+#include <common_utils/functional.hpp>
 
 template <std::size_t NSpatialDim, typename Tout, typename Tbias>
 void cpu_bias_forward_impl(tensor<Tout>& out, const tensor<Tbias>& bias)
