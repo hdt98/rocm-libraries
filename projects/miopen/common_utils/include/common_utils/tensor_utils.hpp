@@ -168,6 +168,8 @@ std::ostream& LogRange(std::ostream& os, const Container& c, const char* sep)
 
 // tensor_view_t utilities -- provide handle-based wrappers for building
 // tensor views without requiring miopen::TensorDescriptor internals.
+// tensor_view_t lives in src/kernels/ because it must be available for
+// runtime kernel compilation (HIPRTC), which cannot resolve common_utils/ paths.
 #include "../../src/kernels/tensor_view.hpp"
 
 namespace tensor_utils {
