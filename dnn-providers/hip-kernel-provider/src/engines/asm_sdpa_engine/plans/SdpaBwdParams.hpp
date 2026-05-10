@@ -87,6 +87,17 @@ struct SdpaBwdParams
 
     // Attention scale
     float attnScale;
+
+    // Per-stage tile sizes; populated by SdpaBwdPlanBuilder from the resolved
+    // CSV configs (ts_qo and ts columns) and consumed by SdpaBwdPlan grid math.
+    struct KernelTiles
+    {
+        unsigned int tsQO; // Q/O tile size (column 'ts_qo' in the AITER CSV)
+        unsigned int ts; // K/V or convert tile size (column 'ts' in the AITER CSV)
+    };
+    KernelTiles odoTiles{0, 0}; // from cfg_fmha_bwd_odo
+    KernelTiles dqdkdvTiles{0, 0}; // from cfg_fmha_bwd_dqdkdv
+    KernelTiles dqConvertTiles{0, 0}; // from cfg_fmha_bwd_dq_convert
 };
 
 } // namespace asm_sdpa_engine
