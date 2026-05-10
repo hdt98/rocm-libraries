@@ -35,7 +35,6 @@
 #include <memory>
 #include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>

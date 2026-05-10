@@ -32,7 +32,6 @@
 #include <limits>
 #include <memory>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <utility>
 
 #include <miopen_utils/tensor_holder.hpp>

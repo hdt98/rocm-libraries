@@ -29,7 +29,6 @@
 #include "tensor_driver.hpp"
 
 #include <common_utils/errors.hpp>
-#include <miopen/tensor.hpp>
 #include <common_utils/stringutils.hpp>
 
 #include <iomanip>

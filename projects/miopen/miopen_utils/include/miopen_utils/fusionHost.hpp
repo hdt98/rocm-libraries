@@ -34,7 +34,6 @@
 #include <miopen/convolution.hpp>
 #include <miopen/batch_norm.hpp>
 #include <miopen/activ.hpp>
-#include <miopen/tensor.hpp>
 #include <miopen/fusion_plan.hpp>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>

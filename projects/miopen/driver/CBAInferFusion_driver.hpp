@@ -44,7 +44,6 @@
 #include <common_utils/errors.hpp>
 #include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 
 #include <algorithm>
 #include <cassert>

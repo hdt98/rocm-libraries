@@ -38,7 +38,6 @@
 #include <memory>
 #include <common_utils/tensor_utils.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <miopen/tensor_view_utils.hpp>
 #include <numeric>
 #include <vector>

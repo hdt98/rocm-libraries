@@ -4,7 +4,6 @@
 #ifndef MLO_SOFTMAXHOST_H_
 #define MLO_SOFTMAXHOST_H_
 
-#include <miopen/tensor.hpp>
 #include <miopen/tensor_extra.hpp>
 #include <common_utils/tensor_utils.hpp>
 

@@ -38,7 +38,6 @@
 #include <cstdlib>
 #include <cfloat>
 #include <memory>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>

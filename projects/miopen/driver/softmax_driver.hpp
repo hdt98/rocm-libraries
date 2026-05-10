@@ -15,7 +15,6 @@
 #include <miopen_utils/verify.hpp>
 
 #include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 
 #include <cfloat>
 #include <cstdlib>
