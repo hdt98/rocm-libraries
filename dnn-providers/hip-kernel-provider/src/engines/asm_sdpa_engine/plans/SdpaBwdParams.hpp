@@ -94,6 +94,14 @@ struct SdpaBwdParams
     {
         unsigned int tsQO; // Q/O tile size (column 'ts_qo' in the AITER CSV)
         unsigned int ts; // K/V or convert tile size (column 'ts' in the AITER CSV)
+
+        // Ceil-divide an extent by `ts` to get the corresponding grid-x dimension.
+        // Returns 0 if `ts` is unset (KernelTiles default-initialised) so callers
+        // can fail loudly at launch time rather than divide-by-zero.
+        constexpr unsigned int gridDim(unsigned int extent) const noexcept
+        {
+            return ts == 0U ? 0U : (extent + ts - 1U) / ts;
+        }
     };
     KernelTiles odoTiles{0, 0}; // from cfg_fmha_bwd_odo
     KernelTiles dqdkdvTiles{0, 0}; // from cfg_fmha_bwd_dqdkdv
