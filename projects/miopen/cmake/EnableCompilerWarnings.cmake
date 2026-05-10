@@ -29,7 +29,6 @@ set(__cxx_compile_options
     -Wall
     -Wextra
     # Additional warnings not included in -Wall/-Wextra
-    -Wundef
     -Wunreachable-code
     -Wmissing-noreturn
     -Wshadow
@@ -38,6 +37,9 @@ set(__cxx_compile_options
     # TODO: Working to enable these warnings. Each requires code cleanup first.
     # -Wconversion            # ~1000+ implicit narrowing/sign conversions to fix
     # -Wdouble-promotion      # implicit float-to-double promotions
+    # -Wundef                 # blocked by rocrand: rocrand_common.h uses bare #if __HIP_DEVICE_COMPILE__
+    #                         # (not #ifdef). TheRock injects rocRAND/stage/include as a global -I path
+    #                         # at the build-system level, so we cannot mark it as -isystem from MIOpen.
     # Suppress specific warnings -- working to remove these by fixing the code
     -Wno-c++11-narrowing        # ~40 instances: narrowing in brace init (batchnorm, ck_impl, addkernels)
     -Wno-sign-compare           # ~1000+ instances: signed/unsigned comparisons throughout codebase
@@ -52,9 +54,6 @@ if(WIN32)
     list(APPEND __clang_cxx_compile_options
         -fms-extensions
         -fms-compatibility)
-    # External headers on Windows are not consistently marked as system
-    # includes, so -Wundef triggers on HIP/rocRAND headers
-    list(APPEND __cxx_compile_options -Wno-undef)
 endif()
 
 add_compile_options(
