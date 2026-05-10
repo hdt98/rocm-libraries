@@ -32,19 +32,19 @@ inline miopenDataType_t GetType(miopenTensorDescriptor_t desc)
     return dt;
 }
 
-inline std::vector<int> GetLengths(miopenTensorDescriptor_t desc)
+inline std::vector<size_t> GetLengths(miopenTensorDescriptor_t desc)
 {
     int ndim = GetNumDims(desc);
-    std::vector<int> lens(ndim);
-    miopenGetTensorDescriptor(desc, nullptr, lens.data(), nullptr);
+    std::vector<size_t> lens(ndim);
+    miopenGetTensorDescriptorV2(desc, nullptr, lens.data(), nullptr);
     return lens;
 }
 
-inline std::vector<int> GetStrides(miopenTensorDescriptor_t desc)
+inline std::vector<size_t> GetStrides(miopenTensorDescriptor_t desc)
 {
     int ndim = GetNumDims(desc);
-    std::vector<int> strides(ndim);
-    miopenGetTensorDescriptor(desc, nullptr, nullptr, strides.data());
+    std::vector<size_t> strides(ndim);
+    miopenGetTensorDescriptorV2(desc, nullptr, nullptr, strides.data());
     return strides;
 }
 

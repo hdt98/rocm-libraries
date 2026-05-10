@@ -1433,7 +1433,8 @@ int RNNDriver<Tgpu, Tref>::RunBackwardDataCPU()
                                         reservespace_host,
                                         workspace_host,
                                         bool(inflags.GetValueInt("use_dropout")),
-                                        DropoutDesc);
+                                        DropoutDesc,
+                                        GetHandle());
     }
     else if(mode == miopenLSTM)
     {
@@ -1461,7 +1462,8 @@ int RNNDriver<Tgpu, Tref>::RunBackwardDataCPU()
                                          reservespace_host,
                                          workspace_host,
                                          bool(inflags.GetValueInt("use_dropout")),
-                                         DropoutDesc);
+                                         DropoutDesc,
+                                         GetHandle());
     }
     else if(mode == miopenGRU)
     {
@@ -1486,7 +1488,8 @@ int RNNDriver<Tgpu, Tref>::RunBackwardDataCPU()
                                         reservespace_host,
                                         workspace_host,
                                         bool(inflags.GetValueInt("use_dropout")),
-                                        DropoutDesc);
+                                        DropoutDesc,
+                                        GetHandle());
     }
     else
     {

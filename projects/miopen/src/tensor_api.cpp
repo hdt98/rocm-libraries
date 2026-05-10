@@ -340,6 +340,32 @@ extern "C" miopenStatus_t miopenGetTensorDescriptor(miopenTensorDescriptor_t ten
     });
 }
 
+extern "C" miopenStatus_t miopenGetTensorDescriptorV2(miopenTensorDescriptor_t tensorDesc,
+                                                      miopenDataType_t* dataType,
+                                                      size_t* dimsA,
+                                                      size_t* stridesA)
+{
+    MIOPEN_LOG_FUNCTION(tensorDesc);
+    return miopen::try_([&] {
+        if(dataType != nullptr)
+        {
+            *dataType = miopen::deref(tensorDesc).GetType();
+        }
+        if(dimsA != nullptr)
+        {
+            std::copy(miopen::deref(tensorDesc).GetLengths().begin(),
+                      miopen::deref(tensorDesc).GetLengths().end(),
+                      dimsA);
+        }
+        if(stridesA != nullptr)
+        {
+            std::copy(miopen::deref(tensorDesc).GetStrides().begin(),
+                      miopen::deref(tensorDesc).GetStrides().end(),
+                      stridesA);
+        }
+    });
+}
+
 extern "C" miopenStatus_t miopenDestroyTensorDescriptor(miopenTensorDescriptor_t tensorDesc)
 {
     MIOPEN_LOG_FUNCTION(tensorDesc);

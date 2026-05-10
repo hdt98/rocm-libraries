@@ -600,6 +600,7 @@ void RunRNNBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
                                      std::vector<Tref>& wkspace_host,
                                      bool use_dropout,
                                      miopenDropoutDescriptor_t dropoutDesc,
+                                     miopenHandle_t handle,
                                      bool dhy_is_null = false)
 {
     /*

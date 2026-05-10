@@ -889,6 +889,7 @@ void RunGRUBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
                                      std::vector<Tref>& wkspace_host,
                                      bool use_dropout,
                                      miopenDropoutDescriptor_t dropoutDesc,
+                                     miopenHandle_t handle,
                                      bool hx_is_null  = false,
                                      bool dhy_is_null = false)
 {
