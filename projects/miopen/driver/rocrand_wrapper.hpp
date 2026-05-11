@@ -17,17 +17,23 @@
 #include <iostream>
 #include <typeinfo>
 
+// Forward-declared; the full definition (miopen/bfloat16.hpp) has unguarded
+// dependencies on <cstdint>/<functional> that we don't want to leak into every
+// driver TU that includes this header.
+class bfloat16;
+
 namespace gpumemrand {
 
 int gen_0_1(double* buf, size_t sz);
 int gen_0_1(float* buf, size_t sz);
 int gen_0_1(half_float::half* buf, size_t sz);
+int gen_0_1(bfloat16* buf, size_t sz);
 
 template <typename T>
 int gen_0_1(T* buf, size_t sz)
 {
-    std::cout << "Warning: gpumemrand functions are supported only for double, float and half. GPU "
-                 "buffer { "
+    std::cout << "Warning: gpumemrand functions are supported only for double, float, half and "
+                 "bfloat16. GPU buffer { "
               << static_cast<void*>(buf) << ", " << sz << ", " << miopen::demangle(typeid(T).name())
               << " } remains uninitialized." << std::endl;
     return 0;

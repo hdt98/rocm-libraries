@@ -26,6 +26,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <cstdio>
 #include <type_traits>
 
 #include <miopen/conv/solvers.hpp>
@@ -306,35 +307,39 @@ ConvHipImplicitGemm3DGroupBwdXdlops::Search(const ExecutionContext& ctx,
 bool ConvHipImplicitGemm3DGroupBwdXdlops::IsApplicable(const ExecutionContext& ctx,
                                                        const ProblemDescription& problem) const
 {
+    auto report = [](bool applicable, const char* reason) -> bool {
+        std::fprintf(
+            stderr, "[CK_APPL_BWD] applicable=%d reason=%s\n", int(applicable), reason);
+        return applicable;
+    };
     if(env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS))
-        return false;
-    if(!problem.AllTensorsDimsFitIntoInt())
-        return false;
+        return report(false, "env_disabled");
     if(problem.HasMixedDataTypes())
-        return false;
+        return report(false, "mixed_dtypes");
     if(problem.IsTensorsCasted())
-        return false;
+        return report(false, "tensors_casted");
     if(!problem.IsDirectionBackwardData())
-        return false;
+        return report(false, "not_bwd");
     if(!problem.Is3d())
-        return false;
+        return report(false, "not_3d");
     if(!(problem.IsLayoutNHWC() || problem.IsLayoutDefault()))
-        return false;
+        return report(false, "layout");
     // needed because layout transpose kernel does not support non-packed tensors
     if(problem.IsLayoutDefault() && problem.HasNonPackedTensors())
-        return false;
+        return report(false, "default_layout_nonpacked");
 
     const auto& loader = CkImplLibLoader::Get(ctx.GetStream().GetDeviceName());
     if(!loader.IsLoaded())
-        return false;
+        return report(false, "loader_not_loaded");
 
     auto data_type = problem.GetInDataType();
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
     if(try_tf32 && loader.IsApplicable(CKSolverType::GrpConv3dBwd, problem, data_type, true))
-        return true;
+        return report(true, "ck_loader_tf32");
 
-    return loader.IsApplicable(CKSolverType::GrpConv3dBwd, problem, data_type, false);
+    return report(loader.IsApplicable(CKSolverType::GrpConv3dBwd, problem, data_type, false),
+                  "ck_loader");
 }
 
 ConvSolution ConvHipImplicitGemm3DGroupBwdXdlops::GetSolution(

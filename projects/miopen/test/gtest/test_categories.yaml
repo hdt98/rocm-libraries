@@ -157,6 +157,8 @@ test_categories:
       - "Full/GPU_MIOpenDriverRegressionBigTensorTest_FP32"
       - "*GPU_TestMhaFind20_FP32*" #rocm-1016 fixed in develop. Re-enable once bumped
       - "*GPU_TestMhaFind20_FP16*" #rocm-1016 fixed in develop. Re-enable once bumped
+      # Large 3D shapes (rocm-23997): 50-shape cross product belongs to comprehensive/full only.
+      - "Full/GPU_UnitTestConvSolverImplicitGemm3DGroup*XdlopsLargeStride_*"
 
     test_files:
       # Quick tests
