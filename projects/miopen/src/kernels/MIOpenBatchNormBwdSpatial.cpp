@@ -497,7 +497,7 @@ struct MIOpenBatchNormBwdSpatialHIPImpl<1, FpType, FpPrecType, FpAccumType>
         constexpr unsigned int readUnrollHint =
             mio_bn_config::n > mio_bn_config::loop_unroll_max_n ? 4 : 2;
         static_unroll_count<unsigned int, 0, less4, grprd, readUnrollHint>{[&](unsigned int k) {
-            unsigned int l = k + (lid << 2 * (1 - mio_config::layout_nhwc));
+            unsigned int l = k + (lid * read_size);
             if(l < less4)
             {
                 unsigned int index     = getTensorIndex(l);
@@ -518,7 +518,7 @@ struct MIOpenBatchNormBwdSpatialHIPImpl<1, FpType, FpPrecType, FpAccumType>
 
         if constexpr(rem4 > 0)
         {
-            unsigned int index = getTensorIndex((lid << 2 * (1 - mio_config::layout_nhwc)) + less4);
+            unsigned int index = getTensorIndex((lid * read_size) + less4);
             if(index + read_size - 1 < mio_bn_config::nchw)
             {
                 fp_read_vec_type xread = *(reinterpret_cast<const fp_read_vec_type*>(x_in + index));
