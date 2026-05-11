@@ -3044,10 +3044,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
             self.codes.globalReadB = self.globalReadDo(kernel, 1, tensorParametersB, unrollLoopIdx=0, g2lBufIdx=vregSetIdxGR)
           else:
             self.codes.globalReadB = StructuredModule() # empty
-          if kernel["ProblemType"]["Sparse"] and kernel["DirectToVgprSparseMetadata"]:
-            self.codes.globalReadMetadata = self.globalReadDo(kernel, 1, tPM, unrollLoopIdx=0, g2lBufIdx=0)
-          else:
-            self.codes.globalReadMetadata = StructuredModule() # empty
 
         else:
           self.codes.localWriteA = Module()
