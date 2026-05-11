@@ -111,10 +111,6 @@ struct MhaBwdArgs
     unsigned int stride_dq_acc;
     int64_t nhead_stride_dq_acc;
     int64_t batch_stride_dq_acc;
-
-    // K/V tile size for the DQDKDV kernel (CSV column 'ts').  Used to compute
-    // the per-tile byte stride passed to the kernel as `Ts`.
-    unsigned int ts_dqdkdv;
 };
 // NOLINTEND(readability-identifier-naming)
 
@@ -151,7 +147,13 @@ asm_sdpa_engine::fmha_bwd_odo_args buildOdoArgs(const MhaBwdArgs& a)
 }
 
 // AITER reference: mha_bwd.cu::run_fmha_bwd_dqdkdv() (commit 9522048)
-asm_sdpa_engine::fmha_bwd_dqdkdv_args buildDqdkdvArgs(const MhaBwdArgs& a)
+//
+// `tsKv` is the K/V tile size for the resolved kernel (CSV column 'ts').  In
+// AITER it comes from the kernel-traits template parameter at the call site;
+// here it is plumbed in from the dispatch tuple via SdpaBwdParams::dqdkdvTiles.
+// Kept as an explicit parameter (not a field on MhaBwdArgs) to mirror AITER's
+// mha_bwd_args layout exactly.
+asm_sdpa_engine::fmha_bwd_dqdkdv_args buildDqdkdvArgs(const MhaBwdArgs& a, unsigned int tsKv)
 {
     asm_sdpa_engine::fmha_bwd_dqdkdv_args dqdkdv{};
 
@@ -181,8 +183,8 @@ asm_sdpa_engine::fmha_bwd_dqdkdv_args buildDqdkdvArgs(const MhaBwdArgs& a)
     dqdkdv.head_dim_v = a.hdim_v;
     dqdkdv.nhead_q = a.nhead_q;
 
-    // Tile size: ts_kv * stride_k * sizeof(BF16)
-    dqdkdv.Ts = a.ts_dqdkdv * a.stride_k * K_BF16_SIZE;
+    // Tile size: tsKv * stride_k * sizeof(BF16)
+    dqdkdv.Ts = tsKv * a.stride_k * K_BF16_SIZE;
 
     // Q strides (bytes)
     dqdkdv.Hs_q = a.nhead_stride_q * K_BF16_SIZE;
@@ -344,10 +346,6 @@ MhaBwdArgs buildMhaBwdArgs(const asm_sdpa_engine::SdpaBwdParams& p,
     a.batch_stride_dq_acc
         = static_cast<int64_t>(p.numHeadsQ) * p.seqLenQ * p.headDimQk; // H_q * S_q * D_qk
 
-    // K/V tile size for the DQDKDV kernel; resolved from the CSV by the builder
-    // and consumed both for the per-tile byte stride and grid-dim ceil-div.
-    a.ts_dqdkdv = p.dqdkdvTiles.ts;
-
     return a;
 }
 
@@ -368,7 +366,7 @@ bool fitsUint32AfterScale(int64_t elements, unsigned int elementBytes)
     return elements >= 0 && elements * static_cast<int64_t>(elementBytes) <= K_U32_MAX_AS_I64;
 }
 
-bool validateMhaBwdByteStrides(const MhaBwdArgs& a, bool checkA32DqAcc)
+bool validateMhaBwdByteStrides(const MhaBwdArgs& a, unsigned int tsKv, bool checkA32DqAcc)
 {
     auto check = [](const char* name, int64_t elements, unsigned int elementBytes) {
         if(fitsUint32AfterScale(elements, elementBytes))
@@ -424,10 +422,10 @@ bool validateMhaBwdByteStrides(const MhaBwdArgs& a, bool checkA32DqAcc)
         ok &= check("stride_dq_acc", a.stride_dq_acc, K_FP32_SIZE);
     }
 
-    // DQDKDV's `Ts` is a 3-way product (ts * stride_k * BF16) — validate the
+    // DQDKDV's `Ts` is a 3-way product (tsKv * stride_k * BF16) — validate the
     // full expression in 64-bit before truncation.
-    ok &= check("Ts (ts * stride_k)",
-                static_cast<int64_t>(a.ts_dqdkdv) * static_cast<int64_t>(a.stride_k),
+    ok &= check("Ts (tsKv * stride_k)",
+                static_cast<int64_t>(tsKv) * static_cast<int64_t>(a.stride_k),
                 K_BF16_SIZE);
 
     return ok;
@@ -552,7 +550,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
 
     // 5a. Reject oversized graphs whose byte strides would silently truncate
     // when packed into the kernarg uint32_t fields.
-    if(!validateMhaBwdByteStrides(mhaArgs, _params.useA32))
+    if(!validateMhaBwdByteStrides(mhaArgs, _params.dqdkdvTiles.ts, _params.useA32))
     {
         return;
     }
@@ -591,7 +589,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     }
 
     // 6b. Build args and launch kernel 2: DQDKDV
-    auto dqdkdvArgs = buildDqdkdvArgs(mhaArgs);
+    auto dqdkdvArgs = buildDqdkdvArgs(mhaArgs, _params.dqdkdvTiles.ts);
 
     unsigned int gdxDqdkdv = _params.dqdkdvTiles.gridDim(mhaArgs.seqlen_k);
 
