@@ -2,6 +2,7 @@
 # Copyright Advanced Micro Devices, Inc.
 # SPDX-License-Identifier: MIT
 
+import importlib.util
 import logging
 import os
 import platform
@@ -9,12 +10,44 @@ import shlex
 import subprocess
 from pathlib import Path
 
-
 logging.basicConfig(level=logging.INFO)
 
 
 def format_command(cmd) -> str:
     return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
+def load_shared_test_utils():
+    tools_dir = os.getenv("THEROCK_TEST_TOOLS_DIR")
+    if not tools_dir:
+        return None
+
+    utils_path = Path(tools_dir) / "test_utils.py"
+    if not utils_path.is_file():
+        return None
+
+    spec = importlib.util.spec_from_file_location("therock_test_utils", utils_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load shared test utilities from {utils_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    logging.info(f"++ Loaded shared test utilities from {utils_path}")
+    return module
+
+
+def gtest_shard_env():
+    shard_index = os.getenv("SHARD_INDEX", "1")
+    total_shards = os.getenv("TOTAL_SHARDS", "1")
+    test_utils = load_shared_test_utils()
+    if test_utils is not None:
+        return test_utils.gtest_shard_env(shard_index, total_shards)
+
+    # GitHub Actions shard arrays are 1-indexed; GTest shard indexes are 0-indexed.
+    return {
+        "GTEST_SHARD_INDEX": str(int(shard_index) - 1),
+        "GTEST_TOTAL_SHARDS": total_shards,
+    }
 
 
 TEST_EXE = "rocfft-test"
@@ -43,9 +76,7 @@ def main() -> None:
     script_dir = Path(__file__).resolve().parent
     rocm_path_env = os.getenv("ROCM_PATH")
     rocm_path = (
-        Path(rocm_path_env).resolve()
-        if rocm_path_env
-        else derive_rocm_path(script_dir)
+        Path(rocm_path_env).resolve() if rocm_path_env else derive_rocm_path(script_dir)
     )
     rocm_bin_dir = Path(os.environ.get("ROCM_BIN_DIR", rocm_path / "bin")).resolve()
     test_exe = rocm_bin_dir / exe_name(TEST_EXE)
@@ -53,9 +84,7 @@ def main() -> None:
         raise FileNotFoundError(f"rocFFT test executable not found at {test_exe}")
 
     env = os.environ.copy()
-    # GitHub Actions shard arrays are 1-indexed; GTest shard indexes are 0-indexed.
-    env["GTEST_SHARD_INDEX"] = str(int(os.getenv("SHARD_INDEX", "1")) - 1)
-    env["GTEST_TOTAL_SHARDS"] = os.getenv("TOTAL_SHARDS", "1")
+    env.update(gtest_shard_env())
 
     if os.getenv("TEST_TYPE", "full") == "quick":
         test_filter = ["--smoketest"]
