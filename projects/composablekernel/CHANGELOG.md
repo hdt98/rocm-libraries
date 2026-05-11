@@ -2,7 +2,7 @@
 
 Documentation for Composable Kernel available at [https://rocm.docs.amd.com/projects/composable_kernel/en/latest/](https://rocm.docs.amd.com/projects/composable_kernel/en/latest/).
 
-## (Unreleased) Composable Kernel 1.3.0
+## (Unreleased) Composable Kernel 1.3.0 for ROCm 7.13.0
 
 ### Added
 * Added overload of load_tile_transpose that takes reference to output tensor as output parameter
