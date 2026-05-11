@@ -74,21 +74,6 @@ jobs:
           # and FFT installed-runner test_script values.
           ref: users/jayhawk-commits/rfc0010-shared-test-utils-fft-validation
 
-      - name: Export shared test utilities path
-        run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
-
-          tools_dir = Path(os.environ["GITHUB_WORKSPACE"]) / "test_tools"
-          utils_path = tools_dir / "test_utils.py"
-          if not utils_path.is_file():
-              raise SystemExit(f"Shared test utilities not found: {utils_path}")
-
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
-              env_file.write(f"THEROCK_TEST_TOOLS_DIR={tools_dir}\n")
-          PY
-
       - name: Configure git for long paths on Windows
         if: ${{ runner.os == 'Windows' }}
         run: git config --global core.longpaths true
@@ -108,6 +93,21 @@ jobs:
           VENV_DIR: ${{ env.VENV_DIR }}
           FETCH_ARTIFACT_ARGS: ${{ fromJSON(inputs.component).fetch_artifact_args }}
           IS_PR_FROM_FORK: ${{ github.event.pull_request.head.repo.fork }}
+
+      - name: Export shared test utilities path
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          tools_dir = Path(os.environ["GITHUB_WORKSPACE"]) / "test_tools"
+          utils_path = tools_dir / "test_utils.py"
+          if not utils_path.is_file():
+              raise SystemExit(f"Shared test utilities not found: {utils_path}")
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"THEROCK_TEST_TOOLS_DIR={tools_dir}\n")
+          PY
 
       - name: Driver / GPU sanity check
         timeout-minutes: 3
