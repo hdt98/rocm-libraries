@@ -2647,10 +2647,8 @@ void testing_matmul_with_bias(const Arguments& arg,
         {
             // MX A is always populated through `mxDataGenerator` -- regardless
             // of whether the build links rocroller. The only architecture
-            // dependency is the scale layout on its way out (gfx950 AITER vs
-            // gfx1250 dimk), and that's now selected by the
-            // `preSwizzleSizeForScale(arg.scaleA)` / `gfx1250Swizzle`
-            // arguments threaded through `generateMXInput`.
+            // dependency is the scale layout on its way out, which is selected
+            // by the `MXScaleLayout` argument threaded through `generateMXInput`.
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2665,11 +2663,14 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            // preTile for A: {tileK, tileM} - swap from preTileSizeForScaleA which returns {tileM, tileK}
-            auto preTileATmp = preTileSizeForScaleA(arg.scaleA);
-            auto preTileA    = (preTileATmp.size() == 2)
-                                   ? std::vector<size_t>{preTileATmp[1], preTileATmp[0]}
-                                   : std::vector<size_t>{};
+            // Pick the scale memory layout the kernel will read from. The
+            // scale-format selection (e.g. AITER UE8M0_32_8_EXT) is the
+            // strongest signal -- it directly encodes the gfx950 layout. If
+            // the format doesn't pin a layout and we're running on gfx1250,
+            // fall through to the gfx1250 dimk swizzle.
+            MXScaleLayout scaleLayoutA = mxScaleLayoutForFormat(arg.scaleA);
+            if(scaleLayoutA == MXScaleLayout::kNone && isGfx1250Arch)
+                scaleLayoutA = MXScaleLayout::kGFX1250;
             size_t dataBatchBytesA  = (num_batches[i] > 1) ? elementsToBytes(stride_a[i], TiA) : 0;
             size_t scaleBatchBytesA = (num_batches[i] > 1) ? size_scaleAVec[i] : 0;
             std::vector<float> refAAll;
@@ -2703,16 +2704,14 @@ void testing_matmul_with_bias(const Arguments& arg,
                                       A_col[i],
                                       lda[i],
                                       transA == HIPBLAS_OP_T,
-                                      preSwizzleSizeForScale(arg.scaleA),
-                                      preTileA,
                                       blockSize(arg.scaleA),
                                       1,
                                       /*isMatrixA=*/true,
                                       initDevA,
+                                      scaleLayoutA,
                                       hipblaslt_initialization2string(arg.initialization),
                                       /*min_val=*/-1.0f,
-                                      /*max_val=*/1.0f,
-                                      /*gfx1250Swizzle=*/isGfx1250Arch);
+                                      /*max_val=*/1.0f);
                 refAAll.insert(refAAll.end(), batchRef.begin(), batchRef.end());
             }
             refA.emplace_back(std::move(refAAll));
@@ -2777,8 +2776,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            // preTile for B: {tileK, tileN}
-            auto               preTileB           = preTileSizeForScaleB(arg.scaleB);
+            MXScaleLayout scaleLayoutB = mxScaleLayoutForFormat(arg.scaleB);
+            if(scaleLayoutB == MXScaleLayout::kNone && isGfx1250Arch)
+                scaleLayoutB = MXScaleLayout::kGFX1250;
             size_t             dataBatchBytesB    = (num_batches[i] > 1)
                                                         ? elementsToBytes(stride_b[i], TiB)
                                                         : 0;
@@ -2808,16 +2808,14 @@ void testing_matmul_with_bias(const Arguments& arg,
                                       B_col[i],
                                       ldb[i],
                                       transB == HIPBLAS_OP_T,
-                                      preSwizzleSizeForScale(arg.scaleB),
-                                      preTileB,
                                       1,
                                       blockSize(arg.scaleB),
                                       /*isMatrixA=*/false,
                                       initDevB,
+                                      scaleLayoutB,
                                       hipblaslt_initialization2string(arg.initialization),
                                       /*min_val=*/-1.0f,
-                                      /*max_val=*/1.0f,
-                                      /*gfx1250Swizzle=*/isGfx1250Arch);
+                                      /*max_val=*/1.0f);
                 refBAll.insert(refBAll.end(), batchRef.begin(), batchRef.end());
             }
             refB.emplace_back(std::move(refBAll));

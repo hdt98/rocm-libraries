@@ -130,42 +130,26 @@ inline int blockSize(hipblaslt_scaling_format s)
     }
 }
 
-inline std::vector<size_t> preSwizzleSizeForScale(hipblaslt_scaling_format s)
-{
-    // Returns preSwizzleSize for scale as {swizzleTileMN, 256 / swizzleTileMN, matrixInstruction.k / scaleBlockSize}
-    switch(s)
-    {
-    // preSwizzleSize: {swizzleTileMN, 256 / swizzleTileMN, matrixInstruction.k / scaleBlockSize}
-    case hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT:
-        return {32, 8, 4};
-    default:
-        return {};
-    }
-}
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
+#include "mxDataGen.hpp"
 
-inline std::vector<size_t> preTileSizeForScaleA(hipblaslt_scaling_format s)
+// Map a hipblaslt scale format to the architecture-flavoured scale memory
+// layout `generateMXInput` should produce. The format itself only encodes
+// `kGFX950` (the AITER-packed UE8M0_32_8_EXT layout); for formats that
+// don't fix a layout, callers may upgrade `kNone` to `kGFX1250` based on
+// the live device's gcnArchName, since the kernel for a given problem only
+// supports one layout per architecture.
+inline MXScaleLayout mxScaleLayoutForFormat(hipblaslt_scaling_format s)
 {
-    // Returns preTile for scale A: {tileM, tileK}
     switch(s)
     {
     case hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT:
-        return {32, 8};
+        return MXScaleLayout::kGFX950;
     default:
-        return {};
+        return MXScaleLayout::kNone;
     }
 }
-
-inline std::vector<size_t> preTileSizeForScaleB(hipblaslt_scaling_format s)
-{
-    // Returns preTile for scale B: {tileK, tileN}
-    switch(s)
-    {
-    case hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT:
-        return {8, 32};
-    default:
-        return {};
-    }
-}
+#endif
 
 // Compute scale buffer size with padding for block-scaled MX formats.
 // dataRow, dataCol are the raw data matrix dimensions (A_row/A_col or B_row/B_col).

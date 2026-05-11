@@ -243,9 +243,7 @@ std::vector<float> generateData(T                           dgen,
                                 int                         elementsPerMXBlock,
                                 bool                        isTranspose,
                                 bool                        isMatrixA,
-                                std::vector<size_t> const&  preSwizzleTile,
-                                std::vector<size_t> const&  preTile,
-                                bool                        gfx1250Swizzle = false)
+                                MXScaleLayout               scaleLayout)
 {
     using namespace DGen;
 
@@ -257,23 +255,31 @@ std::vector<float> generateData(T                           dgen,
 
     std::vector<uint8_t> scaleBytes = dgen.getScaleBytes();
 
-    // Apply pre-swizzle to scale data. The two swizzles target different
-    // architectures and are mutually exclusive: gfx950 expects the AITER
-    // (preSwizzleScalesGFX950) layout, gfx1250 expects the dimk layout.
-    size_t scaleRows = sizes[0] / elementsPerMXBlock;
-    size_t scaleCols = sizes[1];
+    // Apply per-architecture scale swizzle on top of the natural-packed
+    // scales mxDataGenerator wrote. Layouts are mutually exclusive by
+    // construction (single enum), so no validation is needed here.
+    size_t const scaleRows
+        = (elementsPerMXBlock > 0) ? static_cast<size_t>(sizes[0]) / static_cast<size_t>(elementsPerMXBlock) : 0;
+    size_t const scaleCols = static_cast<size_t>(sizes[1]);
 
-    if(preSwizzleTile.size() == 3)
+    switch(scaleLayout)
     {
+    case MXScaleLayout::kGFX950:
         scaleBytes = DGen::preSwizzleScalesGFX950(scaleBytes, {scaleCols, scaleRows});
-    }
-    else if(gfx1250Swizzle && elementsPerMXBlock > 0)
-    {
-        scaleBytes = DGen::preSwizzleScalesGFX1250(scaleBytes,
-                                                   /*slowDim=*/scaleCols,
-                                                   /*fastDim=*/scaleRows,
-                                                   /*mxBlock=*/static_cast<size_t>(
-                                                       elementsPerMXBlock));
+        break;
+    case MXScaleLayout::kGFX1250:
+        if(elementsPerMXBlock > 0)
+        {
+            scaleBytes
+                = DGen::preSwizzleScalesGFX1250(scaleBytes,
+                                                /*slowDim=*/scaleCols,
+                                                /*fastDim=*/scaleRows,
+                                                /*mxBlock=*/static_cast<size_t>(
+                                                    elementsPerMXBlock));
+        }
+        break;
+    case MXScaleLayout::kNone:
+        break;
     }
 
     std::memcpy(scale, scaleBytes.data(), scaleBytes.size() * sizeof(uint8_t));
@@ -333,28 +339,23 @@ std::vector<float> generateData(T                           dgen,
  *
  * @return float values of generated MX type data
  */
-std::vector<float> generateMXInput(hipDataType                dataType,
-                                   hipDataType                scaleType,
-                                   void*                      data,
-                                   void*                      scale,
-                                   DGen::index_t              rowSize,
-                                   DGen::index_t              colSize,
-                                   DGen::index_t              stride,
-                                   bool                       isTranspose,
-                                   const std::vector<size_t>& preSwizzleTile,
-                                   const std::vector<size_t>& preTile,
-                                   int const                  scaleBlockRowSize,
-                                   int const                  scaleBlockColSize,
-                                   bool                       isMatrixA,
-                                   std::string_view const     initMethod,
-                                   float                      min_val,
-                                   float                      max_val,
-                                   bool                       gfx1250Swizzle)
+std::vector<float> generateMXInput(hipDataType            dataType,
+                                   hipDataType            scaleType,
+                                   void*                  data,
+                                   void*                  scale,
+                                   DGen::index_t          rowSize,
+                                   DGen::index_t          colSize,
+                                   DGen::index_t          stride,
+                                   bool                   isTranspose,
+                                   int const              scaleBlockRowSize,
+                                   int const              scaleBlockColSize,
+                                   bool                   isMatrixA,
+                                   MXScaleLayout          scaleLayout,
+                                   std::string_view const initMethod,
+                                   float                  min_val,
+                                   float                  max_val)
 {
     using namespace DGen;
-    if(preSwizzleTile.size() == 3 && gfx1250Swizzle)
-        throw std::runtime_error("generateMXInput(CPU): cannot combine the gfx950 AITER "
-                                 "scale swizzle with the gfx1250 dimk scale swizzle.");
 
     DataGeneratorOptions opt;
     opt.min          = initMethod == "uniform_01" ? 0. : (initMethod == "hpl" ? -.5 : min_val);
@@ -408,9 +409,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                   elementsPerMXBlock,
                                                                   isTranspose,
                                                                   isMatrixA,
-                                                                  preSwizzleTile,
-                                                                  preTile,
-                                                                  gfx1250Swizzle);
+                                                                  scaleLayout);
     }
     else if(dataType == HIP_R_8F_E4M3)
     {
@@ -425,9 +424,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                   elementsPerMXBlock,
                                                                   isTranspose,
                                                                   isMatrixA,
-                                                                  preSwizzleTile,
-                                                                  preTile,
-                                                                  gfx1250Swizzle);
+                                                                  scaleLayout);
     }
     else if(static_cast<hipDataType>(dataType) == HIP_R_6F_E2M3)
     {
@@ -442,9 +439,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                   elementsPerMXBlock,
                                                                   isTranspose,
                                                                   isMatrixA,
-                                                                  preSwizzleTile,
-                                                                  preTile,
-                                                                  gfx1250Swizzle);
+                                                                  scaleLayout);
     }
     else if(static_cast<hipDataType>(dataType) == HIP_R_6F_E3M2)
     {
@@ -459,9 +454,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                   elementsPerMXBlock,
                                                                   isTranspose,
                                                                   isMatrixA,
-                                                                  preSwizzleTile,
-                                                                  preTile,
-                                                                  gfx1250Swizzle);
+                                                                  scaleLayout);
     }
     else if(static_cast<hipDataType>(dataType) == HIP_R_4F_E2M1)
     {
@@ -478,9 +471,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                           elementsPerMXBlock,
                                                                           isTranspose,
                                                                           isMatrixA,
-                                                                          preSwizzleTile,
-                                                                          preTile,
-                                                                          gfx1250Swizzle);
+                                                                          scaleLayout);
         }
         else if(scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
         {
@@ -495,9 +486,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                           elementsPerMXBlock,
                                                                           isTranspose,
                                                                           isMatrixA,
-                                                                          preSwizzleTile,
-                                                                          preTile,
-                                                                          gfx1250Swizzle);
+                                                                          scaleLayout);
         }
         else
         {
@@ -512,9 +501,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                                                       elementsPerMXBlock,
                                                                       isTranspose,
                                                                       isMatrixA,
-                                                                      preSwizzleTile,
-                                                                      preTile,
-                                                                      gfx1250Swizzle);
+                                                                      scaleLayout);
         }
     }
     else
@@ -578,8 +565,7 @@ namespace
                          DGen::DataGeneratorOptions&       opt,
                          uint32_t                          seed,
                          int                               elementsPerMXBlock,
-                         std::vector<size_t> const&        preSwizzleTile,
-                         bool                              gfx1250Swizzle)
+                         MXScaleLayout                     scaleLayout)
     {
         DGen::DataGeneratorGPU<DT> dgen;
         dgen.setSeed(seed);
@@ -626,56 +612,59 @@ namespace
                         / static_cast<size_t>(elementsPerMXBlock)
                   : 0;
         size_t const scaleCols = static_cast<size_t>(sizes[1]);
-        if(preSwizzleTile.size() == 3 && naturalScaleBytes > 0)
+        if(naturalScaleBytes > 0)
         {
-            auto scaleSwizzled
-                = DGen::preSwizzleScalesGFX950(scaleHostNatural, {scaleCols, scaleRows});
-            (void)hipMemcpy(scale,
-                            scaleSwizzled.data(),
-                            scaleSwizzled.size(),
-                            hipMemcpyHostToDevice);
-        }
-        else if(gfx1250Swizzle && naturalScaleBytes > 0 && elementsPerMXBlock > 0)
-        {
-            auto scaleSwizzled
-                = DGen::preSwizzleScalesGFX1250(scaleHostNatural,
-                                                /*slowDim=*/scaleCols,
-                                                /*fastDim=*/scaleRows,
-                                                /*mxBlock=*/static_cast<size_t>(
-                                                    elementsPerMXBlock));
-            (void)hipMemcpy(scale,
-                            scaleSwizzled.data(),
-                            scaleSwizzled.size(),
-                            hipMemcpyHostToDevice);
+            std::vector<uint8_t> scaleSwizzled;
+            switch(scaleLayout)
+            {
+            case MXScaleLayout::kGFX950:
+                scaleSwizzled
+                    = DGen::preSwizzleScalesGFX950(scaleHostNatural, {scaleCols, scaleRows});
+                break;
+            case MXScaleLayout::kGFX1250:
+                if(elementsPerMXBlock > 0)
+                {
+                    scaleSwizzled
+                        = DGen::preSwizzleScalesGFX1250(scaleHostNatural,
+                                                        /*slowDim=*/scaleCols,
+                                                        /*fastDim=*/scaleRows,
+                                                        /*mxBlock=*/static_cast<size_t>(
+                                                            elementsPerMXBlock));
+                }
+                break;
+            case MXScaleLayout::kNone:
+                break;
+            }
+            if(!scaleSwizzled.empty())
+            {
+                (void)hipMemcpy(scale,
+                                scaleSwizzled.data(),
+                                scaleSwizzled.size(),
+                                hipMemcpyHostToDevice);
+            }
         }
 
         return refFloat;
     }
 } // namespace
 
-std::vector<float> generateMXInput(hipDataType                dataType,
-                                   hipDataType                scaleType,
-                                   void*                      data,
-                                   void*                      scale,
-                                   uint64_t                   row,
-                                   uint64_t                   col,
-                                   uint64_t                   stride,
-                                   bool                       isTranspose,
-                                   const std::vector<size_t>& preSwizzleTile,
-                                   const std::vector<size_t>& preTile,
-                                   int const                  scaleBlockRowSize,
-                                   int const                  scaleBlockColSize,
-                                   bool                       isMatrixA,
-                                   MXInitDevice               initDevice,
-                                   std::string_view const     initMethod,
-                                   float                      min_val,
-                                   float                      max_val,
-                                   bool                       gfx1250Swizzle)
+std::vector<float> generateMXInput(hipDataType            dataType,
+                                   hipDataType            scaleType,
+                                   void*                  data,
+                                   void*                  scale,
+                                   uint64_t               row,
+                                   uint64_t               col,
+                                   uint64_t               stride,
+                                   bool                   isTranspose,
+                                   int const              scaleBlockRowSize,
+                                   int const              scaleBlockColSize,
+                                   bool                   isMatrixA,
+                                   MXInitDevice           initDevice,
+                                   MXScaleLayout          scaleLayout,
+                                   std::string_view const initMethod,
+                                   float                  min_val,
+                                   float                  max_val)
 {
-    if(preSwizzleTile.size() == 3 && gfx1250Swizzle)
-        throw std::runtime_error("generateMXInput(GPU): cannot combine the gfx950 AITER "
-                                 "scale swizzle with the gfx1250 dimk scale swizzle.");
-
     // CPU init: straight delegation to the host overload.
     if(initDevice == MXInitDevice::Cpu)
     {
@@ -687,15 +676,13 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                col,
                                stride,
                                isTranspose,
-                               preSwizzleTile,
-                               preTile,
                                scaleBlockRowSize,
                                scaleBlockColSize,
                                isMatrixA,
+                               scaleLayout,
                                initMethod,
                                min_val,
-                               max_val,
-                               gfx1250Swizzle);
+                               max_val);
     }
 
     // GPU init fast path is wired for the layout combinations where the
@@ -716,15 +703,13 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                col,
                                stride,
                                isTranspose,
-                               preSwizzleTile,
-                               preTile,
                                scaleBlockRowSize,
                                scaleBlockColSize,
                                isMatrixA,
+                               scaleLayout,
                                initMethod,
                                min_val,
-                               max_val,
-                               gfx1250Swizzle);
+                               max_val);
     }
 
     // Build the same DataGeneratorOptions the host overload would build,
@@ -768,33 +753,26 @@ std::vector<float> generateMXInput(hipDataType                dataType,
 
     if(dataType == HIP_R_8F_E5M2)
         return generateOnDevice<DGen::ocp_e5m2_mxfp8>(
-            data, scale, sizes, strides, opt, kSeed,
-            elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+            data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
     if(dataType == HIP_R_8F_E4M3)
         return generateOnDevice<DGen::ocp_e4m3_mxfp8>(
-            data, scale, sizes, strides, opt, kSeed,
-            elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+            data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
     if(static_cast<hipDataType>(dataType) == HIP_R_6F_E2M3)
         return generateOnDevice<DGen::ocp_e2m3_mxfp6>(
-            data, scale, sizes, strides, opt, kSeed,
-            elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+            data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
     if(static_cast<hipDataType>(dataType) == HIP_R_6F_E3M2)
         return generateOnDevice<DGen::ocp_e3m2_mxfp6>(
-            data, scale, sizes, strides, opt, kSeed,
-            elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+            data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
     if(static_cast<hipDataType>(dataType) == HIP_R_4F_E2M1)
     {
         if(scaleType == HIP_R_8F_E4M3)
             return generateOnDevice<DGen::ocp_e2m1_mxfp4_e4m3>(
-                data, scale, sizes, strides, opt, kSeed,
-                elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+                data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
         if(scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
             return generateOnDevice<DGen::ocp_e2m1_mxfp4_e5m3>(
-                data, scale, sizes, strides, opt, kSeed,
-                elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+                data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
         return generateOnDevice<DGen::ocp_e2m1_mxfp4>(
-            data, scale, sizes, strides, opt, kSeed,
-            elementsPerMXBlock, preSwizzleTile, gfx1250Swizzle);
+            data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
     }
     throw std::runtime_error("Unsupported data type in GPU MX data generation");
 }
