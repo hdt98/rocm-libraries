@@ -1957,9 +1957,12 @@ namespace TensileLite
             m_mxPreswizzledA = false;
             m_mxPreswizzledB = false;
 
-            // Compute preSwizzle parameters from the solution's matrix instruction to rearrange
-            // the scale tensor into the GPU kernel's expected memory layout
-            std::vector<size_t> preSwizzleA, preTileA, preSwizzleB, preTileB;
+            // Decide per-side whether the gfx950 AITER (preSwizzleScalesGFX950)
+            // scale layout applies to this problem. The geometry checks below
+            // are the same gating mxDataGenerator's gfx950 swizzle expects --
+            // problems that don't fit fall back to the natural scale layout.
+            bool useGFX950ScaleA = false;
+            bool useGFX950ScaleB = false;
 
             if(m_mxScaleFormat > 0 && m_currentSolution != nullptr)
             {
@@ -1974,30 +1977,20 @@ namespace TensileLite
                     {
                         // Scale tensor dimensions from setMXScaleA are already padded
                         // (K/mxBlock to multiple of 8, M to multiple of 32)
-                        auto const& mxsaSizes = problem.mxsa().sizes();
-                        size_t scaleRowsA = mxsaSizes[0];
-                        size_t scaleColsA = mxsaSizes[1];
-                        if(scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0)
-                        {
-                            size_t subTileK = MiK / problem.mxBlockA();
-                            preSwizzleA     = {swizzleTileMN, tileK, subTileK};
-                            preTileA        = {tileK, swizzleTileMN};
-                        }
+                        auto const& mxsaSizes  = problem.mxsa().sizes();
+                        size_t      scaleRowsA = mxsaSizes[0];
+                        size_t      scaleColsA = mxsaSizes[1];
+                        useGFX950ScaleA = (scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0);
                     }
 
                     if(problem.mxBlockB() > 0 && MiK % problem.mxBlockB() == 0)
                     {
                         // Scale tensor dimensions from setMXScaleB are already padded
                         // (K/mxBlock to multiple of 8, N to multiple of 32)
-                        auto const& mxsbSizes = problem.mxsb().sizes();
-                        size_t scaleRowsB = mxsbSizes[0];
-                        size_t scaleColsB = mxsbSizes[1];
-                        if(scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0)
-                        {
-                            size_t subTileK = MiK / problem.mxBlockB();
-                            preSwizzleB     = {swizzleTileMN, tileK, subTileK};
-                            preTileB        = {tileK, swizzleTileMN};
-                        }
+                        auto const& mxsbSizes  = problem.mxsb().sizes();
+                        size_t      scaleRowsB = mxsbSizes[0];
+                        size_t      scaleColsB = mxsbSizes[1];
+                        useGFX950ScaleB = (scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0);
                     }
                 }
             }
@@ -2015,8 +2008,7 @@ namespace TensileLite
                       rocisa::DataType        scaleEltType,
                       bool                    transposed,
                       bool                    isMatrixA,
-                      std::vector<size_t> const& preSwizzle,
-                      std::vector<size_t> const& preTile,
+                      bool                    wantGFX950Swizzle,
                       bool*                   preswizzledFlag) {
                   auto         rows       = dataDesc.sizes()[0];
                   auto         cols       = dataDesc.sizes()[1];
@@ -2062,11 +2054,10 @@ namespace TensileLite
                                       cols,
                                       stride,
                                       transposed,
-                                      {},
-                                      {},
                                       isMatrixA ? mxBlock : 1,
                                       isMatrixA ? 1 : mxBlock,
                                       isMatrixA,
+                                      MXScaleLayout::kNone,
                                       initModeToMXMethod(initMode),
                                       -1.0f,
                                       1.0f);
@@ -2076,7 +2067,7 @@ namespace TensileLite
                   // generate the preswizzled scale and upload it directly to
                   // gpuInput.valid. copySwizzledToGPUBuffer will use gpuInput.valid as-is
                   // instead of applying the gfx1250 K-swizzle.
-                  if(m_isMXPreswizzleArch && !preSwizzle.empty() && pristineScale.gpuInput.valid)
+                  if(m_isMXPreswizzleArch && wantGFX950Swizzle && pristineScale.gpuInput.valid)
                   {
                       size_t gpuScaleBytes
                           = scaleDesc.totalAllocatedElements()
@@ -2095,11 +2086,10 @@ namespace TensileLite
                                           cols,
                                           stride,
                                           transposed,
-                                          preSwizzle,
-                                          preTile,
                                           isMatrixA ? mxBlock : 1,
                                           isMatrixA ? 1 : mxBlock,
                                           isMatrixA,
+                                          MXScaleLayout::kGFX950,
                                           initModeToMXMethod(initMode),
                                           -1.0f,
                                           1.0f);
@@ -2122,8 +2112,7 @@ namespace TensileLite
                               problem.mxTypeA(),
                               problem.transA(),
                               /*isMatrixA=*/true,
-                              preSwizzleA,
-                              preTileA,
+                              useGFX950ScaleA,
                               &m_mxPreswizzledA);
             }
             else
@@ -2146,8 +2135,7 @@ namespace TensileLite
                               problem.mxTypeB(),
                               problem.transB(),
                               /*isMatrixA=*/false,
-                              preSwizzleB,
-                              preTileB,
+                              useGFX950ScaleB,
                               &m_mxPreswizzledB);
             }
             else
