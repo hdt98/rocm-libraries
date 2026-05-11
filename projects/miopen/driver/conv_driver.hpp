@@ -20,13 +20,8 @@
 #include <common_utils/algorithm.hpp>
 #include <miopen_utils/tensor_desc.hpp>
 #include <common_utils/tuple_utils.hpp>
-#include <miopen/conv_algo_name.hpp>
-#include <miopen/convolution.hpp>
 #include <common_utils/errors.hpp>
-#include <miopen/execution_context.hpp>
-#include <miopen/find_controls.hpp>
 #include <miopen/miopen.h>
-#include <miopen/conv/solvers.hpp>
 
 #include <miopen_utils/cpu_bias.hpp>
 #include <miopen_utils/cpu_conv.hpp>
@@ -47,6 +42,44 @@
 // Declare hidden function for MIGraphX to smoke test it.
 extern "C" MIOPEN_EXPORT miopenStatus_t
 miopenHiddenSetConvolutionFindMode(miopenConvolutionDescriptor_t convDesc, int findMode);
+
+namespace conv_driver_detail {
+
+inline std::string ConvolutionAlgoToString(miopenConvAlgorithm_t algo)
+{
+    switch(algo)
+    {
+    case miopenConvolutionAlgoGEMM: return "miopenConvolutionAlgoGEMM";
+    case miopenConvolutionAlgoDirect: return "miopenConvolutionAlgoDirect";
+    case miopenConvolutionAlgoFFT: return "miopenConvolutionAlgoFFT";
+    case miopenConvolutionAlgoWinograd: return "miopenConvolutionAlgoWinograd";
+    case miopenConvolutionAlgoImplicitGEMM: return "miopenConvolutionAlgoImplicitGEMM";
+    }
+    return "<invalid algorithm>";
+}
+
+inline bool EnvEnableTF32()
+{
+    return driver_env::enabled("MIOPEN_TF32_OVERRIDE") ||
+           driver_env::enabled("NVIDIA_TF32_OVERRIDE");
+}
+
+inline std::string GetSolverName(uint64_t solverId)
+{
+    char buf[256];
+    if(miopenGetSolverName(solverId, buf, sizeof(buf)) == miopenStatusSuccess)
+        return buf;
+    return "UNKNOWN_SOLVER_" + std::to_string(solverId);
+}
+
+inline uint64_t GetSolverIdByName(const char* name)
+{
+    uint64_t id = 0;
+    miopenGetSolverIdByName(name, &id);
+    return id;
+}
+
+} // namespace conv_driver_detail
 
 #define WORKAROUND_ISSUE_2176 1 // https://github.com/AMDComputeLibraries/MLOpen/issues/2176
 
@@ -429,7 +462,7 @@ private:
         { // tf32 has same mantissa length as fp16
             auto math_type_ = inflags.GetValueInt("math_type");
             if(std::is_same_v<Tgpu, float> &&
-               (miopen::EnvEnableTF32() || (math_type_ == miopenMathDefault)))
+               (conv_driver_detail::EnvEnableTF32() || (math_type_ == miopenMathDefault)))
                 tolerance = 8.2e-3;
         }
         return tolerance;
@@ -471,14 +504,14 @@ private:
     {
         std::cout << "- id: " << s.solution_id << " algo: " << s.algorithm << ", time: " << s.time
                   << " ms, ws: " << s.workspace_size
-                  << ", name: " << miopen::solver::Id(s.solution_id).ToString() << std::endl;
+                  << ", name: " << conv_driver_detail::GetSolverName(s.solution_id) << std::endl;
     }
 
     std::string AlgorithmSolutionToString(const miopenConvSolution_t& s) const
     {
         std::ostringstream oss;
         oss << "Algorithm: " << s.algorithm << ", Solution: " << s.solution_id << '/'
-            << ((s.solution_id != 0) ? miopen::solver::Id(s.solution_id).ToString()
+            << ((s.solution_id != 0) ? conv_driver_detail::GetSolverName(s.solution_id)
                                      : std::string("UNKNOWN"));
         return oss.str();
     }
@@ -615,7 +648,7 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     is_wrw = (inflags.GetValueInt("forw") == 0 || inflags.GetValueInt("forw") & 4);
 
     const auto solution_str = inflags.GetValueStr("solution");
-    auto solution_value     = static_cast<int>(miopen::solver::Id(solution_str.c_str()).Value());
+    auto solution_value     = static_cast<int>(conv_driver_detail::GetSolverIdByName(solution_str.c_str()));
     if(solution_value == 0) // Assume number on input
     {
         solution_value = std::strtol(solution_str.c_str(), nullptr, 10);
@@ -1885,7 +1918,7 @@ int ConvDriver<Tgpu, Tref>::RunWarmupFindForwardGPU()
         ss << "Wall-clock Total Time: " << warmup_wall_total.gettime_ms() << " ms, ";
     ss << "Find Algorithm: " << find_result.fwd_algo;
     if(immediate_solution)
-        ss << ", Immediate Algorithm: " << miopen::ConvolutionAlgoToString(solution.algorithm)
+        ss << ", Immediate Algorithm: " << conv_driver_detail::ConvolutionAlgoToString(solution.algorithm)
            << '[' << solution.solution_id << ']';
     ss << std::endl;
     std::cout << ss.str();
@@ -2412,8 +2445,8 @@ int ConvDriver<Tgpu, Tref>::RunForwardGPUReference()
     }
 
     auto ref_solution_id = mode == miopenTranspose //
-                               ? miopen::solver::Id("ConvDirectNaiveConvBwd").Value()
-                               : miopen::solver::Id("ConvDirectNaiveConvFwd").Value();
+                               ? conv_driver_detail::GetSolverIdByName("ConvDirectNaiveConvBwd")
+                               : conv_driver_detail::GetSolverIdByName("ConvDirectNaiveConvFwd");
     auto rc              = miopenConvolutionForwardImmediate(handle,
                                                 weightTensor,
                                                 wei.GetDevicePtr(),
@@ -2428,7 +2461,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGPUReference()
     if(rc != miopenStatusSuccess)
     {
         std::cout << "reference kernel fail to run "
-                  << miopen::solver::Id(ref_solution_id).ToString() << std::endl;
+                  << conv_driver_detail::GetSolverName(ref_solution_id) << std::endl;
         return rc;
     }
 
@@ -3504,7 +3537,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWeightsGPUReference()
         dwei.FillGpuBufferWithNans(handle, weightTensor);
     }
 
-    auto ref_solution_id = miopen::solver::Id("ConvDirectNaiveConvWrw").Value();
+    auto ref_solution_id = conv_driver_detail::GetSolverIdByName("ConvDirectNaiveConvWrw");
     auto rc              = miopenConvolutionBackwardWeightsImmediate(handle,
                                                         outputTensor,
                                                         dout.GetDevicePtr(),
@@ -3519,7 +3552,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWeightsGPUReference()
     if(rc != miopenStatusSuccess)
     {
         std::cout << "reference kernel fail to run "
-                  << miopen::solver::Id(ref_solution_id).ToString() << std::endl;
+                  << conv_driver_detail::GetSolverName(ref_solution_id) << std::endl;
         return rc;
     }
 
@@ -3560,8 +3593,8 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGPUReference()
     }
 
     auto ref_solution_id = mode == miopenTranspose //
-                               ? miopen::solver::Id("ConvDirectNaiveConvFwd").Value()
-                               : miopen::solver::Id("ConvDirectNaiveConvBwd").Value();
+                               ? conv_driver_detail::GetSolverIdByName("ConvDirectNaiveConvFwd")
+                               : conv_driver_detail::GetSolverIdByName("ConvDirectNaiveConvBwd");
     auto rc              = miopenConvolutionBackwardDataImmediate(handle,
                                                      outputTensor,
                                                      dout.GetDevicePtr(),
@@ -3576,7 +3609,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGPUReference()
     if(rc != miopenStatusSuccess)
     {
         std::cout << "reference kernel fail to run "
-                  << miopen::solver::Id(ref_solution_id).ToString() << std::endl;
+                  << conv_driver_detail::GetSolverName(ref_solution_id) << std::endl;
         return rc;
     }
 

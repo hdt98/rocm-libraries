@@ -6646,6 +6646,29 @@ MIOPEN_EXPORT miopenStatus_t miopenGetSolutionSolverId(miopenSolution_t solution
 MIOPEN_EXPORT miopenStatus_t miopenGetSolverIdConvAlgorithm(uint64_t solverId,
                                                             miopenConvAlgorithm_t* result);
 
+/*! @brief Gets the human-readable name of a solver from its numeric id.
+ *
+ * For unrecognized ids, writes "INVALID_SOLVER_ID_<id>" into the buffer.
+ *
+ * @param solverId Numeric solver id (e.g. from miopenConvSolution_t::solution_id)
+ * @param nameBuf  Buffer to receive the null-terminated solver name string
+ * @param nameBufLen Size of nameBuf in bytes (must be large enough for the name + null terminator)
+ * @return         miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetSolverName(uint64_t solverId,
+                                                  char* nameBuf,
+                                                  size_t nameBufLen);
+
+/*! @brief Gets the numeric solver id from a solver name string.
+ *
+ * @param solverName Null-terminated solver name string (e.g. "ConvDirectNaiveConvFwd")
+ * @param solverId   Pointer to a location where to write the numeric solver id.
+ *                   Set to 0 if the name is not recognized.
+ * @return           miopenStatus_t
+ */
+MIOPEN_EXPORT miopenStatus_t miopenGetSolverIdByName(const char* solverName,
+                                                      uint64_t* solverId);
+
 #ifdef MIOPEN_BETA_API
 
 /*! @brief Initializes a problem object describing an activation operation.

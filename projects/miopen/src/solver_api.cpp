@@ -23,20 +23,41 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include "gemm_driver.hpp"
-#include "registry_driver_maker.hpp"
+#include <miopen/errors.hpp>
+#include <miopen/logger.hpp>
+#include <miopen/miopen.h>
+#include <miopen/solver_id.hpp>
 
-#include <miopen/config.h>
+#include <algorithm>
+#include <cstring>
 
-static Driver* makeDriver(const std::string& base_arg)
+extern "C" {
+
+miopenStatus_t miopenGetSolverName(uint64_t solverId, char* nameBuf, size_t nameBufLen)
 {
-#if MIOPEN_USE_GEMM
-    if(base_arg == "gemm")
-        return new GemmDriver<float>();
-    if(base_arg == "gemmfp16")
-        return new GemmDriver<float16>();
-#endif
-    return nullptr;
+    MIOPEN_LOG_FUNCTION(solverId);
+
+    return miopen::try_([&] {
+        if(nameBuf == nullptr || nameBufLen == 0)
+            MIOPEN_THROW(miopenStatusBadParm);
+        const auto name = miopen::solver::Id{solverId}.ToString();
+        if(name.size() + 1 > nameBufLen)
+            MIOPEN_THROW(miopenStatusBadParm,
+                         "Buffer too small: need " + std::to_string(name.size() + 1));
+        std::copy_n(name.c_str(), name.size() + 1, nameBuf);
+    });
 }
 
-REGISTER_DRIVER_MAKER(makeDriver);
+miopenStatus_t miopenGetSolverIdByName(const char* solverName, uint64_t* solverId)
+{
+    MIOPEN_LOG_FUNCTION(solverName);
+
+    return miopen::try_([&] {
+        if(solverName == nullptr || solverId == nullptr)
+            MIOPEN_THROW(miopenStatusBadParm);
+        const auto id = miopen::solver::Id{solverName};
+        *solverId     = id.Value();
+    });
+}
+
+} // extern "C"

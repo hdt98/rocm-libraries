@@ -40,8 +40,6 @@
 
 #include <common_utils/errors.hpp>
 #include <miopen/miopen.h>
-#include <miopen/rnn.hpp>
-#include <miopen/tensor.hpp>
 
 #include <algorithm>
 #include <array>
@@ -774,8 +772,6 @@ int RNNDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
 #include <array>
 #include <initializer_list>
 #include <common_utils/errors.hpp>
-#include <miopen/tensor.hpp>
-#include <miopen/tensor_ops.hpp>
 
 template <typename Tgpu, typename Tref>
 int RNNDriver<Tgpu, Tref>::RunForwardGPU()

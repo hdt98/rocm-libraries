@@ -41,8 +41,6 @@
 #include <common_utils/errors.hpp>
 #include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
-#include <miopen/rnn.hpp>
-#include <miopen/tensor_ops.hpp>
 
 #include <algorithm>
 #include <array>
