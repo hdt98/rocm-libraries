@@ -104,6 +104,8 @@ public:
 
     bool enabled()
     {
+        if(!m_smiAvailable)
+            return false;
         static const char* env = getenv("HIPBLASLT_BENCH_FREQ");
         return (env != nullptr || efficiencyReport() || detailedReport());
     }
@@ -136,6 +138,9 @@ public:
 
     void setDeviceId(int deviceId)
     {
+        if(!InitAMDSMI())
+            return;
+
         m_smiDeviceIndex = GetAMDSMIIndex(deviceId);
         m_XCDCount       = 1;
 
@@ -437,16 +442,20 @@ private:
         m_future = std::move(std::future<void>());
     }
 
-    void InitAMDSMI()
+    bool InitAMDSMI()
     {
         static amdsmi_status_t status = amdsmi_init(AMDSMI_INIT_AMD_GPUS);
-        AMDSMI_CHECK_EXC(status);
+        if(status != AMDSMI_STATUS_SUCCESS)
+        {
+            m_smiAvailable = false;
+            return false;
+        }
+        m_smiAvailable = true;
+        return true;
     }
 
     uint32_t GetAMDSMIIndex(int hipDeviceIndex)
     {
-        InitAMDSMI();
-
         hipDeviceProp_t props;
 
         HIP_CHECK_EXC(hipGetDeviceProperties(&props, hipDeviceIndex));
@@ -528,6 +537,7 @@ private:
     std::condition_variable m_cv;
     std::mutex              m_mutex;
     uint32_t                m_smiDeviceIndex;
+    bool                    m_smiAvailable{false};
     bool                    m_isMultiXCDSupported;
     uint16_t                m_XCDCount;
     uint16_t                m_CUCount;

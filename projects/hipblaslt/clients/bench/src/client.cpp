@@ -588,7 +588,7 @@ try
          "Options: c, mix, cpp.")
 
         ("print_kernel_info",
-         value<bool>(&arg.print_kernel_info)->default_value(false),
+         bool_switch(&arg.print_kernel_info)->default_value(false),
          "Print solution, kernel name and solution index.")
 
         ("rotating",
