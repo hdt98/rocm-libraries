@@ -33,8 +33,7 @@
 #include <algorithm>
 #include <iterator>
 #include <miopen/miopen.h>
-#include <miopen/tensor_extra.hpp>
-#include <miopen/tensor_layout.hpp>
+#include <common_utils/tensor_layout.hpp>
 #include <numeric>
 #include <vector>
 

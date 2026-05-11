@@ -27,9 +27,8 @@
 #pragma once
 
 #include <miopen_utils/tensor_holder.hpp>
-#include "tensor_view.hpp"
-
-#include <miopen/tensor_view_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
+#include <miopen_utils/tensor_view.hpp>
 
 #include <vector>
 
@@ -37,17 +36,17 @@ template <typename TIO>
 void cpu_kthvalue(tensor<TIO> input,
                   tensor<TIO>& outputHost,
                   std::vector<size_t>& indices,
-                  miopen::TensorDescriptor indiceDesc,
+                  miopenTensorDescriptor_t indiceDesc,
                   size_t k,
                   int dim)
 {
     size_t inputSize       = input.desc.GetElementSize();
     size_t dimSize         = input.desc.GetLengths()[dim];
     size_t dimStride       = input.desc.GetStrides()[dim];
-    auto inputTv           = miopen::get_inner_expanded_tv<5>(input.desc);
-    auto inputTvWithoutDim = miopen::get_tv_without_dim<5>(inputTv, dim);
-    auto outputTv          = miopen::get_inner_expanded_tv<5>(outputHost.desc);
-    auto indicesTv         = miopen::get_inner_expanded_tv<5>(indiceDesc);
+    auto inputTv           = GetInnerExpandedTv<5>(input.desc);
+    auto inputTvWithoutDim = get_tv_without_dim<5>(inputTv, dim);
+    auto outputTv          = GetInnerExpandedTv<5>(outputHost.desc);
+    auto indicesTv         = GetInnerExpandedTv<5>(indiceDesc);
 
     size_t numSlice = inputSize / dimSize;
 

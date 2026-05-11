@@ -30,9 +30,7 @@
 #include "mloNeuronHost.hpp"
 
 #include <miopen_utils/tensor_desc.hpp>
-#include <miopen/convolution.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor_extra.hpp>
 
 #include <cmath>
 #include <iomanip>

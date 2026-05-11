@@ -27,7 +27,6 @@
 #ifndef MLO_CONVHOST_H_
 #define MLO_CONVHOST_H_
 
-#include <miopen/tensor.hpp>
 #include <miopen_utils/tensor_desc.hpp>
 
 #include <cmath>
@@ -899,21 +898,18 @@ bool mloVerify(const miopenTensorDescriptor_t& cpu_,
                bool check_ulps,
                double& report_err)
 {
-    const auto& cpu = miopen::deref(cpu_);
-    const auto& gpu = miopen::deref(gpu_);
-
-    const auto spatial_dim = cpu.GetLengths().size() - 2;
+    const auto spatial_dim = TensorDesc::GetLengths(cpu_).size() - 2;
 
     size_t n_batchs, n_channels, depth, height, width;
     size_t c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride;
     size_t g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride;
 
     std::tie(n_batchs, n_channels, depth, height, width) =
-        TensorDesc::GetNCDHW(spatial_dim, cpu.GetLengths());
+        TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetLengths(cpu_));
     std::tie(c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride) =
-        TensorDesc::GetNCDHW(spatial_dim, cpu.GetStrides());
+        TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetStrides(cpu_));
     std::tie(g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride) =
-        TensorDesc::GetNCDHW(spatial_dim, gpu.GetStrides());
+        TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetStrides(gpu_));
 
     bool match          = true;
     double rms_accum    = 0.0;
@@ -1051,21 +1047,18 @@ bool mloVerify_mt(const miopenTensorDescriptor_t& cpu_,
                   bool check_ulps,
                   double& report_err)
 {
-    const auto& cpu = miopen::deref(cpu_);
-    const auto& gpu = miopen::deref(gpu_);
-
-    const auto spatial_dim = cpu.GetLengths().size() - 2;
+    const auto spatial_dim = TensorDesc::GetLengths(cpu_).size() - 2;
 
     size_t n_batchs, n_channels, depth, height, width;
     size_t c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride;
     size_t g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride;
 
     std::tie(n_batchs, n_channels, depth, height, width) =
-        TensorDesc::GetNCDHW(spatial_dim, cpu.GetLengths());
+        TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetLengths(cpu_));
     std::tie(c_batch_stride, c_channel_stride, c_depth_stride, c_height_stride, c_width_stride) =
-        TensorDesc::GetNCDHW(spatial_dim, cpu.GetStrides());
+        TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetStrides(cpu_));
     std::tie(g_batch_stride, g_channel_stride, g_depth_stride, g_height_stride, g_width_stride) =
-        TensorDesc::GetNCDHW(spatial_dim, gpu.GetStrides());
+        TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetStrides(gpu_));
 
     double rms_accum    = 0.0;
     Tcheck_ worst_c_val = static_cast<Tcheck_>(0);
