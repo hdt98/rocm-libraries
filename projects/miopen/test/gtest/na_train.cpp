@@ -170,9 +170,9 @@ struct verify_fwd_batchnorm_spatial_activ
         auto lclxdesc = x.desc;
         miopenExecuteFusionPlan(&handle,
                                 fusionplan,
-                                &lclxdesc,
+                                lclxdesc,
                                 in_dev.get(),
-                                &lclxdesc,
+                                lclxdesc,
                                 out_dev.get(),
                                 ptr_fusionargs.get());
 
@@ -480,9 +480,9 @@ struct verify_fwd_batchnorm_peract_activ
         auto lclxdesc = x.desc;
         miopenExecuteFusionPlan(&handle,
                                 fusionplan,
-                                &lclxdesc,
+                                lclxdesc,
                                 in_dev.get(),
-                                &lclxdesc,
+                                lclxdesc,
                                 out_dev.get(),
                                 ptr_fusionargs.get());
 

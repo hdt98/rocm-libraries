@@ -610,7 +610,7 @@ struct pooling_driver : test_driver
                 miopen::tensor_layout_get_default(input.desc.GetNumDims()),
                 in_layout,
                 dim_strides);
-            input.desc = miopen::TensorDescriptor(miopen_type<T>{}, dim_lens, dim_strides);
+            input.desc = TensorDesc(miopen_type<T>{}, dim_lens, dim_strides);
         }
 
         input.generate(tensor_elem_gen_integer{

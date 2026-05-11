@@ -242,7 +242,7 @@ struct verify_rnn_api_base
         }
 
         auto& inLens = input.desc.GetLengths();
-        auto& hLens  = xHiddenState.desc.GetLengths();
+        auto hLens  = xHiddenState.desc.GetLengths();
 
         ss << " --batch_size " << inLens[0] << " --seq_len " << inLens[1] << " --in_vec "
            << inLens[2] << " --hid_h " << hLens[2] << " --num_layer " << rnnDesc.nLayers << " -r "
@@ -1535,14 +1535,14 @@ protected:
         size_t train_workSpace_size, train_reserveSpace_size;
         miopenGetRNNTempSpaceSizes(&handle,
                                    &rnnDesc,
-                                   input.desc,
+                                   &input.desc,
                                    miopenRNNTraining,
                                    &train_workSpace_size,
                                    &train_reserveSpace_size);
 
         size_t inference_workSpace_size;
         miopenGetRNNTempSpaceSizes(
-            &handle, &rnnDesc, input.desc, miopenRNNInference, &inference_workSpace_size, nullptr);
+            &handle, &rnnDesc, &input.desc, miopenRNNInference, &inference_workSpace_size, nullptr);
 
         auto tmp_mem =
             std::max(inference_workSpace_size, train_workSpace_size + train_reserveSpace_size);
