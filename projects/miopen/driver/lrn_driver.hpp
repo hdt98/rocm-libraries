@@ -396,17 +396,20 @@ template <typename Tgpu, typename Tref>
 int LRNDriver<Tgpu, Tref>::VerifyForward()
 {
     int nInStride, cInStride, hInStride, wInStride;
-    miopenGet4dTensorDescriptorStrides(inputTensor, &nInStride, &cInStride, &hInStride, &wInStride);
+    miopenGet4dTensorDescriptor(
+        inputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &nInStride, &cInStride, &hInStride, &wInStride);
 
     int nIn, cIn, hIn, wIn;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
+    miopenGet4dTensorDescriptor(
+        inputTensor, nullptr, &nIn, &cIn, &hIn, &wIn, nullptr, nullptr, nullptr, nullptr);
 
     int nOutStride, cOutStride, hOutStride, wOutStride;
-    miopenGet4dTensorDescriptorStrides(
-        outputTensor, &nOutStride, &cOutStride, &hOutStride, &wOutStride);
+    miopenGet4dTensorDescriptor(
+        outputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &nOutStride, &cOutStride, &hOutStride, &wOutStride);
 
     int nOut, cOut, hOut, wOut;
-    miopenGet4dTensorDescriptorLengths(outputTensor, &nOut, &cOut, &hOut, &wOut);
+    miopenGet4dTensorDescriptor(
+        outputTensor, nullptr, &nOut, &cOut, &hOut, &wOut, nullptr, nullptr, nullptr, nullptr);
 
     miopenLRNMode_t v_mode;
     unsigned int v_lrnN;
@@ -478,25 +481,30 @@ template <typename Tgpu, typename Tref>
 int LRNDriver<Tgpu, Tref>::VerifyBackward()
 {
     int nInStride, cInStride, hInStride, wInStride;
-    miopenGet4dTensorDescriptorStrides(inputTensor, &nInStride, &cInStride, &hInStride, &wInStride);
+    miopenGet4dTensorDescriptor(
+        inputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &nInStride, &cInStride, &hInStride, &wInStride);
     int nIn, cIn, hIn, wIn;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
+    miopenGet4dTensorDescriptor(
+        inputTensor, nullptr, &nIn, &cIn, &hIn, &wIn, nullptr, nullptr, nullptr, nullptr);
     int nOutStride, cOutStride, hOutStride, wOutStride;
-    miopenGet4dTensorDescriptorStrides(
-        outputTensor, &nOutStride, &cOutStride, &hOutStride, &wOutStride);
+    miopenGet4dTensorDescriptor(
+        outputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &nOutStride, &cOutStride, &hOutStride, &wOutStride);
     int nOut, cOut, hOut, wOut;
-    miopenGet4dTensorDescriptorLengths(outputTensor, &nOut, &cOut, &hOut, &wOut);
+    miopenGet4dTensorDescriptor(
+        outputTensor, nullptr, &nOut, &cOut, &hOut, &wOut, nullptr, nullptr, nullptr, nullptr);
 
     int ndInStride, cdInStride, hdInStride, wdInStride;
-    miopenGet4dTensorDescriptorStrides(
-        dInputTensor, &ndInStride, &cdInStride, &hdInStride, &wdInStride);
+    miopenGet4dTensorDescriptor(
+        dInputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &ndInStride, &cdInStride, &hdInStride, &wdInStride);
     int ndIn, cdIn, hdIn, wdIn;
-    miopenGet4dTensorDescriptorLengths(dInputTensor, &ndIn, &cdIn, &hdIn, &wdIn);
+    miopenGet4dTensorDescriptor(
+        dInputTensor, nullptr, &ndIn, &cdIn, &hdIn, &wdIn, nullptr, nullptr, nullptr, nullptr);
     int ndOutStride, cdOutStride, hdOutStride, wdOutStride;
-    miopenGet4dTensorDescriptorStrides(
-        dOutputTensor, &ndOutStride, &cdOutStride, &hdOutStride, &wdOutStride);
+    miopenGet4dTensorDescriptor(
+        dOutputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &ndOutStride, &cdOutStride, &hdOutStride, &wdOutStride);
     int ndOut, cdOut, hdOut, wdOut;
-    miopenGet4dTensorDescriptorLengths(dOutputTensor, &ndOut, &cdOut, &hdOut, &wdOut);
+    miopenGet4dTensorDescriptor(
+        dOutputTensor, nullptr, &ndOut, &cdOut, &hdOut, &wdOut, nullptr, nullptr, nullptr, nullptr);
 
     miopenLRNMode_t v_mode;
     unsigned int v_lrnN;

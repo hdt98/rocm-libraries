@@ -198,15 +198,17 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
 
     if(spatial_dim == 2)
     {
-        miopenGet4dTensorDescriptorStrides(
-            inputTensor, &nInStride, &cInStride, &hInStride, &wInStride);
+        miopenGet4dTensorDescriptor(
+            inputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &nInStride, &cInStride, &hInStride, &wInStride);
         dInStride = hInStride;
-        miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
+        miopenGet4dTensorDescriptor(
+            inputTensor, nullptr, &nIn, &cIn, &hIn, &wIn, nullptr, nullptr, nullptr, nullptr);
         dIn = 1;
-        miopenGet4dTensorDescriptorStrides(
-            outputTensor, &nOutStride, &cOutStride, &hOutStride, &wOutStride);
+        miopenGet4dTensorDescriptor(
+            outputTensor, nullptr, nullptr, nullptr, nullptr, nullptr, &nOutStride, &cOutStride, &hOutStride, &wOutStride);
         dOutStride = hOutStride;
-        miopenGet4dTensorDescriptorLengths(outputTensor, &nOut, &cOut, &hOut, &wOut);
+        miopenGet4dTensorDescriptor(
+            outputTensor, nullptr, &nOut, &cOut, &hOut, &wOut, nullptr, nullptr, nullptr, nullptr);
         dOut = 1;
 
         miopenGet2dPoolingDescriptor(
@@ -221,12 +223,15 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
         std::vector<int> padV(spatial_dim);
         std::vector<int> strV(spatial_dim);
 
-        miopenGet5dTensorDescriptorStrides(
-            inputTensor, &nInStride, &cInStride, &dInStride, &hInStride, &wInStride);
-        miopenGet5dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &dIn, &hIn, &wIn);
-        miopenGet5dTensorDescriptorStrides(
-            outputTensor, &nOutStride, &cOutStride, &dOutStride, &hOutStride, &wOutStride);
-        miopenGet5dTensorDescriptorLengths(outputTensor, &nOut, &cOut, &dOut, &hOut, &wOut);
+        {
+            int dims[5], strides[5];
+            miopenGetTensorDescriptor(inputTensor, nullptr, dims, strides);
+            nIn = dims[0]; cIn = dims[1]; dIn = dims[2]; hIn = dims[3]; wIn = dims[4];
+            nInStride = strides[0]; cInStride = strides[1]; dInStride = strides[2]; hInStride = strides[3]; wInStride = strides[4];
+            miopenGetTensorDescriptor(outputTensor, nullptr, dims, strides);
+            nOut = dims[0]; cOut = dims[1]; dOut = dims[2]; hOut = dims[3]; wOut = dims[4];
+            nOutStride = strides[0]; cOutStride = strides[1]; dOutStride = strides[2]; hOutStride = strides[3]; wOutStride = strides[4];
+        }
 
         miopenGetNdPoolingDescriptor(
             poolDesc, spatial_dim, &mode, nullptr, winV.data(), padV.data(), strV.data());

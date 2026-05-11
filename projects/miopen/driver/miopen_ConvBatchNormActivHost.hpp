@@ -46,7 +46,8 @@ int miopenBNSpatialFwdInferHost(miopenTensorDescriptor_t& inputTensor,
                                 const Tgpu* estimatedVariance)
 {
     int nIn, cIn, hIn, wIn;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
+    miopenGet4dTensorDescriptor(
+        inputTensor, nullptr, &nIn, &cIn, &hIn, &wIn, nullptr, nullptr, nullptr, nullptr);
     const auto tensorLayout = TensorDesc::GetLayout(inputTensor);
 
     int n_batchs = nIn;
@@ -103,7 +104,8 @@ int miopenBNPerActivFwdInferHost(miopenTensorDescriptor_t& inputTensor,
 { // use running mean and variance
 
     int nIn, cIn, hIn, wIn;
-    miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
+    miopenGet4dTensorDescriptor(
+        inputTensor, nullptr, &nIn, &cIn, &hIn, &wIn, nullptr, nullptr, nullptr, nullptr);
     const auto tensorLayout = TensorDesc::GetLayout(inputTensor);
 
     int n_batchs = nIn;
