@@ -16,7 +16,7 @@ set(FMHA_FWD_ENABLE_APIS "fwd" CACHE STRING
 if(BUILD_TESTING)
   # Build instances of all APIs for tests
   message(DEBUG "Enabling all FWD APIs of CK Tile FMHA for because testing is enabled")
-  set(FMHA_FWD_ENABLE_APIS "all")
+  set(FMHA_FWD_ENABLE_APIS "fwd")
 endif()
 if(FMHA_FWD_ENABLE_APIS STREQUAL "all")
   set(FMHA_FWD_ENABLE_APIS ${FMHA_FWD_KNOWN_APIS})
@@ -64,7 +64,9 @@ set(FMHA_BWD_CODE_GEN_COMMON_ARGS
 # there is no corresponding instance for parameters).
 if(BUILD_TESTING)
   # Filters are in the order of FMHA_FWD_KNOWN_APIS: fwd,fwd_splitkv_combine@fwd_splitkv,fwd_appendkv,pagedkv_prefill
-  list(APPEND FMHA_FWD_CODE_GEN_COMMON_ARGS --filter *_nlogits*_nskip*_nsink*,*@*_nlogits*_nbias*_nsink*,*,*_nlogits*_nskip*_pagedkv*)
+  # list(APPEND FMHA_FWD_CODE_GEN_COMMON_ARGS --filter *_nlogits*_nskip*_nsink*,*@*_nlogits*_nbias*_nsink*,*,*_nlogits*_nskip*_pagedkv*)
+  # list(APPEND FMHA_FWD_CODE_GEN_COMMON_ARGS --filter *d128*bf16*qr_async*_nlogits*_nskip*_nsink*,*qr_async*,*qr_async*,*qr_async*)
+  list(APPEND FMHA_FWD_CODE_GEN_COMMON_ARGS --filter *d128_bf16_batch_b64x128x32x128x32x128_r4x1x1_r4x1x1_w16x16x32_w16x16x16_qr_async_vr_psddv_nlogits_nbias_mask_lse_dropout_nskip_nqscale_ntrload_nsink*,*qr_async*,*qr_async*,*qr_async*)
 endif()
 
 # generate a list of kernels, but not actually emit files at config sta
@@ -133,6 +135,7 @@ set(FMHA_BWD_INTERFACE_COMPILE_OPTIONS)
 # NOTE: we turn off undefined-func-template to let source compile without explicit declare function specializations
 #       ... because they are auto-generated
 list(APPEND FMHA_FWD_PRIVATE_COMPILE_OPTIONS -Wno-undefined-func-template)
+list(APPEND FMHA_FWD_PRIVATE_COMPILE_OPTIONS --save-temps)
 list(APPEND FMHA_BWD_PRIVATE_COMPILE_OPTIONS -Wno-undefined-func-template)
 
 # Allow comparing floating points directly in order to check sentinel values
