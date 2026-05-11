@@ -77,7 +77,7 @@ set(CMAKE_CXX_COMPILER_NAMES clang++)
 set(CMAKE_C_COMPILER_NAMES clang)
 
 # Warn if ROCM_PATH is set in environment (can interfere with toolchain discovery).
-if(DEFINED ENV{ROCM_PATH})
+if(DEFINED ENV{ROCM_PATH} AND NOT _ROCM_CLANG_TOOLCHAIN_FIRST_RUN_COMPLETED)
     message(
         WARNING "\nROCM_PATH is set in the environment and may interfere with toolchain detection. "
                 "Remove ROCM_PATH from the environment and use the following instead:\n"

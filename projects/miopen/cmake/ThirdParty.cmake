@@ -60,6 +60,31 @@ function(_miopen_report_dep name found version)
 endfunction()
 
 # -----------------------------------------------------------------------------
+# Helpers: silence ROCMChecks's variable_watch on CMAKE_*_FLAGS / CMAKE_*_COMPILER
+# while a third-party subproject configures.
+#
+# Several upstream projects (googletest, eigen) set these toolchain variables
+# directly — perfectly normal CMake usage that we can't fix upstream. ROCMChecks
+# installs a variable_watch that fires on every assignment, producing pages of
+# warnings during configure. Override the watcher to a no-op around the fetch,
+# then re-include ROCMChecks (with the warn/error toggles off so it only
+# redefines the function and doesn't reinstall a second watch) to restore the
+# original handler for MIOpen's own code.
+# -----------------------------------------------------------------------------
+macro(_miopen_suppress_rocm_toolchain_checks)
+    function(rocm_check_toolchain_var)
+    endfunction()
+endmacro()
+
+macro(_miopen_restore_rocm_toolchain_checks)
+    set(ROCM_WARN_TOOLCHAIN_VAR OFF)
+    set(ROCM_ERROR_TOOLCHAIN_VAR OFF)
+    include(ROCMChecks)
+    unset(ROCM_WARN_TOOLCHAIN_VAR)
+    unset(ROCM_ERROR_TOOLCHAIN_VAR)
+endmacro()
+
+# -----------------------------------------------------------------------------
 # Eigen3 (header-only)
 # -----------------------------------------------------------------------------
 find_package(Eigen3 QUIET)
@@ -70,7 +95,12 @@ if(NOT Eigen3_FOUND)
         URL      https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.bz2
         URL_HASH SHA256=b4c198460eba6f28d34894e3a5710998818515104d6e74e5cc331ce31e46e626
         OVERRIDE_FIND_PACKAGE)
+    # Eigen's CMakeLists writes to CMAKE_CXX_FLAGS while probing compiler support
+    # for many warning flags; without the guard ROCMChecks emits one warning per
+    # probe (dozens during configure).
+    _miopen_suppress_rocm_toolchain_checks()
     FetchContent_MakeAvailable(Eigen3)
+    _miopen_restore_rocm_toolchain_checks()
 endif()
 
 # -----------------------------------------------------------------------------
@@ -192,7 +222,9 @@ if(NOT GTest_FOUND)
         OVERRIDE_FIND_PACKAGE)
     set(_miopen_saved_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS OFF)
+    _miopen_suppress_rocm_toolchain_checks()
     FetchContent_MakeAvailable(GTest)
+    _miopen_restore_rocm_toolchain_checks()
     set(BUILD_SHARED_LIBS ${_miopen_saved_BUILD_SHARED_LIBS})
     unset(_miopen_saved_BUILD_SHARED_LIBS)
 

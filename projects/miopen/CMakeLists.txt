@@ -67,15 +67,6 @@ option(MIOPEN_STANDALONE_BUILD
     ${_MIOPEN_STANDALONE_DEFAULT})
 unset(_MIOPEN_STANDALONE_DEFAULT)
 
-# Standalone (FetchContent-only) builds don't have a system rocMLIR or OpenCL
-# stack to depend on. Pre-seed the relevant cache entries so a bare `cmake ..`
-# produces a working HIP build. Explicit -D on the command line still wins,
-# since these set(... CACHE) calls are no-ops when the entry already exists.
-if(MIOPEN_STANDALONE_BUILD)
-    set(MIOPEN_BACKEND "HIP" CACHE STRING "Which of MIOpens's backends to use?")
-    set(MIOPEN_USE_MLIR OFF CACHE BOOL "Use MLIR compilation backend")
-endif()
-
 project(MIOpen CXX)
 
 set(CMAKE_CXX_STANDARD 20)
