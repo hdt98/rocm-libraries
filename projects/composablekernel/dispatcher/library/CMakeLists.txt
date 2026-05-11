@@ -28,9 +28,7 @@ set(_DISP_CONFIG_SUBDIR_fwd "forward")
 set(_DISP_CONFIG_SUBDIR_bwd_weight "backward_weight")
 set(_DISP_CONFIG_SUBDIR_bwd_data "backward_data")
 
-set(_DISP_GEN_SCRIPT_fwd "generate_profiler_fwd_kernels.py")
-set(_DISP_GEN_SCRIPT_bwd_weight "generate_profiler_bwd_weight_kernels.py")
-set(_DISP_GEN_SCRIPT_bwd_data "generate_profiler_bwd_data_kernels.py")
+set(_DISP_GEN_SCRIPT "generate_profiler_kernels.py")
 
 set(_DISP_HEADER_PREFIX_fwd "grouped_conv_fwd_")
 set(_DISP_HEADER_PREFIX_bwd_weight "grouped_conv_bwd_weight_")
@@ -48,7 +46,6 @@ set(_DISP_HEADER_PREFIX_bwd_data "grouped_conv_bwd_data_")
 function(ck_add_dispatcher_conv_instances VARIANT)
   # Look up variant-specific paths
   set(CONFIG_SUBDIR "${_DISP_CONFIG_SUBDIR_${VARIANT}}")
-  set(GEN_SCRIPT "${_DISP_GEN_SCRIPT_${VARIANT}}")
   set(HEADER_PREFIX "${_DISP_HEADER_PREFIX_${VARIANT}}")
 
   if(NOT CONFIG_SUBDIR)
@@ -56,7 +53,7 @@ function(ck_add_dispatcher_conv_instances VARIANT)
   endif()
 
   set(CONFIG_DIR "${DISPATCHER_DIR}/codegen/configs/grouped_conv/${CONFIG_SUBDIR}")
-  set(SCRIPT_PATH "${DISPATCHER_DIR}/scripts/${GEN_SCRIPT}")
+  set(SCRIPT_PATH "${DISPATCHER_DIR}/scripts/${_DISP_GEN_SCRIPT}")
   set(KERNEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/dispatcher_${VARIANT}_kernels")
   set(TARGET_NAME "ck_dispatcher_grouped_conv_${VARIANT}")
 
@@ -65,6 +62,7 @@ function(ck_add_dispatcher_conv_instances VARIANT)
     file(MAKE_DIRECTORY ${KERNEL_DIR})
     execute_process(
       COMMAND ${Python3_EXECUTABLE} ${SCRIPT_PATH}
+              --variant ${VARIANT}
               --config-dir ${CONFIG_DIR}
               --codegen ${DISPATCHER_CODEGEN}
               --output-dir ${KERNEL_DIR}
