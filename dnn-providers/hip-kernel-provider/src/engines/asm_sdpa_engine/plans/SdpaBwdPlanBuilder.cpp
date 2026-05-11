@@ -12,6 +12,7 @@
 #include <hip_kernel_provider_common/HipDeviceUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/data_types_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/sdpa_backward_attributes_generated.h>
+#include <hipdnn_plugin_sdk/PluginException.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <optional>
 #include <stdexcept>
@@ -597,7 +598,9 @@ void SdpaBwdPlanBuilder::buildPlan(
         = tryGetDeviceString(handle.getStream(), "Failed to query device properties with error: ");
     if(!deviceStringOpt)
     {
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "SdpaBwdPlanBuilder::buildPlan: failed to query device string");
     }
     const std::string& deviceString = *deviceStringOpt;
 
@@ -705,9 +708,10 @@ void SdpaBwdPlanBuilder::buildPlan(
                                                   dvTensor->data_type());
     if(!dataTypeIdOpt)
     {
-        HIPDNN_PLUGIN_LOG_ERROR(
-            "buildPlan: unsupported tensor dtype combination (isApplicable should have rejected)");
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "SdpaBwdPlanBuilder::buildPlan: unsupported tensor dtype combination "
+            "(isApplicable should have rejected)");
     }
     const auto& dataTypeId = *dataTypeIdOpt;
     auto maskType = getMaskType(sdpaAttrs);
@@ -717,14 +721,14 @@ void SdpaBwdPlanBuilder::buildPlan(
     auto dispatchTuples = computeDispatchTuples(maskType, bf16CvtValue);
 
     auto resolveStage
-        = [&](const char* stageName,
-              std::optional<fmha_v3_bwdConfig> cfgOpt) -> std::optional<ResolvedKernel> {
+        = [&](const char* stageName, std::optional<fmha_v3_bwdConfig> cfgOpt) -> ResolvedKernel {
         if(!cfgOpt)
         {
-            HIPDNN_PLUGIN_LOG_ERROR("Failed to resolve "
-                                    << stageName << " kernel for arch=" << deviceString
-                                    << " dtype=" << dataTypeId << " hdim=" << headDimQk);
-            return std::nullopt;
+            throw hipdnn_plugin_sdk::HipdnnPluginException(
+                HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                std::string("SdpaBwdPlanBuilder::buildPlan: failed to resolve ") + stageName
+                    + " kernel for arch=" + deviceString + " dtype=" + dataTypeId + " hdim="
+                    + std::to_string(headDimQk) + " (isApplicable should have rejected)");
         }
         return ResolvedKernel{getKernelCoPath(cfgOpt->co_name),
                               cfgOpt->knl_name,
@@ -748,10 +752,6 @@ void SdpaBwdPlanBuilder::buildPlan(
                                                odtuple.pddv,
                                                static_cast<int>(batchMode),
                                                odtuple.bf16Cvt));
-    if(!odoResolved)
-    {
-        return;
-    }
     auto dqdkdvResolved = resolveStage("dqdkdv",
                                        findConfig(cfg_fmha_bwd_dqdkdv,
                                                   deviceString,
@@ -764,10 +764,6 @@ void SdpaBwdPlanBuilder::buildPlan(
                                                   dqdtuple.pddv,
                                                   static_cast<int>(batchMode),
                                                   dqdtuple.bf16Cvt));
-    if(!dqdkdvResolved)
-    {
-        return;
-    }
 
     // Determine accumulator mode from the resolved dispatch tuple. isApplicable
     // currently hard-codes A32, so `useA32` is always true today. When A16 is
@@ -794,16 +790,12 @@ void SdpaBwdPlanBuilder::buildPlan(
                                                     dqctuple.pddv,
                                                     static_cast<int>(batchMode),
                                                     dqctuple.bf16Cvt));
-        if(!dqConvertResolved)
-        {
-            return;
-        }
     }
 
-    HIPDNN_PLUGIN_LOG_INFO("Using bwd odo kernel: " << odoResolved->coPath
-                                                    << " :: " << odoResolved->knlName);
-    HIPDNN_PLUGIN_LOG_INFO("Using bwd dqdkdv kernel: " << dqdkdvResolved->coPath
-                                                       << " :: " << dqdkdvResolved->knlName);
+    HIPDNN_PLUGIN_LOG_INFO("Using bwd odo kernel: " << odoResolved.coPath
+                                                    << " :: " << odoResolved.knlName);
+    HIPDNN_PLUGIN_LOG_INFO("Using bwd dqdkdv kernel: " << dqdkdvResolved.coPath
+                                                       << " :: " << dqdkdvResolved.knlName);
     if(dqConvertResolved)
     {
         HIPDNN_PLUGIN_LOG_INFO("Using bwd dq_convert kernel: " << dqConvertResolved->coPath
@@ -811,16 +803,22 @@ void SdpaBwdPlanBuilder::buildPlan(
                                                                << dqConvertResolved->knlName);
     }
 
-    auto odoKernel = loadKernelModule(odoResolved->coPath, odoResolved->knlName.c_str());
+    auto odoKernel = loadKernelModule(odoResolved.coPath, odoResolved.knlName.c_str());
     if(!odoKernel)
     {
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "SdpaBwdPlanBuilder::buildPlan: failed to load odo kernel module from "
+                + odoResolved.coPath);
     }
 
-    auto dqdkdvKernel = loadKernelModule(dqdkdvResolved->coPath, dqdkdvResolved->knlName.c_str());
+    auto dqdkdvKernel = loadKernelModule(dqdkdvResolved.coPath, dqdkdvResolved.knlName.c_str());
     if(!dqdkdvKernel)
     {
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "SdpaBwdPlanBuilder::buildPlan: failed to load dqdkdv kernel module from "
+                + dqdkdvResolved.coPath);
     }
 
     std::optional<HipModuleGuard> postKernel;
@@ -830,13 +828,16 @@ void SdpaBwdPlanBuilder::buildPlan(
             = loadKernelModule(dqConvertResolved->coPath, dqConvertResolved->knlName.c_str());
         if(!postKernel)
         {
-            return;
+            throw hipdnn_plugin_sdk::HipdnnPluginException(
+                HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                "SdpaBwdPlanBuilder::buildPlan: failed to load dq_convert kernel module from "
+                    + dqConvertResolved->coPath);
         }
     }
 
     SdpaBwdParams params{};
-    params.odoTiles = odoResolved->tiles;
-    params.dqdkdvTiles = dqdkdvResolved->tiles;
+    params.odoTiles = odoResolved.tiles;
+    params.dqdkdvTiles = dqdkdvResolved.tiles;
     if(dqConvertResolved)
     {
         params.dqConvertTiles = dqConvertResolved->tiles;
