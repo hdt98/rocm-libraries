@@ -69,6 +69,7 @@ hipDNN is organized into several key components. For detailed architecture descr
 | **[Plugin SDK](./plugin_sdk/)** | Header-only library for plugin development |
 | **[Samples](./samples/)** | Example implementations demonstrating hipDNN usage |
 | **[Tests](./tests/)** | Tests for the public API (incl. frontend integration tests) |
+| **[Python Bindings](./python_bindings/)** | Python bindings for the frontend via nanobind (see [README](./python_bindings/README.md) for installation methods) |
 | **[Tools](./tools/)** | Experimental utilities (e.g., benchmarking, engine listing) — subject to change |
 
 > [!NOTE]
@@ -112,6 +113,61 @@ The documentation covers the frontend API including:
 - Tensor and operation attributes
 - Engine configuration and knobs
 - Error handling
+
+---
+
+## Python Bindings — Packaging and Distribution
+
+The Python bindings are built via nanobind and distributed through two
+separate channels depending on the consumer:
+
+### Build Phase (rocm-libraries)
+
+`hipdnn/CMakeLists.txt` guards the bindings behind
+`HIPDNN_BUILD_PYTHON_BINDINGS` (default OFF). When enabled, it calls
+`add_subdirectory(python_bindings)`, which:
+
+- Fetches nanobind via `FetchContent` and builds `hipdnn_frontend_python.*.so`
+- If `SKBUILD` is set (pip install path): installs to the wheel root
+- If `SKBUILD` is not set (cmake/superbuild): installs to
+  `python_bindings/hipdnn_frontend/` under the install prefix
+
+### Distribution Channels
+
+```
+┌─ tar.xz (C/C++ consumers) ───────────┐   ┌─ wheel (Python consumers) ────────┐
+│                                       │   │                                   │
+│  install_rocm_from_artifacts.py       │   │  pip install rocm[libraries]      │
+│    → /opt/rocm/lib/libhipdnn_*.so     │   │    → hipdnn_frontend importable   │
+│    → NO python bindings               │   │    → libhipdnn_backend.so included│
+│                                       │   │                                   │
+└───────────────────────────────────────┘   └───────────────────────────────────┘
+```
+
+- **tar.xz** — native `.so` libraries, headers, cmake configs.
+  `python_bindings/**` is excluded via `artifact-hipdnn.toml`.
+- **wheel (`rocm-sdk-libraries`)** — native `.so` libraries +
+  Python bindings. No duplication of binding files.
+
+### TheRock Wheel Build Flow
+
+1. TheRock sets `-DHIPDNN_BUILD_PYTHON_BINDINGS=ON` in the hipDNN subproject
+2. cmake installs to `python_bindings/hipdnn_frontend/` in the stage tree
+3. `populate_python_bindings()` copies those files into the wheel's `src/`
+4. `setup.py`'s `find_packages(where="./src")` discovers `hipdnn_frontend`
+5. The nanobind `.so` extension goes into the wheel alongside `__init__.py`
+6. `libhipdnn_backend.so` is separately included via `populate_runtime_files()`
+
+### CI Testing
+
+- `rocm-sdk test` runs `libraries_test.py::testHipDNNFrontendImport`
+  which imports `hipdnn_frontend`
+- Skips gracefully if the package is not present in the build
+- Full CI chain: **build wheels** → **upload** → **pip install** →
+  **`rocm-sdk test`**
+
+See [python_bindings/README.md](./python_bindings/README.md) for all
+installation methods.
 
 ---
 

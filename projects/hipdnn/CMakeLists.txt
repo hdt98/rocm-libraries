@@ -136,6 +136,7 @@ if(DEFINED HIP_DNN_BUILD_FRONTEND)
     message(DEPRECATION "HIP_DNN_BUILD_FRONTEND has been renamed to HIPDNN_BUILD_FRONTEND. Please update your build scripts to use -DHIPDNN_BUILD_FRONTEND instead.")
 endif()
 option(HIPDNN_BUILD_FRONTEND "Build the frontend code" ON)
+option(HIPDNN_BUILD_PYTHON_BINDINGS "Build the Python bindings" OFF)
 
 # Migrate HIP_DNN_GENERATE_SDK_HEADERS -> HIPDNN_GENERATE_SDK_HEADERS
 if(DEFINED HIP_DNN_GENERATE_SDK_HEADERS)
@@ -244,7 +245,9 @@ add_subdirectory(plugin_sdk)
 
 add_subdirectory(tests)
 add_subdirectory(tools)
-add_subdirectory(python)
+if(HIPDNN_BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python_bindings)
+endif()
 
 if(NOT HIPDNN_SKIP_TESTS)
     # Keep this after all build folders have been added so they have a chance to register their tests
