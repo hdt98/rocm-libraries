@@ -361,3 +361,6 @@ set(ContaminationTestSources ${UnitCommonSources}
 
 
 add_rocwmma_unit_test(contamination_test ${ContaminationTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

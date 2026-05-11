@@ -206,3 +206,6 @@ set(MapUtilTestSources ${UnitCommonSources}
                        )
 
                    add_rocwmma_unit_test(map_util_test ${MapUtilTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

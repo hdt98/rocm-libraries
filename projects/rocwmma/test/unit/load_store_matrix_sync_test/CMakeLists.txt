@@ -52,3 +52,6 @@ set(LoadStoreMatrixSyncTestSources ${UnitCommonSources}
                     )
 
 add_rocwmma_unit_test(load_store_matrix_sync_test ${LoadStoreMatrixSyncTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

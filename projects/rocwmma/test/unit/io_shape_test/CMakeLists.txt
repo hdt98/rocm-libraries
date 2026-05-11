@@ -43,3 +43,6 @@ set(IoShapeTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(io_shape_test ${IoShapeTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

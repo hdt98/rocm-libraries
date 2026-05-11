@@ -34,3 +34,6 @@ set(VectorUtilTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(vector_util_test ${VectorUtilTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

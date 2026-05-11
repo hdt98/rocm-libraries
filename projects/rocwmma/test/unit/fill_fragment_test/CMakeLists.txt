@@ -63,3 +63,6 @@ set(FillFragmentTestSources ${UnitCommonSources}
 
 
 add_rocwmma_unit_test(fill_fragment_test ${FillFragmentTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

@@ -1,0 +1,67 @@
+# rocWMMA Test Categories Configuration (CTest)
+#
+# Based on test_rocwmma.py from TheRock.
+#
+# NOTE: Each test subdirectory (regression/, unit/*, gemm/*, dlrm/) calls
+# rocwmma_apply_ctest_labels() to apply labels to tests it registered.
+# CMake's TESTS directory property is directory-scoped, so labeling must
+# happen in the same scope where add_test() ran.
+#
+# Test types used by TheRock:
+# - quick/regression: regression_tests only (fast validation, ~12 min timeout)
+# - full: all tests (~60 min timeout)
+#
+# Tier labels are applied automatically by parse_ctest_categories.py:
+#   quick         -> quick, standard, comprehensive, full so that tests in quick category will be run for all categories
+#   standard      -> standard, comprehensive, full
+#   comprehensive -> comprehensive, full
+#   full          -> full
+# The `labels:` field below is a placeholder for additional custom labels
+# (e.g. "flaky", "gpu_only", "slow"). The category's own tier label is
+# kept here for clarity and as an anchor for future additions.
+
+test_categories:
+  quick:
+    description: "rocWMMA quick tests - regression tests only"
+    test_patterns:
+      - "regression_tests"
+    exclude:
+      # Flaky/problematic tests excluded
+      - ".*unpack_util_test.*"
+      - ".*contamination_test.*"
+      - ".*map_util_test.*"
+    labels:
+      - "quick"
+
+  standard:
+    description: "rocWMMA standard tests"
+    test_patterns:
+      - ".*"
+    exclude:
+      - ".*unpack_util_test.*"
+      - ".*contamination_test.*"
+      - ".*map_util_test.*"
+    labels:
+      - "standard"
+
+  comprehensive:
+    description: "rocWMMA comprehensive tests"
+    test_patterns:
+      - ".*"
+    exclude:
+      - ".*unpack_util_test.*"
+      - ".*contamination_test.*"
+      - ".*map_util_test.*"
+    labels:
+      - "comprehensive"
+
+  full:
+    description: "rocWMMA full test suite"
+    test_patterns:
+      - ".*"
+    exclude:
+      - ".*unpack_util_test.*"
+      - ".*contamination_test.*"
+      - ".*map_util_test.*"
+    labels:
+      - "full"

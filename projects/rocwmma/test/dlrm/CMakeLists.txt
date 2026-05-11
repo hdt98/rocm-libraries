@@ -89,3 +89,6 @@ endif()
      add_dlrm_validation_test(dlrm_dot_test-validate ${DlrmDotTestSources})
      add_dlrm_validation_test(dlrm_dot_lds_test-validate ${DlrmDotLdsTestSources})
  endif()
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

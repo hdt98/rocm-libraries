@@ -34,3 +34,6 @@ set(TupleTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(tuple_test ${TupleTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

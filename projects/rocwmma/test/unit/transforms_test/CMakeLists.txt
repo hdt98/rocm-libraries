@@ -34,3 +34,6 @@ set(TransformsTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(transforms_test ${TransformsTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

@@ -190,3 +190,7 @@ set(${ROCWMMA_AD_HOC_TARGET_SOURCES} ${ROCWMMA_COMMON_TEST_SOURCES}
 # Create targets
 add_gemm_test(${ROCWMMA_TARGET_NAME}  ${${ROCWMMA_TARGET_SOURCES}})
 add_gemm_test(${ROCWMMA_AD_HOC_TARGET_NAME} ${${ROCWMMA_AD_HOC_TARGET_SOURCES}})
+
+# Applying Test category labels
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

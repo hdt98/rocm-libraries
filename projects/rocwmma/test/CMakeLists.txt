@@ -90,6 +90,37 @@ else()
   set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_OLD} CACHE INTERNAL "Build SHARED libraries" FORCE)
 endif()
 
+# CTest test categorization (YAML-driven). Include the helper module up
+# front so the function apply_ctest_category_labels() is available not
+# only here but also in nested test subdirectories (gemm/, unit/, dlrm/,
+# regression/), which are processed by add_subdirectory() further down.
+# Each scope that registers tests must call apply_ctest_category_labels()
+# itself, because CMake's TESTS directory property and set_property(TEST ...)
+# are scoped to the directory in which add_test() ran.
+set(_ROCWMMA_TEST_CATEGORIES_YAML "${CMAKE_SOURCE_DIR}/test_categories.yaml")
+set(_ROCWMMA_SHARED_CTEST          "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+if(EXISTS "${_ROCWMMA_SHARED_CTEST}" AND EXISTS "${_ROCWMMA_TEST_CATEGORIES_YAML}")
+    include("${_ROCWMMA_SHARED_CTEST}")
+    message(STATUS "rocWMMA: YAML-based CTest categorization enabled")
+else()
+    if(NOT EXISTS "${_ROCWMMA_SHARED_CTEST}")
+        message(STATUS "rocWMMA: shared/ctest not found at ${_ROCWMMA_SHARED_CTEST}; skipping CTest categories")
+    endif()
+    if(NOT EXISTS "${_ROCWMMA_TEST_CATEGORIES_YAML}")
+        message(STATUS "rocWMMA: ${_ROCWMMA_TEST_CATEGORIES_YAML} not found; skipping CTest categories")
+    endif()
+endif()
+
+# Convenience wrapper so subdirectories can apply CTest category labels with
+# a single call. The underlying apply_ctest_category_labels() must be invoked
+# from the directory scope where add_test() ran, because CMake's TESTS
+# directory property and set_property(TEST ...) are directory-scoped.
+function(rocwmma_apply_ctest_labels)
+    if(COMMAND apply_ctest_category_labels)
+        apply_ctest_category_labels("${_ROCWMMA_TEST_CATEGORIES_YAML}")
+    endif()
+endfunction()
+
 set(ROCWMMA_TEST_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
 set(ROCWMMA_COMMON_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/hip_device.cpp
                                 ${CMAKE_CURRENT_SOURCE_DIR}/rocwmma_gtest_main.cpp)
@@ -225,3 +256,8 @@ rocm_install(
     COMPONENT tests
     RENAME "CTestTestfile.cmake"
 )
+
+# NOTE: Test labeling via rocwmma_apply_ctest_labels() happens in each
+# subdirectory that registers tests (regression/, unit/*, gemm/*, dlrm/).
+# Due to CMake's directory-scoped TESTS property, labels can only be applied
+# to tests visible in the current directory scope.

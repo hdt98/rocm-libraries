@@ -103,3 +103,6 @@ set(LayoutTraitsTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(layout_traits_test ${LayoutTraitsTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

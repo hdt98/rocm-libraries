@@ -33,3 +33,6 @@ set(FloatTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(float_test ${FloatTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

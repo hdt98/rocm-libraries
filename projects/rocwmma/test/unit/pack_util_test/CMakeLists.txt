@@ -34,3 +34,6 @@ set(PackUtilTestSources ${UnitCommonSources}
                        )
 
 add_rocwmma_unit_test(pack_util_test ${PackUtilTestSources})
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()

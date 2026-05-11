@@ -150,3 +150,6 @@ set(CrossLaneOpsTestSources ${UnitCommonSources}
 
 add_rocwmma_unit_test(cross_lane_ops_test ${CrossLaneOpsTestSources})
 
+
+# Apply Test category labels
+rocwmma_apply_ctest_labels()
