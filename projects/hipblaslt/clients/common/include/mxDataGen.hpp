@@ -26,20 +26,11 @@
 
 #pragma once
 
-// All content below is gated so the header is harmless to include when the
-// feature is disabled (the entire translation unit collapses to nothing).
-// Callers that actually invoke `generateMXInput` must guard their use sites
-// on the same macro.
-#if HIPBLASLT_ENABLE_MXDATAGENERATOR
-
-#include <hip/hip_bfloat16.h>
-#include <hip/hip_runtime.h>
-#include <hipblaslt/hipblaslt-export.h>
-#include <hipblaslt/hipblaslt-types.h>
-#include <stdint.h>
-
-#include <string_view>
-#include <vector>
+// Pure-value enums used to parameterise `generateMXInput`. These are
+// intentionally declared outside the `HIPBLASLT_ENABLE_MXDATAGENERATOR`
+// guard so callers can hold them as member variables in widely-included
+// headers without having to drag in HIP / hipblaslt headers transitively
+// when the MX data generator is disabled.
 
 // Selects whether `generateMXInput` populates the packed `data`/`scale`
 // buffers via the host (CPU PRNG + std::memcpy) or writes them straight
@@ -81,14 +72,29 @@ enum class MXInitDevice
 //   kNone    -- natural mxDataGenerator scale layout, no swizzle.
 //   kGFX950  -- AITER (preSwizzleScalesGFX950) layout used by gfx950
 //               subtile MX kernels.
-//   kGFX1250 -- dimk (preSwizzleScalesGFX1250) layout used by gfx1250 MX
-//               kernels.
+//   kGFX1250 -- dimk (preSwizzleScalesGFX1250) layout used by gfx1250
+//               (and other non-rocroller WMMA) MX kernels.
 enum class MXScaleLayout
 {
     kNone    = 0,
     kGFX950  = 1,
     kGFX1250 = 2,
 };
+
+// All content below is gated so the header is harmless to include when the
+// feature is disabled (the entire translation unit collapses to nothing).
+// Callers that actually invoke `generateMXInput` must guard their use sites
+// on the same macro.
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
+
+#include <hip/hip_bfloat16.h>
+#include <hip/hip_runtime.h>
+#include <hipblaslt/hipblaslt-export.h>
+#include <hipblaslt/hipblaslt-types.h>
+#include <stdint.h>
+
+#include <string_view>
+#include <vector>
 
 // CPU-only overload (kept for callers that don't want to opt into the
 // GPU backend). Equivalent to passing `MXInitDevice::Cpu` to the overload
