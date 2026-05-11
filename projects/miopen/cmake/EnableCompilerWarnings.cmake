@@ -65,7 +65,7 @@ set(__clang_cxx_compile_options
     -Wno-c++11-narrowing
     -Wno-switch-enum
     -Wno-suggest-override
-    -Wno-nonportable-system-include-path
+    -Wnonportable-system-include-path
     -Wno-documentation
     -Wmissing-noreturn)
 
