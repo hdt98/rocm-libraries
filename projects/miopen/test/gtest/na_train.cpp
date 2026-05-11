@@ -772,11 +772,11 @@ struct na_fusion_test : public testing::TestWithParam<TestCase>
 
         miopenFusionOpDescriptor_t bNormFwdOp = nullptr;
         miopenFusionOpDescriptor_t activFwdOp = nullptr;
-        auto ptr_fwdfusionplan                = GetManagedFusionPlanDesc(&input.desc);
+        auto ptr_fwdfusionplan                = GetManagedFusionPlanDesc(input.desc);
 
         miopenFusionOpDescriptor_t bNormBwdOp = nullptr;
         miopenFusionOpDescriptor_t activBwdOp = nullptr;
-        auto ptr_bwdfusionplan                = GetManagedFusionPlanDesc(&input.desc);
+        auto ptr_bwdfusionplan                = GetManagedFusionPlanDesc(input.desc);
 
         std::size_t ssn, ssc, ssh, ssw;
         if(batchnormMode == 1)

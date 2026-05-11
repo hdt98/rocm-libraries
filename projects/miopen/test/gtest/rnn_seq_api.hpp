@@ -1535,14 +1535,14 @@ protected:
         size_t train_workSpace_size, train_reserveSpace_size;
         miopenGetRNNTempSpaceSizes(&handle,
                                    &rnnDesc,
-                                   &input.desc,
+                                   input.desc,
                                    miopenRNNTraining,
                                    &train_workSpace_size,
                                    &train_reserveSpace_size);
 
         size_t inference_workSpace_size;
         miopenGetRNNTempSpaceSizes(
-            &handle, &rnnDesc, &input.desc, miopenRNNInference, &inference_workSpace_size, nullptr);
+            &handle, &rnnDesc, input.desc, miopenRNNInference, &inference_workSpace_size, nullptr);
 
         auto tmp_mem =
             std::max(inference_workSpace_size, train_workSpace_size + train_reserveSpace_size);

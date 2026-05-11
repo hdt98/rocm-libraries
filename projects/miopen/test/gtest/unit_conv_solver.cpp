@@ -417,8 +417,10 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
     // Prepare
     //**********************************
 
-    auto input   = tensor<Tin>{conv_config.GetXTensorDescriptor()};
-    auto weights = tensor<Twei>{conv_config.GetWTensorDescriptor()};
+    auto x_td    = conv_config.GetXTensorDescriptor();
+    auto w_td    = conv_config.GetWTensorDescriptor();
+    auto input   = tensor<Tin>{&x_td};
+    auto weights = tensor<Twei>{&w_td};
 
     if(weights.desc.GetLayout() == miopenTensorCHWNc4 ||
        weights.desc.GetLayout() == miopenTensorCHWNc8)
@@ -428,10 +430,10 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
 
     const auto conv_desc = conv_config.GetConv();
 
-    const auto output_desc =
+    auto output_td =
         conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<Tout>{});
 
-    auto output = tensor<Tout>{output_desc};
+    auto output = tensor<Tout>{&output_td};
 
     input.generate(GenConvData<Tin, Tout>{weights.desc.GetLengths()});
     weights.generate(GenConvData<Twei, Tout>{weights.desc.GetLengths()});
@@ -551,8 +553,10 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
     // Prepare
     //**********************************
 
-    auto input   = tensor<Tin>{conv_config.GetXTensorDescriptor()};
-    auto weights = tensor<Twei>{conv_config.GetWTensorDescriptor()};
+    auto x_td    = conv_config.GetXTensorDescriptor();
+    auto w_td    = conv_config.GetWTensorDescriptor();
+    auto input   = tensor<Tin>{&x_td};
+    auto weights = tensor<Twei>{&w_td};
 
     if(weights.desc.GetLayout() == miopenTensorCHWNc4 ||
        weights.desc.GetLayout() == miopenTensorCHWNc8)
@@ -562,10 +566,10 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
 
     const auto conv_desc = conv_config.GetConv();
 
-    const auto output_desc =
+    auto output_td =
         conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<Tout>{});
 
-    auto output = tensor<Tout>{output_desc};
+    auto output = tensor<Tout>{&output_td};
 
     output.generate(GenConvData<Tout, Tin>{weights.desc.GetLengths()});
     weights.generate(GenConvData<Twei, Tin>{weights.desc.GetLengths()});
@@ -677,24 +681,26 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
     // Prepare
     //**********************************
 
-    auto input   = tensor<Tin>{conv_config.GetXTensorDescriptor()};
-    auto weights = tensor<Twei>{conv_config.GetWTensorDescriptor()};
+    auto x_td    = conv_config.GetXTensorDescriptor();
+    auto w_td    = conv_config.GetWTensorDescriptor();
+    auto input   = tensor<Tin>{&x_td};
+    auto weights = tensor<Twei>{&w_td};
 
     const auto conv_desc = conv_config.GetConv();
 
-    const auto output_desc =
+    auto output_td =
         conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<Tout>{});
 
-    if(output_desc.GetLayout() == miopenTensorCHWNc4 ||
-       output_desc.GetLayout() == miopenTensorCHWNc8)
+    if(output_td.GetLayout_t() == miopenTensorCHWNc4 ||
+       output_td.GetLayout_t() == miopenTensorCHWNc8)
     {
         throw std::runtime_error("GenConvData do not support CHWNc filter layout");
     }
 
-    auto output = tensor<Tout>{output_desc};
+    auto output = tensor<Tout>{&output_td};
 
-    input.generate(GenConvData<Tin, Twei>{output_desc.GetLengths()});
-    output.generate(GenConvData<Tout, Twei>{output_desc.GetLengths()});
+    input.generate(GenConvData<Tin, Twei>{output_td.GetLengths()});
+    output.generate(GenConvData<Tout, Twei>{output_td.GetLengths()});
     std::fill(weights.begin(), weights.end(), Twei());
 
     auto&& handle = get_handle();

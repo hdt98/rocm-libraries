@@ -142,7 +142,7 @@ protected:
             auto tmp = std::make_unique<TensorStruct>(std::move(tensor));
             std::visit(
                 [this, id, &handle, &gpu_buff = tmp->m_gpu_buffer](auto&& cpu_tensor) {
-                    ASSERT_EQ(miopenSetProblemTensorDescriptor(problem, id, &cpu_tensor.desc),
+                    ASSERT_EQ(miopenSetProblemTensorDescriptor(problem, id, cpu_tensor.desc),
                               miopenStatusSuccess);
 
                     gpu_buff = handle.Write(cpu_tensor.data);

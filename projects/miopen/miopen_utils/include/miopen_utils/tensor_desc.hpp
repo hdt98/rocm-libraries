@@ -41,6 +41,12 @@
 #include <tuple>
 #include <vector>
 
+// When building tests, include the internal TensorDescriptor type so that
+// TensorDesc can provide an implicit conversion to it (see operator below).
+#ifdef MIOPEN_BUILD_TESTING
+#include <miopen/tensor.hpp>
+#endif
+
 class TensorDesc
 {
     miopenTensorDescriptor_t handle_ = nullptr;
@@ -404,6 +410,16 @@ public:
 
     /// Implicit conversion so code like miopenSetTensor(h, desc, ...) works.
     operator miopenTensorDescriptor_t() const { return handle_; }
+
+#ifdef MIOPEN_BUILD_TESTING
+    // Test code (Layer 4) legitimately needs access to the internal
+    // miopen::TensorDescriptor type for constructing conv::ProblemDescription,
+    // calling DeriveBNTensorDescriptor, etc. This conversion dereferences the
+    // opaque handle to return a reference to the underlying internal object.
+    // Driver and miopen_utils builds do NOT define MIOPEN_BUILD_TESTING,
+    // so this conversion is not available outside of test code.
+    operator const miopen::TensorDescriptor&() const { return miopen::deref(handle_); }
+#endif
 };
 
 // tensor_view_t utilities -- build tensor views from descriptor handles

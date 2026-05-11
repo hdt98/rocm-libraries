@@ -31,12 +31,21 @@
 #include <common_utils/tuple_utils.hpp>
 #include <common_utils/ford.hpp>
 #include <common_utils/functional.hpp>
-#include <miopen_utils/tensor_desc.hpp>
-#include <common_utils/tuple_utils.hpp>
 #include <common_utils/type_name.hpp>
 #include <common_utils/each_args.hpp>
 #include <common_utils/bfloat16.hpp>
 #include <common_utils/random.hpp>
+
+// When building tests, include internal MIOpen tensor type so test code can
+// access miopen::TensorDescriptor, miopen::tien, miopen::deref, etc. via
+// tensor_holder.hpp's transitive includes. Test code (Layer 4) legitimately
+// needs these internals for constructing conv::ProblemDescription, calling
+// DeriveBNTensorDescriptor, and similar internal test infrastructure.
+// Driver and miopen_utils builds do NOT define MIOPEN_BUILD_TESTING, so they
+// remain clean of internal includes.
+#ifdef MIOPEN_BUILD_TESTING
+#include <miopen/tensor.hpp>
+#endif
 
 #include <miopen_utils/serialize.hpp>
 
@@ -174,6 +183,18 @@ struct tensor
         : desc(miopen_type<T>{}, layout, std::vector<size_t>(dims.begin(), dims.end())),
           data(desc.GetElementSpace())
     {
+    }
+
+    template <class X>
+    tensor(miopenTensorLayout_t layout,
+           const std::vector<X>& dims,
+           const std::vector<X>& strides)
+        : desc(miopen_type<T>{},
+               std::vector<size_t>(dims.begin(), dims.end()),
+               std::vector<size_t>(strides.begin(), strides.end())),
+          data(desc.GetElementSpace())
+    {
+        assert(dims.size() == strides.size());
     }
 
     tensor(std::size_t n, std::size_t c, std::size_t h, std::size_t w)

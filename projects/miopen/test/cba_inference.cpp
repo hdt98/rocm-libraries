@@ -29,6 +29,7 @@
 #include <miopen_utils/fusionHost.hpp>
 #include <miopen_utils/random.hpp>
 #include <common_utils/stringutils.hpp>
+#include <miopen/convolution.hpp>
 
 using ptr_FusionPlanDesc = MIOPEN_MANAGE_PTR(miopenFusionPlanDescriptor_t, miopenDestroyFusionPlan);
 using ptr_FusionPlanArgs = MIOPEN_MANAGE_PTR(miopenOperatorArgs_t, miopenDestroyOperatorArgs);
@@ -77,11 +78,11 @@ struct verify_forward_conv_bias
                              size_t pworkspace_size)
     {
         input          = pinput;
-        inputDesc      = &pinput.desc;
+        inputDesc      = pinput.desc;
         weights        = pweights;
-        weightsDesc    = &pweights.desc;
+        weightsDesc    = pweights.desc;
         bias           = pbias;
-        biasDesc       = &pbias.desc;
+        biasDesc       = pbias.desc;
         filter         = &pfilter;
         fusionplan     = pfusionplan;
         workspace_size = pworkspace_size;
@@ -89,7 +90,7 @@ struct verify_forward_conv_bias
 
     tensor<T> cpu() const
     {
-        auto rout = get_output_tensor(miopen::deref(filter), input, weights);
+        auto rout = get_output_tensor(filter, input, weights);
         convHostForward(input, rout, weights, 1, bias, filter);
         return rout;
     }
@@ -101,7 +102,7 @@ struct verify_forward_conv_bias
         miopenFusionOpDescriptor_t biasOp{};
 
         auto&& handle = get_handle();
-        auto rout     = get_output_tensor(miopen::deref(filter), input, weights);
+        auto rout     = get_output_tensor(filter, input, weights);
         auto in_dev   = handle.Write(input.data);
         auto wei_dev  = handle.Write(weights.data);
         auto b_dev    = handle.Write(bias.data);
@@ -119,7 +120,7 @@ struct verify_forward_conv_bias
                                    fusionplan,
                                    inputDesc,
                                    in_dev.get(),
-                                   &rout.desc,
+                                   rout.desc,
                                    out_dev.get(),
                                    ptr_fusionargs.get(),
                                    workspace_dev.get(),
@@ -159,11 +160,11 @@ struct verify_forward_conv_bias_activ
                                    size_t pworkspace_size)
     {
         input          = pinput;
-        inputDesc      = &pinput.desc;
+        inputDesc      = pinput.desc;
         weights        = pweights;
-        weightsDesc    = &pweights.desc;
+        weightsDesc    = pweights.desc;
         bias           = pbias;
-        biasDesc       = &pbias.desc;
+        biasDesc       = pbias.desc;
         filter         = &pfilter;
         activDesc      = pactivDesc;
         bias_mode      = pbias_mode;
@@ -173,7 +174,7 @@ struct verify_forward_conv_bias_activ
 
     tensor<T> cpu() const
     {
-        auto rout = get_output_tensor(miopen::deref(filter), input, weights);
+        auto rout = get_output_tensor(filter, input, weights);
         auto aout = rout;
         std::fill(aout.begin(), aout.end(), 0.);
         double activ_alpha, activ_beta, activ_gamma;
@@ -188,7 +189,7 @@ struct verify_forward_conv_bias_activ
     tensor<T> gpu() const
     {
         auto&& handle = get_handle();
-        auto rout     = get_output_tensor(miopen::deref(filter), input, weights);
+        auto rout     = get_output_tensor(filter, input, weights);
         auto in_dev   = handle.Write(input.data);
         auto wei_dev  = handle.Write(weights.data);
         auto b_dev    = handle.Write(bias.data);
@@ -229,7 +230,7 @@ struct verify_forward_conv_bias_activ
                                    fusionplan,
                                    inputDesc,
                                    in_dev.get(),
-                                   &rout.desc,
+                                   rout.desc,
                                    out_dev.get(),
                                    ptr_fusionargs.get(),
                                    workspace_dev.get(),
@@ -384,10 +385,10 @@ struct cba_fusion_driver : test_driver
                     return;
             }
 
-            auto ptr_fusionplan = GetManagedFusionPlanDesc(&input.desc);
-            miopenCreateOpConvForward(ptr_fusionplan.get(), &convoOp, &filter, &weights.desc);
+            auto ptr_fusionplan = GetManagedFusionPlanDesc(input.desc);
+            miopenCreateOpConvForward(ptr_fusionplan.get(), &convoOp, &filter, weights.desc);
 
-            auto output = get_output_tensor(filter, input, weights);
+            auto output = get_output_tensor(&filter, input, weights);
             if(bias_mode)
             {
                 if(input.desc.GetType() == miopenFloat)
@@ -404,7 +405,7 @@ struct cba_fusion_driver : test_driver
                     }
                 }
 
-                miopenCreateOpBiasForward(ptr_fusionplan.get(), &biasOp, &bias.desc);
+                miopenCreateOpBiasForward(ptr_fusionplan.get(), &biasOp, bias.desc);
             }
             else
             {

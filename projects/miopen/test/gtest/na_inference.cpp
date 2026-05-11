@@ -72,9 +72,9 @@ struct verify_inference_batchnorm_activ
                                      miopenFusionOpDescriptor_t pactivOp)
     {
         input           = pinput;
-        inputDesc       = &pinput.desc;
+        inputDesc       = pinput.desc;
         activDesc       = pactivDesc;
-        biasScaleTensor = &pbnscale.desc;
+        biasScaleTensor = pbnscale.desc;
         bnscale         = pbnscale;
         bnbias          = pbnbias;
         estMean         = pestMean;
@@ -296,9 +296,9 @@ struct na_fusion_inference_test : public ::testing::TestWithParam<TestCase>
         miopenFusionOpDescriptor_t bNormOp = nullptr;
         miopenFusionOpDescriptor_t activOp = nullptr;
 
-        auto ptr_fusionplan = GetManagedFusionPlanDesc(&input.desc);
+        auto ptr_fusionplan = GetManagedFusionPlanDesc(input.desc);
 
-        miopenCreateOpBatchNormInference(ptr_fusionplan.get(), &bNormOp, bnmode, &scale.desc);
+        miopenCreateOpBatchNormInference(ptr_fusionplan.get(), &bNormOp, bnmode, scale.desc);
         miopenCreateOpActivationForward(ptr_fusionplan.get(), &activOp, activ_mode);
 
         miopenStatus_t miopenError = miopenCompileFusionPlan(&handle, ptr_fusionplan.get());

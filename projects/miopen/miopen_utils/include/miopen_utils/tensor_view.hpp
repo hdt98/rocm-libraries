@@ -1,8 +1,8 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#ifndef GUARD_MIOPEN_UTILS_TENSOR_VIEW_HPP
-#define GUARD_MIOPEN_UTILS_TENSOR_VIEW_HPP
+#ifndef GUARD_TENSOR_VIEW_HPP
+#define GUARD_TENSOR_VIEW_HPP
 
 // HOST-SIDE copy of tensor_view_t and tensor_layout_t.
 //
@@ -123,4 +123,4 @@ inline void slice_tv(tensor_view_t<N>& tensor_view, int32_t sliceCount, const in
     }
 }
 
-#endif // GUARD_MIOPEN_UTILS_TENSOR_VIEW_HPP
+#endif // GUARD_TENSOR_VIEW_HPP

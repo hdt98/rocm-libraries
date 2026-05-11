@@ -28,7 +28,8 @@ struct CPU_EmbedSQLite_NONE : public ::testing::TestWithParam<int>
 #if MIOPEN_EMBED_DB
         x = tensor<float>{128, 1024, 14, 14};
         w = tensor<float>{2048, 1024, 1, 1};
-        y = tensor<float>{filter.GetForwardOutputTensor(x.desc, w.desc)};
+        auto y_td = filter.GetForwardOutputTensor(x.desc, w.desc);
+        y = tensor<float>{&y_td};
 #endif
     }
 

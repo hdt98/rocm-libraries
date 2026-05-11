@@ -29,6 +29,8 @@
 #include <miopen/miopen.h>
 #include <miopen/solver_id.hpp>
 #include <miopen/batchnorm/problem_description.hpp>
+#include <miopen/batch_norm.hpp>
+#include <miopen/fusion_plan.hpp>
 #include <serialize.hpp>
 #include <fusionHost.hpp>
 

@@ -123,7 +123,9 @@ protected:
         std::transform(inputs.begin(),
                        inputs.end(),
                        std::back_inserter(inputDescs),
-                       [](auto& input) { return &input.desc; });
+                       [](auto& input) -> miopen::TensorDescriptor* {
+                           return &miopen::deref(input.desc.get());
+                       });
         std::transform(inputs_dev.begin(),
                        inputs_dev.end(),
                        std::back_inserter(inputData),

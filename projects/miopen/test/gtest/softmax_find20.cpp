@@ -127,7 +127,7 @@ public:
     {
         std::cerr << "Testing solution functions..." << std::endl;
 
-        miopenTensorDescriptor_t x_desc = &xTensor.desc, y_desc = &yTensor.desc;
+        miopenTensorDescriptor_t x_desc = xTensor.desc, y_desc = yTensor.desc;
 
         const unsigned int numTensors = 2;
 
@@ -169,7 +169,7 @@ public:
                                                  x_desc,
                                                  in_gpu.get(),
                                                  &beta,
-                                                 &yTensorRef.desc,
+                                                 yTensorRef.desc,
                                                  out_gpu_ref.get(),
                                                  softmax_descriptor.GetAlgorithm(),
                                                  softmax_descriptor.GetMode()),
@@ -178,8 +178,8 @@ public:
             yTensor.data    = handle.Read<T>(out_gpu, yTensor.data.size());
             yTensorRef.data = handle.Read<T>(out_gpu_ref, yTensorRef.data.size());
 
-            mloSoftmaxForwardRunHost<T, Tref>(&xTensor.desc,
-                                              &yTensor.desc,
+            mloSoftmaxForwardRunHost<T, Tref>(xTensor.desc,
+                                              yTensor.desc,
                                               xTensor.data.data(),
                                               outhost.data(),
                                               alpha,
@@ -201,9 +201,9 @@ public:
     {
         std::cerr << "Testing solution functions..." << std::endl;
 
-        miopenTensorDescriptor_t y_desc  = &yTensor.desc;
-        miopenTensorDescriptor_t dy_desc = &dyTensor.desc;
-        miopenTensorDescriptor_t dx_desc = &dxTensor.desc;
+        miopenTensorDescriptor_t y_desc  = yTensor.desc;
+        miopenTensorDescriptor_t dy_desc = dyTensor.desc;
+        miopenTensorDescriptor_t dx_desc = dxTensor.desc;
 
         const unsigned int numTensors = 3;
 
@@ -249,7 +249,7 @@ public:
                                                   dy_desc,
                                                   in2_gpu.get(),
                                                   &beta,
-                                                  &dxTensorRef.desc,
+                                                  dxTensorRef.desc,
                                                   out_gpu_ref.get(),
                                                   softmax_descriptor.GetAlgorithm(),
                                                   softmax_descriptor.GetMode()),
@@ -258,8 +258,8 @@ public:
             dxTensorRef.data = handle.Read<T>(out_gpu_ref, dxTensorRef.data.size());
 
             // run softmax cpu
-            mloSoftmaxBackwardRunHost<T, Tref>(&yTensor.desc,
-                                               &dyTensor.desc,
+            mloSoftmaxBackwardRunHost<T, Tref>(yTensor.desc,
+                                               dyTensor.desc,
                                                yTensor.data.data(),
                                                dyTensor.data.data(),
                                                dinhost.data(),

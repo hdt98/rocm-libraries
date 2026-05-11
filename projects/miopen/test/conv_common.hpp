@@ -186,8 +186,9 @@ tensor<Tout> get_output_tensor(const miopen::ConvolutionDescriptor& filter,
 {
 
     std::string yLayout = out_layout.empty() ? input.desc.GetLayout_str() : out_layout;
-    return tensor<Tout>{filter.GetForwardOutputTensorWithLayout(
-        input.desc, weights.desc, yLayout, miopen_type<Tout>{})};
+    auto out_desc = filter.GetForwardOutputTensorWithLayout(
+        input.desc, weights.desc, yLayout, miopen_type<Tout>{});
+    return tensor<Tout>{&out_desc};
 }
 
 enum class ConvApi
@@ -834,7 +835,7 @@ struct verify_forward_conv : conv_base<T, Tout>
                 else if(api == ConvApi::Find_2_0)
                 {
                     const auto f2_problem = MakeConvProblem(
-                        miopenProblemDirectionForward, &in_desc, &wei_desc, &rout.desc);
+                        miopenProblemDirectionForward, &in_desc, &wei_desc, rout.desc);
 
                     const miopenTensorArgument_t arguments[3] = {
                         {miopenTensorConvolutionX, nullptr, in_buf},
@@ -939,7 +940,7 @@ struct verify_forward_conv : conv_base<T, Tout>
                 else if(api == ConvApi::Find_2_0)
                 {
                     const auto f2_problem = MakeConvProblem(
-                        miopenProblemDirectionForward, &input.desc, &weights.desc, &rout.desc);
+                        miopenProblemDirectionForward, input.desc, weights.desc, rout.desc);
 
                     const miopenTensorArgument_t arguments[3] = {
                         {miopenTensorConvolutionX, nullptr, in_dev.get()},
@@ -1299,7 +1300,7 @@ struct verify_backward_conv : conv_base<T>
         }
         case ConvApi::Find_2_0: {
             const auto f2_problem = MakeConvProblem(
-                miopenProblemDirectionBackward, &rinput.desc, &weights.desc, &out.desc);
+                miopenProblemDirectionBackward, rinput.desc, weights.desc, out.desc);
 
             const miopenTensorArgument_t arguments[3] = {
                 {miopenTensorConvolutionX, nullptr, in_dev.get()},
@@ -1559,7 +1560,7 @@ struct verify_backward_weights_conv : conv_base<T>
         }
         case ConvApi::Find_2_0: {
             const auto f2_problem = MakeConvProblem(
-                miopenProblemDirectionBackwardWeights, &input.desc, &rweights.desc, &out.desc);
+                miopenProblemDirectionBackwardWeights, input.desc, rweights.desc, out.desc);
 
             const miopenTensorArgument_t arguments[3] = {
                 {miopenTensorConvolutionX, nullptr, in_dev.get()},
@@ -2091,7 +2092,7 @@ struct conv_driver : test_driver
                 in_layout,
                 vector_length,
                 dim_strides);
-            input.desc = miopen::TensorDescriptor(miopen_type<T>{}, dim_lens, dim_strides);
+            input.desc = TensorDesc(miopen_type<T>{}, dim_lens, dim_strides);
         }
         if(fil_layout != "NCHW" && fil_layout != "NCDHW" && fil_layout != "CHWN")
         {
@@ -2103,7 +2104,7 @@ struct conv_driver : test_driver
                 fil_layout,
                 vector_length,
                 dim_strides);
-            weights.desc = miopen::TensorDescriptor(miopen_type<T>{}, dim_lens, dim_strides);
+            weights.desc = TensorDesc(miopen_type<T>{}, dim_lens, dim_strides);
         }
 
         if(input.desc.GetNumDims() != 2 + spatial_dim ||

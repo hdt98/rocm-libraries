@@ -58,7 +58,8 @@ struct find_db_driver
         filter.findMode.Set(FindMode::Values::Hybrid);
         x = {100, 25, 32, 32};
         w = {300, 25, 3, 3};
-        y = tensor<T>{filter.GetForwardOutputTensor(x.desc, w.desc)};
+        auto y_td = filter.GetForwardOutputTensor(x.desc, w.desc);
+        y = tensor<T>{&y_td};
     }
 
     void run()

@@ -28,6 +28,8 @@
 #include <miopen_utils/fusionHost.hpp>
 #include "workspace.hpp"
 #include <common_utils/stringutils.hpp>
+#include <miopen/convolution.hpp>
+#include <miopen/batch_norm.hpp>
 
 using ptr_FusionPlanDesc = MIOPEN_MANAGE_PTR(miopenFusionPlanDescriptor_t, miopenDestroyFusionPlan);
 using ptr_FusionPlanArgs = MIOPEN_MANAGE_PTR(miopenOperatorArgs_t, miopenDestroyOperatorArgs);
@@ -94,16 +96,16 @@ struct verify_forward_conv_bias_batchnorm_activ
                                              miopenBatchNormMode_t pbnmode)
     {
         input           = pinput;
-        inputDesc       = &pinput.desc;
+        inputDesc       = pinput.desc;
         weights         = pweights;
-        weightsDesc     = &pweights.desc;
+        weightsDesc     = pweights.desc;
         bias            = pbias;
-        biasDesc        = &pbias.desc;
+        biasDesc        = pbias.desc;
         filter          = &pfilter;
         activDesc       = pactivDesc;
         doactive        = pdoactiv;
         bias_mode       = pbias_mode;
-        biasScaleTensor = &pbnscale.desc;
+        biasScaleTensor = pbnscale.desc;
         bnscale         = pbnscale;
         bnbias          = pbnbias;
         estMean         = pestMean;
@@ -116,7 +118,7 @@ struct verify_forward_conv_bias_batchnorm_activ
     tensor<T> cpu() const
     {
 
-        auto rout = get_output_tensor(miopen::deref(filter), input, weights);
+        auto rout = get_output_tensor(filter, input, weights);
         auto aout = rout;
         std::fill(aout.begin(), aout.end(), 0.);
         auto bout = rout;
@@ -157,7 +159,7 @@ struct verify_forward_conv_bias_batchnorm_activ
     tensor<T> gpu() const
     {
         auto&& handle        = get_handle();
-        auto rout            = get_output_tensor(miopen::deref(filter), input, weights);
+        auto rout            = get_output_tensor(filter, input, weights);
         auto in_dev          = handle.Write(input.data);
         auto wei_dev         = handle.Write(weights.data);
         auto b_dev           = handle.Write(bias.data);
@@ -220,7 +222,7 @@ struct verify_forward_conv_bias_batchnorm_activ
                                    fusionplan,
                                    inputDesc,
                                    in_dev.get(),
-                                   &rout.desc,
+                                   rout.desc,
                                    out_dev.get(),
                                    ptr_fusionargs.get(),
                                    wspace.ptr(),
@@ -359,7 +361,7 @@ struct cbna_fusion_driver : test_driver
         miopenFusionOpDescriptor_t activOp = nullptr;
 
         auto&& handle       = get_handle();
-        auto ptr_fusionplan = GetManagedFusionPlanDesc(&input.desc);
+        auto ptr_fusionplan = GetManagedFusionPlanDesc(input.desc);
 
         filter.mode         = cmode_lookup[miopen::ToUpper(conv_mode)];
         filter.paddingMode  = pmode_lookup[miopen::ToUpper(pad_mode)];
@@ -427,7 +429,7 @@ struct cbna_fusion_driver : test_driver
 
         std::size_t ssn, ssc, ssh, ssw;
         auto derivedBnDesc = miopen::TensorDescriptor{};
-        output             = get_output_tensor(filter, input, weights);
+        output             = get_output_tensor(&filter, input, weights);
         miopen::DeriveBNTensorDescriptor(derivedBnDesc, output.desc, bnmode);
         std::tie(ssn, ssc, ssh, ssw) = miopen::tien<4>(derivedBnDesc.GetLengths());
 
@@ -436,20 +438,20 @@ struct cbna_fusion_driver : test_driver
         estMean     = tensor<T>{ssn, ssc, ssh, ssw}.generate(tensor_elem_gen_integer{max_value});
         estVariance = tensor<T>{ssn, ssc, ssh, ssw}.generate(tensor_elem_gen_integer{max_value});
 
-        miopenCreateOpConvForward(ptr_fusionplan.get(), &convoOp, &filter, &weights.desc);
+        miopenCreateOpConvForward(ptr_fusionplan.get(), &convoOp, &filter, weights.desc);
 
         if(bias_mode)
         {
             bias = tensor<T>{1, output.desc.GetLengths()[1], 1, 1}.generate(
                 tensor_elem_gen_integer{max_value});
-            miopenCreateOpBiasForward(ptr_fusionplan.get(), &biasOp, &bias.desc);
+            miopenCreateOpBiasForward(ptr_fusionplan.get(), &biasOp, bias.desc);
         }
         else
         {
             bias = tensor<T>{1, 1, 1, 1};
         }
 
-        miopenCreateOpBatchNormInference(ptr_fusionplan.get(), &bNormOp, bnmode, &scale.desc);
+        miopenCreateOpBatchNormInference(ptr_fusionplan.get(), &bNormOp, bnmode, scale.desc);
 
         ptr_activdesc = GetManagedActivDesc();
         if(tactiv)
@@ -503,7 +505,7 @@ struct cbna_fusion_driver : test_driver
                 exit(EXIT_SUCCESS); // NOLINT (concurrency-mt-unsafe)
             }
 #endif
-            output = get_output_tensor(filter, input, weights);
+            output = get_output_tensor(&filter, input, weights);
             ++successfull_cnt;
             if(bias_mode)
             {

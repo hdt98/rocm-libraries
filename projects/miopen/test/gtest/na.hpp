@@ -27,6 +27,8 @@
 
 #include <gtest/gtest.h>
 #include <miopen/solver_id.hpp>
+#include <miopen/batch_norm.hpp>
+#include <miopen/fusion_plan.hpp>
 #include <serialize.hpp>
 #include <fusionHost.hpp>
 

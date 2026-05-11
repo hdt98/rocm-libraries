@@ -48,7 +48,8 @@ static inline void print(const miopen::PoolingDescriptor& filter)
 template <class T>
 tensor<T> get_output_tensor(const miopen::PoolingDescriptor& filter, const tensor<T>& input)
 {
-    return tensor<T>{filter.GetForwardOutputTensor(input.desc)};
+    auto out_td = filter.GetForwardOutputTensor(input.desc);
+    return tensor<T>{&out_td};
 }
 
 template <class T>

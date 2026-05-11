@@ -882,22 +882,22 @@ struct na_train_find2 : public ::testing::TestWithParam<TestCase>
                 miopenCreateBatchnormProblem(&problem, bnmode, true, miopenProblemDirectionForward);
 
                 // clang-format off
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, &input.desc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, &scale.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, input.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, scale.desc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedMean, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedVariance, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormRunningMean, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormRunningVariance, &derivedBnDesc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, &shift.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, shift.desc);
                 // clang-format on
 
                 AddAndFuse(problem, [&](auto activation) {
                     miopenCreateActivationProblem(
                         activation, ptr_activdesc.get(), miopenProblemDirectionForward);
                     miopenSetProblemTensorDescriptor(
-                        *activation, miopenTensorActivationX, &input.desc);
+                        *activation, miopenTensorActivationX, input.desc);
                     miopenSetProblemTensorDescriptor(
-                        *activation, miopenTensorActivationY, &input.desc);
+                        *activation, miopenTensorActivationY, input.desc);
                 });
 
                 return ManagedProblem{problem, &miopenDestroyProblem};
@@ -909,23 +909,23 @@ struct na_train_find2 : public ::testing::TestWithParam<TestCase>
                     &problem, bnmode, true, miopenProblemDirectionBackward);
 
                 // clang-format off
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormDY, &input.desc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, &input.desc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, &scale.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormDY, input.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, input.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, scale.desc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedMean, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedVariance, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScaleDiff, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBiasDiff, &derivedBnDesc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, &shift.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, shift.desc);
                 // clang-format on
 
                 AddAndFuse(problem, [&](auto activation) {
                     miopenCreateActivationProblem(
                         activation, ptr_activdesc.get(), miopenProblemDirectionBackward);
                     miopenSetProblemTensorDescriptor(
-                        *activation, miopenTensorActivationX, &input.desc);
+                        *activation, miopenTensorActivationX, input.desc);
                     miopenSetProblemTensorDescriptor(
-                        *activation, miopenTensorActivationY, &input.desc);
+                        *activation, miopenTensorActivationY, input.desc);
                 });
 
                 return ManagedProblem{problem, &miopenDestroyProblem};
@@ -960,7 +960,7 @@ struct na_train_find2 : public ::testing::TestWithParam<TestCase>
         {
             miopenFusionOpDescriptor_t bNormBwdOp = nullptr;
             miopenFusionOpDescriptor_t activBwdOp = nullptr;
-            auto ptr_bwdfusionplan                = GetManagedFusionPlanDesc(&input.desc);
+            auto ptr_bwdfusionplan                = GetManagedFusionPlanDesc(input.desc);
 
             bnmode = miopenBNPerActivation;
             miopen::TensorDescriptor derivedBnDesc{};
@@ -978,13 +978,13 @@ struct na_train_find2 : public ::testing::TestWithParam<TestCase>
                               &problem, bnmode, true, miopenProblemDirectionForward));
 
                 // clang-format off
-                EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, &input.desc));
-                EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, &scale.desc));
+                EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, input.desc));
+                EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, scale.desc));
                 EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedMean, &derivedBnDesc));
                 EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedVariance, &derivedBnDesc));
                 EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormRunningMean, &derivedBnDesc));
                 EXPECT_EQ(miopenStatusSuccess, miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormRunningVariance, &derivedBnDesc));
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, &shift.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, shift.desc);
                 // clang-format on
 
                 AddAndFuse(problem, [&](auto activation) {
@@ -993,10 +993,10 @@ struct na_train_find2 : public ::testing::TestWithParam<TestCase>
                                   activation, ptr_activdesc.get(), miopenProblemDirectionForward));
                     EXPECT_EQ(miopenStatusSuccess,
                               miopenSetProblemTensorDescriptor(
-                                  *activation, miopenTensorActivationX, &input.desc));
+                                  *activation, miopenTensorActivationX, input.desc));
                     EXPECT_EQ(miopenStatusSuccess,
                               miopenSetProblemTensorDescriptor(
-                                  *activation, miopenTensorActivationY, &input.desc));
+                                  *activation, miopenTensorActivationY, input.desc));
                 });
 
                 return ManagedProblem{problem, &miopenDestroyProblem};
@@ -1009,23 +1009,23 @@ struct na_train_find2 : public ::testing::TestWithParam<TestCase>
                               &problem, bnmode, true, miopenProblemDirectionBackward));
 
                 // clang-format off
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormDY, &input.desc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, &input.desc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, &scale.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormDY, input.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormX, input.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScale, scale.desc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedMean, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormSavedVariance, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormScaleDiff, &derivedBnDesc);
                 miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBiasDiff, &derivedBnDesc);
-                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, &shift.desc);
+                miopenSetProblemTensorDescriptor(problem, miopenTensorBatchnormBias, shift.desc);
                 // clang-format on
 
                 AddAndFuse(problem, [&](auto activation) {
                     miopenCreateActivationProblem(
                         activation, ptr_activdesc.get(), miopenProblemDirectionBackward);
                     miopenSetProblemTensorDescriptor(
-                        *activation, miopenTensorActivationX, &input.desc);
+                        *activation, miopenTensorActivationX, input.desc);
                     miopenSetProblemTensorDescriptor(
-                        *activation, miopenTensorActivationY, &input.desc);
+                        *activation, miopenTensorActivationY, input.desc);
                 });
 
                 return ManagedProblem{problem, &miopenDestroyProblem};

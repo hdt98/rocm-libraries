@@ -25,17 +25,21 @@
  *******************************************************************************/
 #pragma once
 
+#include <miopen/batch_norm.hpp>
+#include <miopen/fusion_plan.hpp>
+
 namespace test {
 template <typename DLModule>
 void ComputeCPUBNInference(DLModule& dl_module)
 {
     int size{0};
-    miopenGetTensorDescriptorSize(&dl_module.input.desc, &size);
+    miopenGetTensorDescriptorSize(dl_module.input.desc, &size);
     // In case of NxCxDxHxW
     auto ReshapeIfNeeded = [size](auto& desc) {
         if(size == 5)
         {
-            desc = miopen::BuildReshaped4DTensorDescriptor(desc);
+            auto td = miopen::BuildReshaped4DTensorDescriptor(desc);
+            desc = TensorDesc(&td);
         }
     };
     ReshapeIfNeeded(dl_module.input.desc);
@@ -78,12 +82,13 @@ template <typename DLModule>
 void ComputeCPUBNBwd(DLModule& dl_module)
 {
     int size{0};
-    miopenGetTensorDescriptorSize(&dl_module.input.desc, &size);
+    miopenGetTensorDescriptorSize(dl_module.input.desc, &size);
     // In case of NxCxDxHxW
     auto ReshapeIfNeeded = [size](auto& desc) {
         if(size == 5)
         {
-            desc = miopen::BuildReshaped4DTensorDescriptor(desc);
+            auto td = miopen::BuildReshaped4DTensorDescriptor(desc);
+            desc = TensorDesc(&td);
         }
     };
     ReshapeIfNeeded(dl_module.input.desc);
@@ -132,12 +137,13 @@ template <typename DLModule>
 void ComputeCPUBNFwdTrain(DLModule& dl_module)
 {
     int size{0};
-    miopenGetTensorDescriptorSize(&dl_module.input.desc, &size);
+    miopenGetTensorDescriptorSize(dl_module.input.desc, &size);
     // In case of NxCxDxHxW
     auto ReshapeIfNeeded = [size](auto& desc) {
         if(size == 5)
         {
-            desc = miopen::BuildReshaped4DTensorDescriptor(desc);
+            auto td = miopen::BuildReshaped4DTensorDescriptor(desc);
+            desc = TensorDesc(&td);
         }
     };
     ReshapeIfNeeded(dl_module.input.desc);

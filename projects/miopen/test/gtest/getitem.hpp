@@ -284,7 +284,9 @@ protected:
         std::transform(indexs.begin(),
                        indexs.end(),
                        std::back_inserter(indexDescs),
-                       [](auto& index) { return &index.desc; });
+                       [](auto& index) -> miopen::TensorDescriptor* {
+                           return &miopen::deref(index.desc.get());
+                       });
 
         std::vector<size_t> workspace_dims;
         ws_sizeInBytes =
@@ -328,7 +330,9 @@ protected:
         std::transform(indexs.begin(),
                        indexs.end(),
                        std::back_inserter(indexDescs),
-                       [](auto& index) { return &index.desc; });
+                       [](auto& index) -> miopen::TensorDescriptor* {
+                           return &miopen::deref(index.desc.get());
+                       });
         std::transform(indexs_dev.begin(),
                        indexs_dev.end(),
                        std::back_inserter(indexData),

@@ -27,6 +27,7 @@
 #include "get_handle.hpp"
 #include "na.hpp"
 #include "perf_helper.hpp"
+#include <miopen/batch_norm.hpp>
 
 template <typename XDataType,
           typename YDataType,
