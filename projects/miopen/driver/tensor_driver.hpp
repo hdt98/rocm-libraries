@@ -86,73 +86,19 @@ inline void LengthReorder(std::vector<int>& lens, const std::initializer_list<in
 
 inline std::size_t GetTensorVectorLength(const miopenTensorDescriptor_t& tensor)
 {
-    std::size_t vectorLength;
-
-    int size = 0;
-    miopenGetTensorDescriptorSize(tensor, &size);
-
-    miopenGetNdTensorDescriptorVectorLength(tensor, &vectorLength);
-    return vectorLength;
+    return TensorDesc::GetVectorLength(tensor);
 }
 
 inline std::vector<int> GetTensorLengths(const miopenTensorDescriptor_t& tensor)
 {
-    int n;
-    int c;
-    int h;
-    int w;
-    int d;
-
-    int size = 0;
-    miopenGetTensorDescriptorSize(tensor, &size);
-
-    if(size == 5)
-    {
-        miopenGet5dTensorDescriptorLengths(tensor, &n, &c, &d, &h, &w);
-        return std::vector<int>({n, c, d, h, w});
-    }
-    else if(size == 4)
-    {
-        miopenGet4dTensorDescriptorLengths(tensor, &n, &c, &h, &w);
-        return std::vector<int>({n, c, h, w});
-    }
-
-    std::vector<int> tensor_len;
-    tensor_len.resize(TensorDesc::GetNumDims(tensor));
-    miopenGetTensorDescriptor(tensor, nullptr, tensor_len.data(), nullptr);
-
-    return tensor_len;
+    auto lens = TensorDesc::GetLengths(tensor);
+    return std::vector<int>(lens.begin(), lens.end());
 }
 
 inline std::vector<int> GetTensorStrides(const miopenTensorDescriptor_t& tensor)
 {
-    int nstride;
-    int cstride;
-    int dstride;
-    int hstride;
-    int wstride;
-
-    int size = 0;
-    miopenGetTensorDescriptorSize(tensor, &size);
-
-    if(size == 5)
-    {
-        miopenGet5dTensorDescriptorStrides(
-            tensor, &nstride, &cstride, &dstride, &hstride, &wstride);
-        return std::vector<int>({nstride, cstride, dstride, hstride, wstride});
-    }
-    else if(size == 4)
-    {
-        miopenGet4dTensorDescriptorStrides(tensor, &nstride, &cstride, &hstride, &wstride);
-        return std::vector<int>({nstride, cstride, hstride, wstride});
-    }
-
-    std::vector<int> tensor_strides;
-    tensor_strides.resize(TensorDesc::GetNumDims(tensor));
-
-    miopenGetTensorDescriptor(tensor, nullptr, nullptr, tensor_strides.data());
-
-    return tensor_strides;
+    auto strides = TensorDesc::GetStrides(tensor);
+    return std::vector<int>(strides.begin(), strides.end());
 }
 
 inline int SetTensor4d(miopenTensorDescriptor_t t,
