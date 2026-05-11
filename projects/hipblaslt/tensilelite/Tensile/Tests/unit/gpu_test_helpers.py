@@ -10,6 +10,7 @@
 #   - Prologue builder (generate_load_params) and export epilogue (generate_export_epilogue)
 #   - Assembly & GPU execution (assemble_kernel, assemble_and_run)
 #   - Debug utilities (print_offset_grid)
+#   - Roundtrip kernel helpers (generate_srd_setup, setup_roundtrip_writer, build_roundtrip_inner_asm)
 ################################################################################
 
 import ctypes
@@ -37,12 +38,12 @@ from dataclasses import dataclass
 
 from rocisa.code import Module, TextBlock
 from rocisa.container import vgpr, sgpr
-from rocisa.instruction import SLoadB32, SLoadB64, SLoadB128, SWaitCnt, VLShiftLeftB32, VMovB32
+from rocisa.instruction import SLoadB32, SLoadB64, SLoadB128, SMovB32, SMovB64, SWaitCnt, SBarrier, VLShiftLeftB32, VMovB32
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType
 from Tensile.Components.Subtile.Kernel import TileInfo, AB_B16, AB_B8
-from Tensile.Components.Subtile.SubtileGREmit import graTileAssignment
-from Tensile.Components.Subtile.SubtileLREmit import lraTileAssignment
+from Tensile.Components.Subtile.SubtileGREmit import graTileAssignment, globalReadDTLInitCommonSgpr, globalReadDoSubtile
+from Tensile.Components.Subtile.SubtileLREmit import lraTileAssignment, localReadDoSubtile
 
 # ---- Constants ----
 GFX_TARGET = "gfx950"
@@ -243,6 +244,16 @@ def generate_gra_asm(cfg, geometry=None, inst_k=32, bpe=2):
 def generate_lra_asm(cfg, geometry=None, inst_k=32, bpe=2):
     """Run lraTileAssignment and return (lra_asm, writer, tileInfoA, tileInfoB, kernel)."""
     return _generate_tile_asm(cfg, lraTileAssignment, geometry=geometry, inst_k=inst_k, bpe=bpe)
+
+
+def compute_expected_subtile(regId, stride, tileInfo, bpe):
+    """Expected subtile soffset register value: rowOffset * bpe * regId * stride.
+
+    rowOffset is 2*subtileSize when loadRatioGR==2.0 (two subtiles per GR), else subtileSize.
+    """
+    subtileSize = tileInfo.subtileShape[0] * tileInfo.mmaTileShape[0]
+    rowOffset = 2 * subtileSize if tileInfo.loadRatioGR == 2.0 else subtileSize
+    return rowOffset * bpe * regId * stride
 
 
 def export_register(writer, test_asm, export_reg, is_sgpr, cfg, tmp_path, label):
@@ -605,6 +616,155 @@ def assemble_and_run(asm, tmp_path, label, output_size, inputs=(), scalars=(), l
     assemble_kernel(asm, co_path)
     return run_on_gpu(co_path, output_size, inputs=inputs, scalars=scalars, lds_size=lds_size, num_threads=num_threads)
 
+
+
+# ---- Roundtrip kernel helpers ----
+
+def generate_srd_setup():
+    """Generate SRD buffer descriptor setup for A and B.
+
+    Kernarg layout (set by build_roundtrip_inner_asm prologue):
+      s[4:5] = input_A_ptr, s[6:7] = input_B_ptr, s[8:9] = output_ptr
+    SRD descriptor fields (4 dwords):
+      [0:1] = base address (64-bit), [2] = NumRecords, [3] = descriptor flags
+    """
+    module = Module("SRD setup")
+    module.add(SMovB64(dst=sgpr("SrdA+0", 2), src=sgpr(4, 2), comment="SrdA base = s[4:5] = input_A_ptr"))
+    module.add(SMovB32(dst=sgpr("SrdA+2"), src="0xFFFFFFFF",   comment="SrdA NumRecords = max (no bounds check)"))
+    module.add(SMovB32(dst=sgpr("SrdA+3"), src="0x20000",      comment="SrdA OOB_SELECT=2 (raw buffer)"))
+    module.add(SMovB64(dst=sgpr("SrdB+0", 2), src=sgpr(6, 2), comment="SrdB base = s[6:7] = input_B_ptr"))
+    module.add(SMovB32(dst=sgpr("SrdB+2"), src="0xFFFFFFFF",   comment="SrdB NumRecords = max (no bounds check)"))
+    module.add(SMovB32(dst=sgpr("SrdB+3"), src="0x20000",      comment="SrdB OOB_SELECT=2 (raw buffer)"))
+    return module
+
+
+def setup_roundtrip_writer(cfg, geometry=None, inst_k=32, bpe=2):
+    """Create and configure a writer for roundtrip kernel tests.
+
+    Calls create_writer, reserves sgprs for HW regs + strides + SRD + DTL + swap,
+    computes LDS size, and allocates vgprTile registers.
+
+    Returns:
+        (writer, kernel, tileInfoA, tileInfoB, lds_size)
+    """
+    init_rocisa()
+    writer, kernel, tileInfoA, tileInfoB = create_writer(cfg, geometry=geometry, inst_k=inst_k, bpe=bpe)
+
+    # Reserve s0-s11: s[0:1]=kernarg ptr (HW), s[2:3]=workgroup IDs (HW),
+    # s[4:5]=input_A_ptr, s[6:7]=input_B_ptr, s[8:9]=output_ptr,
+    # s10=StrideA0I, s11=StrideB1J
+    writer.sgprPool.checkOut(12)
+    writer.sgprs["StrideA0I"] = 10
+    writer.sgprs["StrideB1J"] = 11
+    tileInfoA.allocOffsetRegisters(writer, kernel)
+    tileInfoB.allocOffsetRegisters(writer, kernel)
+
+    # SRD descriptors: 4 dwords each, aligned to 4-dword boundary
+    writer.sgprs["SrdA"] = writer.sgprPool.checkOutAligned(4, 4, "SrdA", preventOverflow=False)
+    writer.sgprs["SrdB"] = writer.sgprPool.checkOutAligned(4, 4, "SrdB", preventOverflow=False)
+    writer.sgprs["LocalWriteBaseAddrA"]  = writer.sgprPool.checkOut(1, "LocalWriteBaseAddrA",  preventOverflow=False)
+    writer.sgprs["LocalWriteDTLOffsetA"] = writer.sgprPool.checkOut(1, "LocalWriteDTLOffsetA", preventOverflow=False)
+    writer.sgprs["LocalWriteBaseAddrB"]  = writer.sgprPool.checkOut(1, "LocalWriteBaseAddrB",  preventOverflow=False)
+    writer.sgprs["LocalWriteDTLOffsetB"] = writer.sgprPool.checkOut(1, "LocalWriteDTLOffsetB", preventOverflow=False)
+    writer.sgprs["SwapA"] = writer.sgprPool.checkOut(1, "SwapA", preventOverflow=False)
+    writer.sgprs["SwapB"] = writer.sgprPool.checkOut(1, "SwapB", preventOverflow=False)
+
+    # LDS layout: align A and B to readSize = 2*subtileSize (DTL reads 2 subtiles at once).
+    # Matches production formula in KernelWriter.py.
+    readSize     = 2 * tileInfoA.subtileSize
+    numASubtiles = tileInfoA.globalSubtileGrid[0] * tileInfoA.globalSubtileGrid[1]
+    numBSubtiles = tileInfoB.globalSubtileGrid[0] * tileInfoB.globalSubtileGrid[1]
+    sizeA = ((numASubtiles * tileInfoA.subtileSize + readSize - 1) // readSize) * readSize
+    sizeB = ((numBSubtiles * tileInfoB.subtileSize + readSize - 1) // readSize) * readSize
+    lds_size = int(sizeA + sizeB)
+    writer.ldsTotalSize = lds_size
+
+    tileInfoA.allocVgprTileRegisters_legacy(writer, kernel)
+    tileInfoB.allocVgprTileRegisters_legacy(writer, kernel)
+
+    return writer, kernel, tileInfoA, tileInfoB, lds_size
+
+
+def collect_tile_vgprs(tileInfoA, tileInfoB):
+    """Return the set of all vgpr indices used by tile and offset registers."""
+    used = set()
+    for tileInfo in (tileInfoA, tileInfoB):
+        for t in tileInfo.vgprTiles:
+            used.update(t.regList.indices)
+        used.update(tileInfo.sharedVgprGROffset)
+        used.update(tileInfo.sharedVgprLROffset)
+    return used
+
+
+def alloc_export_vgprs(tileInfoA, tileInfoB):
+    """Find free vgpr temporaries for export assembly (tmp, addr_lo, addr_hi).
+
+    Scans all vgprTile registers plus GR/LR offset registers to find the
+    next free vgpr, then allocates tmp (any), addr_lo (even-aligned), addr_hi.
+
+    Returns:
+        (tmp, addr_lo, addr_hi, next_v)
+    """
+    all_used = collect_tile_vgprs(tileInfoA, tileInfoB)
+
+    next_v = max(all_used | {0}) + 1
+    tmp = next_v; next_v += 1
+    if next_v % 2 != 0:
+        next_v += 1
+    addr_lo = next_v; next_v += 1
+    addr_hi = next_v; next_v += 1
+    return tmp, addr_lo, addr_hi, next_v
+
+
+def build_roundtrip_inner_asm(writer, kernel, export_asm):
+    """Generate the inner assembly for a GR->LDS->LR roundtrip kernel.
+
+    Emits: prologue, SRD setup, GRA, LRA, DTL init, global reads (A+B),
+    wait, barrier, local reads (A+B), wait, then the provided export_asm.
+
+    Args:
+        writer:     Configured writer (from setup_roundtrip_writer).
+        kernel:     Kernel dict.
+        export_asm: Assembly string for exporting tile registers.
+
+    Returns:
+        inner_asm string.
+    """
+    gra_module  = graTileAssignment(writer, kernel, useSwizzling=True)
+    lra_module  = lraTileAssignment(writer, kernel)
+    dtl_module  = globalReadDTLInitCommonSgpr(writer, kernel)
+    gr_a_module = globalReadDoSubtile('A', writer, kernel)
+    gr_b_module = globalReadDoSubtile('B', writer, kernel)
+    wait_gr     = SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1)   # wait for global reads
+    barrier     = SBarrier()
+    lr_a_module = localReadDoSubtile('A', writer, kernel)
+    lr_b_module = localReadDoSubtile('B', writer, kernel)
+    wait_lr     = SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1)   # wait for local reads
+
+    # Kernarg layout (two s_load_dwordx4 covering all 5 args):
+    #   offset 0x00: s[4:5]=input_A_ptr (8B), s[6:7]=input_B_ptr (8B)
+    #   offset 0x10: s[8:9]=output_ptr (8B), s10=strideA (4B), s11=strideB (4B)
+    prologue   = generate_load_params([
+        (4, 4, 0x00, "input_A_ptr + input_B_ptr"),
+        (8, 4, 0x10, "output_ptr + strideA + strideB"),
+    ])
+    srd_module = generate_srd_setup()
+
+    return "\n".join([
+        str(prologue),
+        str(srd_module),
+        str(gra_module),
+        str(lra_module),
+        str(dtl_module),
+        str(gr_a_module),
+        str(gr_b_module),
+        str(wait_gr),
+        str(barrier),
+        str(lr_a_module),
+        str(lr_b_module),
+        str(wait_lr),
+        str(export_asm),
+    ])
 
 
 # ---- Utilities ----

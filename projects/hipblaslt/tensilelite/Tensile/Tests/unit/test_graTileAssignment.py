@@ -21,6 +21,7 @@ from gpu_test_helpers import (
     BPE, LOAD_WIDTH, WAVESIZE, NUM_THREADS, NUM_WAVES,
     generate_gra_asm,
     export_register,
+    compute_expected_subtile,
     print_offset_grid,
 )
 
@@ -111,15 +112,6 @@ def compute_expected_offset(thread_id, cfg, tileInfo):
     offset2 = totalRow2 * stride * bpe + colId2_bytes
     return [base, offset2]
 
-def compute_expected_subtile(regId, stride, tileInfo):
-    """Compute expected subtile register value: rowOffset * bpe * regId * stride.
-
-    The kernel uses regId (index into localSubtilesRegister) and rowOffset
-    which is 2*subtileSize when loadRatioGR==2.0, otherwise subtileSize.
-    """
-    subtileSize = tileInfo.subtileShape[0] * tileInfo.mmaTileShape[0]
-    rowOffset = 2 * subtileSize if tileInfo.loadRatioGR == 2.0 else subtileSize
-    return rowOffset * BPE * regId * stride
 
 
 # Tile configs to test
@@ -196,7 +188,7 @@ class TestGraTileAssignmentGPU:
             for reg in tileInfo.localSubtilesRegister[regId]:
                 results = export_register(gra_env.writer, gra_env.gra_asm, reg, st.useSgpr,
                                           cfg, gra_env.tmp_path, f"subtile{tc}_s{reg}_{cfg.label}")
-                expected = compute_expected_subtile(regId, stride, tileInfo)
+                expected = compute_expected_subtile(regId, stride, tileInfo, BPE)
                 actual = results[0]
                 assert actual == expected, \
                     f"[{cfg.label}] {tc} subtile s{reg} (regId={regId}): " \
@@ -299,7 +291,7 @@ if __name__ == "__main__":
                             print("Regl",reg)
                             results = export_register(writer, gra_asm, reg, st.useSgpr, cfg,
                                                       tmp_path, f"subtile{tc}_s{reg}_{cfg.label}")
-                            expected = compute_expected_subtile(regId, stride, tileInfo)
+                            expected = compute_expected_subtile(regId, stride, tileInfo, BPE)
                             actual = results[0]
                             status = "OK" if actual == expected else "FAIL"
                             print(f"  Subtile {tc} s{reg} (regId={regId}): {actual} (expected {expected}) {status}")

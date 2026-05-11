@@ -29,31 +29,19 @@ import tempfile
 import pytest
 import numpy as np
 
+import math
+
 from gpu_test_helpers import (
     HAS_HIP,
     TileConfig,
     WAVESIZE, NUM_WAVES, NUM_THREADS,
-    init_rocisa,
+    AB_B8,
     assemble_and_run,
     generate_kernel_asm,
-    generate_load_params,
-    compute_lds_start_offset_b,
+    setup_roundtrip_writer,
+    build_roundtrip_inner_asm,
+    collect_tile_vgprs,
 )
-from rocisa.code import Module
-from rocisa.container import sgpr
-from rocisa.instruction import SMovB32, SMovB64, SWaitCnt, SBarrier
-
-from Tensile.Components.Subtile.SubtileGREmit import (
-    graTileAssignment,
-    globalReadDTLInitCommonSgpr,
-    globalReadDoSubtile,
-)
-from Tensile.Components.Subtile.SubtileLREmit import (
-    lraTileAssignment,
-    localReadDoSubtile,
-)
-
-from gpu_test_helpers import create_writer, AB_B8
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -105,42 +93,8 @@ def make_fp8_input(num_rows: int, num_cols: int, seed: int = 42) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# SRD setup (identical to roundtrip FP8 test)
-# ---------------------------------------------------------------------------
-
-def generate_srd_setup_fp8():
-    module = Module("SRD setup FP8")
-    module.add(SMovB64(dst=sgpr("SrdA+0", 2), src=sgpr(4, 2),
-                       comment="SrdA base = input_A_ptr"))
-    module.add(SMovB32(dst=sgpr("SrdA+2"), src="0xFFFFFFFF",
-                       comment="SrdA NumRecords = max"))
-    module.add(SMovB32(dst=sgpr("SrdA+3"), src="0x20000",
-                       comment="SrdA OOB_SELECT=2"))
-    module.add(SMovB64(dst=sgpr("SrdB+0", 2), src=sgpr(6, 2),
-                       comment="SrdB base = input_B_ptr"))
-    module.add(SMovB32(dst=sgpr("SrdB+2"), src="0xFFFFFFFF",
-                       comment="SrdB NumRecords = max"))
-    module.add(SMovB32(dst=sgpr("SrdB+3"), src="0x20000",
-                       comment="SrdB OOB_SELECT=2"))
-    return module
-
-
-# ---------------------------------------------------------------------------
 # MFMA assembly generation
 # ---------------------------------------------------------------------------
-
-def _collect_tile_vgprs(tileInfoA, tileInfoB):
-    """Return the set of all VGPR indices used by A/B tile and offset registers."""
-    used = set()
-    for t in tileInfoA.vgprTiles:
-        used.update(t.regList.indices)
-    for t in tileInfoB.vgprTiles:
-        used.update(t.regList.indices)
-    used.update(tileInfoA.sharedVgprGROffset)
-    used.update(tileInfoB.sharedVgprGROffset)
-    used.update(tileInfoA.sharedVgprLROffset)
-    used.update(tileInfoB.sharedVgprLROffset)
-    return used
 
 
 def generate_mfma_pairs(tileInfoA, tileInfoB, writer):
@@ -228,10 +182,9 @@ def generate_mfma_export_asm(mfma_pairs, tileInfoA, tileInfoB):
 
     Returns: (asm_string, next_free_vgpr)
     """
-    import math
     wave_region_size = len(mfma_pairs) * WAVESIZE * ACC_SIZE * 4
 
-    used   = _collect_tile_vgprs(tileInfoA, tileInfoB)
+    used   = collect_tile_vgprs(tileInfoA, tileInfoB)
     next_v = max(used | {0}) + 1
 
     wave_off = next_v; next_v += 1
@@ -296,79 +249,15 @@ def generate_mfma_kernel_fp8(cfg):
         (kernel_asm, writer, kernel, tileInfoA, tileInfoB,
          mfma_pairs, output_size, lds_size)
     """
-    init_rocisa()
-
-    writer, kernel, tileInfoA, tileInfoB = create_writer(cfg, geometry=AB_B8, inst_k=MATRIX_INST_K, bpe=BPE_FP8)
-
-    writer.sgprPool.checkOut(12)
-    writer.sgprs["StrideA0I"] = 10
-    writer.sgprs["StrideB1J"] = 11
-    tileInfoA.allocOffsetRegisters(writer, kernel)
-    tileInfoB.allocOffsetRegisters(writer, kernel)
-
-    writer.sgprs["SrdA"] = writer.sgprPool.checkOutAligned(
-        4, 4, "SrdA", preventOverflow=False)
-    writer.sgprs["SrdB"] = writer.sgprPool.checkOutAligned(
-        4, 4, "SrdB", preventOverflow=False)
-    writer.sgprs["LocalWriteBaseAddrA"]  = writer.sgprPool.checkOut(
-        1, "LocalWriteBaseAddrA",  preventOverflow=False)
-    writer.sgprs["LocalWriteDTLOffsetA"] = writer.sgprPool.checkOut(
-        1, "LocalWriteDTLOffsetA", preventOverflow=False)
-    writer.sgprs["LocalWriteBaseAddrB"]  = writer.sgprPool.checkOut(
-        1, "LocalWriteBaseAddrB",  preventOverflow=False)
-    writer.sgprs["LocalWriteDTLOffsetB"] = writer.sgprPool.checkOut(
-        1, "LocalWriteDTLOffsetB", preventOverflow=False)
-    writer.sgprs["SwapA"] = writer.sgprPool.checkOut(1, "SwapA", preventOverflow=False)
-    writer.sgprs["SwapB"] = writer.sgprPool.checkOut(1, "SwapB", preventOverflow=False)
-
-    readSize    = 2 * tileInfoA.subtileSize
-    numASubtiles = tileInfoA.globalSubtileGrid[0] * tileInfoA.globalSubtileGrid[1]
-    numBSubtiles = tileInfoB.globalSubtileGrid[0] * tileInfoB.globalSubtileGrid[1]
-    sizeA = ((numASubtiles * tileInfoA.subtileSize + readSize - 1) // readSize) * readSize
-    sizeB = ((numBSubtiles * tileInfoB.subtileSize + readSize - 1) // readSize) * readSize
-    lds_size = int(sizeA + sizeB)
-    writer.ldsTotalSize = lds_size
-
-    tileInfoA.allocVgprTileRegisters_legacy(writer, kernel)
-    tileInfoB.allocVgprTileRegisters_legacy(writer, kernel)
-
-    gra_module  = graTileAssignment(writer, kernel, useSwizzling=True)
-    lra_module  = lraTileAssignment(writer, kernel)
-    dtl_module  = globalReadDTLInitCommonSgpr(writer, kernel)
-    gr_a_module = globalReadDoSubtile('A', writer, kernel)
-    gr_b_module = globalReadDoSubtile('B', writer, kernel)
-    wait_gr     = SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1)
-    barrier     = SBarrier()
-    lr_a_module = localReadDoSubtile('A', writer, kernel)
-    lr_b_module = localReadDoSubtile('B', writer, kernel)
-    wait_lr     = SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1)
+    writer, kernel, tileInfoA, tileInfoB, lds_size = setup_roundtrip_writer(
+        cfg, geometry=AB_B8, inst_k=MATRIX_INST_K, bpe=BPE_FP8)
 
     mfma_pairs  = generate_mfma_pairs(tileInfoA, tileInfoB, writer)
     mfma_asm    = generate_mfma_asm(mfma_pairs)
     export_asm, _ = generate_mfma_export_asm(mfma_pairs, tileInfoA, tileInfoB)
 
-    prologue   = generate_load_params([
-        (4, 4, 0x00, "input_A_ptr + input_B_ptr"),
-        (8, 4, 0x10, "output_ptr + strideA + strideB"),
-    ])
-    srd_module = generate_srd_setup_fp8()
-
-    inner_asm = "\n".join([
-        str(prologue),
-        str(srd_module),
-        str(gra_module),
-        str(lra_module),
-        str(dtl_module),
-        str(gr_a_module),
-        str(gr_b_module),
-        str(wait_gr),
-        str(barrier),
-        str(lr_a_module),
-        str(lr_b_module),
-        str(wait_lr),
-        mfma_asm,
-        export_asm,
-    ])
+    # GR->LDS->LR pipeline + MFMA + export
+    inner_asm = build_roundtrip_inner_asm(writer, kernel, mfma_asm + "\n" + export_asm)
 
     args = (
         ("input_A_ptr", 8, "global_buffer", "u8"),

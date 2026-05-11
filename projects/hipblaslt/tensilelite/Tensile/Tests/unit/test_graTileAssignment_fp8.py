@@ -59,9 +59,9 @@ from gpu_test_helpers import (
     TileConfig,
     LOAD_WIDTH, WAVESIZE, NUM_THREADS, NUM_WAVES,
     AB_B8,
-    create_writer,
     generate_gra_asm,
     export_register,
+    compute_expected_subtile,
     print_offset_grid,
 )
 
@@ -144,14 +144,6 @@ def compute_expected_offset_fp8(thread_id, cfg, tileInfo):
     return [base, offset2]
 
 
-def compute_expected_subtile_fp8(regId, stride, tileInfo):
-    """Expected subtile soffset register value for FP8.
-
-    rowOffset * BPE * regId * stride, where BPE=1 for FP8.
-    """
-    subtileSize = tileInfo.subtileShape[0] * tileInfo.mmaTileShape[0]
-    rowOffset = 2 * subtileSize if tileInfo.loadRatioGR == 2.0 else subtileSize
-    return rowOffset * BPE * regId * stride
 
 
 # ---- Tile configs: MT=256x256, DU=128, 2x2 WG ----
@@ -227,7 +219,7 @@ class TestGraTileAssignmentFP8GPU:
                 results = export_register(
                     gra_env.writer, gra_env.gra_asm, reg, st.useSgpr,
                     cfg, gra_env.tmp_path, f"subtile{tc}_s{reg}_{cfg.label}")
-                expected = compute_expected_subtile_fp8(regId, stride, tileInfo)
+                expected = compute_expected_subtile(regId, stride, tileInfo, BPE)
                 assert results[0] == expected, (
                     f"[{cfg.label}] {tc} subtile s{reg} (regId={regId}): "
                     f"got {results[0]}, expected {expected}"
@@ -308,7 +300,7 @@ if __name__ == "__main__":
                             results = export_register(
                                 writer, gra_asm, reg, st.useSgpr,
                                 cfg, tmp_path, f"subtile{tc}_s{reg}_{cfg.label}")
-                            expected = compute_expected_subtile_fp8(regId, stride, tileInfo)
+                            expected = compute_expected_subtile(regId, stride, tileInfo, BPE)
                             status = "OK" if results[0] == expected else "FAIL"
                             print(f"  {tc} subtile s{reg} (regId={regId}): "
                                   f"{results[0]} (expected {expected}) {status}")
