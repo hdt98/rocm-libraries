@@ -62,8 +62,8 @@ public:
         std::cerr << "Creating softmax tensor descriptors..." << std::endl;
 
         auto test_set_tensor_descriptor = [this](miopenTensorArgumentId_t name,
-                                                 TensorDescriptor& desc) {
-            EXPECT_EQUAL(miopenSetProblemTensorDescriptor(problem, name, &desc),
+                                                 miopenTensorDescriptor_t desc) {
+            EXPECT_EQUAL(miopenSetProblemTensorDescriptor(problem, name, desc),
                          miopenStatusSuccess);
         };
 

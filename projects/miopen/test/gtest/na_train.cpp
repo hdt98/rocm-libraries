@@ -5,6 +5,7 @@
 
 #include "../fusionHost.hpp"
 #include "compare_helper.hpp"
+#include <miopen/batch_norm.hpp>
 #include <common_utils/stringutils.hpp>
 #include <sstream>
 
@@ -337,9 +338,9 @@ struct verify_bwd_batchnorm_spatial_activ
         auto lcldydesc = dy.desc;
         miopenExecuteFusionPlan(&handle,
                                 fusionplan,
-                                &lcldydesc,
+                                lcldydesc,
                                 dyin_dev.get(),
-                                &lcldydesc,
+                                lcldydesc,
                                 dxout_dev.get(),
                                 ptr_fusionargs.get());
 
@@ -642,9 +643,9 @@ struct verify_bwd_batchnorm_peract_activ
         auto lcldydesc = dy.desc;
         miopenExecuteFusionPlan(&handle,
                                 fusionplan,
-                                &lcldydesc,
+                                lcldydesc,
                                 dyin_dev.get(),
-                                &lcldydesc,
+                                lcldydesc,
                                 dxout_dev.get(),
                                 ptr_fusionargs.get());
 

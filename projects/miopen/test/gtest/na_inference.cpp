@@ -5,6 +5,7 @@
 #include "../fusionHost.hpp"
 #include "../random.hpp"
 #include "compare_helper.hpp"
+#include <miopen/batch_norm.hpp>
 #include <common_utils/stringutils.hpp>
 
 #define MIO_BN_USE_MIX_PREC 1

@@ -219,7 +219,7 @@ public:
         int i = 0;
         for(const auto& it : tensors)
         {
-            descVector[i] = &it.second->GetTensorDescriptor();
+            descVector[i] = it.second->GetTensorDescriptor();
 
             it.second->GpuWrite(handle);
 
@@ -337,7 +337,7 @@ private:
             IsInt64TensorId(id) ? TensorType::Int64 : TensorType::Float, n, h, s, d);
 
         EXPECT_EQUAL(
-            miopenSetProblemTensorDescriptor(problem, id, &tensors[id]->GetTensorDescriptor()),
+            miopenSetProblemTensorDescriptor(problem, id, tensors[id]->GetTensorDescriptor()),
             miopenStatusSuccess);
 
         return *tensors[id];
