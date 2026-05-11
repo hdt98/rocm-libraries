@@ -70,8 +70,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: "ROCm/TheRock"
-          # Validation-only: exercise shared test utilities from ROCm/TheRock#5115.
-          ref: users/jayhawk-commits/rfc0010-shared-test-utils
+          # Validation-only: exercise shared test utilities from ROCm/TheRock#5115
+          # and FFT installed-runner test_script values.
+          ref: users/jayhawk-commits/rfc0010-shared-test-utils-fft-validation
 
       - name: Export shared test utilities path
         run: |
