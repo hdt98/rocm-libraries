@@ -29,6 +29,7 @@
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "driver_env.hpp"
+#include "driver_log.hpp"
 #include "miopen_ConvBatchNormActivHost.hpp"
 #include "mloNeuronHost.hpp"
 #include "random.hpp"
@@ -1387,7 +1388,7 @@ template <typename Tgpu, typename Tref>
 int CBAInferFusionDriver<Tgpu, Tref>::RunForwardCPU()
 {
     //"Fusion mode (cbna = 0, cna = 1, na = 2, cn = 3, cba = 4, ca = 5, cb = 6) (Default=cbna)"
-    MIOPEN_LOG_I("Fusion mode: " << fusion_mode);
+    DRIVER_LOG_INFO2("Fusion mode: " << fusion_mode);
     if(fusion_mode != miopen_fusion_na)
     {
         std::cout << "Running CPU fwd convolution and/or bias." << std::endl;
