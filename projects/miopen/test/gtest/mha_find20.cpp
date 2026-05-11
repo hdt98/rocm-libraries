@@ -139,7 +139,7 @@ struct TensorStruct
     // helper function for cases when we know exactly that given tensor is float
     tensor<float>& GetFloatTensor() { return std::get<tensor<float>>(tensorVariant); }
 
-    TensorDescriptor& GetTensorDescriptor()
+    TensorDesc& GetTensorDescriptor()
     {
         if(std::holds_alternative<tensor<float>>(tensorVariant))
         {

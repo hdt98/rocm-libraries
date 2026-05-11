@@ -159,7 +159,7 @@ protected:
                                          config.k,
                                          config.dim,
                                          config.keepDim);
-        cpu_kthvalue<TIO>(input, outputHost, indicesHost, indicesDesc, config.k, config.dim);
+        cpu_kthvalue<TIO>(input, outputHost, indicesHost, &indicesDesc, config.k, config.dim);
 
         EXPECT_EQ(status, miopenStatusSuccess);
         output.data = handle.Read<TIO>(output_dev, output.data.size());
