@@ -18,6 +18,9 @@
 #include "profiler/profile_grouped_gemm_impl.hpp"
 #include "profiler/profile_grouped_gemm_fixed_nk_impl.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-invalidation"
+
 static ck::index_t param_mask     = 0xffffff;
 static ck::index_t instance_index = -1;
 
@@ -342,3 +345,4 @@ int main(int argc, char** argv)
     }
     return RUN_ALL_TESTS();
 }
+#pragma clang diagnostic pop

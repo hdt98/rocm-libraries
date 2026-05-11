@@ -15,6 +15,9 @@
 #include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 #include "conv_configs.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-invalidation"
+
 struct GemmWarpConfig_Mfma
 {
     static constexpr ck_tile::index_t M_Warp_Tile = 32;
@@ -159,3 +162,4 @@ struct InvokerResult
     float ave_time;
     ck_tile::index_t split_k;
 };
+#pragma clang diagnostic pop

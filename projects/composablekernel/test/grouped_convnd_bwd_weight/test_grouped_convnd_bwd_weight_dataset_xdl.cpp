@@ -15,6 +15,8 @@
 #include "profiler/profile_grouped_conv_bwd_weight_impl.hpp" // The actual GPU profiler that does convolution work
 #include "../common/csv_test_loader.hpp"                     // Shared CSV test case loader
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-invalidation"
 using namespace ck::tensor_layout::convolution;
 static ck::index_t param_mask     = 0xffff;
 static ck::index_t instance_index = -1;
@@ -279,3 +281,4 @@ int main(int argc, char** argv)
     }
     return RUN_ALL_TESTS();
 }
+#pragma clang diagnostic pop

@@ -13,6 +13,8 @@
 #include "ck_tile/core/numeric/int8.hpp"
 #include "ck_tile/core/numeric/mxfp_convert.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 namespace ck_tile {
 
 #if CK_TILE_USE_CUSTOM_DATA_TYPE
@@ -315,3 +317,4 @@ struct pk4scaled_type_convert_impl<Y, bf8x8_t, Scale_sel>
 #endif
 
 } // namespace ck_tile
+#pragma clang diagnostic pop
