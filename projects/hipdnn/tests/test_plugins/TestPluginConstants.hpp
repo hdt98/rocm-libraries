@@ -114,4 +114,45 @@ inline const std::string& testIncompatibleVersionPluginPath()
         = getTestCustomFilepathForPlugin(TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME);
     return s_testIncompatibleVersionPluginPath;
 }
+
+// Override-execute fake-plugin paths.
+inline const std::string& testOverrideImplementingPluginPath()
+{
+    static const std::string s_path
+        = getTestCustomFilepathForPlugin(TEST_OVERRIDE_IMPLEMENTING_PLUGIN_NAME);
+    return s_path;
+}
+
+inline const std::string& testOverrideOmittingPluginPath()
+{
+    static const std::string s_path
+        = getTestCustomFilepathForPlugin(TEST_OVERRIDE_OMITTING_PLUGIN_NAME);
+    return s_path;
+}
+
+inline const std::string& testVersionLiarPluginPath()
+{
+    static const std::string s_path = getTestCustomFilepathForPlugin(TEST_VERSION_LIAR_PLUGIN_NAME);
+    return s_path;
+}
+
+inline const std::string& testSecondOverridePluginPath()
+{
+    static const std::string s_path
+        = getTestCustomFilepathForPlugin(TEST_SECOND_OVERRIDE_PLUGIN_NAME);
+    return s_path;
+}
+
+inline const std::string& testMalformedVersionPluginPath()
+{
+    static const std::string s_path
+        = getTestCustomFilepathForPlugin(TEST_MALFORMED_VERSION_PLUGIN_NAME);
+    return s_path;
+}
+
+inline const std::string& testVersionZeroPluginPath()
+{
+    static const std::string s_path = getTestCustomFilepathForPlugin(TEST_VERSION_ZERO_PLUGIN_NAME);
+    return s_path;
+}
 } // namespace hipdnn_tests::plugin_constants

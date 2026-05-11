@@ -5,6 +5,8 @@ include(GoogleTest)
 find_package(hip REQUIRED)
 find_package(Threads REQUIRED)
 
+include(${PROJECT_SOURCE_DIR}/tests/test_plugins/cmake/TestPluginTargets.cmake)
+
 add_executable(
     hipdnn_public_frontend_tests
     main.cpp
@@ -45,6 +47,7 @@ add_executable(
     IntegrationLayerNormDescriptorLifting.cpp
     IntegrationLayerNormDescriptorLowering.cpp
     IntegrationLayernormForward.cpp
+    IntegrationMalformedVersionPlugin.cpp
     IntegrationMatmul.cpp
     IntegrationMatmulDescriptorLifting.cpp
     IntegrationMatmulDescriptorLowering.cpp
@@ -56,6 +59,8 @@ add_executable(
     IntegrationRMSNormDescriptorLowering.cpp
     IntegrationRMSNormForward.cpp
     IntegrationSetPluginPathsExt.cpp
+    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationOverrideExecute.cpp>
+    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationOverrideValidation.cpp>
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdDescriptorLowering.cpp>
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdLifting.cpp>
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLifting.cpp>
@@ -70,6 +75,7 @@ target_link_libraries(
     Threads::Threads
     hipdnn_test_sdk
     hipdnn_backend
+    hipdnn_plugin_sdk
     hip::host
     ${CMAKE_DL_LIBS}
 )
@@ -89,21 +95,35 @@ target_compile_definitions(
             TEST_KNOBS_PLUGIN_NAME="${TEST_KNOBS_PLUGIN_NAME}"
             TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME="${TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME}"
             TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME="${TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME}"
+            # Override-execute fake plugins.
+            TEST_OVERRIDE_IMPLEMENTING_PLUGIN_NAME="${HIPDNN_TEST_OVERRIDE_IMPLEMENTING_PLUGIN_TARGET}"
+            TEST_OVERRIDE_OMITTING_PLUGIN_NAME="${HIPDNN_TEST_OVERRIDE_OMITTING_PLUGIN_TARGET}"
+            TEST_VERSION_LIAR_PLUGIN_NAME="${HIPDNN_TEST_VERSION_LIAR_PLUGIN_TARGET}"
+            TEST_SECOND_OVERRIDE_PLUGIN_NAME="${HIPDNN_TEST_SECOND_OVERRIDE_PLUGIN_TARGET}"
+            TEST_MALFORMED_VERSION_PLUGIN_NAME="${HIPDNN_TEST_MALFORMED_VERSION_PLUGIN_TARGET}"
+            TEST_VERSION_ZERO_PLUGIN_NAME="${HIPDNN_TEST_VERSION_ZERO_PLUGIN_TARGET}"
 )
 
 # Ensure test plugins are built before tests
 add_dependencies(
     hipdnn_public_frontend_tests
-    test_good_plugin
-    test_good_default_plugin
-    test_execute_fails_plugin
-    test_no_applicable_engines_a_plugin
-    test_no_applicable_engines_b_plugin
-    test_duplicate_id_a_plugin
-    test_duplicate_id_b_plugin
-    test_incomplete_api_plugin
-    test_knobs_plugin
-    test_knob_constraint_validation_plugin
+    ${TEST_GOOD_PLUGIN_NAME}
+    ${TEST_GOOD_DEFAULT_PLUGIN_NAME}
+    ${TEST_EXECUTE_FAILS_PLUGIN_NAME}
+    ${TEST_NO_APPLICABLE_ENGINES_A_PLUGIN_NAME}
+    ${TEST_NO_APPLICABLE_ENGINES_B_PLUGIN_NAME}
+    ${TEST_DUPLICATE_ID_A_PLUGIN_NAME}
+    ${TEST_DUPLICATE_ID_B_PLUGIN_NAME}
+    ${TEST_INCOMPLETE_API_PLUGIN_NAME}
+    ${TEST_KNOBS_PLUGIN_NAME}
+    ${TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME}
+    # Override-execute fake plugins.
+    ${HIPDNN_TEST_OVERRIDE_IMPLEMENTING_PLUGIN_TARGET}
+    ${HIPDNN_TEST_OVERRIDE_OMITTING_PLUGIN_TARGET}
+    ${HIPDNN_TEST_VERSION_LIAR_PLUGIN_TARGET}
+    ${HIPDNN_TEST_SECOND_OVERRIDE_PLUGIN_TARGET}
+    ${HIPDNN_TEST_MALFORMED_VERSION_PLUGIN_TARGET}
+    ${HIPDNN_TEST_VERSION_ZERO_PLUGIN_TARGET}
 )
 
 clang_tidy_check(hipdnn_public_frontend_tests)

@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 3.25.2)
 
 find_package(hip REQUIRED)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/TestPluginTargets.cmake")
+
 # Define plugin names as variables
 set(TEST_GOOD_PLUGIN_NAME "test_good_plugin")
 set(TEST_EXECUTE_FAILS_PLUGIN_NAME "test_execute_fails_plugin")
@@ -30,7 +32,8 @@ function(add_test_plugin target_name)
     add_library(${target_name} SHARED ${source_files})
 
     target_compile_definitions(
-        ${target_name} PRIVATE HIPDNN_COMPONENT_NAME="${target_name}" __HIP_PLATFORM_AMD__
+        ${target_name} PRIVATE HIPDNN_COMPONENT_NAME="${target_name}" HIPDNN_TEST_PLUGIN_BUILD
+                               __HIP_PLATFORM_AMD__
     )
 
     target_include_directories(${target_name} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -90,6 +93,25 @@ add_test_plugin(${TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME} TestKnobConstrain
 
 # test_incompatible_version_plugin is a plugin that returns an incompatible plugin API version
 add_test_plugin(${TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME} TestIncompatibleVersionPlugin.cpp)
+
+# Override-implementing fake: reports `K_OVERRIDE_EXECUTE_MIN_API_VERSION`
+# and exports the optional override-execute symbol.
+add_test_plugin(${HIPDNN_TEST_OVERRIDE_IMPLEMENTING_PLUGIN_TARGET} TestOverrideImplementingPlugin.cpp)
+
+# Override-omitting fake: reports the baseline API and omits the override symbol.
+add_test_plugin(${HIPDNN_TEST_OVERRIDE_OMITTING_PLUGIN_TARGET} TestOverrideOmittingPlugin.cpp)
+
+# Version-liar fake: reports the override API version but omits the override symbol.
+add_test_plugin(${HIPDNN_TEST_VERSION_LIAR_PLUGIN_TARGET} TestVersionLiarPlugin.cpp)
+
+# Second override-implementing fake with a distinct engine id.
+add_test_plugin(${HIPDNN_TEST_SECOND_OVERRIDE_PLUGIN_TARGET} TestSecondOverridePlugin.cpp)
+
+# Malformed-version fake exercises load-time API-version parse rejection.
+add_test_plugin(${HIPDNN_TEST_MALFORMED_VERSION_PLUGIN_TARGET} TestMalformedVersionPlugin.cpp)
+
+# Version-zero fake reports a parseable but too-low API version.
+add_test_plugin(${HIPDNN_TEST_VERSION_ZERO_PLUGIN_TARGET} TestVersionZeroPlugin.cpp)
 
 # Create the default plugin in test_plugins/default
 set(test_good_default_plugin_OUTPUT_DIR "${HIPDNN_TEST_PLUGIN_DIR}/default")
