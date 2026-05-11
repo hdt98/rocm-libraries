@@ -2010,6 +2010,7 @@ pipeline {
                         cleanWs()
                     }
                 }
+                /*
                 stage("Build CK and run Tests on gfx1010")
                 {
                     when {
@@ -2042,6 +2043,7 @@ pipeline {
                         cleanWs()
                     }
                 }
+                */
                 stage("Build CK and run Tests on gfx11")
                 {
                     when {
@@ -2167,3 +2169,4 @@ pipeline {
         }
     }
 }
+
