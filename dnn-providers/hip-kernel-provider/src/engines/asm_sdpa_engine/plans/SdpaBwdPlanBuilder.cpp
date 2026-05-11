@@ -8,12 +8,14 @@
 #include "plans/SdpaBwdPlan.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <hip/hip_runtime.h>
 #include <hip_kernel_provider_common/HipDeviceUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/data_types_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/sdpa_backward_attributes_generated.h>
 #include <hipdnn_plugin_sdk/PluginException.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -253,6 +255,88 @@ std::string getKernelCoPath(const std::string& coName)
     return asm_kernels::getAsmKernelPath(coName);
 }
 
+// Validates that every byte stride consumed by the backward kernels fits in
+// the uint32_t fields of the kernarg structs.  Catches overflow at
+// applicability time so the engine can be excluded from heuristics for graphs
+// it cannot represent, instead of failing at execute time.  Returns false (and
+// logs the offending field) on any overflow; returns true when every stride is
+// safe.
+bool wouldBwdByteStridesFitUint32(
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& q,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& k,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& v,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& o,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& dO,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& dq,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& dk,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& dv,
+    const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& stats,
+    int64_t headsQ,
+    int64_t seqLenQ,
+    int64_t headDimQk,
+    int64_t tsKv,
+    bool useA32)
+{
+    constexpr int64_t K_U32_MAX_AS_I64 = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
+    constexpr int64_t K_BF16_BYTES = 2;
+    constexpr int64_t K_FP32_BYTES = 4;
+
+    auto check = [](const char* name, int64_t elements, int64_t elementBytes) {
+        if(elements >= 0 && elements * elementBytes <= K_U32_MAX_AS_I64)
+        {
+            return true;
+        }
+        HIPDNN_PLUGIN_LOG_INFO("SDPA backward: byte stride overflows uint32_t (field="
+                               << name << ", elements=" << elements << ", elementBytes="
+                               << elementBytes << ", scaled=" << elements * elementBytes
+                               << ", max=" << K_U32_MAX_AS_I64 << ")");
+        return false;
+    };
+
+    // [B, H, S, D] tensors: Get(0)=batch, Get(1)=head, Get(2)=seq.
+    auto checkBwdTensor
+        = [&](const char* prefix, const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& t) {
+              const auto* s = t.strides();
+              bool ok = true;
+              ok &= check((std::string("batch_stride_") + prefix).c_str(), s->Get(0), K_BF16_BYTES);
+              ok &= check((std::string("nhead_stride_") + prefix).c_str(), s->Get(1), K_BF16_BYTES);
+              ok &= check((std::string("stride_") + prefix).c_str(), s->Get(2), K_BF16_BYTES);
+              return ok;
+          };
+
+    bool ok = true;
+    ok &= checkBwdTensor("q", q);
+    ok &= checkBwdTensor("k", k);
+    ok &= checkBwdTensor("v", v);
+    ok &= checkBwdTensor("o", o);
+    ok &= checkBwdTensor("do", dO);
+    ok &= checkBwdTensor("dq", dq);
+    ok &= checkBwdTensor("dk", dk);
+    ok &= checkBwdTensor("dv", dv);
+
+    // LSE/D buffer: rank 3 [B, H_q, S_q] in FP32; only batch+head strides used.
+    const auto* statsStrides = stats.strides();
+    ok &= check("batch_stride_lsed", statsStrides->Get(0), K_FP32_BYTES);
+    ok &= check("nhead_stride_lsed", statsStrides->Get(1), K_FP32_BYTES);
+
+    // dq_acc: contiguous [B, H_q, S_q, D_qk] FP32, derived from dims (A32 only).
+    if(useA32)
+    {
+        const int64_t strideDqAcc = headDimQk;
+        const int64_t nheadStrideDqAcc = seqLenQ * headDimQk;
+        const int64_t batchStrideDqAcc = headsQ * nheadStrideDqAcc;
+        ok &= check("stride_dq_acc", strideDqAcc, K_FP32_BYTES);
+        ok &= check("nhead_stride_dq_acc", nheadStrideDqAcc, K_FP32_BYTES);
+        ok &= check("batch_stride_dq_acc", batchStrideDqAcc, K_FP32_BYTES);
+    }
+
+    // DQDKDV's `Ts` kernarg is the 3-way product (tsKv * stride_k * BF16).
+    ok &= check(
+        "Ts (tsKv * stride_k)", tsKv * static_cast<int64_t>(k.strides()->Get(2)), K_BF16_BYTES);
+
+    return ok;
+}
+
 // Per-stage dispatch tuples differ. The odo (D-reduction) and dq_convert
 // (FP32 -> output dtype cast) kernels are not parameterised by mask/
 // accumulator/padding — every row in those CSVs has
@@ -400,6 +484,7 @@ bool SdpaBwdPlanBuilder::isApplicable(
     const int64_t qUid = attrs.q_tensor_uid();
     const int64_t kUid = attrs.k_tensor_uid();
     const int64_t vUid = attrs.v_tensor_uid();
+    const int64_t oUid = attrs.o_tensor_uid();
     const int64_t doUid = attrs.do_tensor_uid();
     const int64_t statsUid = attrs.stats_tensor_uid();
     const int64_t dqUid = attrs.dq_tensor_uid();
@@ -420,14 +505,15 @@ bool SdpaBwdPlanBuilder::isApplicable(
     const auto* qTensor = findTensor("q", qUid);
     const auto* kTensor = findTensor("k", kUid);
     const auto* vTensor = findTensor("v", vUid);
+    const auto* oTensor = findTensor("o", oUid);
     const auto* doTensor = findTensor("do", doUid);
     const auto* statsTensor = findTensor("stats", statsUid);
     const auto* dqTensor = findTensor("dq", dqUid);
     const auto* dkTensor = findTensor("dk", dkUid);
     const auto* dvTensor = findTensor("dv", dvUid);
-    if(qTensor == nullptr || kTensor == nullptr || vTensor == nullptr || doTensor == nullptr
-       || statsTensor == nullptr || dqTensor == nullptr || dkTensor == nullptr
-       || dvTensor == nullptr)
+    if(qTensor == nullptr || kTensor == nullptr || vTensor == nullptr || oTensor == nullptr
+       || doTensor == nullptr || statsTensor == nullptr || dqTensor == nullptr
+       || dkTensor == nullptr || dvTensor == nullptr)
     {
         return false;
     }
@@ -554,6 +640,44 @@ bool SdpaBwdPlanBuilder::isApplicable(
             bwd_dispatch::PipelineStage::DQ_CONVERT,
             dispatchTuples[static_cast<size_t>(bwd_dispatch::PipelineStage::DQ_CONVERT)]),
         "Failed dq_convert registry lookup");
+
+    // Reject oversized graphs whose byte strides would silently truncate when
+    // packed into the kernarg uint32_t fields. Caught here rather than at
+    // execute time so the engine can be excluded from heuristics for graphs it
+    // cannot represent. Uses the resolved DQDKDV row's tile size for the Ts
+    // product (tsKv * stride_k * BF16).
+    const auto& dqdkdvTuple
+        = dispatchTuples[static_cast<size_t>(bwd_dispatch::PipelineStage::DQDKDV)];
+    auto dqdkdvCfgOpt = findConfig(cfg_fmha_bwd_dqdkdv,
+                                   deviceString,
+                                   dataTypeId,
+                                   headDimQk,
+                                   headDimV,
+                                   dqdkdvTuple.mask,
+                                   dqdkdvTuple.atomic32,
+                                   dqdkdvTuple.pssk,
+                                   dqdkdvTuple.pddv,
+                                   static_cast<int>(BatchMode::BATCH),
+                                   dqdkdvTuple.bf16Cvt);
+    HIP_KERNEL_RETURN_FALSE_IF(!dqdkdvCfgOpt,
+                               "Failed to resolve dqdkdv config for byte-stride validation");
+    const bool useA32 = (dqdkdvTuple.atomic32 == static_cast<int>(AccumulatorMode::A32));
+    const int64_t seqLenQ = qTensor->dims()->Get(2);
+    HIP_KERNEL_RETURN_FALSE_IF(!wouldBwdByteStridesFitUint32(*qTensor,
+                                                             *kTensor,
+                                                             *vTensor,
+                                                             *oTensor,
+                                                             *doTensor,
+                                                             *dqTensor,
+                                                             *dkTensor,
+                                                             *dvTensor,
+                                                             *statsTensor,
+                                                             numHeadsQ,
+                                                             seqLenQ,
+                                                             headDimQk,
+                                                             dqdkdvCfgOpt->ts,
+                                                             useA32),
+                               "Backward byte strides overflow uint32_t kernarg fields");
 
     return true;
 }

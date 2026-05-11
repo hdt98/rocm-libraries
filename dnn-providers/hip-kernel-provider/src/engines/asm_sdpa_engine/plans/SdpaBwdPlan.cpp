@@ -7,8 +7,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <hip/hip_runtime.h>
+#include <hipdnn_plugin_sdk/PluginException.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
-#include <limits>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -347,118 +348,23 @@ MhaBwdArgs buildMhaBwdArgs(const asm_sdpa_engine::SdpaBwdParams& p,
 }
 
 // =============================================================================
-// Byte-stride uint32 overflow validation
+// Per-launch post-check
 // =============================================================================
 //
-// Every byte stride packed into the AITER kernarg structs is a uint32_t.  The
-// build* helpers do `unsigned int * elementBytes` to compute them, which
-// silently truncates if the product exceeds 2^32 — the kernel then reads/writes
-// the wrong addresses and silently corrupts dQ/dK/dV.  TODO: hoist this into
-// `isApplicable` so oversized graphs are rejected before plan-building (depends
-// on T20's BwdDispatchTuple refactor landing first).
-constexpr int64_t K_U32_MAX_AS_I64 = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
-
-bool fitsUint32AfterScale(int64_t elements, unsigned int elementBytes)
-{
-    return elements >= 0 && elements * static_cast<int64_t>(elementBytes) <= K_U32_MAX_AS_I64;
-}
-
-bool validateMhaBwdByteStrides(const MhaBwdArgs& a, unsigned int tsKv, bool checkA32DqAcc)
-{
-    auto check = [](const char* name, int64_t elements, unsigned int elementBytes) {
-        if(fitsUint32AfterScale(elements, elementBytes))
-        {
-            return true;
-        }
-        HIPDNN_PLUGIN_LOG_ERROR("SDPA backward: byte stride overflows uint32_t (field="
-                                << name << ", elements=" << elements
-                                << ", elementBytes=" << elementBytes
-                                << ", scaled=" << elements * static_cast<int64_t>(elementBytes)
-                                << ", max=" << K_U32_MAX_AS_I64 << ")");
-        return false;
-    };
-
-    bool ok = true;
-
-    // Q/K/V/O/dO/dQ/dK/dV strides scaled by BF16 element size in build* helpers.
-    ok &= check("nhead_stride_q", a.nhead_stride_q, K_BF16_SIZE);
-    ok &= check("batch_stride_q", a.batch_stride_q, K_BF16_SIZE);
-    ok &= check("stride_q", a.stride_q, K_BF16_SIZE);
-    ok &= check("nhead_stride_k", a.nhead_stride_k, K_BF16_SIZE);
-    ok &= check("batch_stride_k", a.batch_stride_k, K_BF16_SIZE);
-    ok &= check("stride_k", a.stride_k, K_BF16_SIZE);
-    ok &= check("nhead_stride_v", a.nhead_stride_v, K_BF16_SIZE);
-    ok &= check("batch_stride_v", a.batch_stride_v, K_BF16_SIZE);
-    ok &= check("stride_v", a.stride_v, K_BF16_SIZE);
-    ok &= check("nhead_stride_o", a.nhead_stride_o, K_BF16_SIZE);
-    ok &= check("batch_stride_o", a.batch_stride_o, K_BF16_SIZE);
-    ok &= check("stride_o", a.stride_o, K_BF16_SIZE);
-    ok &= check("nhead_stride_do", a.nhead_stride_do, K_BF16_SIZE);
-    ok &= check("batch_stride_do", a.batch_stride_do, K_BF16_SIZE);
-    ok &= check("stride_do", a.stride_do, K_BF16_SIZE);
-    ok &= check("nhead_stride_dq", a.nhead_stride_dq, K_BF16_SIZE);
-    ok &= check("batch_stride_dq", a.batch_stride_dq, K_BF16_SIZE);
-    ok &= check("stride_dq", a.stride_dq, K_BF16_SIZE);
-    ok &= check("nhead_stride_dk", a.nhead_stride_dk, K_BF16_SIZE);
-    ok &= check("batch_stride_dk", a.batch_stride_dk, K_BF16_SIZE);
-    ok &= check("stride_dk", a.stride_dk, K_BF16_SIZE);
-    ok &= check("nhead_stride_dv", a.nhead_stride_dv, K_BF16_SIZE);
-    ok &= check("batch_stride_dv", a.batch_stride_dv, K_BF16_SIZE);
-    ok &= check("stride_dv", a.stride_dv, K_BF16_SIZE);
-
-    // LSE/D buffer strides scaled by FP32 element size.
-    ok &= check("nhead_stride_lsed", a.nhead_stride_lsed, K_FP32_SIZE);
-    ok &= check("batch_stride_lsed", a.batch_stride_lsed, K_FP32_SIZE);
-
-    // dq_acc strides scaled by FP32 element size (A32 path only; A16 writes dQ
-    // directly and never touches the dq_acc buffer).
-    if(checkA32DqAcc)
-    {
-        ok &= check("nhead_stride_dq_acc", a.nhead_stride_dq_acc, K_FP32_SIZE);
-        ok &= check("batch_stride_dq_acc", a.batch_stride_dq_acc, K_FP32_SIZE);
-        ok &= check("stride_dq_acc", a.stride_dq_acc, K_FP32_SIZE);
-    }
-
-    // DQDKDV's `Ts` is a 3-way product (tsKv * stride_k * BF16) — validate the
-    // full expression in 64-bit before truncation.
-    ok &= check("Ts (tsKv * stride_k)",
-                static_cast<int64_t>(tsKv) * static_cast<int64_t>(a.stride_k),
-                K_BF16_SIZE);
-
-    return ok;
-}
-
-// =============================================================================
-// Per-launch pre/post checks
-// =============================================================================
-//
-// `KernelTiles::gridDim` deliberately returns 0 when its `ts` is 0 (the
-// "unresolved CSV row" sentinel from the builder).  hipModuleLaunchKernel does
-// not consistently distinguish gridX==0 from a generic launch error, so we
-// catch the resolution failure here with a specific diagnostic.
-bool checkLaunchPreconditions(const char* stage, unsigned int gridX)
-{
-    if(gridX == 0)
-    {
-        HIPDNN_PLUGIN_LOG_ERROR(stage << ": gridX is 0 — kernel tile size was not resolved "
-                                         "by the builder (CSV row mismatch)");
-        return false;
-    }
-    return true;
-}
-
 // Surfaces async launch faults that hipModuleLaunchKernel itself returned
 // success for.  Without this, a memory-access fault inside the ASM kernel
-// would propagate silently to the next stage.
-bool checkLaunchPostError(const char* stage)
+// would propagate silently to the next stage.  Throws
+// HipdnnPluginException(INTERNAL_ERROR) on async error so the caller's
+// API status reflects the actual root cause.
+void throwOnLaunchPostError(const char* stage)
 {
     const hipError_t err = hipPeekAtLastError();
     if(err != hipSuccess)
     {
-        HIPDNN_PLUGIN_LOG_ERROR(stage << ": post-launch error: " << hipGetErrorString(err));
-        return false;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            std::string(stage) + ": post-launch error: " + hipGetErrorString(err));
     }
-    return true;
 }
 
 } // anonymous namespace
@@ -505,11 +411,15 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
                           uint32_t numDeviceBuffers,
                           void* workspace) const
 {
-    // 1. Validate workspace
+    // 1. Validate workspace.  getMaxWorkspaceSize() always reports a non-zero
+    // size for backward SDPA, so a null workspace pointer here is a contract
+    // violation by the caller.
     if(workspace == nullptr)
     {
-        HIPDNN_PLUGIN_LOG_ERROR("Backward SDPA requires workspace but received nullptr");
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_BAD_PARAM,
+            "SdpaBwdPlan::execute: workspace is null but backward SDPA requires a non-zero "
+            "workspace (see getMaxWorkspaceSize())");
     }
 
     // 2. Build UID->ptr map from device buffers
@@ -541,16 +451,10 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
                    + sdpaBwdDBufferSize(_params.batchSize, _params.numHeadsQ, _params.seqLenQ);
     }
 
-    // 5. Build convenience args struct (mirrors AITER mha_bwd_args)
+    // 5. Build convenience args struct (mirrors AITER mha_bwd_args).
+    // Byte-stride uint32 overflow was already rejected by isApplicable.
     const MhaBwdArgs mhaArgs = buildMhaBwdArgs(
         _params, qPtr, kPtr, vPtr, oPtr, doPtr, lsePtr, dqPtr, dkPtr, dvPtr, dBufPtr, dqAccPtr);
-
-    // 5a. Reject oversized graphs whose byte strides would silently truncate
-    // when packed into the kernarg uint32_t fields.
-    if(!validateMhaBwdByteStrides(mhaArgs, _params.dqdkdvTiles.ts, _params.useA32))
-    {
-        return;
-    }
 
     // 6. Launch 3 kernels on the same stream.
     // All three kernels have data dependencies (ODO produces D, DQDKDV
@@ -564,10 +468,6 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
 
     const unsigned int gdxOdo = _params.odoTiles.gridDim(mhaArgs.seqlen_q);
 
-    if(!checkLaunchPreconditions("SDPA backward ODO", gdxOdo))
-    {
-        return;
-    }
     if(!launchKernel("SDPA backward ODO",
                      _odoKernel.function(),
                      &odoArgs,
@@ -578,12 +478,11 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
                      K_BWD_BLOCK_DIM,
                      stream))
     {
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "SdpaBwdPlan::execute: hipModuleLaunchKernel failed for SDPA backward ODO");
     }
-    if(!checkLaunchPostError("SDPA backward ODO"))
-    {
-        return;
-    }
+    throwOnLaunchPostError("SDPA backward ODO");
 
     // 6b. Build args and launch kernel 2: DQDKDV
     auto dqdkdvArgs = buildDqdkdvArgs(mhaArgs, _params.dqdkdvTiles.ts);
@@ -602,17 +501,14 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
         const hipError_t memsetErr = hipMemsetAsync(dqAccPtr, 0, dqAccBytes, stream);
         if(memsetErr != hipSuccess)
         {
-            HIPDNN_PLUGIN_LOG_ERROR("Failed to zero dq_acc workspace before SDPA backward DQDKDV, "
-                                    "error: "
-                                    << hipGetErrorString(memsetErr));
-            return;
+            throw hipdnn_plugin_sdk::HipdnnPluginException(
+                HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                std::string("SdpaBwdPlan::execute: failed to zero dq_acc workspace before SDPA "
+                            "backward DQDKDV, error: ")
+                    + hipGetErrorString(memsetErr));
         }
     }
 
-    if(!checkLaunchPreconditions("SDPA backward DQDKDV", gdxDqdkdv))
-    {
-        return;
-    }
     if(!launchKernel("SDPA backward DQDKDV",
                      _dqdkdvKernel.function(),
                      &dqdkdvArgs,
@@ -623,12 +519,11 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
                      K_BWD_BLOCK_DIM,
                      stream))
     {
-        return;
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "SdpaBwdPlan::execute: hipModuleLaunchKernel failed for SDPA backward DQDKDV");
     }
-    if(!checkLaunchPostError("SDPA backward DQDKDV"))
-    {
-        return;
-    }
+    throwOnLaunchPostError("SDPA backward DQDKDV");
 
     // 6c. DQ_CONVERT (FP32 → BF16) — A32 path only.
     // A16 wrote dQ directly to the output BF16 buffer in step 6b; no cast needed.
@@ -640,10 +535,6 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
 
         const unsigned int gdxPost = _params.dqConvertTiles.gridDim(mhaArgs.seqlen_q);
 
-        if(!checkLaunchPreconditions("SDPA backward DQ_CONVERT", gdxPost))
-        {
-            return;
-        }
         if(!launchKernel("SDPA backward DQ_CONVERT",
                          _postKernel->function(),
                          &postArgs,
@@ -654,12 +545,11 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
                          K_BWD_BLOCK_DIM,
                          stream))
         {
-            return;
+            throw hipdnn_plugin_sdk::HipdnnPluginException(
+                HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                "SdpaBwdPlan::execute: hipModuleLaunchKernel failed for SDPA backward DQ_CONVERT");
         }
-        if(!checkLaunchPostError("SDPA backward DQ_CONVERT"))
-        {
-            return;
-        }
+        throwOnLaunchPostError("SDPA backward DQ_CONVERT");
     }
 }
 
