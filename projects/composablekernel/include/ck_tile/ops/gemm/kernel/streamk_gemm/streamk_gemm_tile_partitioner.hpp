@@ -294,7 +294,13 @@ struct StreamKTilePartitioner<BlockGemmShapeType, ReductionStrategyType, true>
      */
     CK_TILE_HOST_DEVICE index_t get_extra_dp_tiles() const noexcept;
 
+    /**
+     * @brief Returns the total number of DP workgroups. TEMPORARY
+     */
+    CK_TILE_HOST_DEVICE index_t get_dp_ctas() const noexcept;
+
     protected:
+    index_t dp_ctas_;
     index_t dp_tiles_per_cta_;
     index_t extra_dp_tiles_;
 };

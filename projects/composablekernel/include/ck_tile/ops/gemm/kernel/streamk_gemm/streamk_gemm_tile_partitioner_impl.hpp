@@ -327,6 +327,14 @@ StreamKTilePartitioner<BlockGemmShapeType, ReductionStrategyType, true>::get_ext
     return extra_dp_tiles_;
 }
 
+template <typename BlockGemmShapeType, StreamKReductionStrategy ReductionStrategyType>
+CK_TILE_HOST_DEVICE index_t
+StreamKTilePartitioner<BlockGemmShapeType, ReductionStrategyType, true>::get_dp_ctas()
+    const noexcept
+{
+    return 0;
+}
+
 // child class for Non-Persistent Tile Partitioner
 template <typename BlockGemmShapeType, StreamKReductionStrategy ReductionStrategyType>
 StreamKTilePartitioner<BlockGemmShapeType, ReductionStrategyType, false>::StreamKTilePartitioner(

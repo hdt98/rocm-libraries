@@ -105,8 +105,6 @@ class TestGemmPersistentAsyncInput : public ::testing::Test
         constexpr bool Persistent                          = true;
         constexpr int NumWaveGroup                         = 1;
         constexpr bool Preshuffle                          = false;
-        constexpr ck_tile::index_t TilePartitionerGroupNum = 8;
-        constexpr ck_tile::index_t TilePartitionerM01      = 4;
 
         using GemmShape =
             ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
