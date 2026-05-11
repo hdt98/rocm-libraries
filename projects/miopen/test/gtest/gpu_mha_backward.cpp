@@ -146,7 +146,7 @@ protected:
                               miopenStatusSuccess);
 
                     gpu_buff = handle.Write(cpu_tensor.data);
-                    descVector.push_back(&(cpu_tensor.desc));
+                    descVector.push_back(cpu_tensor.desc);
                 },
                 tmp->m_cpu_tensor);
 
