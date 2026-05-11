@@ -58,14 +58,14 @@ if(DEFINED SKBUILD)
     install(TARGETS hipdnn_frontend_python DESTINATION .)
     install(FILES hipdnn_frontend/__init__.py DESTINATION .)
 else()
-    # Superbuild / cmake --install: install to python/ under install prefix.
-    # TheRock's wheel builder detects python/*/ and promotes to top-level
+    # Superbuild / cmake --install: install to python_bindings/ under install prefix.
+    # TheRock's wheel builder detects python_bindings/*/ and promotes to top-level
     # packages in the rocm-sdk-libraries wheel.
     install(TARGETS hipdnn_frontend_python
-        LIBRARY DESTINATION python/hipdnn_frontend
+        LIBRARY DESTINATION python_bindings/hipdnn_frontend
         COMPONENT python_bindings)
 
     install(FILES hipdnn_frontend/__init__.py
-        DESTINATION python/hipdnn_frontend
+        DESTINATION python_bindings/hipdnn_frontend
         COMPONENT python_bindings)
 endif()
