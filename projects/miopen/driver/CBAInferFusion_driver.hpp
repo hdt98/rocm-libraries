@@ -32,7 +32,7 @@
 #include "driver_log.hpp"
 #include "miopen_ConvBatchNormActivHost.hpp"
 #include "mloNeuronHost.hpp"
-#include "random.hpp"
+#include <common_utils/random.hpp>
 #include "tensor_driver.hpp"
 #include "timer.hpp"
 #include "util_driver.hpp"

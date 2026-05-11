@@ -41,12 +41,7 @@
 #define MAX_PRNG_STATE (256 * 64)
 #endif
 
-// disable __device__ qualifiers
-#ifdef FQUALIFIERS
-#error rocrand FQUALIFIERS defined externally, probably one of rocrand device header included prior to this
-#endif
-#define FQUALIFIERS inline
-#include "../src/kernels/miopen_rocrand.hpp"
+#include <miopen_utils/prng.hpp>
 
 static void InitKernelStateEmulator(std::vector<rocrand_state_xorwow>& states,
                                     const miopenDropoutDescriptor_t dropoutDesc,

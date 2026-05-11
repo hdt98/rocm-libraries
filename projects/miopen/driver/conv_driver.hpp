@@ -10,7 +10,7 @@
 #include "driver.hpp"
 #include "driver_env.hpp"
 #include "mloConvHost.hpp"
-#include "random.hpp"
+#include <common_utils/random.hpp>
 #include "rocrand_wrapper.hpp"
 #include "tensor_driver.hpp"
 #include "timer.hpp"

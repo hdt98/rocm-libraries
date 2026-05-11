@@ -27,7 +27,7 @@
 #define GUARD_MIOPEN_DRIVER_HPP
 
 #include <half/half.hpp>
-#include "../driver/random.hpp"
+#include <common_utils/random.hpp>
 
 #include <common_utils/errors.hpp>
 #include "InputFlags.hpp"

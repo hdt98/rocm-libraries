@@ -6,7 +6,7 @@
 
 #include "InputFlags.hpp"
 #include "driver.hpp"
-#include "random.hpp"
+#include <common_utils/random.hpp>
 #include "tensor_driver.hpp"
 #include "timer.hpp"
 #include <algorithm>

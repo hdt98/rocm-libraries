@@ -31,7 +31,7 @@
 #include "driver.hpp"
 #include "tensor_driver.hpp"
 #include "timer.hpp"
-#include "random.hpp"
+#include <common_utils/random.hpp>
 #include <algorithm>
 #include <cfloat>
 #include <cstdlib>
@@ -42,7 +42,7 @@
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
-#include "../src/kernels/MIOpenReduceExtreme.hpp"
+#include <miopen_utils/reduce_extreme_ops.hpp>
 
 template <typename T>
 bool compare_equal(T r1, T r2)

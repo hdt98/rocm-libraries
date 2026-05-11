@@ -32,7 +32,7 @@
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include <miopen/miopen.h>
-#include "random.hpp"
+#include <common_utils/random.hpp>
 #include "tensor_driver.hpp"
 #include "timer.hpp"
 #include <cfloat>
