@@ -22,6 +22,49 @@ include(FetchContent)
 
 message(STATUS "MIOpen: standalone build — preferring system third-party deps, fetching what's missing")
 
+# -----------------------------------------------------------------------------
+# Save state of variables we override below so we can restore them before
+# returning to MIOpen's own CMakeLists. Without this:
+#   - FORCE-setting a cache variable and then unset(... CACHE) silently wipes
+#     the user's -D value. This broke BUILD_TESTING and skipped the test/
+#     subdirectory, so miopen_gtest never got created.
+#   - Setting a normal variable without restoring leaks into MIOpen's parent
+#     scope (CMAKE_POLICY_VERSION_MINIMUM, FETCHCONTENT_QUIET).
+# -----------------------------------------------------------------------------
+macro(_miopen_save_var name)
+    if(DEFINED ${name})
+        set(_miopen_saved_${name} "${${name}}")
+        set(_miopen_saved_${name}_was_defined TRUE)
+    else()
+        set(_miopen_saved_${name}_was_defined FALSE)
+    endif()
+endmacro()
+
+macro(_miopen_restore_cache_var name docstring)
+    if(_miopen_saved_${name}_was_defined)
+        set(${name} "${_miopen_saved_${name}}" CACHE BOOL "${docstring}" FORCE)
+    else()
+        unset(${name} CACHE)
+    endif()
+    unset(_miopen_saved_${name})
+    unset(_miopen_saved_${name}_was_defined)
+endmacro()
+
+macro(_miopen_restore_var name)
+    if(_miopen_saved_${name}_was_defined)
+        set(${name} "${_miopen_saved_${name}}")
+    else()
+        unset(${name})
+    endif()
+    unset(_miopen_saved_${name})
+    unset(_miopen_saved_${name}_was_defined)
+endmacro()
+
+_miopen_save_var(BUILD_TESTING)
+_miopen_save_var(CMAKE_WARN_DEPRECATED)
+_miopen_save_var(FETCHCONTENT_QUIET)
+_miopen_save_var(CMAKE_POLICY_VERSION_MINIMUM)
+
 # Suppress sub-project noise: only CMake's own one-liner per dep.
 set(FETCHCONTENT_QUIET ON)
 
@@ -245,6 +288,9 @@ if(NOT GTest_FOUND)
     endif()
 endif()
 
-# Restore settings that should not leak into MIOpen's own CMakeLists.
-unset(BUILD_TESTING CACHE)
-unset(CMAKE_WARN_DEPRECATED CACHE)
+# Restore the variables we overrode at the top of this file so nothing leaks
+# into MIOpen's own CMakeLists.
+_miopen_restore_cache_var(BUILD_TESTING "Build the testing tree.")
+_miopen_restore_cache_var(CMAKE_WARN_DEPRECATED "")
+_miopen_restore_var(FETCHCONTENT_QUIET)
+_miopen_restore_var(CMAKE_POLICY_VERSION_MINIMUM)
