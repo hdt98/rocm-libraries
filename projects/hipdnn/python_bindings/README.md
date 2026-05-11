@@ -45,7 +45,7 @@ There are three ways to install the Python bindings, depending on your setup:
 |---|---|---|
 | [TheRock wheel](#1-therock-wheel-recommended) | `pip install rocm[libraries]` | End users, CI |
 | [Standalone pip install](#2-standalone-pip-install) | `pip install .` from this directory | Developers building hipDNN from source |
-| [TheRock cmake install](#3-therock-cmake-install) | Automatic via `ninja install` | Intermediate staging only (not directly importable) |
+| [cmake install](#3-cmake-install) | Automatic via `ninja install` | Intermediate staging only (not directly importable) |
 
 ### 1. TheRock Wheel (Recommended)
 
@@ -75,12 +75,7 @@ installed directly with pip using scikit-build-core:
 
 ```bash
 cd python_bindings
-
-# If hipDNN is installed to a known prefix (e.g. /opt/rocm):
 pip install -v . -Ccmake.define.CMAKE_PREFIX_PATH=/opt/rocm
-
-# Or if using a TheRock build tree:
-pip install -v . -Ccmake.define.CMAKE_PREFIX_PATH=/path/to/TheRock/build/dist/rocm
 ```
 
 This triggers scikit-build-core which:
@@ -106,10 +101,16 @@ pip uninstall hipdnn-frontend -y
 pip install -v . -Ccmake.define.CMAKE_PREFIX_PATH=/opt/rocm
 ```
 
-### 3. TheRock cmake Install
+### 3. cmake Install
 
-When hipDNN is built as part of TheRock (or the rocm-libraries superbuild),
-the Python bindings are always built and installed to
+When building hipDNN with cmake, enable the Python bindings with:
+
+```bash
+cmake -DHIPDNN_BUILD_PYTHON_BINDINGS=ON ...
+```
+
+When hipDNN is built as part of a superbuild (e.g. TheRock or rocm-libraries),
+this option is enabled automatically. The bindings are installed to
 `<install_prefix>/python_bindings/hipdnn_frontend/`. This directory is an
 intermediate staging location used by TheRock's wheel builder — it is **not**
 directly importable by Python.
