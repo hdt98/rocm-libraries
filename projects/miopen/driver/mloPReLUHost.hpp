@@ -27,7 +27,7 @@
 #pragma once
 
 #include <common_utils/ford.hpp>
-#include <miopen/tensor_view_utils.hpp>
+#include <miopen_utils/tensor_view.hpp>
 #include <miopen/prelu/utils.hpp>
 
 template <typename Tgpu, typename Tcheck>

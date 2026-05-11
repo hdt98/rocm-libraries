@@ -408,9 +408,7 @@ public:
 
 // tensor_view_t utilities -- build tensor views from descriptor handles
 // without requiring miopen::TensorDescriptor internals.
-// tensor_view_t lives in src/kernels/ because it must be available for
-// runtime kernel compilation (HIPRTC), which cannot resolve miopen_utils/ paths.
-#include "../../src/kernels/tensor_view.hpp"
+#include <miopen_utils/tensor_view.hpp>
 
 /// Build a tensor_view_t<N> from an opaque tensor descriptor handle.
 /// Replacement for miopen::get_inner_expanded_tv<N>(miopen::deref(desc)).

@@ -39,7 +39,7 @@
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
-#include <miopen/tensor_view_utils.hpp>
+#include <miopen_utils/tensor_view.hpp>
 
 template <typename Tgpu, typename Tcheck>
 int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,

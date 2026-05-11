@@ -38,7 +38,7 @@
 #include <memory>
 #include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
-#include <miopen/tensor_view_utils.hpp>
+#include <miopen_utils/tensor_view.hpp>
 #include <numeric>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
@@ -79,7 +79,7 @@ int32_t mloGetitemBackwardRunHost(miopenTensorDescriptor_t dyDesc,
 
     auto dy_tv     = GetInnerExpandedTv<5>(dyDesc);
     auto dxhost_tv = GetInnerExpandedTv<5>(dxDesc);
-    miopen::slice_tv<5>(dxhost_tv, sliceCount, slices);
+    slice_tv<5>(dxhost_tv, sliceCount, slices);
 
     int32_t ret = 0;
 

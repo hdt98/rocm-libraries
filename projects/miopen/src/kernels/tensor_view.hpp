@@ -27,6 +27,19 @@
 #ifndef GUARD_TENSOR_VIEW_HPP
 #define GUARD_TENSOR_VIEW_HPP
 
+// DEVICE-SIDE tensor_view_t and tensor_layout_t for GPU kernel code.
+//
+// This file is registered with HIPRTC for runtime kernel compilation.
+// It must remain in src/kernels/ because HIPRTC resolves includes by
+// flat filename only — directory paths are not supported.
+//
+// A HOST-SIDE copy lives at miopen_utils/include/miopen_utils/tensor_view.hpp
+// for use by driver, test, and miopen_utils code without reaching into
+// MIOpen internals.
+//
+// WARNING: Both copies must stay in sync. If you change the layout,
+// indexing, or semantics here, update the host-side copy to match.
+
 #include "miopen_cstdint.hpp"
 #include <initializer_list>
 

@@ -34,7 +34,7 @@
 #include <miopen_utils/verify.hpp>
 
 #include <miopen_utils/tensor_desc.hpp>
-#include <miopen/tensor_view_utils.hpp>
+#include <miopen_utils/tensor_view.hpp>
 #include <miopen/miopen.h>
 #include <common_utils/errors.hpp>
 
@@ -55,7 +55,7 @@ void mloKthvalueFwdRunHost(TIO* input,
     size_t dimSize         = inputDesc.GetLengths()[dim];
     size_t dimStride       = inputDesc.GetStrides()[dim];
     auto inputTv           = GetInnerExpandedTv<5>(pInputDesc);
-    auto inputTvWithoutDim = miopen::get_tv_without_dim<5>(inputTv, dim);
+    auto inputTvWithoutDim = get_tv_without_dim<5>(inputTv, dim);
     auto outputTv          = GetInnerExpandedTv<5>(outputDesc);
     auto indicesTv         = GetInnerExpandedTv<5>(indicesDesc);
 
