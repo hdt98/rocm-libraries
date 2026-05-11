@@ -4,6 +4,7 @@
 #include "origami/logger.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <iostream>
 
@@ -11,7 +12,9 @@ static origami::LogFormat format_from_path(const std::string& path) {
     auto dot = path.rfind('.');
     if (dot != std::string::npos) {
         auto ext = path.substr(dot);
-        if (ext == ".csv" || ext == ".CSV") return origami::LogFormat::CSV;
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext == ".csv") return origami::LogFormat::CSV;
     }
     return origami::LogFormat::TEXT;
 }
@@ -241,23 +244,23 @@ std::string Logger::escape_csv(const std::string& field) {
 void Logger::flush_csv_locked() {
     if (rows_.empty()) return;
 
-    bool file_exists = std::ifstream(file_path_).good();
-    bool need_header = !file_exists || !header_written_;
-
-    std::ofstream file(file_path_,
-                       need_header ? (std::ios::out | std::ios::trunc)
-                                   : (std::ios::out | std::ios::app));
+    std::ofstream file(file_path_, std::ios::out | std::ios::app);
     if (!file.is_open()) {
-        std::cerr << "Warning: Failed to open CSV file: " << file_path_ << std::endl;
+        std::cerr << "Warning: Failed to open CSV file: " << file_path_
+                   << ". Dropping " << rows_.size() << " buffered row(s)." << std::endl;
+        rows_.clear();
         return;
     }
 
-    if (need_header) {
-        for (size_t i = 0; i < columns_.size(); ++i) {
-            if (i > 0) file << ",";
-            file << escape_csv(columns_[i]);
+    if (!header_written_) {
+        bool file_empty = (file.tellp() == 0);
+        if (file_empty) {
+            for (size_t i = 0; i < columns_.size(); ++i) {
+                if (i > 0) file << ",";
+                file << escape_csv(columns_[i]);
+            }
+            file << "\n";
         }
-        file << "\n";
         header_written_ = true;
     }
 
