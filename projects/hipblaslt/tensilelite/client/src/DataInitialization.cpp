@@ -2088,9 +2088,37 @@ namespace TensileLite
                   // canonical layout for the CPU reference path.
                   if(swizzleLayout != MXScaleLayout::kNone && pristineScale.gpuInput.valid)
                   {
-                      size_t gpuScaleBytes
-                          = scaleDesc.totalAllocatedElements()
-                            * DataTypeInfo::Get(scaleDesc.dataType()).elementSize;
+                      size_t const eltSize
+                          = DataTypeInfo::Get(scaleDesc.dataType()).elementSize;
+                      size_t const canonicalScaleElems = scaleDesc.totalAllocatedElements();
+
+                      // preSwizzleScalesGFX1250 internally pads the fast dim
+                      // (scaleRows = data rows / mxBlock) up to a multiple of
+                      // dimk = 128 / mxBlock. On gfx1250 the scale tensor itself
+                      // is allocated unpadded (m_padMXScaleTensor = false), so
+                      // generateMXInput's swizzle output can be larger than
+                      // canonicalScaleElems. Size the staging buffer (and the
+                      // hipMemcpy) for that worst case so we never overrun the
+                      // host vector. preSwizzleScalesGFX950 has no built-in
+                      // padding, so the canonical size suffices there.
+                      size_t swizzledScaleElems = canonicalScaleElems;
+                      if(swizzleLayout == MXScaleLayout::kGFX1250 && mxBlock > 0)
+                      {
+                          size_t const slowDim = static_cast<size_t>(cols);
+                          size_t const fastDim
+                              = static_cast<size_t>(rows) / static_cast<size_t>(mxBlock);
+                          size_t const dimk = 128u / static_cast<size_t>(mxBlock);
+                          size_t const paddedFast
+                              = (dimk == 0) ? fastDim
+                                            : ((fastDim + dimk - 1) / dimk) * dimk;
+                          size_t const paddedElemsPerBatch = slowDim * paddedFast;
+                          // Account for batched problems: keep the same per-batch
+                          // stride contract that generateMXInput sees.
+                          size_t const totalPaddedElems = paddedElemsPerBatch * batchCount;
+                          if(totalPaddedElems > swizzledScaleElems)
+                              swizzledScaleElems = totalPaddedElems;
+                      }
+                      size_t const gpuScaleBytes = swizzledScaleElems * eltSize;
                       std::vector<uint8_t> gpuScaleBuf(gpuScaleBytes, 0);
                       for(size_t b = 0; b < batchCount; b++)
                       {

@@ -314,7 +314,7 @@ namespace DGen
                 uint32_t       s     = seedMix(seed, dataIdx);
                 float          u     = prngFloat01(s);
                 constexpr float kTwoPi = 6.283185307179586f;
-                return cosf(kTwoPi * u);
+                return __builtin_cosf(kTwoPi * u);
             }
             case DeviceInitMode::Bounded:
             {
@@ -327,7 +327,7 @@ namespace DGen
                 uint32_t s = seedMix(seed, dataIdx);
                 float    u = prngFloat01(s);
                 float    v = cfg.minVal + (cfg.maxVal - cfg.minVal) * u;
-                return ((dataIdx & 1ull) ? -fabsf(v) : fabsf(v));
+                return ((dataIdx & 1ull) ? -__builtin_fabsf(v) : __builtin_fabsf(v));
             }
             case DeviceInitMode::Unbounded:
             {
@@ -335,17 +335,17 @@ namespace DGen
                 float    u   = prngFloat01(s);
                 // Map to a wide log-spaced range, sign random.
                 float    sign = (xorshift32(s) & 1u) ? -1.0f : 1.0f;
-                float    mag  = ldexpf(u + 1.0f, static_cast<int>((xorshift32(s) % 16) - 8));
+                float    mag  = __builtin_ldexpf(u + 1.0f, static_cast<int>((xorshift32(s) % 16) - 8));
                 return sign * mag;
             }
             case DeviceInitMode::NormalFromFloat:
             {
                 // Box-Muller transform from two uniforms.
                 uint32_t s  = seedMix(seed, dataIdx);
-                float    u1 = fmaxf(prngFloat01(s), 1.0e-7f);
+                float    u1 = __builtin_fmaxf(prngFloat01(s), 1.0e-7f);
                 float    u2 = prngFloat01(s);
-                float    r  = sqrtf(-2.0f * logf(u1));
-                float    z0 = r * cosf(6.2831853f * u2);
+                float    r  = __builtin_sqrtf(-2.0f * __builtin_logf(u1));
+                float    z0 = r * __builtin_cosf(6.2831853f * u2);
                 return cfg.mean + cfg.stdDev * z0;
             }
             }
@@ -413,7 +413,7 @@ namespace DGen
         __device__ __forceinline__ float decodeScale<ScaleType::E8M0>(uint8_t scale)
         {
             int unbiased = static_cast<int>(scale) - 127;
-            return ldexpf(1.0f, unbiased);
+            return __builtin_ldexpf(1.0f, unbiased);
         }
 
         template <>
@@ -429,7 +429,7 @@ namespace DGen
                 m        = static_cast<float>(mant) / 8.0f;
                 unbiased = 1 - 7;
             }
-            return m * ldexpf(1.0f, unbiased);
+            return m * __builtin_ldexpf(1.0f, unbiased);
         }
 
         template <>
@@ -444,7 +444,7 @@ namespace DGen
                 m        = static_cast<float>(mant) / 8.0f;
                 unbiased = 1 - 15;
             }
-            return m * ldexpf(1.0f, unbiased);
+            return m * __builtin_ldexpf(1.0f, unbiased);
         }
 
         // ----------------------------------------------------------------------
@@ -462,17 +462,17 @@ namespace DGen
 
             // Sign + magnitude
             uint32_t sign = (value < 0.0f) ? 1u : 0u;
-            float    mag  = fabsf(value);
+            float    mag  = __builtin_fabsf(value);
 
             // NaN / Inf saturate to max normal magnitude (matches CPU saturating convert).
-            if(!isfinite(mag))
+            if(!__builtin_isfinite(mag))
                 mag = T::maxNormal;
             if(mag > T::maxNormal)
                 mag = T::maxNormal;
 
             // Round to a representable value. Use frexpf to split into exponent + mantissa.
             int   e2 = 0;
-            float m  = frexpf(mag, &e2);
+            float m  = __builtin_frexpf(mag, &e2);
             // frexpf returns m in [0.5, 1) and e2 such that mag = m * 2^e2.
             // The "1.M" representation has m' in [1, 2) and exp = e2 - 1.
             int unbiasedExp = e2 - 1;
@@ -486,10 +486,10 @@ namespace DGen
             {
                 // Subnormal: shift mantissa right by (minNormalExp - unbiasedExp).
                 int   shift     = minNormalExp - unbiasedExp;
-                float mScaled   = mag * ldexpf(1.0f, T::mantBits + T::bias - 1);
+                float mScaled   = mag * __builtin_ldexpf(1.0f, T::mantBits + T::bias - 1);
                 // mScaled is the magnitude in units of "1 ULP of the smallest subnormal".
                 // Round to nearest even.
-                float floorVal  = floorf(mScaled);
+                float floorVal  = __builtin_floorf(mScaled);
                 float frac      = mScaled - floorVal;
                 uint32_t intVal = static_cast<uint32_t>(floorVal);
                 if(frac > 0.5f
@@ -514,7 +514,7 @@ namespace DGen
                 float    mPrime    = m * 2.0f;        // in [1, 2)
                 float    fracPart  = mPrime - 1.0f;   // in [0, 1)
                 float    scaled    = fracPart * static_cast<float>(1u << T::mantBits);
-                float    floorVal  = floorf(scaled);
+                float    floorVal  = __builtin_floorf(scaled);
                 float    frac      = scaled - floorVal;
                 uint32_t intVal    = static_cast<uint32_t>(floorVal);
                 if(frac > 0.5f || (frac == 0.5f && (intVal & 1u)))
@@ -639,7 +639,7 @@ namespace DGen
                 uint64_t dataIdx = blockIdx_ * static_cast<uint64_t>(blockSize) + i;
                 float    v       = genValue(cfg.mode, seed, dataIdx, cfg);
                 values[i]        = v;
-                float a          = fabsf(v);
+                float a          = __builtin_fabsf(v);
                 if(a > maxAbs)
                     maxAbs = a;
             }
@@ -651,10 +651,10 @@ namespace DGen
             if(maxAbs > 0.0f)
             {
                 float ratio  = maxAbs / Tr::maxNormal;
-                float l2     = log2f(ratio);
-                scaleExp     = static_cast<int>(ceilf(l2));
+                float l2     = __builtin_log2f(ratio);
+                scaleExp     = static_cast<int>(__builtin_ceilf(l2));
                 // Avoid rounding-induced over-saturation: bump up one if needed.
-                while(maxAbs > Tr::maxNormal * ldexpf(1.0f, scaleExp))
+                while(maxAbs > Tr::maxNormal * __builtin_ldexpf(1.0f, scaleExp))
                     ++scaleExp;
             }
             else
