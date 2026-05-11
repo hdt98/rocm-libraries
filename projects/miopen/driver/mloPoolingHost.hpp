@@ -39,6 +39,7 @@
 #include <cstring>
 #include <iomanip>
 #include <limits>
+#include <optional>
 #include <type_traits>
 
 #include "calcerr.hpp"
@@ -113,13 +114,13 @@ struct TensorDimsStrides
 
     TensorDimsStrides() {}
 
-    TensorDimsStrides(int spatial_dim, const miopen::TensorDescriptor& desc)
+    TensorDimsStrides(int spatial_dim, miopenTensorDescriptor_t desc)
     {
         std::tie(n_batchs, n_outputs, depth, height, width) =
-            TensorDesc::GetNCDHW(spatial_dim, desc.GetLengths());
+            TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetLengths(desc));
 
         std::tie(n_stride, c_stride, d_stride, h_stride, w_stride) =
-            TensorDesc::GetNCDHW(spatial_dim, desc.GetStrides());
+            TensorDesc::GetNCDHW(spatial_dim, TensorDesc::GetStrides(desc));
     }
 };
 
@@ -381,12 +382,9 @@ bool mloPoolingForwardRunHostAndVerify(PoolingConfig poolConf,
                                        pooling_math_stats& stats,
                                        int index_position = 1)
 {
-    const miopen::TensorDescriptor& bot = miopen::deref(bot_);
-    const miopen::TensorDescriptor& top = miopen::deref(top_);
-
-    const auto spatial_dim = bot.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot);
-    TensorDimsStrides top_dims_strides(spatial_dim, top);
+    const auto spatial_dim = TensorDesc::GetLengths(bot_).size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_);
 
     // Mask data is always NCDHW
     std::array<int, 5> mask_strides;
@@ -443,12 +441,9 @@ bool mloPoolingForwardRunHostAndVerify_mt(PoolingConfig poolConf,
                                           pooling_math_stats& stats,
                                           int index_position = 1)
 {
-    const miopen::TensorDescriptor& bot = miopen::deref(bot_);
-    const miopen::TensorDescriptor& top = miopen::deref(top_);
-
-    const auto spatial_dim = bot.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot);
-    TensorDimsStrides top_dims_strides(spatial_dim, top);
+    const auto spatial_dim = TensorDesc::GetLengths(bot_).size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_);
 
     // Mask data is always NCDHW
     std::array<int, 5> mask_strides;
@@ -627,13 +622,10 @@ void mloPoolingBackwardRunHost(
     const size_t* mask_ptr,
     pooling_math_stats& stats)
 {
-    const miopen::TensorDescriptor& bot_df = miopen::deref(bot_df_);
-    const miopen::TensorDescriptor& top_df = miopen::deref(top_df_);
-
-    const auto spatial_dim = bot_df.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df);
-    TensorDimsStrides top_dims_strides(spatial_dim, top_df);
-    std::vector<int> num_flops(bot_df.GetElementSize(), 0);
+    const auto spatial_dim = TensorDesc::GetLengths(bot_df_).size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df_);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_df_);
+    std::vector<int> num_flops(TensorDesc::GetElementSize(bot_df_), 0);
 
     for(int b = 0; b < bot_dims_strides.n_batchs; b++)
     {
@@ -664,14 +656,11 @@ void mloPoolingBackwardRunHost_mt(
     const size_t* mask_ptr,
     pooling_math_stats& stats)
 {
-    const miopen::TensorDescriptor& bot_df = miopen::deref(bot_df_);
-    const miopen::TensorDescriptor& top_df = miopen::deref(top_df_);
+    const auto spatial_dim = TensorDesc::GetLengths(bot_df_).size() - 2;
+    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df_);
+    TensorDimsStrides top_dims_strides(spatial_dim, top_df_);
 
-    const auto spatial_dim = bot_df.GetLengths().size() - 2;
-    TensorDimsStrides bot_dims_strides(spatial_dim, bot_df);
-    TensorDimsStrides top_dims_strides(spatial_dim, top_df);
-
-    std::vector<int> num_flops(bot_df.GetElementSize(), 0);
+    std::vector<int> num_flops(TensorDesc::GetElementSize(bot_df_), 0);
 
     miopen::par_ford(bot_dims_strides.n_batchs, bot_dims_strides.n_outputs)([&](int b, int o) {
         bwd_pooling_compute<true>(bot_dims_strides,
