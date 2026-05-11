@@ -34,6 +34,8 @@
 #include "ClientProblemFactory.hpp"
 #include "Rotating.hpp"
 
+#include <mxDataGen.hpp>
+
 #include <cstddef>
 #include <random>
 
@@ -1137,10 +1139,17 @@ namespace TensileLite
             ContractionProblemGemm const* m_currentGemmProblem = nullptr;
 
             int m_mxScaleFormat = 0;
-            // True when the current GPU uses preswizzled MX scale layout (gfx950 subtile).
-            // False for architectures that use K-swizzle layout (e.g. gfx1250).
-            bool m_isMXPreswizzleArch = false;
-            // Set by initializeMXData when preswizzled scale was uploaded to gpuInput.valid.
+            // The MX scale tensor layout the current GPU's kernels expect.
+            //   kGFX950  -- AITER (preSwizzleScalesGFX950) -- gfx950 subtile.
+            //   kGFX1250 -- dimk (preSwizzleScalesGFX1250) -- gfx1250 (and
+            //               other non-rocroller WMMA architectures).
+            //   kNone    -- the user did not request an MX scale format
+            //               (`--mx-scale-format=0`); no swizzle is applied.
+            // Set once at construction time from `gcnArchName`.
+            MXScaleLayout m_mxScaleLayout = MXScaleLayout::kNone;
+            // Set by initializeMXData when a preswizzled scale was uploaded
+            // straight into gpuInput.valid (i.e. copySwizzledToGPUBuffer can
+            // hand back gpuInput.valid as-is rather than re-swizzling).
             bool m_mxPreswizzledA = false;
             bool m_mxPreswizzledB = false;
         };

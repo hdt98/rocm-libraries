@@ -926,15 +926,19 @@ namespace TensileLite
             , m_mxScaleFormat(args["mx-scale-format"].as<int>())
 
         {
-            if(m_mxScaleFormat > 0)
             {
+                // gfx950 subtile kernels expect the preswizzled (AITER) MX scale
+                // layout. Every other architecture currently uses the dimk K-swizzle
+                // layout (gfx1250 + non-rocroller WMMA backends). Both layouts are
+                // produced by `generateMXInput` via `MXScaleLayout`, so the only
+                // arch-specific decision is which enum value to pick here.
                 hipDeviceProp_t prop;
                 int deviceIdx = args.count("device-idx") ? args["device-idx"].as<int>() : 0;
                 hipGetDeviceProperties(&prop, deviceIdx);
-                // gfx950 subtile kernels expect the preswizzled layout produced by
-                // generateMXInput. All other architectures use the K-swizzle path.
-                m_isMXPreswizzleArch
-                    = (std::string(prop.gcnArchName).find("gfx950") != std::string::npos);
+                std::string const archName(prop.gcnArchName);
+                m_mxScaleLayout = (archName.find("gfx950") != std::string::npos)
+                                      ? MXScaleLayout::kGFX950
+                                      : MXScaleLayout::kGFX1250;
             }
 
             m_rotatingBuffer
@@ -1787,12 +1791,13 @@ namespace TensileLite
         void DataInitialization::initializeCPUInputs(ContractionProblemGemm const& problem)
         {
             // We always drive `mxDataGenerator` for any MX side (FP4, FP6, FP8) so the
-            // values are coordinated with their E8/E4M3/E5M3 scales. We gate on
-            // `m_mxScaleFormat > 0` because that is the user-visible signal that they
-            // opted into a subtile / pre-swizzle MX layout (and on architectures that
-            // read canonical scales -- e.g. gfx1250 -- the K-swizzle path takes over
-            // later in `copySwizzledToGPUBuffer`).
-            bool useMXGenerator = isMXProblem(problem) && m_mxScaleFormat > 0;
+            // values are coordinated with their E8/E4M3/E5M3 scales. `initializeMXData`
+            // also handles the arch-appropriate scale swizzle (kGFX950 for gfx950
+            // subtile kernels when --mx-scale-format>0, kGFX1250 for gfx1250 +
+            // non-rocroller WMMA backends), so `copySwizzledToGPUBuffer` doesn't
+            // need its own MX scale swizzle path -- it just hands back the
+            // already-swizzled gpuInput.valid.
+            bool useMXGenerator = isMXProblem(problem);
             if(useMXGenerator)
                 initializeMXData(problem);
 
@@ -1957,14 +1962,18 @@ namespace TensileLite
             m_mxPreswizzledA = false;
             m_mxPreswizzledB = false;
 
-            // Decide per-side whether the gfx950 AITER (preSwizzleScalesGFX950)
-            // scale layout applies to this problem. The geometry checks below
-            // are the same gating mxDataGenerator's gfx950 swizzle expects --
-            // problems that don't fit fall back to the natural scale layout.
-            bool useGFX950ScaleA = false;
-            bool useGFX950ScaleB = false;
+            // Decide per-side which scale layout the kernel will read from.
+            //   * gfx950: only the AITER swizzle (preSwizzleScalesGFX950) is
+            //     supported, and it has no built-in padding -- so we fall
+            //     back to kNone for problems whose padded scale dims are not
+            //     divisible by the AITER tiling.
+            //   * gfx1250: the dimk swizzle (preSwizzleScalesGFX1250) pads
+            //     internally, so we can always apply it to any MX problem.
+            //   * kNone arch (--mx-scale-format=0): no preswizzle.
+            MXScaleLayout layoutA = MXScaleLayout::kNone;
+            MXScaleLayout layoutB = MXScaleLayout::kNone;
 
-            if(m_mxScaleFormat > 0 && m_currentSolution != nullptr)
+            if(m_mxScaleLayout == MXScaleLayout::kGFX950 && m_currentSolution != nullptr)
             {
                 auto const&      mi            = m_currentSolution->sizeMapping.matrixInstruction;
                 size_t           MiK           = static_cast<size_t>(mi[2]);
@@ -1980,7 +1989,8 @@ namespace TensileLite
                         auto const& mxsaSizes  = problem.mxsa().sizes();
                         size_t      scaleRowsA = mxsaSizes[0];
                         size_t      scaleColsA = mxsaSizes[1];
-                        useGFX950ScaleA = (scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0);
+                        if(scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0)
+                            layoutA = MXScaleLayout::kGFX950;
                     }
 
                     if(problem.mxBlockB() > 0 && MiK % problem.mxBlockB() == 0)
@@ -1990,9 +2000,17 @@ namespace TensileLite
                         auto const& mxsbSizes  = problem.mxsb().sizes();
                         size_t      scaleRowsB = mxsbSizes[0];
                         size_t      scaleColsB = mxsbSizes[1];
-                        useGFX950ScaleB = (scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0);
+                        if(scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0)
+                            layoutB = MXScaleLayout::kGFX950;
                     }
                 }
+            }
+            else if(m_mxScaleLayout == MXScaleLayout::kGFX1250)
+            {
+                if(problem.mxBlockA() > 0)
+                    layoutA = MXScaleLayout::kGFX1250;
+                if(problem.mxBlockB() > 0)
+                    layoutB = MXScaleLayout::kGFX1250;
             }
 
             // Per-side helper. We hand `generateMXInput` host pointers (cpuInput.valid)
@@ -2008,7 +2026,7 @@ namespace TensileLite
                       rocisa::DataType        scaleEltType,
                       bool                    transposed,
                       bool                    isMatrixA,
-                      bool                    wantGFX950Swizzle,
+                      MXScaleLayout           swizzleLayout,
                       bool*                   preswizzledFlag) {
                   auto         rows       = dataDesc.sizes()[0];
                   auto         cols       = dataDesc.sizes()[1];
@@ -2063,11 +2081,12 @@ namespace TensileLite
                                       1.0f);
                   }
 
-                  // For preswizzle-arch (gfx950): when the preswizzle condition fires,
-                  // generate the preswizzled scale and upload it directly to
-                  // gpuInput.valid. copySwizzledToGPUBuffer will use gpuInput.valid as-is
-                  // instead of applying the gfx1250 K-swizzle.
-                  if(m_isMXPreswizzleArch && wantGFX950Swizzle && pristineScale.gpuInput.valid)
+                  // When the kernel needs the scale in a swizzled layout, regenerate
+                  // it with the requested layout and upload straight to gpuInput.valid.
+                  // copySwizzledToGPUBuffer will use gpuInput.valid as-is rather than
+                  // re-swizzling. The cpuInput.valid copy generated above stays in the
+                  // canonical layout for the CPU reference path.
+                  if(swizzleLayout != MXScaleLayout::kNone && pristineScale.gpuInput.valid)
                   {
                       size_t gpuScaleBytes
                           = scaleDesc.totalAllocatedElements()
@@ -2089,7 +2108,7 @@ namespace TensileLite
                                           isMatrixA ? mxBlock : 1,
                                           isMatrixA ? 1 : mxBlock,
                                           isMatrixA,
-                                          MXScaleLayout::kGFX950,
+                                          swizzleLayout,
                                           initModeToMXMethod(initMode),
                                           -1.0f,
                                           1.0f);
@@ -2112,7 +2131,7 @@ namespace TensileLite
                               problem.mxTypeA(),
                               problem.transA(),
                               /*isMatrixA=*/true,
-                              useGFX950ScaleA,
+                              layoutA,
                               &m_mxPreswizzledA);
             }
             else
@@ -2135,7 +2154,7 @@ namespace TensileLite
                               problem.mxTypeB(),
                               problem.transB(),
                               /*isMatrixA=*/false,
-                              useGFX950ScaleB,
+                              layoutB,
                               &m_mxPreswizzledB);
             }
             else
@@ -2514,20 +2533,10 @@ namespace TensileLite
                       || (problem.swizzleTensorB() && i == ContractionProblemGemm::TENSOR::B);
 
                 bool needMXSwizzle = false;
-                bool unrollMajor = false;
-                size_t MX = 0;
-                if (i == ContractionProblemGemm::TENSOR::MXSA && problem.mxBlockA())
-                {
+                if(i == ContractionProblemGemm::TENSOR::MXSA && problem.mxBlockA())
                     needMXSwizzle = true;
-                    unrollMajor = (problem.freeIndicesA()[0].i != 0);
-                    MX = problem.mxBlockA();
-                }
-                else if (i == ContractionProblemGemm::TENSOR::MXSB && problem.mxBlockB())
-                {
+                else if(i == ContractionProblemGemm::TENSOR::MXSB && problem.mxBlockB())
                     needMXSwizzle = true;
-                    unrollMajor = (problem.freeIndicesB()[0].i != 0);
-                    MX = problem.mxBlockB();
-                }
 
                 void* ptr{};
 
@@ -2586,82 +2595,31 @@ namespace TensileLite
                         g_swizzleCache.emplace(swizzleKey, std::move(permuted));
                     }
                 }
-                else if (needMXSwizzle)
+                else if(needMXSwizzle)
                 {
-                    bool isMXSA = (i == ContractionProblemGemm::TENSOR::MXSA);
-                    bool isMXSB = (i == ContractionProblemGemm::TENSOR::MXSB);
-                    bool preswizzledAlready = (isMXSA && m_mxPreswizzledA)
-                                             || (isMXSB && m_mxPreswizzledB);
-
-                    if (m_isMXPreswizzleArch && preswizzledAlready)
+                    // initializeMXData has already populated gpuInput.valid with the
+                    // arch-appropriate swizzled MX scale (gfx950 AITER or gfx1250
+                    // dimk) when the architecture and problem geometry allow. In
+                    // that case, just hand back gpuInput.valid as-is. Otherwise
+                    // (preswizzle didn't fire -- e.g. --mx-scale-format=0, or
+                    // gfx950 with a problem geometry that doesn't fit the AITER
+                    // tiling) the kernel expects the canonical layout, which is
+                    // exactly what cpuInput.valid holds.
+                    bool const isMXSA            = (i == ContractionProblemGemm::TENSOR::MXSA);
+                    bool const isMXSB            = (i == ContractionProblemGemm::TENSOR::MXSB);
+                    bool const preswizzledAlready = (isMXSA && m_mxPreswizzledA)
+                                                    || (isMXSB && m_mxPreswizzledB);
+                    if(preswizzledAlready)
                     {
-                        // gfx950 subtile: preswizzle was applied by initializeMXDataForFP4 and
-                        // gpuInput.valid was already populated — use it as-is.
                         ptr = p.gpuInput.valid.get();
                     }
-                    else if (m_isMXPreswizzleArch)
+                    else
                     {
-                        // gfx950: preswizzle didn't fire (scale dims not divisible by tileK,
-                        // e.g. small K). Kernel expects canonical layout — copy cpuInput.valid
-                        // directly without K-swizzle.
                         ptr = copyInputBuffers(desc,
                                                p.gpuInput.valid.get(),
                                                p.cpuInput.valid.get(),
                                                p.maxElements,
                                                hipMemcpyHostToDevice);
-                    }
-                    else
-                    {
-                        // gfx1250 and other arches: apply K-dimension swizzle.
-                        // gfx950 is excluded by the branches above.
-                        using Tensor = Tensor::Manipulation::Tensor;
-
-                        if (unrollMajor)
-                        {
-                            auto unrolledSize = desc.sizes()[0];
-                            auto tiledSize    = desc.sizes()[1];
-                            size_t dimk       = 128 / MX;
-                            auto tmpTensor    = Tensor({tiledSize, unrolledSize}, desc.elementBytes());
-                            ::Tensor::Manipulation::Shape paddedShape{tiledSize, (unrolledSize + dimk - 1) / dimk * dimk};
-
-                            memcpy(tmpTensor.as<void>(), p.cpuInput.valid.get(), tmpTensor.getNumBytes());
-                            //Temporary hack
-                            uint64_t padVal{};
-                            auto     paddedTensor = ::Tensor::Manipulation::pad(
-                                tmpTensor, paddedShape, &padVal, tmpTensor.getElementSize());
-                            paddedTensor.reshape({paddedShape[0],
-                                                  paddedShape[1] / dimk,
-                                                  dimk});
-                            Tensor permuted = permute(paddedTensor, {1,0,2});
-                            ptr             = copyInputBuffers(desc,
-                                                   p.gpuInput.valid.get(),
-                                                   permuted.as<void>(),
-                                                   permuted.getDesc().flattenSize(),
-                                                   hipMemcpyHostToDevice);
-                        }
-                        else
-                        {
-                            auto unrolledSize = desc.sizes()[1];
-                            auto tiledSize    = desc.sizes()[0];
-                            size_t dimk       = 128 / MX;
-                            auto tmpTensor    = Tensor({unrolledSize, tiledSize}, desc.elementBytes());
-                            ::Tensor::Manipulation::Shape paddedShape{(unrolledSize + dimk - 1) / dimk * dimk, tiledSize};
-
-                            memcpy(tmpTensor.as<void>(), p.cpuInput.valid.get(), tmpTensor.getNumBytes());
-                            //Temporary hack
-                            uint64_t padVal{};
-                            auto     paddedTensor = ::Tensor::Manipulation::pad(
-                                tmpTensor, paddedShape, &padVal, tmpTensor.getElementSize());
-                            paddedTensor.reshape({paddedShape[0] / dimk,
-                                                  dimk,
-                                                  paddedShape[1]});
-                            Tensor permuted = permute(paddedTensor, {0,2,1});
-                            ptr             = copyInputBuffers(desc,
-                                                   p.gpuInput.valid.get(),
-                                                   permuted.as<void>(),
-                                                   permuted.getDesc().flattenSize(),
-                                                   hipMemcpyHostToDevice);
-                        }
                     }
                 }
                 else
