@@ -76,18 +76,13 @@ jobs:
 
       - name: Export shared test utilities path
         run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
-
-          tools_dir = Path(os.environ["GITHUB_WORKSPACE"]) / "test_tools"
-          utils_path = tools_dir / "test_utils.py"
-          if not utils_path.is_file():
-              raise SystemExit(f"Shared test utilities not found: {utils_path}")
-
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
-              env_file.write(f"THEROCK_TEST_TOOLS_DIR={tools_dir}\n")
-          PY
+          tools_dir="${GITHUB_WORKSPACE}/test_tools"
+          utils_path="${tools_dir}/test_utils.py"
+          if [ ! -f "${utils_path}" ]; then
+            echo "Shared test utilities not found: ${utils_path}" >&2
+            exit 1
+          fi
+          echo "THEROCK_TEST_TOOLS_DIR=${tools_dir}" >> "$GITHUB_ENV"
 
       - name: Configure git for long paths on Windows
         if: ${{ runner.os == 'Windows' }}
