@@ -32,6 +32,7 @@
 #include <limits>
 #include <memory>
 #include <miopen/miopen.h>
+#include <common_utils/errors.hpp>
 #include <utility>
 
 #include <miopen_utils/tensor_holder.hpp>
@@ -105,7 +106,7 @@ void cpu_bias_forward(tensor<Tout>& out, const tensor<Tbias>& bias)
         break;
     }
     default: {
-        MIOPEN_THROW("not belong to any case");
+        COMMON_THROW("not belong to any case");
     }
     }
 }
@@ -132,7 +133,7 @@ void cpu_bias_backward_data(const tensor<Tout>& out, tensor<Tbias>& bias)
         break;
     }
     default: {
-        MIOPEN_THROW("not belong to any case");
+        COMMON_THROW("not belong to any case");
     }
     }
 }

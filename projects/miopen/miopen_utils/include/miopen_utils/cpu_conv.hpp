@@ -32,6 +32,7 @@
 #include <limits>
 #include <memory>
 #include <miopen/miopen.h>
+#include <common_utils/errors.hpp>
 #include <utility>
 
 #include <miopen_utils/tensor_holder.hpp>
@@ -414,7 +415,7 @@ void cpu_convolution_forward(std::size_t spatial_dim,
         break;
     }
     default: {
-        MIOPEN_THROW("not belong to any case");
+        COMMON_THROW("not belong to any case");
     }
     }
 }
@@ -460,7 +461,7 @@ void cpu_convolution_backward_data(std::size_t spatial_dim,
         break;
     }
     default: {
-        MIOPEN_THROW("not belong to any case");
+        COMMON_THROW("not belong to any case");
     }
     }
 }
@@ -506,7 +507,7 @@ void cpu_convolution_backward_weight(std::size_t spatial_dim,
         break;
     }
     default: {
-        MIOPEN_THROW("not belong to any case");
+        COMMON_THROW("not belong to any case");
     }
     }
 }

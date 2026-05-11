@@ -894,6 +894,22 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 if(NOT MIOPEN_USE_SQLITE_PERFDB)
     add_subdirectory(tools/sqlite2txt)
 endif()
+# Internal shared utility libraries (not installed, not exported).
+# See common_utils/CMakeLists.txt and miopen_utils/CMakeLists.txt for details.
+#
+# Layer architecture:
+#   Layer 1: common_utils   — pure C++ utilities, no MIOpen/GPU deps
+#   Layer 2: MIOpen library — the main library (src/)
+#   Layer 3: miopen_utils   — shared test/driver utilities, depends on common_utils + public API
+#   Layer 4: driver + tests — end consumers
+#
+# Namespace convention:
+#   All C++ code in common_utils and miopen_utils uses the miopen:: namespace.
+#   This does NOT imply a dependency on the MIOpen library — it simply indicates
+#   the code is part of the MIOpen project. The public API is the C functions in
+#   miopen.h (miopenFoo()), not the miopen:: C++ namespace. Layer separation is
+#   enforced by #include paths and link dependencies, not by namespaces.
+#   Do not rename the namespace to match the library name.
 add_subdirectory(common_utils)
 add_subdirectory(addkernels)
 add_subdirectory(src)

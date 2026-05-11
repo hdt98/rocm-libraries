@@ -30,6 +30,7 @@
 #include <limits>
 #include <memory>
 #include <utility>
+#include <common_utils/errors.hpp>
 #include <miopen/miopen.h>
 #include <miopen_utils/tensor_desc.hpp>
 #include <common_utils/tuple_utils.hpp>
@@ -86,7 +87,7 @@ void convHostForward(const tensor<T>& input,
     }
 
     if(out_h <= 0 || out_w <= 0)
-        MIOPEN_THROW("Invalid Test Case: Check Output Dimension.");
+        COMMON_THROW("Invalid Test Case: Check Output Dimension.");
 
     for(int o = 0; o < out_n; o++)
     { // mini-batch size
