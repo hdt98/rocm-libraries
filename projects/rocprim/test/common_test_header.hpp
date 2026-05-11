@@ -52,6 +52,12 @@
     #define HAS_VALGRIND_H 0
 #endif
 
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    #define USES_ASAN 1
+#else
+    #define USES_ASAN 0
+#endif
+
 #if HAS_VALGRIND_H
     #define GTEST_SKIP_VALGRIND()                               \
         do                                                      \
