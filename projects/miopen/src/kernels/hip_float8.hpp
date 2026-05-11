@@ -25,6 +25,16 @@
  *******************************************************************************/
 #pragma once
 
+// DEVICE-SIDE FP8/BF8 type implementation for GPU kernel code.
+//
+// This file is registered with HIPRTC for runtime kernel compilation.
+// It must remain in src/kernels/ because HIPRTC resolves includes by
+// flat filename only — directory paths are not supported.
+//
+// HOST-SIDE code should include <common_utils/float8.hpp> instead of
+// this file directly. That wrapper provides the same types plus the
+// float8_fnuz / bfloat8_fnuz aliases.
+
 #include "miopen_cstdint.hpp"
 #include "miopen_limits.hpp"
 

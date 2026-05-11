@@ -26,7 +26,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
-#include <hip_float8.hpp>
+#include <common_utils/float8.hpp>
 
 #include "../random.hpp"
 

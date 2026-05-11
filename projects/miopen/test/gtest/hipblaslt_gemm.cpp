@@ -42,7 +42,7 @@
 #include <miopen/gemm_v2.hpp>
 
 #include <half/half.hpp>
-#include <hip_float8.hpp>
+#include <common_utils/float8.hpp>
 
 using float16      = half_float::half;
 using float8_fnuz  = miopen_f8::hip_f8<miopen_f8::hip_f8_type::fp8>;

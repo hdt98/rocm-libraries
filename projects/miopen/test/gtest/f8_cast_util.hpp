@@ -25,7 +25,7 @@
  *******************************************************************************/
 #pragma once
 
-#include <hip_float8.hpp>
+#include <common_utils/float8.hpp>
 #include <miopen_utils/verify.hpp>
 using float8_fnuz  = miopen_f8::hip_f8<miopen_f8::hip_f8_type::fp8>;
 using bfloat8_fnuz = miopen_f8::hip_f8<miopen_f8::hip_f8_type::bf8>;

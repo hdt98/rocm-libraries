@@ -26,7 +26,7 @@
 #include <miopen_utils/tensor_holder.hpp>
 #include "conv_tensor_gen.hpp"
 
-#include <hip_float8.hpp>
+#include <common_utils/float8.hpp>
 #include <nlohmann/json.hpp>
 
 // disable __device__ qualifiers

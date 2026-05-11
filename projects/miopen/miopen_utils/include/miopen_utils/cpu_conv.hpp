@@ -37,7 +37,7 @@
 #include <miopen_utils/tensor_holder.hpp>
 #include <common_utils/stringutils.hpp>
 #include <common_utils/functional.hpp>
-#include <hip_float8.hpp>
+#include <common_utils/float8.hpp>
 
 template <class T, class... Ts>
 static constexpr auto make_array(T x, Ts... xs)

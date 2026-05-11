@@ -32,7 +32,7 @@
 #include <fusionHost.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
 #include "conv_common.hpp"
-#include "hip_float8.hpp"
+#include <common_utils/float8.hpp>
 #include <miopen_utils/verify.hpp>
 #include "../random.hpp"
 
