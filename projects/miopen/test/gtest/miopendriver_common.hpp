@@ -35,7 +35,7 @@
 #ifdef __linux__
 #include <dlfcn.h>
 #else
-#include <windows.h>
+#include <Windows.h>
 #endif
 
 using ::testing::HasSubstr;

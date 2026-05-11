@@ -17,7 +17,7 @@
 
 #ifdef _WIN32
 // clang-format off
-#include <windows.h>
+#include <Windows.h>
 // clang-format on
 #else
 #include <dlfcn.h>
