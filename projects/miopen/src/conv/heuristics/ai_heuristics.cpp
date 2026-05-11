@@ -36,6 +36,7 @@
 #include <fdeep/fdeep.hpp>
 #include <miopen/filesystem.hpp>
 #include <miopen/env.hpp>
+#include <chrono>
 
 #include <any>
 
@@ -749,6 +750,10 @@ std::vector<uint64_t> PredictSolver(const conv::ProblemDescription& problem,
     // Try ND model first (preferred for gfx942/gfx950)
     if((is2d || is3d) && HasNDTunaNetSupport(device))
     {
+        const bool logging = miopen::IsLogging(LoggingLevel::Info2);
+        const auto start   = logging ? std::chrono::high_resolution_clock::now()
+                                     : std::chrono::high_resolution_clock::time_point{};
+
         int dim                        = is3d ? 3 : 2;
         std::unique_ptr<ModelND> model = GetNDModel(device, dim);
 
@@ -756,8 +761,14 @@ std::vector<uint64_t> PredictSolver(const conv::ProblemDescription& problem,
         {
             MIOPEN_LOG_I2("Evaluating ND TunaNet for " << device);
             std::vector<float> predictions = model->Forward(problem);
-            return ProcessAndCachePredictions(
+            auto result = ProcessAndCachePredictions(
                 problem, device, true, predictions, model->GetSolverMap());
+            if(logging)
+            {
+                const auto end = std::chrono::high_resolution_clock::now();
+                MIOPEN_LOG_I2("Heuristic solver selection inference time: " << (end - start).count() * .000001f << " ms");
+            }
+            return result;
         }
         // If ND model failed for this architecture, don't try legacy - go to WTI
         MIOPEN_LOG_I2("ND TunaNet not applicable for this problem on " << device);
