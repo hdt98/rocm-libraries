@@ -26,6 +26,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <cstdio>
 #include <optional>
 #include <type_traits>
 
@@ -510,33 +511,39 @@ ConvHipImplicitGemm3DGroupFwdXdlops::Search(const ExecutionContext& ctx,
 bool ConvHipImplicitGemm3DGroupFwdXdlops::IsApplicable(const ExecutionContext& ctx,
                                                        const ProblemDescription& problem) const
 {
+    auto report = [](bool applicable, const char* reason) -> bool {
+        std::fprintf(
+            stderr, "[CK_APPL_FWD] applicable=%d reason=%s\n", int(applicable), reason);
+        return applicable;
+    };
     if(env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS))
-        return false;
+        return report(false, "env_disabled");
     if(problem.GetConv().attribute.deterministic)
-        return false;
+        return report(false, "deterministic");
     if(problem.HasMixedDataTypes())
-        return false;
+        return report(false, "mixed_dtypes");
     if(!problem.IsDirectionForward())
-        return false;
+        return report(false, "not_fwd");
     if(!problem.Is3d())
-        return false;
+        return report(false, "not_3d");
     if(!(problem.IsLayoutNHWC() || problem.IsLayoutDefault()))
-        return false;
+        return report(false, "layout");
     // needed because layout transpose kernel does not support non-packed tensors
     if(problem.IsLayoutDefault() && problem.HasNonPackedTensors())
-        return false;
+        return report(false, "default_layout_nonpacked");
 
     const auto& loader = CkImplLibLoader::Get(ctx.GetStream().GetDeviceName());
     if(!loader.IsLoaded())
-        return false;
+        return report(false, "loader_not_loaded");
 
     auto data_type = problem.GetInDataType();
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
     if(try_tf32 && loader.IsApplicable(CKSolverType::GrpConv3dFwd, problem, data_type, true))
-        return true;
+        return report(true, "ck_loader_tf32");
 
-    return loader.IsApplicable(CKSolverType::GrpConv3dFwd, problem, data_type, false);
+    return report(loader.IsApplicable(CKSolverType::GrpConv3dFwd, problem, data_type, false),
+                  "ck_loader");
 }
 
 float ConvHipImplicitGemm3DGroupFwdXdlops::GetWti(const ExecutionContext&,
