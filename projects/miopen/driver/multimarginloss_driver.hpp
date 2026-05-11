@@ -34,7 +34,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
@@ -54,10 +54,10 @@ int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,
                                          const Tgpu* weight,
                                          Tcheck* ref_output)
 {
-    auto I_tv = tensor_utils::GetInnerExpandedTv<2>(iDesc);
-    auto T_tv = tensor_utils::GetInnerExpandedTv<1>(tDesc);
-    auto W_tv = tensor_utils::GetInnerExpandedTv<1>(wDesc);
-    auto O_tv = tensor_utils::GetInnerExpandedTv<1>(oDesc);
+    auto I_tv = GetInnerExpandedTv<2>(iDesc);
+    auto T_tv = GetInnerExpandedTv<1>(tDesc);
+    auto W_tv = GetInnerExpandedTv<1>(wDesc);
+    auto O_tv = GetInnerExpandedTv<1>(oDesc);
     auto N = I_tv.size[0], C = I_tv.size[1];
 
     int32_t ret     = miopenStatusSuccess;
@@ -294,7 +294,7 @@ int MultiMarginLossDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     {
         I[i] = prng::gen_A_to_B<Tgpu>(static_cast<Tgpu>(-1), static_cast<Tgpu>(1));
     }
-    int C = tensor_utils::GetLengths(iDesc)[1];
+    int C = TensorDesc::GetLengths(iDesc)[1];
     // 0 to C - 1
     for(int i = 0; i < t_sz; i++)
     {

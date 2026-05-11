@@ -28,9 +28,11 @@
 
 #include <miopen_utils/network_data.hpp>
 #include <miopen_utils/tensor_desc.hpp>
+#include <common_utils/tuple_utils.hpp>
 #include <common_utils/ford.hpp>
 #include <common_utils/functional.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
+#include <common_utils/tuple_utils.hpp>
 #include <common_utils/type_name.hpp>
 #include <common_utils/each_args.hpp>
 #include <common_utils/bfloat16.hpp>
@@ -323,7 +325,7 @@ struct tensor
         template <class Self, class Loop, class F, class Size>
         void operator()(Self* self, Loop loop, F f, Size size) const
         {
-            auto dims = tensor_utils::Tien<Size::value>(self->desc.GetLengths());
+            auto dims = Tien<Size::value>(self->desc.GetLengths());
             miopen::unpack(for_each_unpacked<Loop, F>{loop, std::move(f)}, dims);
         }
     };

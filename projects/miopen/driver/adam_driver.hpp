@@ -36,7 +36,7 @@
 
 #include <common_utils/float_equal.hpp>
 #include <common_utils/ford.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 
 #include <algorithm>
@@ -73,7 +73,7 @@ void mloAdamRunHost(miopenTensorDescriptor_t paramDesc,
     if(is_amp && found_inf)
         return;
 
-    const size_t numel = tensor_utils::GetElementSize(paramDesc);
+    const size_t numel = TensorDesc::GetElementSize(paramDesc);
 
     const float bias_correction1             = 1.0 - pow(beta1, step);
     const float bias_correction2             = 1.0 - pow(beta2, step);

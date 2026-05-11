@@ -33,7 +33,7 @@
 #include "random.hpp"
 #include <cstdlib>
 #include <memory>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 #include <vector>
 #include <miopen_utils/tensor_holder.hpp>
@@ -49,10 +49,10 @@ int32_t mloSoftMarginLossForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                         Tcheck* outputhost,
                                         miopenLossReductionMode_t reduction_mode)
 {
-    auto input_numel = tensor_utils::GetElementSize(inputDesc);
-    auto i_tv        = tensor_utils::GetInnerExpandedTv<5>(inputDesc);
-    auto t_tv        = tensor_utils::GetInnerExpandedTv<5>(targetDesc);
-    auto o_tv        = tensor_utils::GetInnerExpandedTv<5>(outputDesc);
+    auto input_numel = TensorDesc::GetElementSize(inputDesc);
+    auto i_tv        = GetInnerExpandedTv<5>(inputDesc);
+    auto t_tv        = GetInnerExpandedTv<5>(targetDesc);
+    auto o_tv        = GetInnerExpandedTv<5>(outputDesc);
 
     int32_t ret = miopenStatusSuccess;
 
@@ -87,11 +87,11 @@ int32_t mloSoftMarginLossBackwardRunHost(miopenTensorDescriptor_t inputDesc,
                                          Tcheck* dIhost,
                                          miopenLossReductionMode_t reduction_mode)
 {
-    auto input_numel = tensor_utils::GetElementSize(inputDesc);
-    auto i_tv        = tensor_utils::GetInnerExpandedTv<5>(inputDesc);
-    auto t_tv        = tensor_utils::GetInnerExpandedTv<5>(targetDesc);
-    auto dO_tv       = tensor_utils::GetInnerExpandedTv<5>(dODesc);
-    auto dI_tv       = tensor_utils::GetInnerExpandedTv<5>(dIDesc);
+    auto input_numel = TensorDesc::GetElementSize(inputDesc);
+    auto i_tv        = GetInnerExpandedTv<5>(inputDesc);
+    auto t_tv        = GetInnerExpandedTv<5>(targetDesc);
+    auto dO_tv       = GetInnerExpandedTv<5>(dODesc);
+    auto dI_tv       = GetInnerExpandedTv<5>(dIDesc);
 
     int32_t ret = miopenStatusSuccess;
 

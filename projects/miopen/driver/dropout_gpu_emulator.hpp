@@ -28,7 +28,7 @@
 
 #include <common_utils/float_equal.hpp>
 #include <common_utils/par_for.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 
 #include <algorithm>
@@ -137,8 +137,8 @@ void RunDropoutForwardEmulator(miopenHandle_t handle,
                                size_t rsvsp_offset = 0)
 {
     (void)noise_shape;
-    auto in_dim  = tensor_utils::GetNumDims(inputTensor);
-    auto out_dim = tensor_utils::GetNumDims(outputTensor);
+    auto in_dim  = TensorDesc::GetNumDims(inputTensor);
+    auto out_dim = TensorDesc::GetNumDims(outputTensor);
     if(in_dim != out_dim)
     {
         printf("CPU verification: Input/Output dimension does not match\n");
@@ -150,7 +150,7 @@ void RunDropoutForwardEmulator(miopenHandle_t handle,
         printf("CPU verification: Only support 1D to 5D tensors\n");
     }
 
-    if(tensor_utils::GetElementSize(inputTensor) != tensor_utils::GetElementSize(outputTensor))
+    if(TensorDesc::GetElementSize(inputTensor) != TensorDesc::GetElementSize(outputTensor))
     {
         printf("CPU verification: Input/Output element size does not match\n");
     }
@@ -175,10 +175,10 @@ void RunDropoutForwardEmulator(miopenHandle_t handle,
     std::vector<size_t> out_len(5, 1);
     std::vector<size_t> out_str(5, 1);
 
-    ExpandTensorDim(tensor_utils::GetLengths(inputTensor),
-                    tensor_utils::GetStrides(inputTensor),
-                    tensor_utils::GetLengths(outputTensor),
-                    tensor_utils::GetStrides(outputTensor),
+    ExpandTensorDim(TensorDesc::GetLengths(inputTensor),
+                    TensorDesc::GetStrides(inputTensor),
+                    TensorDesc::GetLengths(outputTensor),
+                    TensorDesc::GetStrides(outputTensor),
                     in_len,
                     in_str,
                     out_len,
@@ -288,8 +288,8 @@ void RunDropoutBackwardEmulator(const miopenDropoutDescriptor_t dropoutDesc,
                                 size_t out_offset   = 0,
                                 size_t rsvsp_offset = 0)
 {
-    auto in_dim  = tensor_utils::GetNumDims(inputTensor);
-    auto out_dim = tensor_utils::GetNumDims(outputTensor);
+    auto in_dim  = TensorDesc::GetNumDims(inputTensor);
+    auto out_dim = TensorDesc::GetNumDims(outputTensor);
     if(in_dim != out_dim)
     {
         printf("CPU verification: Input/Output dimension does not match\n");
@@ -301,7 +301,7 @@ void RunDropoutBackwardEmulator(const miopenDropoutDescriptor_t dropoutDesc,
         printf("CPU verification: Only support 1D to 5D tensors\n");
     }
 
-    if(tensor_utils::GetElementSize(inputTensor) != tensor_utils::GetElementSize(outputTensor))
+    if(TensorDesc::GetElementSize(inputTensor) != TensorDesc::GetElementSize(outputTensor))
     {
         printf("CPU verification: Input/Output element size does not match\n");
     }
@@ -320,10 +320,10 @@ void RunDropoutBackwardEmulator(const miopenDropoutDescriptor_t dropoutDesc,
     std::vector<size_t> out_len(5, 1);
     std::vector<size_t> out_str(5, 1);
 
-    ExpandTensorDim(tensor_utils::GetLengths(inputTensor),
-                    tensor_utils::GetStrides(inputTensor),
-                    tensor_utils::GetLengths(outputTensor),
-                    tensor_utils::GetStrides(outputTensor),
+    ExpandTensorDim(TensorDesc::GetLengths(inputTensor),
+                    TensorDesc::GetStrides(inputTensor),
+                    TensorDesc::GetLengths(outputTensor),
+                    TensorDesc::GetStrides(outputTensor),
                     in_len,
                     in_str,
                     out_len,
@@ -363,8 +363,8 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
                                   size_t out_offset   = 0,
                                   size_t rsvsp_offset = 0)
 {
-    auto in_dim  = tensor_utils::GetNumDims(inputTensor);
-    auto out_dim = tensor_utils::GetNumDims(outputTensor);
+    auto in_dim  = TensorDesc::GetNumDims(inputTensor);
+    auto out_dim = TensorDesc::GetNumDims(outputTensor);
     if(in_dim != out_dim)
     {
         printf("CPU verification: Input/Output dimension does not match\n");
@@ -376,7 +376,7 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
         printf("CPU verification: Only support 1D to 5D tensors\n");
     }
 
-    if(tensor_utils::GetElementSize(inputTensor) != tensor_utils::GetElementSize(outputTensor))
+    if(TensorDesc::GetElementSize(inputTensor) != TensorDesc::GetElementSize(outputTensor))
     {
         printf("CPU verification: Input/Output element size does not match\n");
     }
@@ -395,10 +395,10 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
     std::vector<size_t> out_len(5, 1);
     std::vector<size_t> out_str(5, 1);
 
-    ExpandTensorDim(tensor_utils::GetLengths(inputTensor),
-                    tensor_utils::GetStrides(inputTensor),
-                    tensor_utils::GetLengths(outputTensor),
-                    tensor_utils::GetStrides(outputTensor),
+    ExpandTensorDim(TensorDesc::GetLengths(inputTensor),
+                    TensorDesc::GetStrides(inputTensor),
+                    TensorDesc::GetLengths(outputTensor),
+                    TensorDesc::GetStrides(outputTensor),
                     in_len,
                     in_str,
                     out_len,

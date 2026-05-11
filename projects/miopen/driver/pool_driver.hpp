@@ -37,7 +37,8 @@
 #include "util_file.hpp"
 
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
+#include <common_utils/tuple_utils.hpp>
 #include <miopen/miopen.h>
 
 #include <algorithm>
@@ -229,9 +230,9 @@ int PoolDriver_impl<Tgpu, Tref, Index>::GetandSetData()
 
         miopenGetNdPoolingDescriptor(
             poolDesc, spatial_dim, &mode, nullptr, winV.data(), padV.data(), strV.data());
-        std::tie(windowDepth, windowHeight, windowWidth) = tensor_utils::Tien<3>(winV);
-        std::tie(pad_d, pad_h, pad_w)                    = tensor_utils::Tien<3>(padV);
-        std::tie(stride_d, stride_h, stride_w)           = tensor_utils::Tien<3>(strV);
+        std::tie(windowDepth, windowHeight, windowWidth) = Tien<3>(winV);
+        std::tie(pad_d, pad_h, pad_w)                    = Tien<3>(padV);
+        std::tie(stride_d, stride_h, stride_w)           = Tien<3>(strV);
     }
     else
     {

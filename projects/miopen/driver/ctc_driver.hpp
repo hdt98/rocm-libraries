@@ -33,7 +33,7 @@
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 
 #include <miopen_utils/verify.hpp>
@@ -280,8 +280,8 @@ int CTCDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
                                   ctcLossDesc,
                                   &workSpaceSize);
 
-    GetCTCLossWorkspaceSizeCPU<Tgpu>(tensor_utils::GetLengths(probsDesc),
-                                     tensor_utils::GetLengths(gradientsDesc),
+    GetCTCLossWorkspaceSizeCPU<Tgpu>(TensorDesc::GetLengths(probsDesc),
+                                     TensorDesc::GetLengths(gradientsDesc),
                                      labels.data(),
                                      labelLengths.data(),
                                      inputLengths.data(),
@@ -400,10 +400,10 @@ template <typename Tgpu, typename Tref>
 int CTCDriver<Tgpu, Tref>::RunCTCLossCPU()
 {
     RunCTCLossCPUVerify<Tgpu, Tref>(num_class,
-                                    tensor_utils::GetLengths(probsDesc),
-                                    tensor_utils::GetStrides(probsDesc),
-                                    tensor_utils::GetLengths(gradientsDesc),
-                                    tensor_utils::GetStrides(gradientsDesc),
+                                    TensorDesc::GetLengths(probsDesc),
+                                    TensorDesc::GetStrides(probsDesc),
+                                    TensorDesc::GetLengths(gradientsDesc),
+                                    TensorDesc::GetStrides(gradientsDesc),
                                     probs,
                                     labels,
                                     labelLengths,

@@ -33,7 +33,7 @@
 #endif
 
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -116,10 +116,10 @@ struct TensorDimsStrides
     TensorDimsStrides(int spatial_dim, const miopen::TensorDescriptor& desc)
     {
         std::tie(n_batchs, n_outputs, depth, height, width) =
-            tensor_utils::GetNCDHW(spatial_dim, desc.GetLengths());
+            TensorDesc::GetNCDHW(spatial_dim, desc.GetLengths());
 
         std::tie(n_stride, c_stride, d_stride, h_stride, w_stride) =
-            tensor_utils::GetNCDHW(spatial_dim, desc.GetStrides());
+            TensorDesc::GetNCDHW(spatial_dim, desc.GetStrides());
     }
 };
 

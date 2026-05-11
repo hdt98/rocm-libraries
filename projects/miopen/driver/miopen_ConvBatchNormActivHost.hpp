@@ -29,7 +29,7 @@
 
 #include "mloNeuronHost.hpp"
 
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/convolution.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor_extra.hpp>
@@ -49,7 +49,7 @@ int miopenBNSpatialFwdInferHost(miopenTensorDescriptor_t& inputTensor,
 {
     int nIn, cIn, hIn, wIn;
     miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
-    const auto tensorLayout = tensor_utils::GetLayout(inputTensor);
+    const auto tensorLayout = TensorDesc::GetLayout(inputTensor);
 
     int n_batchs = nIn;
     int channels = cIn;
@@ -106,7 +106,7 @@ int miopenBNPerActivFwdInferHost(miopenTensorDescriptor_t& inputTensor,
 
     int nIn, cIn, hIn, wIn;
     miopenGet4dTensorDescriptorLengths(inputTensor, &nIn, &cIn, &hIn, &wIn);
-    const auto tensorLayout = tensor_utils::GetLayout(inputTensor);
+    const auto tensorLayout = TensorDesc::GetLayout(inputTensor);
 
     int n_batchs = nIn;
     int channels = cIn;

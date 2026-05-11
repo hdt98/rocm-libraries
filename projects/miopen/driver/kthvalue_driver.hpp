@@ -33,7 +33,7 @@
 #include <miopen_utils/tensor_holder.hpp>
 #include <miopen_utils/verify.hpp>
 
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/tensor_view_utils.hpp>
 #include <miopen/miopen.h>
 #include <common_utils/errors.hpp>
@@ -54,10 +54,10 @@ void mloKthvalueFwdRunHost(TIO* input,
     size_t inputSize       = inputDesc.GetElementSize();
     size_t dimSize         = inputDesc.GetLengths()[dim];
     size_t dimStride       = inputDesc.GetStrides()[dim];
-    auto inputTv           = tensor_utils::GetInnerExpandedTv<5>(pInputDesc);
+    auto inputTv           = GetInnerExpandedTv<5>(pInputDesc);
     auto inputTvWithoutDim = miopen::get_tv_without_dim<5>(inputTv, dim);
-    auto outputTv          = tensor_utils::GetInnerExpandedTv<5>(outputDesc);
-    auto indicesTv         = tensor_utils::GetInnerExpandedTv<5>(indicesDesc);
+    auto outputTv          = GetInnerExpandedTv<5>(outputDesc);
+    auto indicesTv         = GetInnerExpandedTv<5>(indicesDesc);
 
     size_t numSlice = inputSize / dimSize;
 
@@ -242,9 +242,9 @@ int KthvalueDriver<TIO>::AddCmdLineArgs()
 template <typename TIO>
 int KthvalueDriver<TIO>::AllocateBuffersAndCopy()
 {
-    size_t in_sz  = tensor_utils::GetElementSize(inputDesc);
-    size_t idx_sz = tensor_utils::GetElementSize(indicesDesc);
-    size_t out_sz = tensor_utils::GetElementSize(outputDesc);
+    size_t in_sz  = TensorDesc::GetElementSize(inputDesc);
+    size_t idx_sz = TensorDesc::GetElementSize(indicesDesc);
+    size_t out_sz = TensorDesc::GetElementSize(outputDesc);
 
     uint32_t ctx = 0;
 

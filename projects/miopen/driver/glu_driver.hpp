@@ -41,7 +41,7 @@
 #include <miopen_utils/verify.hpp>
 
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 
 template <typename T>
@@ -55,7 +55,7 @@ int mloGLUForwardContiguousDim0RunHost(const Tgpu* input,
                                        miopenTensorDescriptor_t outputDesc,
                                        Tcheck* outputHost)
 {
-    auto output_numel    = tensor_utils::GetElementSize(outputDesc);
+    auto output_numel    = TensorDesc::GetElementSize(outputDesc);
     auto inputFirstHalf  = input;
     auto inputSecondHalf = input + output_numel;
 
@@ -80,7 +80,7 @@ int mloGLUBackwardCongiguousDim0RunHost(const Tgpu* input,
 {
     int ret = 0;
 
-    auto outputGrad_numel     = tensor_utils::GetElementSize(outputGradDesc);
+    auto outputGrad_numel     = TensorDesc::GetElementSize(outputGradDesc);
     auto inputFirstHalf       = input;
     auto inputSecondHalf      = input + outputGrad_numel;
     auto inputFistHalf_grad   = inputGradHost;

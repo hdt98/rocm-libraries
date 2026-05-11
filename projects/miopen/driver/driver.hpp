@@ -39,7 +39,7 @@
 #include <memory>
 #include <miopen/miopen.h>
 #include <common_utils/bfloat16.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen_utils/tensor_holder.hpp>
 #include "util_driver.hpp"
 #include "rocrand_wrapper.hpp"
@@ -95,8 +95,8 @@ public:
 
     void AllocOnHost(miopenTensorDescriptor_t t)
     {
-        host = tensor<Tgpu>(tensor_utils::GetLengths(t),
-                            tensor_utils::GetStrides(t));
+        host = tensor<Tgpu>(TensorDesc::GetLengths(t),
+                            TensorDesc::GetStrides(t));
         if(is_gpualloc) // We do not need host data.
         {
             host.data.clear();

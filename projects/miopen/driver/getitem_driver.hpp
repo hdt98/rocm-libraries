@@ -36,7 +36,7 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor_view_utils.hpp>
 #include <numeric>
@@ -60,10 +60,10 @@ int32_t mloGetitemBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                   int32_t* slices,
                                   uint32_t /*offset*/)
 {
-    auto dy_dims  = tensor_utils::GetLengths(dyDesc);
+    auto dy_dims  = TensorDesc::GetLengths(dyDesc);
     auto dy_numel = std::accumulate(dy_dims.begin(), dy_dims.end(), 1L, std::multiplies<int64_t>());
-    auto dx_dims  = tensor_utils::GetLengths(dxDesc);
-    auto index_dims = tensor_utils::GetLengths(indexDescs[0]);
+    auto dx_dims  = TensorDesc::GetLengths(dxDesc);
+    auto index_dims = TensorDesc::GetLengths(indexDescs[0]);
     auto index_numel =
         std::accumulate(index_dims.begin(), index_dims.end(), 1L, std::multiplies<int64_t>());
     auto element_index = std::vector<int32_t>(indexCount * index_numel + indexCount);
@@ -77,8 +77,8 @@ int32_t mloGetitemBackwardRunHost(miopenTensorDescriptor_t dyDesc,
     auto dim_info_offset = indexCount > 0 ? indexCount * index_dims[0] : 0;
     auto start_dim       = dims[0];
 
-    auto dy_tv     = tensor_utils::GetInnerExpandedTv<5>(dyDesc);
-    auto dxhost_tv = tensor_utils::GetInnerExpandedTv<5>(dxDesc);
+    auto dy_tv     = GetInnerExpandedTv<5>(dyDesc);
+    auto dxhost_tv = GetInnerExpandedTv<5>(dxDesc);
     miopen::slice_tv<5>(dxhost_tv, sliceCount, slices);
 
     int32_t ret = 0;

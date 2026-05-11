@@ -40,7 +40,8 @@
 #include <miopen_utils/fusionHost.hpp>
 
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
+#include <common_utils/tuple_utils.hpp>
 #include <miopen/miopen.h>
 
 #include <algorithm>
@@ -1352,9 +1353,9 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(in.GetTensor().desc.GetLengths());
+        std::tie(in_n, in_c, in_h, in_w) = Tien<4>(in.GetTensor().desc.GetLengths());
         size_t M                         = in_n * in_c * in_h * in_w;
-        size_t dataSz = (M + 2 * in_c) * tensor_utils::GetTypeSize(in.GetTensor().desc.GetType());
+        size_t dataSz = (M + 2 * in_c) * TensorDesc::GetTypeSize(in.GetTensor().desc.GetType());
         float rdCnt   = -1.0;
         float wrCnt   = 1.0;
         if(forw == 1)
@@ -1716,9 +1717,9 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
                 avgtime += time;
 
             int in_n, in_c, in_h, in_w;
-            std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(in.GetTensor().desc.GetLengths());
+            std::tie(in_n, in_c, in_h, in_w) = Tien<4>(in.GetTensor().desc.GetLengths());
             size_t M                         = in_n * in_c * in_h * in_w;
-            size_t dataSz = (M + 2 * in_c) * tensor_utils::GetTypeSize(in.GetTensor().desc.GetType());
+            size_t dataSz = (M + 2 * in_c) * TensorDesc::GetTypeSize(in.GetTensor().desc.GetType());
             float rdCnt   = 2.0;
             float wrCnt   = 1.0;
             // layer, flopCnt, reads, writes, GFLOPS, GB/s, timeMs

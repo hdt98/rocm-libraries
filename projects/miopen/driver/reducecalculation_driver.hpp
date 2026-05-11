@@ -37,7 +37,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <memory>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 #include <numeric>
 #include <vector>
@@ -56,8 +56,8 @@ int32_t mloReduceCalculationForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                            int32_t dim,
                                            miopenReduceCalculationNanPropagation_t nanPropagation)
 {
-    auto input_dims  = tensor_utils::GetLengths(inputDesc);
-    auto output_dims = tensor_utils::GetLengths(outputDesc);
+    auto input_dims  = TensorDesc::GetLengths(inputDesc);
+    auto output_dims = TensorDesc::GetLengths(outputDesc);
 
     auto reduce_size = input_dims[dim];
     auto output_numel =

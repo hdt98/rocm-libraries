@@ -49,7 +49,7 @@ int32_t mloT5LayerNormForwardRunHost(miopenTensorDescriptor_t xDesc,
                                      miopenNormMode_t mode,
                                      bool use_multithread)
 {
-    auto dims         = tensor_utils::GetLengths(xDesc);
+    auto dims         = TensorDesc::GetLengths(xDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -96,7 +96,7 @@ int32_t mloT5LayerNormBackwardRunHost(miopenTensorDescriptor_t dyDesc,
                                       miopenNormMode_t mode,
                                       bool use_multithread)
 {
-    auto dims         = tensor_utils::GetLengths(dyDesc);
+    auto dims         = TensorDesc::GetLengths(dyDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 
@@ -147,7 +147,7 @@ int32_t mloT5LayerNormBackwardweightRunHost(miopenTensorDescriptor_t dyDesc,
                                             Tcheck* dwhost,
                                             bool use_multithread)
 {
-    auto dims         = tensor_utils::GetLengths(dyDesc);
+    auto dims         = TensorDesc::GetLengths(dyDesc);
     size_t outer_size = 1;
     size_t inner_size = dims[dims.size() - 1];
 

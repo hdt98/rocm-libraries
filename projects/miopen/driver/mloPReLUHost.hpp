@@ -41,12 +41,12 @@ int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
                                 Tcheck* dinput_host,
                                 Tcheck* dweight_host)
 {
-    auto input_tv   = tensor_utils::GetInnerExpandedTv<5>(inputDesc);
-    auto doutput_tv = tensor_utils::GetInnerExpandedTv<5>(doutputDesc);
-    auto dinput_tv  = tensor_utils::GetInnerExpandedTv<5>(dinputDesc);
+    auto input_tv   = GetInnerExpandedTv<5>(inputDesc);
+    auto doutput_tv = GetInnerExpandedTv<5>(doutputDesc);
+    auto dinput_tv  = GetInnerExpandedTv<5>(dinputDesc);
 
-    auto input_sz              = tensor_utils::GetElementSize(inputDesc);
-    auto weight_sz             = tensor_utils::GetElementSize(weightDesc);
+    auto input_sz              = TensorDesc::GetElementSize(inputDesc);
+    auto weight_sz             = TensorDesc::GetElementSize(weightDesc);
     auto weight_grad_collector = std::vector<float>(input_sz);
 
     miopen::par_ford(input_sz)([&](int gid) {

@@ -38,6 +38,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 class TensorDesc
@@ -170,94 +171,122 @@ public:
     ~TensorDesc() { destroy(); }
 
     // ---------------------------------------------------------------
-    // Getters (all use public API)
+    // Static query functions (work on raw miopenTensorDescriptor_t)
     // ---------------------------------------------------------------
 
-    std::vector<size_t> GetLengths() const
-    {
-        int ndim = GetNumDims();
-        std::vector<size_t> v(ndim);
-        miopenGetTensorDescriptorV2(handle_, nullptr, v.data(), nullptr);
-        return v;
-    }
-
-    std::vector<size_t> GetStrides() const
-    {
-        int ndim = GetNumDims();
-        std::vector<size_t> v(ndim);
-        miopenGetTensorDescriptorV2(handle_, nullptr, nullptr, v.data());
-        return v;
-    }
-
-    miopenDataType_t GetType() const
-    {
-        miopenDataType_t dt;
-        miopenGetTensorDescriptorV2(handle_, &dt, nullptr, nullptr);
-        return dt;
-    }
-
-    int GetNumDims() const
+    static int GetNumDims(miopenTensorDescriptor_t desc)
     {
         int n = 0;
-        miopenGetTensorDescriptorSize(handle_, &n);
+        miopenGetTensorDescriptorSize(desc, &n);
         return n;
     }
 
-    /// Total number of elements in the tensor (product of all dimension lengths).
-    /// For a 4D tensor with dims [N,C,H,W] this returns N*C*H*W.
-    size_t GetElementSize() const
+    static miopenDataType_t GetType(miopenTensorDescriptor_t desc)
     {
-        auto lens = GetLengths();
+        miopenDataType_t dt;
+        miopenGetTensorDescriptorV2(desc, &dt, nullptr, nullptr);
+        return dt;
+    }
+
+    static std::vector<size_t> GetLengths(miopenTensorDescriptor_t desc)
+    {
+        int ndim = GetNumDims(desc);
+        std::vector<size_t> v(ndim);
+        miopenGetTensorDescriptorV2(desc, nullptr, v.data(), nullptr);
+        return v;
+    }
+
+    static std::vector<size_t> GetStrides(miopenTensorDescriptor_t desc)
+    {
+        int ndim = GetNumDims(desc);
+        std::vector<size_t> v(ndim);
+        miopenGetTensorDescriptorV2(desc, nullptr, nullptr, v.data());
+        return v;
+    }
+
+    static size_t GetNumBytes(miopenTensorDescriptor_t desc)
+    {
+        size_t n = 0;
+        miopenGetTensorNumBytes(desc, &n);
+        return n;
+    }
+
+    static size_t GetElementSize(miopenTensorDescriptor_t desc)
+    {
+        auto lens = GetLengths(desc);
         size_t n  = 1;
         for(auto l : lens)
             n *= l;
         return n;
     }
 
-    /// Total number of element slots needed to store the tensor in memory,
-    /// including any gaps introduced by non-packed strides.  For a packed
-    /// tensor this equals GetElementSize(); for a strided tensor it may
-    /// be larger.  Use this to allocate the backing data buffer.
-    size_t GetElementSpace() const
+    static size_t GetElementSpace(miopenTensorDescriptor_t desc)
     {
         size_t s = 0;
-        miopenGetTensorElementSpace(handle_, &s);
+        miopenGetTensorElementSpace(desc, &s);
         return s;
     }
 
-    size_t GetNumBytes() const
-    {
-        size_t n = 0;
-        miopenGetTensorNumBytes(handle_, &n);
-        return n;
-    }
-
-    bool IsPacked() const
+    static bool IsPacked(miopenTensorDescriptor_t desc)
     {
         bool p = false;
-        miopenIsTensorPacked(handle_, &p);
+        miopenIsTensorPacked(desc, &p);
         return p;
     }
 
-    size_t GetVectorLength() const
+    static size_t GetVectorLength(miopenTensorDescriptor_t desc)
     {
         size_t v = 0;
-        miopenGetTensorVectorLength(handle_, &v);
+        miopenGetTensorVectorLength(desc, &v);
         return v;
     }
 
-    /// Returns the tensor layout enum (miopenTensorNCHW, miopenTensorNHWC, etc.).
-    miopenTensorLayout_t GetLayout() const
+    static miopenTensorLayout_t GetLayout(miopenTensorDescriptor_t desc)
     {
         miopenTensorLayout_t layout;
-        miopenGetTensorLayout(handle_, &layout);
+        miopenGetTensorLayout(desc, &layout);
         return layout;
     }
 
-    /// Returns the tensor layout as a human-readable string ("NCHW", "NHWC", etc.).
-    std::string GetLayout_str() const
+    /// Returns the byte size of a MIOpen data type.
+    static size_t GetTypeSize(miopenDataType_t dt)
     {
-        switch(GetLayout())
+        switch(dt)
+        {
+        case miopenHalf: return 2;
+        case miopenFloat: return 4;
+        case miopenDouble: return 8;
+        case miopenBFloat16: return 2;
+        case miopenInt8: return 1;
+        case miopenInt32: return 4;
+        case miopenInt64: return 8;
+        case miopenFloat8_fnuz: return 1;
+        case miopenBFloat8_fnuz: return 1;
+        default: return 0;
+        }
+    }
+
+    /// Given a spatial dimension count and a vector of lengths (or strides),
+    /// return a tuple of (N, C, D, H, W) with D=1 for 2D tensors.
+    template <class TElement>
+    static auto GetNCDHW(unsigned spatial_dims, const std::vector<TElement>& data)
+    {
+        if(spatial_dims == 3)
+        {
+            assert(data.size() >= 5);
+            return std::make_tuple(data[0], data[1], data[2], data[3], data[4]);
+        }
+        else
+        {
+            assert(data.size() >= 4);
+            return std::make_tuple(
+                data[0], data[1], static_cast<TElement>(1), data[2], data[3]);
+        }
+    }
+
+    static std::string GetLayout_str(miopenTensorDescriptor_t desc)
+    {
+        switch(GetLayout(desc))
         {
         case miopenTensorNCHW: return "NCHW";
         case miopenTensorNHWC: return "NHWC";
@@ -268,6 +297,22 @@ public:
         default: return "Unknown";
         }
     }
+
+    // ---------------------------------------------------------------
+    // Instance getters (delegate to static versions)
+    // ---------------------------------------------------------------
+
+    int GetNumDims() const { return GetNumDims(handle_); }
+    miopenDataType_t GetType() const { return GetType(handle_); }
+    std::vector<size_t> GetLengths() const { return GetLengths(handle_); }
+    std::vector<size_t> GetStrides() const { return GetStrides(handle_); }
+    size_t GetNumBytes() const { return GetNumBytes(handle_); }
+    size_t GetElementSize() const { return GetElementSize(handle_); }
+    size_t GetElementSpace() const { return GetElementSpace(handle_); }
+    bool IsPacked() const { return IsPacked(handle_); }
+    size_t GetVectorLength() const { return GetVectorLength(handle_); }
+    miopenTensorLayout_t GetLayout() const { return GetLayout(handle_); }
+    std::string GetLayout_str() const { return GetLayout_str(handle_); }
 
     /// Compute linear index from multi-dimensional coordinates using strides.
     template <typename... Ts>
@@ -360,5 +405,41 @@ public:
     /// Implicit conversion so code like miopenSetTensor(h, desc, ...) works.
     operator miopenTensorDescriptor_t() const { return handle_; }
 };
+
+// tensor_view_t utilities -- build tensor views from descriptor handles
+// without requiring miopen::TensorDescriptor internals.
+// tensor_view_t lives in src/kernels/ because it must be available for
+// runtime kernel compilation (HIPRTC), which cannot resolve miopen_utils/ paths.
+#include "../../src/kernels/tensor_view.hpp"
+
+/// Build a tensor_view_t<N> from an opaque tensor descriptor handle.
+/// Replacement for miopen::get_inner_expanded_tv<N>(miopen::deref(desc)).
+template <int N>
+inline tensor_view_t<N> GetInnerExpandedTv(miopenTensorDescriptor_t desc)
+{
+    auto dims    = TensorDesc::GetLengths(desc);
+    auto strides = TensorDesc::GetStrides(desc);
+
+    tensor_view_t<N> tv{};
+    for(int i = 0; i < N; ++i)
+    {
+        if(dims.empty())
+        {
+            tv.stride[i] = 0;
+            tv.size[i]   = 0;
+        }
+        else if(static_cast<size_t>(i) < dims.size())
+        {
+            tv.stride[i] = strides[i];
+            tv.size[i]   = dims[i];
+        }
+        else
+        {
+            tv.stride[i] = strides.back();
+            tv.size[i]   = 1;
+        }
+    }
+    return tv;
+}
 
 #endif // GUARD_MIOPEN_UTILS_TENSOR_DESC_HPP

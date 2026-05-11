@@ -36,7 +36,8 @@
 
 #include <common_utils/float_equal.hpp>
 #include <miopen/miopen.h>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
+#include <common_utils/tuple_utils.hpp>
 
 template <typename Tgpu, typename Tref>
 class TensorOpDriver : public Driver
@@ -312,9 +313,9 @@ int TensorOpDriver<Tgpu, Tref>::RunForwardGPU()
                    avgtime / (iters - 1),
                    iters - 1);
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(aTensor));
+        std::tie(in_n, in_c, in_h, in_w) = Tien<4>(TensorDesc::GetLengths(aTensor));
         size_t dataSz =
-            in_n * in_c * in_h * in_w * tensor_utils::GetTypeSize(tensor_utils::GetType(aTensor));
+            in_n * in_c * in_h * in_w * TensorDesc::GetTypeSize(TensorDesc::GetType(aTensor));
 
         printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
         printf("stats: tensor op, %zu, %zu, %f, %f\n",

@@ -39,7 +39,7 @@
 #include <cstdlib>
 #include <memory>
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <vector>
 
 template <typename T>
@@ -308,22 +308,22 @@ int LayerNormDriver<T>::AllocateBuffersAndCopy()
     db_dev        = std::unique_ptr<GPUMem>(new GPUMem(ctx, db_sz, sizeof(T)));
     workspace_dev = std::unique_ptr<GPUMem>(new GPUMem(ctx, ws_sizeInBytes, sizeof(std::byte)));
 
-    in       = tensor<T>(tensor_utils::GetLengths(inputDesc), tensor_utils::GetStrides(inputDesc)).generate(genT0val);
-    weight   = tensor<T>(tensor_utils::GetLengths(weightDesc), tensor_utils::GetStrides(weightDesc)).generate(genT0val);
-    bias     = tensor<T>(tensor_utils::GetLengths(biasDesc), tensor_utils::GetStrides(biasDesc)).generate(genT0val);
-    out      = tensor<T>(tensor_utils::GetLengths(outputDesc), tensor_utils::GetStrides(outputDesc)).generate(genT0val);
-    mean     = tensor<T>(tensor_utils::GetLengths(meanDesc), tensor_utils::GetStrides(meanDesc)).generate(genT0val);
-    rstd     = tensor<T>(tensor_utils::GetLengths(rstdDesc), tensor_utils::GetStrides(rstdDesc)).generate(genT0val);
-    dy       = tensor<T>(tensor_utils::GetLengths(dyDesc), tensor_utils::GetStrides(dyDesc)).generate(genT0val);
-    dx       = tensor<T>(tensor_utils::GetLengths(dxDesc), tensor_utils::GetStrides(dxDesc)).generate(genT0val);
-    dw       = tensor<T>(tensor_utils::GetLengths(dwDesc), tensor_utils::GetStrides(dwDesc)).generate(genT0val);
-    db       = tensor<T>(tensor_utils::GetLengths(dbDesc), tensor_utils::GetStrides(dbDesc)).generate(genT0val);
-    outhost  = tensor<T>(tensor_utils::GetLengths(outputDesc), tensor_utils::GetStrides(outputDesc)).generate(genT0val);
-    meanhost = tensor<T>(tensor_utils::GetLengths(meanDesc), tensor_utils::GetStrides(meanDesc)).generate(genT0val);
-    rstdhost = tensor<T>(tensor_utils::GetLengths(rstdDesc), tensor_utils::GetStrides(rstdDesc)).generate(genT0val);
-    dxhost   = tensor<T>(tensor_utils::GetLengths(dxDesc), tensor_utils::GetStrides(dxDesc)).generate(genT0val);
-    dwhost   = tensor<T>(tensor_utils::GetLengths(dwDesc), tensor_utils::GetStrides(dwDesc)).generate(genT0val);
-    dbhost   = tensor<T>(tensor_utils::GetLengths(dbDesc), tensor_utils::GetStrides(dbDesc)).generate(genT0val);
+    in       = tensor<T>(TensorDesc::GetLengths(inputDesc), TensorDesc::GetStrides(inputDesc)).generate(genT0val);
+    weight   = tensor<T>(TensorDesc::GetLengths(weightDesc), TensorDesc::GetStrides(weightDesc)).generate(genT0val);
+    bias     = tensor<T>(TensorDesc::GetLengths(biasDesc), TensorDesc::GetStrides(biasDesc)).generate(genT0val);
+    out      = tensor<T>(TensorDesc::GetLengths(outputDesc), TensorDesc::GetStrides(outputDesc)).generate(genT0val);
+    mean     = tensor<T>(TensorDesc::GetLengths(meanDesc), TensorDesc::GetStrides(meanDesc)).generate(genT0val);
+    rstd     = tensor<T>(TensorDesc::GetLengths(rstdDesc), TensorDesc::GetStrides(rstdDesc)).generate(genT0val);
+    dy       = tensor<T>(TensorDesc::GetLengths(dyDesc), TensorDesc::GetStrides(dyDesc)).generate(genT0val);
+    dx       = tensor<T>(TensorDesc::GetLengths(dxDesc), TensorDesc::GetStrides(dxDesc)).generate(genT0val);
+    dw       = tensor<T>(TensorDesc::GetLengths(dwDesc), TensorDesc::GetStrides(dwDesc)).generate(genT0val);
+    db       = tensor<T>(TensorDesc::GetLengths(dbDesc), TensorDesc::GetStrides(dbDesc)).generate(genT0val);
+    outhost  = tensor<T>(TensorDesc::GetLengths(outputDesc), TensorDesc::GetStrides(outputDesc)).generate(genT0val);
+    meanhost = tensor<T>(TensorDesc::GetLengths(meanDesc), TensorDesc::GetStrides(meanDesc)).generate(genT0val);
+    rstdhost = tensor<T>(TensorDesc::GetLengths(rstdDesc), TensorDesc::GetStrides(rstdDesc)).generate(genT0val);
+    dxhost   = tensor<T>(TensorDesc::GetLengths(dxDesc), TensorDesc::GetStrides(dxDesc)).generate(genT0val);
+    dwhost   = tensor<T>(TensorDesc::GetLengths(dwDesc), TensorDesc::GetStrides(dwDesc)).generate(genT0val);
+    dbhost   = tensor<T>(TensorDesc::GetLengths(dbDesc), TensorDesc::GetStrides(dbDesc)).generate(genT0val);
 
     for(int i = 0; i < in_sz; i++)
     {

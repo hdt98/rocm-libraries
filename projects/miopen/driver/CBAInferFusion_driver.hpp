@@ -42,7 +42,7 @@
 #include <miopen_utils/cpu_bias.hpp>
 
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 
 #include <algorithm>
@@ -671,7 +671,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
 template <typename Tgpu, typename Tref>
 std::vector<int> CBAInferFusionDriver<Tgpu, Tref>::GetOutputTensorLengths()
 {
-    int ndim = tensor_utils::GetNumDims(inputTensor);
+    int ndim = TensorDesc::GetNumDims(inputTensor);
 
     std::vector<int> out_lens(ndim);
 
@@ -1316,8 +1316,8 @@ void CBAInferFusionDriver<Tgpu, Tref>::runCPUConvFwdInference()
 
     if(bias_mode)
     {
-        tensor<Tref> bias_local_host(tensor_utils::GetLengths(biasTensor),
-                                     tensor_utils::GetStrides(biasTensor));
+        tensor<Tref> bias_local_host(TensorDesc::GetLengths(biasTensor),
+                                     TensorDesc::GetStrides(biasTensor));
         bias_local_host.data = bias_host;
         cpu_bias_forward(outhost_local_host, bias_local_host);
     }

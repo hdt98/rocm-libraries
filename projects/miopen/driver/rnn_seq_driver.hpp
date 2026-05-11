@@ -39,7 +39,7 @@
 #include <miopen_utils/verify.hpp>
 
 #include <common_utils/errors.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
 #include <miopen/miopen.h>
 #include <miopen/rnn.hpp>
 #include <miopen/tensor_ops.hpp>
@@ -760,7 +760,7 @@ int RNNSeqDriver<Tgpu, Tref>::SetRNNDescriptorFromCmdLineArgs()
 // GetTensorSize broken So this is WA
 inline size_t Get3DNoVECTensorSize(miopenTensorDescriptor_t& tensor)
 {
-    assert(tensor_utils::IsPacked(tensor) &&
+    assert(TensorDesc::IsPacked(tensor) &&
            "GetTensorSize should not be used on an unpacked tensor.");
     const auto len = GetTensorLengths(tensor);
     size_t sz      = std::accumulate(len.begin(), len.end(), 1ULL, std::multiplies<size_t>());

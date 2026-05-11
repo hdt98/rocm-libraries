@@ -18,7 +18,8 @@
 #include "util_file.hpp"
 
 #include <common_utils/algorithm.hpp>
-#include <common_utils/tensor_utils.hpp>
+#include <miopen_utils/tensor_desc.hpp>
+#include <common_utils/tuple_utils.hpp>
 #include <miopen/conv_algo_name.hpp>
 #include <miopen/convolution.hpp>
 #include <common_utils/errors.hpp>
@@ -791,15 +792,15 @@ int ConvDriver<Tgpu, Tref>::GetandSetData()
     SetConvDescriptorFromCmdLineArgs();
 
     std::vector<int> out_len = GetOutputTensorLengths();
-    if(tensor_utils::GetLayout(inputTensor) == miopenTensorNCHWc4 ||
-       tensor_utils::GetLayout(inputTensor) == miopenTensorNCHWc8)
+    if(TensorDesc::GetLayout(inputTensor) == miopenTensorNCHWc4 ||
+       TensorDesc::GetLayout(inputTensor) == miopenTensorNCHWc8)
     {
-        out_len[1] *= tensor_utils::GetVectorLength(inputTensor);
+        out_len[1] *= TensorDesc::GetVectorLength(inputTensor);
     }
-    if(tensor_utils::GetLayout(inputTensor) == miopenTensorCHWNc4 ||
-       tensor_utils::GetLayout(inputTensor) == miopenTensorCHWNc8)
+    if(TensorDesc::GetLayout(inputTensor) == miopenTensorCHWNc4 ||
+       TensorDesc::GetLayout(inputTensor) == miopenTensorCHWNc8)
     {
-        out_len[0] *= tensor_utils::GetVectorLength(inputTensor);
+        out_len[0] *= TensorDesc::GetVectorLength(inputTensor);
     }
     SetTensorNd(outputTensor, out_len, inflags.GetValueStr("out_layout"), data_type);
     if(inflags.GetValueStr("out_cast_type") != "-1")
@@ -841,7 +842,7 @@ int ConvDriver<Tgpu, Tref>::GetandSetData()
         miopenSetConvolutionAttribute(
             warmupConvDesc, MIOPEN_CONVOLUTION_ATTRIB_MATH_TYPE, inflags.GetValueInt("math_type"));
 
-        int warmup_out_len_size = tensor_utils::GetNumDims(warmupInputTensor);
+        int warmup_out_len_size = TensorDesc::GetNumDims(warmupInputTensor);
         std::vector<int> warmup_out_len(warmup_out_len_size);
         miopenGetConvolutionNdForwardOutputDim(warmupConvDesc,
                                                warmupInputTensor,
@@ -1215,7 +1216,7 @@ int ConvDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
 template <typename Tgpu, typename Tref>
 std::vector<int> ConvDriver<Tgpu, Tref>::GetOutputTensorLengths()
 {
-    int ndim = tensor_utils::GetNumDims(inputTensor);
+    int ndim = TensorDesc::GetNumDims(inputTensor);
 
     std::vector<int> out_lens(ndim);
 
@@ -1508,8 +1509,8 @@ int ConvDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
 
             b.AllocOnHost(biasTensor);
             db.AllocOnHost(b_sz);
-            db_host = tensor<Tref>(tensor_utils::GetLengths(biasTensor),
-                                   tensor_utils::GetStrides(biasTensor));
+            db_host = tensor<Tref>(TensorDesc::GetLengths(biasTensor),
+                                   TensorDesc::GetStrides(biasTensor));
 
             // Init tensor on host
             bool b_read = false;
@@ -1669,7 +1670,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
     printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
 
-    const auto num_dim = tensor_utils::GetNumDims(inputTensor) - 2;
+    const auto num_dim = TensorDesc::GetNumDims(inputTensor) - 2;
     if(num_dim != 2 && num_dim != 3)
     {
         printf("stats: <not implemented> for conv%ud\n", num_dim);
@@ -1695,24 +1696,24 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
     if(num_dim == 2)
     {
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(inputTensor));
+        std::tie(in_n, in_c, in_h, in_w) = Tien<4>(TensorDesc::GetLengths(inputTensor));
         int wei_c, wei_n, wei_h, wei_w;
         std::tie(wei_c, wei_n, wei_h, wei_w) =
-            tensor_utils::Tien<4>(tensor_utils::GetLengths(weightTensor));
+            Tien<4>(TensorDesc::GetLengths(weightTensor));
         int out_n, out_c, out_h, out_w;
         std::tie(out_n, out_c, out_h, out_w) =
-            tensor_utils::Tien<4>(tensor_utils::GetLengths(outputTensor));
+            Tien<4>(TensorDesc::GetLengths(outputTensor));
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_h * wei_w * out_c * out_h *
                          out_w / group_count;
         size_t inputBytes =
-            in_n * in_c * in_h * in_w * tensor_utils::GetTypeSize(tensor_utils::GetType(inputTensor));
+            in_n * in_c * in_h * in_w * TensorDesc::GetTypeSize(TensorDesc::GetType(inputTensor));
         size_t weightBytes = wei_n * wei_c * wei_h * wei_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(weightTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(weightTensor));
         size_t readBytes = inputBytes + weightBytes;
 
         size_t outputBytes = 1.0 * out_n * out_c * out_h * out_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(outputTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(outputTensor));
 
         printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
                "GB/s, timeMs\n");
@@ -1739,24 +1740,24 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
     { // 3d
         int in_n, in_c, in_d, in_h, in_w;
         std::tie(in_n, in_c, in_d, in_h, in_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(inputTensor));
+            Tien<5>(TensorDesc::GetLengths(inputTensor));
         int wei_c, wei_n, wei_d, wei_h, wei_w;
         std::tie(wei_c, wei_n, wei_d, wei_h, wei_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(weightTensor));
+            Tien<5>(TensorDesc::GetLengths(weightTensor));
         int out_n, out_c, out_d, out_h, out_w;
         std::tie(out_n, out_c, out_d, out_h, out_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(outputTensor));
+            Tien<5>(TensorDesc::GetLengths(outputTensor));
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_h * wei_w * wei_d * out_c *
                          out_d * out_h * out_w / group_count;
         size_t inputBytes = in_n * in_c * in_d * in_h * in_w *
-                            tensor_utils::GetTypeSize(tensor_utils::GetType(inputTensor));
+                            TensorDesc::GetTypeSize(TensorDesc::GetType(inputTensor));
         size_t weightBytes = wei_n * wei_c * wei_d * wei_h * wei_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(weightTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(weightTensor));
         size_t readBytes = inputBytes + weightBytes;
 
         size_t outputBytes = 1.0 * out_n * out_c * out_d * out_h * out_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(outputTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(outputTensor));
 
         printf("stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, "
                "GFLOPs, "
@@ -2438,8 +2439,8 @@ int ConvDriver<Tgpu, Tref>::RunForwardGPUReference()
     {
         if(!is_gpualloc)
         {
-            auto out_tmp = tensor<Tgpu>(tensor_utils::GetLengths(outputTensor),
-                                       tensor_utils::GetStrides(outputTensor));
+            auto out_tmp = tensor<Tgpu>(TensorDesc::GetLengths(outputTensor),
+                                       TensorDesc::GetStrides(outputTensor));
             out.CopyFromDeviceToHost(GetStream(), out_tmp);
             for(size_t i = 0; i < out_tmp.data.size(); ++i)
             {
@@ -2727,7 +2728,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
     printf("GPU Kernel Time Backward Data Conv. Elapsed: %f ms (average)\n", kernel_average_time);
 
-    const auto num_dim = tensor_utils::GetNumDims(inputTensor) - 2;
+    const auto num_dim = TensorDesc::GetNumDims(inputTensor) - 2;
     if(num_dim != 2 && num_dim != 3)
     {
         printf("stats: <not implemented> for conv%ud\n", num_dim);
@@ -2754,24 +2755,24 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
     if(num_dim == 2)
     {
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(inputTensor));
+        std::tie(in_n, in_c, in_h, in_w) = Tien<4>(TensorDesc::GetLengths(inputTensor));
         int wei_c, wei_n, wei_h, wei_w;
         std::tie(wei_c, wei_n, wei_h, wei_w) =
-            tensor_utils::Tien<4>(tensor_utils::GetLengths(weightTensor));
+            Tien<4>(TensorDesc::GetLengths(weightTensor));
         int out_n, out_c, out_h, out_w;
         std::tie(out_n, out_c, out_h, out_w) =
-            tensor_utils::Tien<4>(tensor_utils::GetLengths(outputTensor));
+            Tien<4>(TensorDesc::GetLengths(outputTensor));
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_h * wei_w * out_c * out_h *
                          out_w / group_count;
         size_t weightBytes = wei_n * wei_c * wei_h * wei_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(weightTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(weightTensor));
         size_t inputBytes =
-            in_n * in_c * out_c * tensor_utils::GetTypeSize(tensor_utils::GetType(inputTensor));
+            in_n * in_c * out_c * TensorDesc::GetTypeSize(TensorDesc::GetType(inputTensor));
         size_t readBytes = inputBytes + weightBytes;
 
         size_t outputBytes = 1.0 * out_n * out_c * out_h * out_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(outputTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(outputTensor));
 
         printf("stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
                "GB/s, timeMs\n");
@@ -2798,24 +2799,24 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
     { // 3d
         int in_n, in_c, in_d, in_h, in_w;
         std::tie(in_n, in_c, in_d, in_h, in_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(inputTensor));
+            Tien<5>(TensorDesc::GetLengths(inputTensor));
         int wei_c, wei_n, wei_d, wei_h, wei_w;
         std::tie(wei_c, wei_n, wei_d, wei_h, wei_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(weightTensor));
+            Tien<5>(TensorDesc::GetLengths(weightTensor));
         int out_n, out_c, out_d, out_h, out_w;
         std::tie(out_n, out_c, out_d, out_h, out_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(outputTensor));
+            Tien<5>(TensorDesc::GetLengths(outputTensor));
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_d * wei_h * wei_w * out_c *
                          out_d * out_h * out_w / group_count;
         size_t weightBytes = wei_n * wei_c * wei_d * wei_h * wei_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(weightTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(weightTensor));
         size_t inputBytes =
-            in_n * in_c * out_c * tensor_utils::GetTypeSize(tensor_utils::GetType(inputTensor));
+            in_n * in_c * out_c * TensorDesc::GetTypeSize(TensorDesc::GetType(inputTensor));
         size_t readBytes = inputBytes + weightBytes;
 
         size_t outputBytes = 1.0 * out_n * out_c * out_d * out_h * out_w *
-                             tensor_utils::GetTypeSize(tensor_utils::GetType(outputTensor));
+                             TensorDesc::GetTypeSize(TensorDesc::GetType(outputTensor));
 
         printf(
             "stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
@@ -2970,7 +2971,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
     printf("GPU Kernel Time Backward Weights Conv. Elapsed: %f ms (average)\n",
            kernel_average_time);
 
-    const auto num_dim = tensor_utils::GetNumDims(inputTensor) - 2;
+    const auto num_dim = TensorDesc::GetNumDims(inputTensor) - 2;
     if(num_dim != 2 && num_dim != 3)
     {
         printf("stats: <not implemented> for conv%ud\n", num_dim);
@@ -2997,13 +2998,13 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
     if(num_dim == 2)
     {
         int in_n, in_c, in_h, in_w;
-        std::tie(in_n, in_c, in_h, in_w) = tensor_utils::Tien<4>(tensor_utils::GetLengths(inputTensor));
+        std::tie(in_n, in_c, in_h, in_w) = Tien<4>(TensorDesc::GetLengths(inputTensor));
         int wei_c, wei_n, wei_h, wei_w;
         std::tie(wei_c, wei_n, wei_h, wei_w) =
-            tensor_utils::Tien<4>(tensor_utils::GetLengths(weightTensor));
+            Tien<4>(TensorDesc::GetLengths(weightTensor));
         int out_n, out_c, out_h, out_w;
         std::tie(out_n, out_c, out_h, out_w) =
-            tensor_utils::Tien<4>(tensor_utils::GetLengths(outputTensor));
+            Tien<4>(TensorDesc::GetLengths(outputTensor));
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_h * wei_w * out_c * out_h *
                          out_w / group_count;
@@ -3035,13 +3036,13 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
     { // 3d
         int in_n, in_c, in_d, in_h, in_w;
         std::tie(in_n, in_c, in_d, in_h, in_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(inputTensor));
+            Tien<5>(TensorDesc::GetLengths(inputTensor));
         int wei_c, wei_n, wei_d, wei_h, wei_w;
         std::tie(wei_c, wei_n, wei_d, wei_h, wei_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(weightTensor));
+            Tien<5>(TensorDesc::GetLengths(weightTensor));
         int out_n, out_c, out_d, out_h, out_w;
         std::tie(out_n, out_c, out_d, out_h, out_w) =
-            tensor_utils::Tien<5>(tensor_utils::GetLengths(outputTensor));
+            Tien<5>(TensorDesc::GetLengths(outputTensor));
 
         size_t flopCnt = static_cast<size_t>(2) * in_n * in_c * wei_d * wei_h * wei_w * out_c *
                          out_d * out_h * out_w / group_count;
@@ -3528,8 +3529,8 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWeightsGPUReference()
     {
         if(!is_gpualloc)
         {
-            auto dwei_tmp = tensor<Tgpu>(tensor_utils::GetLengths(weightTensor),
-                                        tensor_utils::GetStrides(weightTensor));
+            auto dwei_tmp = tensor<Tgpu>(TensorDesc::GetLengths(weightTensor),
+                                        TensorDesc::GetStrides(weightTensor));
             dwei.CopyFromDeviceToHost(GetStream(), dwei_tmp);
             for(size_t i = 0; i < dwei_tmp.data.size(); ++i)
             {
@@ -3585,8 +3586,8 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGPUReference()
     {
         if(!is_gpualloc)
         {
-            auto din_tmp = tensor<Tgpu>(tensor_utils::GetLengths(inputTensor),
-                                       tensor_utils::GetStrides(inputTensor));
+            auto din_tmp = tensor<Tgpu>(TensorDesc::GetLengths(inputTensor),
+                                       TensorDesc::GetStrides(inputTensor));
             din.CopyFromDeviceToHost(GetStream(), din_tmp);
             for(size_t i = 0; i < din_tmp.data.size(); ++i)
             {
@@ -3683,12 +3684,12 @@ std::string ConvDriver<Tgpu, Tref>::GetVerificationCacheFileName(
         miopenGetConvolutionGroupCount(convDesc, &gc);
         ss << "_" << gc;
     }
-    tensor_utils::LogRange(ss << "_", tensor_utils::GetLengths(inputTensor), "x");
-    tensor_utils::LogRange(ss << "_", tensor_utils::GetLengths(weightTensor), "x");
-    tensor_utils::LogRange(ss << "_", pads, "x");
-    tensor_utils::LogRange(ss << "_", conv_strides, "x");
-    tensor_utils::LogRange(ss << "_", conv_dilations, "x");
-    tensor_utils::LogRange(ss << "_", trans_output_pads, "x");
+    LogRange(ss << "_", TensorDesc::GetLengths(inputTensor), "x");
+    LogRange(ss << "_", TensorDesc::GetLengths(weightTensor), "x");
+    LogRange(ss << "_", pads, "x");
+    LogRange(ss << "_", conv_strides, "x");
+    LogRange(ss << "_", conv_dilations, "x");
+    LogRange(ss << "_", trans_output_pads, "x");
     ss << "_" << inflags.GetValueInt("pad_val");
     ss << "_" << inflags.GetValueInt("bias");
     ss << "_" << "GPU" << get_datatype_string(Tgpu{});
