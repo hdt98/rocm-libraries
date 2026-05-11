@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <vector>
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/host_tensor.hpp"
 
