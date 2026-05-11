@@ -109,7 +109,7 @@ struct SdpaBwdParams
     // True when the resolved DQDKDV row has atomic32==1 (A32 FP32-accumulator path).
     // When false (A16), dQ is written directly by DQDKDV and the dq_acc workspace
     // allocation and DQ_CONVERT launch are both skipped.
-    // TODO(I8.2): flip gate in computeDispatchTuples once A16 correctness is verified.
+    // TODO(ALMIOPEN-1825): flip gate in computeDispatchTuples once A16 correctness is verified.
     bool useA32{true};
 };
 

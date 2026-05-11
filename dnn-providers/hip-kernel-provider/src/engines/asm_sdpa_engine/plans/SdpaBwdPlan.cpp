@@ -635,7 +635,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
 
     // 6c. DQ_CONVERT (FP32 → BF16) — A32 path only.
     // A16 wrote dQ directly to the output BF16 buffer in step 6b; no cast needed.
-    // TODO(I8.2): remove this guard and the dq_acc allocation once A16 is enabled
+    // TODO(ALMIOPEN-1825): remove this guard and the dq_acc allocation once A16 is enabled
     // in computeDispatchTuples and verified correct.
     if(_params.useA32)
     {

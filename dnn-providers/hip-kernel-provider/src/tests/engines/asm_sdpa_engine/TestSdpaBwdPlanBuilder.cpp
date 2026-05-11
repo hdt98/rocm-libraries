@@ -78,11 +78,11 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicableSdpaBwdVariations)
         {GraphTest{createSdpaBwdGraph({4, 8, 256, 64}), "Head dimension 64"}, false},
 
         // HD=192: dispatch infrastructure exists but CPU reference correctness
-        // has not been verified. Gated until I8.4.x.
+        // has not been verified. Gated until ALMIOPEN-1832.
         {GraphTest{createSdpaBwdGraph({4, 8, 256, 192}), "Head dimension 192"}, false},
 
         // FP16: dispatch infrastructure exists but CPU reference correctness
-        // has not been verified. Gated until I8.4.x.
+        // has not been verified. Gated until ALMIOPEN-1832.
         {GraphTest{createSdpaBwdGraph({4, 8, 256, 128}, DataType::HALF), "FP16 tensors"}, false},
 
         // Causal mask not currently dispatched.

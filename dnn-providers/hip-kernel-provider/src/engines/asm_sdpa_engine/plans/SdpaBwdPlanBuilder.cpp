@@ -133,14 +133,17 @@ BatchMode getBatchMode(const hipdnn_flatbuffers_sdk::data_objects::SdpaBackwardA
 // Map the seven backward tensor dtypes to a CSV dtype identifier. The backward
 // graph carries Q/K/V/dO inputs and dQ/dK/dV gradient outputs that all share
 // a single floating-point type per the CSV schema; FP32 stats are validated
-// separately. FP8 is rejected because the backward CSV does not define FP8 rows.
-std::string getDataTypeIdentifier(hipdnn_flatbuffers_sdk::data_objects::DataType qType,
-                                  hipdnn_flatbuffers_sdk::data_objects::DataType kType,
-                                  hipdnn_flatbuffers_sdk::data_objects::DataType vType,
-                                  hipdnn_flatbuffers_sdk::data_objects::DataType doType,
-                                  hipdnn_flatbuffers_sdk::data_objects::DataType dqType,
-                                  hipdnn_flatbuffers_sdk::data_objects::DataType dkType,
-                                  hipdnn_flatbuffers_sdk::data_objects::DataType dvType)
+// separately. Returns std::nullopt when the seven tensors do not share a
+// supported dtype (BF16 or FP16); FP8 falls into this bucket because the
+// backward CSV does not define FP8 rows.
+std::optional<std::string>
+    tryGetDataTypeIdentifier(hipdnn_flatbuffers_sdk::data_objects::DataType qType,
+                             hipdnn_flatbuffers_sdk::data_objects::DataType kType,
+                             hipdnn_flatbuffers_sdk::data_objects::DataType vType,
+                             hipdnn_flatbuffers_sdk::data_objects::DataType doType,
+                             hipdnn_flatbuffers_sdk::data_objects::DataType dqType,
+                             hipdnn_flatbuffers_sdk::data_objects::DataType dkType,
+                             hipdnn_flatbuffers_sdk::data_objects::DataType dvType)
 {
     using namespace hipdnn_flatbuffers_sdk::data_objects;
 
@@ -151,13 +154,13 @@ std::string getDataTypeIdentifier(hipdnn_flatbuffers_sdk::data_objects::DataType
 
     if(allEqual(DataType::BFLOAT16))
     {
-        return "bf16";
+        return std::string("bf16");
     }
     if(allEqual(DataType::HALF))
     {
-        return "fp16";
+        return std::string("fp16");
     }
-    return "";
+    return std::nullopt;
 }
 
 // Walk the chosen registry and return a pointer to the row that matches the
@@ -451,16 +454,16 @@ bool SdpaBwdPlanBuilder::isApplicable(
                                "stats tensor datatype must be FP32 (Actual type: "
                                    + EnumNameDataType(statsTensor->data_type()) + ")");
 
-    auto dataTypeId = getDataTypeIdentifier(qTensor->data_type(),
-                                            kTensor->data_type(),
-                                            vTensor->data_type(),
-                                            doTensor->data_type(),
-                                            dqTensor->data_type(),
-                                            dkTensor->data_type(),
-                                            dvTensor->data_type());
+    auto dataTypeIdOpt = tryGetDataTypeIdentifier(qTensor->data_type(),
+                                                  kTensor->data_type(),
+                                                  vTensor->data_type(),
+                                                  doTensor->data_type(),
+                                                  dqTensor->data_type(),
+                                                  dkTensor->data_type(),
+                                                  dvTensor->data_type());
 
     HIP_KERNEL_RETURN_FALSE_IF(
-        dataTypeId.empty(),
+        !dataTypeIdOpt,
         "All Q/K/V/dO/dQ/dK/dV tensors must share a supported dtype (BF16 or FP16). "
         "Actual: q="
             + std::string(EnumNameDataType(qTensor->data_type()))
@@ -470,6 +473,7 @@ bool SdpaBwdPlanBuilder::isApplicable(
             + ", dq=" + EnumNameDataType(dqTensor->data_type())
             + ", dk=" + EnumNameDataType(dkTensor->data_type())
             + ", dv=" + EnumNameDataType(dvTensor->data_type()));
+    const auto& dataTypeId = *dataTypeIdOpt;
 
     auto headDimQk = static_cast<int>(qTensor->dims()->Get(3));
     auto headDimV = static_cast<int>(vTensor->dims()->Get(3));
@@ -481,7 +485,7 @@ bool SdpaBwdPlanBuilder::isApplicable(
     // The codegen-generated registry carries hd64, hd128, and hd192 rows, but
     // only hd128 has a CPU backward reference that has been calibrated against
     // the in-tree kernels. Other head dims are reachable infrastructure but
-    // gated here until I8.4.x extends correctness coverage.
+    // gated here until ALMIOPEN-1832 extends correctness coverage.
     HIP_KERNEL_RETURN_FALSE_IF(headDimQk != 128,
                                "Head dimension currently dispatched is 128 only (Actual value: "
                                    + std::to_string(headDimQk) + ")");
@@ -686,14 +690,23 @@ void SdpaBwdPlanBuilder::buildPlan(
         attnScale = scaleValue.value();
     }
 
-    // Resolve dispatch parameters from the graph
-    auto dataTypeId = getDataTypeIdentifier(qTensor->data_type(),
-                                            kTensor->data_type(),
-                                            vTensor->data_type(),
-                                            doTensor->data_type(),
-                                            dqTensor->data_type(),
-                                            dkTensor->data_type(),
-                                            dvTensor->data_type());
+    // Resolve dispatch parameters from the graph. isApplicable already verified
+    // the dtype is supported; the empty check here is a defensive guard that
+    // mirrors the resolveStage pattern below.
+    auto dataTypeIdOpt = tryGetDataTypeIdentifier(qTensor->data_type(),
+                                                  kTensor->data_type(),
+                                                  vTensor->data_type(),
+                                                  doTensor->data_type(),
+                                                  dqTensor->data_type(),
+                                                  dkTensor->data_type(),
+                                                  dvTensor->data_type());
+    if(!dataTypeIdOpt)
+    {
+        HIPDNN_PLUGIN_LOG_ERROR(
+            "buildPlan: unsupported tensor dtype combination (isApplicable should have rejected)");
+        return;
+    }
+    const auto& dataTypeId = *dataTypeIdOpt;
     auto maskType = getMaskType(sdpaAttrs);
     auto batchMode = getBatchMode(sdpaAttrs);
     int bf16CvtValue = (dataTypeId == "fp16") ? BF16_CVT_FP16_SENTINEL
@@ -754,7 +767,7 @@ void SdpaBwdPlanBuilder::buildPlan(
 
     // Determine accumulator mode from the resolved dispatch tuple. isApplicable
     // currently hard-codes A32, so `useA32` is always true today. When A16 is
-    // enabled (TODO: I8.2 — flip AccumulatorMode in computeDispatchTuples and
+    // enabled (TODO: ALMIOPEN-1825 — flip AccumulatorMode in computeDispatchTuples and
     // verify correctness), this branch will resolve dq_convert conditionally,
     // skip the dq_acc allocation, and route DQDKDV's dQ output directly to the
     // output BF16 buffer.

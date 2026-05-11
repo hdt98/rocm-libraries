@@ -56,7 +56,7 @@ constexpr size_t sdpaBwdDBufferSize(size_t batch, size_t headsQ, size_t seqLenQ)
 
 /// dq_acc buffer: FP32 accumulator for dQ, shape [B, H_q, S_q, D_qk] in FP32.
 /// Only needed for a32-accumulator kernels; a16 kernels write dQ in BF16 directly.
-// TODO(Task I8.2): POC assumes a32 accumulator — always allocates FP32 dq_acc buffer.
+// TODO(ALMIOPEN-1825): POC assumes a32 accumulator — always allocates FP32 dq_acc buffer.
 // For a16 accumulator kernels, dQ is written directly in BF16 (no dq_acc buffer needed,
 // no dq_convert kernel launched). Provider should check accumulator type and skip
 // dq_acc allocation for a16.
