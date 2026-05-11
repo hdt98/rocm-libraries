@@ -31,9 +31,8 @@
 #include <unistd.h>
 #endif
 
-#ifdef MEMCHECK_LOGGING
+// Needed for ROCPRIM_MEMCHECK_LOGGING
 #include <iostream>
-#endif
 
 #include "../../common/utils.hpp"
 
@@ -119,9 +118,7 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 //  loop iterations.  Creating a new MemCheck object each time ensures correct
 //  tracking for the current size.
 //
-// Define MEMCHECK_LOGGING at compile time to enable diagnostic output.
-
-// #define MEMCHECK_LOGGING
+// Set the ROCPRIM_MEMCHECK_LOGGING environment variable to enable diagnostic output.
 
 class MemCheck
 {
@@ -136,6 +133,10 @@ public:
         // to be shared across multiple instances of MemCheck.
         // This constructor is not meant to be in performance critical code so it's OK
         // if we end up repeatedly querying the same data to keep things simpler.
+
+        char* env = common::__get_env("ROCPRIM_MEMCHECK_LOGGING");
+        logging_enabled = (env != nullptr) && (strcmp(env, "1") == 0);
+        common::clean_env(env);
 
         size_t free_dev_mem;
         HIP_CHECK(hipMemGetInfo(&free_dev_mem, &dev_limit));
@@ -183,12 +184,13 @@ public:
             dev_carved = dev_limit - dev_shared;
         }
 
-#ifdef MEMCHECK_LOGGING
-        std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_limit)
-                  << " MiB, host " << toMB(host_usage) << "/" << toMB(host_limit)
-                  << " MiB, dev_shared: " << toMB(dev_shared) << " MiB, dev_carved: " << toMB(dev_carved)
-                  << " MiB, is_apu=" << is_apu << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_limit)
+                    << " MiB, host " << toMB(host_usage) << "/" << toMB(host_limit)
+                    << " MiB, dev_shared: " << toMB(dev_shared) << " MiB, dev_carved: " << toMB(dev_carved)
+                    << " MiB, is_apu=" << is_apu << std::endl;
+        }
     }
 
 	// Call this before host allocs
@@ -201,9 +203,10 @@ public:
 
     inline bool alloc_host_bytes(const size_t bytes)
     {
-#ifdef MEMCHECK_LOGGING
-        std::cout << "alloc host: " << toMB(bytes) << " MiB" << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            std::cout << "alloc host: " << toMB(bytes) << " MiB" << std::endl;
+        }
         host_usage += bytes;
         return mem_check_host();
     }
@@ -218,9 +221,10 @@ public:
 
     inline void free_host_bytes(const size_t bytes)
     {
-#ifdef MEMCHECK_LOGGING
-        std::cout << "free host: " << toMB(bytes) << " MiB" << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            std::cout << "free host: " << toMB(bytes) << " MiB" << std::endl;
+        }
         host_usage -= bytes;
     }
 
@@ -234,9 +238,10 @@ public:
 
     inline bool alloc_device_bytes(const size_t bytes)
     {
-#ifdef MEMCHECK_LOGGING
-        std::cout << "alloc device: " << toMB(bytes) << " MiB" << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            std::cout << "alloc device: " << toMB(bytes) << " MiB" << std::endl;
+        }
         dev_usage += bytes;
         return mem_check_device();
     }
@@ -251,9 +256,10 @@ public:
 
     inline void free_device_bytes(const size_t bytes)
     {
-#ifdef MEMCHECK_LOGGING
-        std::cout << "free device: " << toMB(bytes) << " MiB" << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            std::cout << "free device: " << toMB(bytes) << " MiB" << std::endl;
+        }
         dev_usage -= bytes;
     }
 
@@ -294,24 +300,27 @@ private:
 
             success = host_usage <= host_limit_padded;
 
-#ifdef MEMCHECK_LOGGING
-            std::cout << "mem_check_host: host=" << toMB(host_usage) << "/" << toMB(host_limit_padded)
-                      << " MiB, device=" << toMB(dev_usage) << " MiB, spill=" << toMB(spill)
-                      << " MiB" << std::endl;
-#endif
+            if (logging_enabled)
+            {
+                std::cout << "mem_check_host: host=" << toMB(host_usage) << "/" << toMB(host_limit_padded)
+                          << " MiB, device=" << toMB(dev_usage) << " MiB, spill=" << toMB(spill)
+                          << " MiB" << std::endl;
+            }
         }
         else
         {
             success = host_usage <= host_limit_padded;
-#ifdef MEMCHECK_LOGGING
-            std::cout << "mem_check_host: host=" << toMB(host_usage) << "/" << toMB(host_limit_padded)
-                      << " MiB" << std::endl;
-#endif
+            if (logging_enabled)
+            {
+                std::cout << "mem_check_host: host=" << toMB(host_usage) << "/" << toMB(host_limit_padded)
+                          << " MiB" << std::endl;
+            }
         }
-#ifdef MEMCHECK_LOGGING
-        if (!success)
-            std::cout << "mem_check_host: out of memory" << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            if (!success)
+                std::cout << "mem_check_host: out of memory" << std::endl;
+        }
         return success;
     }
 
@@ -344,35 +353,39 @@ private:
 
             success = dev_usage <= dev_limit_padded;
 
-#ifdef MEMCHECK_LOGGING
-            std::cout << "mem_check_device: device=" << toMB(dev_usage) << "/" << toMB(dev_limit_padded)
-                      << " MiB, host=" << toMB(host_usage) << " MiB, spill=" << toMB(spill)
-                      << " MiB" << std::endl;
-#endif
+            if (logging_enabled)
+            {
+                std::cout << "mem_check_device: device=" << toMB(dev_usage) << "/" << toMB(dev_limit_padded)
+                          << " MiB, host=" << toMB(host_usage) << " MiB, spill=" << toMB(spill)
+                          << " MiB" << std::endl;
+            }
         }
         else
         {
             success = dev_usage <= dev_limit_padded;
-#ifdef MEMCHECK_LOGGING
-            std::cout << "mem_check_device: device=" << toMB(dev_usage) << "/" << toMB(dev_limit_padded)
-                      << " MiB" << std::endl;
-#endif
+            if (logging_enabled)
+            {
+                std::cout << "mem_check_device: device=" << toMB(dev_usage) << "/" << toMB(dev_limit_padded)
+                          << " MiB" << std::endl;
+            }
         }
-#ifdef MEMCHECK_LOGGING
-        if (!success)
-            std::cout << "mem_check_device: out of memory" << std::endl;
-#endif
+        if (logging_enabled)
+        {
+            if (!success)
+                std::cout << "mem_check_device: out of memory" << std::endl;
+        }
         return success;
     }
 
-	bool is_apu = false;
-	size_t host_limit = 0;
-	size_t dev_limit = 0;
+    bool logging_enabled = false;
+    bool is_apu = false;
+    size_t host_limit = 0;
+    size_t dev_limit = 0;
     size_t dev_shared = 0;
     size_t dev_carved = 0;
-	float padding_factor;
-	size_t host_usage = 0;
-	size_t dev_usage = 0;
+    float padding_factor;
+    size_t host_usage = 0;
+    size_t dev_usage = 0;
 };
 
 }
