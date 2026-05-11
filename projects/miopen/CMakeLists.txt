@@ -110,6 +110,13 @@ if(MIOPEN_INCBIN)
     enable_language(ASM)
 endif()
 
+# Truncation rounding or (default) rounding to nearest even (RNE) is enabled.
+# This switch controls two related but different aspects of MIOpen behavior:
+#  1. How host code performs conversions of float to bfloat16 (important for testing).
+#  2. How BF16 kernels perform the final conversion (and rounding) of FP32 to BF16 results
+#     (affects the main functionality of the library).
+option(MIOPEN_USE_RNE_BFLOAT16 "Sets rounding scheme for bfloat16 type" ON)
+
 # Strip symbols for release
 if(MIOPEN_STRIP_SYMBOLS AND NOT WIN32 AND NOT APPLE)
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
