@@ -314,7 +314,6 @@ using Gfx942AndHigherIntrinsics = ::testing::Types<
 >;
 using Gfx950Intrinsics = ::testing::Types<
     amdgcn_mma<F16,  F16,  F32,  16u, 16u, 32u,  DefaultMfmaCtrlFlags,       TestTarget, MmaOpFamily::DENSE>, // mfma_f32_16x16x32_f16
-    amdgcn_mma<F16,  F16,  F32,  16u, 16u, 32u,  DefaultMfmaCtrlFlags,       TestTarget, MmaOpFamily::DENSE>, // mfma_f32_16x16x32_f16
     amdgcn_mma<BF16, BF16, F32,  16u, 16u, 32u,  DefaultMfmaCtrlFlags,       TestTarget, MmaOpFamily::DENSE>, // mfma_f32_16x16x32_bf16
     amdgcn_mma<F16,  F16,  F32,  32u, 32u, 16u,  DefaultMfmaCtrlFlags,       TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x16_f16
     amdgcn_mma<BF16, BF16, F32,  32u, 32u, 16u,  DefaultMfmaCtrlFlags,       TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x16_bf16
