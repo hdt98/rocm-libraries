@@ -1795,7 +1795,7 @@ namespace TensileLite
             // they opted into the subtile / pre-swizzle layout.
             bool useMXGenerator = isMXProblem(problem) && m_mxScaleFormat > 0;
             if(useMXGenerator)
-                initializeMXDataForFP4OrFP8(problem);
+                initializeMXData(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
@@ -1891,7 +1891,7 @@ namespace TensileLite
             }
         }
 
-        void DataInitialization::initializeMXDataForFP4OrFP8(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
             // can safely skip them. For MX-FP4 / MX-FP8 / MX-BFloat8 sides we drive
@@ -2174,7 +2174,7 @@ namespace TensileLite
             }
         }
 #else  // HIPBLASLT_ENABLE_MXDATAGENERATOR
-        void DataInitialization::initializeMXDataForFP4OrFP8(ContractionProblemGemm const& /*problem*/)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& /*problem*/)
         {
             // The MX data generator is disabled at build time. Reaching this
             // path means a problem requiring MX FP4 or MX FP8 initialization was issued
