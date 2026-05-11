@@ -394,7 +394,7 @@ def _allocate_d_tile(kernel, writer):
     Returns (tileInfoD, agpr_base) where agpr_base is the first accvgpr index.
     """
     tileInfoD = TileInfo(CD_F32, 'D', writer, kernel)
-    tileInfoD.allocVgprTileRegisters(writer, kernel)
+    tileInfoD.allocVgprTileRegisters_legacy(writer, kernel)
     # Collect all allocated agpr indices (in order)
     agpr_indices = []
     for vtile in tileInfoD.vgprTiles:

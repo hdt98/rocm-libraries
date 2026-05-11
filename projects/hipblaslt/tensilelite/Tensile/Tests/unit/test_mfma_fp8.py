@@ -53,8 +53,7 @@ from Tensile.Components.Subtile.SubtileLREmit import (
     localReadDoSubtile,
 )
 
-# Re-use FP8 writer/kernel helpers from the GRA test
-from test_graTileAssignment_fp8 import create_writer_fp8
+from gpu_test_helpers import create_writer, AB_B8
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -299,7 +298,7 @@ def generate_mfma_kernel_fp8(cfg):
     """
     init_rocisa()
 
-    writer, kernel, tileInfoA, tileInfoB = create_writer_fp8(cfg)
+    writer, kernel, tileInfoA, tileInfoB = create_writer(cfg, geometry=AB_B8, inst_k=MATRIX_INST_K, bpe=BPE_FP8)
 
     writer.sgprPool.checkOut(12)
     writer.sgprs["StrideA0I"] = 10

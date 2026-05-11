@@ -40,7 +40,9 @@ from rocisa.container import vgpr, sgpr
 from rocisa.instruction import SLoadB32, SLoadB64, SLoadB128, SWaitCnt, VLShiftLeftB32, VMovB32
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType
-from Tensile.Components.Subtile.Kernel import TileInfo, AB_B16
+from Tensile.Components.Subtile.Kernel import TileInfo, AB_B16, AB_B8
+from Tensile.Components.Subtile.SubtileGREmit import graTileAssignment
+from Tensile.Components.Subtile.SubtileLREmit import lraTileAssignment
 
 # ---- Constants ----
 GFX_TARGET = "gfx950"
@@ -91,9 +93,9 @@ def _mock_dtype(num_bytes=2):
     return mock
 
 
-def _create_kernel(cfg, mi_wave_group=None):
+def _create_kernel(cfg, mi_wave_group=None, inst_k=32, bpe=2):
     """Create a minimal kernel dict matching the given tile config."""
-    dtype = _mock_dtype(BPE)
+    dtype = _mock_dtype(bpe)
     if mi_wave_group is not None:
         MIWaveGroup = mi_wave_group
     elif ((cfg.mt_a//16) % 2 == 0) and ((cfg.mt_b//16) % 2 == 0):
@@ -104,7 +106,6 @@ def _create_kernel(cfg, mi_wave_group=None):
         MIWaveGroup = [4,1]
     else:
         raise ValueError(f"Unsupported tile config for wave grouping: mt_a={cfg.mt_a}, mt_b={cfg.mt_b}")
-
 
     return {
         "DepthU": cfg.depth_u,
@@ -117,7 +118,7 @@ def _create_kernel(cfg, mi_wave_group=None):
         "MacroTile1": cfg.mt_b,
         "MatrixInstM": 16,
         "MatrixInstN": 16,
-        "MatrixInstK": 32,
+        "MatrixInstK": inst_k,
         "MIWaveGroup": MIWaveGroup,
         "WavefrontSize": WAVESIZE,
         "UseSubtileImpl": True,
@@ -138,7 +139,7 @@ def compute_lds_start_offset_b(tileInfoA):
     return int(((numASubtiles * tileInfoA.subtileSize + readSize - 1) // readSize) * readSize)
 
 
-def create_writer(cfg, mi_wave_group=None):
+def create_writer(cfg, mi_wave_group=None, geometry=None, inst_k=32, bpe=2):
     """Create a minimal mock writer with register pools, kernel dict, and TileInfo.
 
     Sets up the base writer that all tests need:
@@ -148,12 +149,22 @@ def create_writer(cfg, mi_wave_group=None):
       - TileInfo A/B
       - writer.states with tileInfo refs and register caps
 
+    Args:
+        cfg:           TileConfig with macro tile / depthU / stride parameters.
+        mi_wave_group: Override MIWaveGroup; auto-detected from cfg if None.
+        geometry:      ABTilePair geometry (e.g. AB_B16, AB_B8). Defaults to AB_B16.
+        inst_k:        MatrixInstK value (32 for FP16, 128 for FP8).
+        bpe:           Bytes per element for A/B data type (2 for FP16, 1 for FP8).
+
     Each test is responsible for reserving sgprs, defining named sgprs
     (writer.sgprs), and calling allocOffsetRegisters etc.
 
     Returns:
         (writer, kernel, tileInfoA, tileInfoB)
     """
+    if geometry is None:
+        geometry = AB_B16
+
     writer = SimpleNamespace()
 
     writer.vgprPool = RegisterPool(0, RegisterType.Vgpr,
@@ -166,10 +177,10 @@ def create_writer(cfg, mi_wave_group=None):
     writer.vgprPool.checkOut(1)
 
     # Build kernel and TileInfo
-    kernel = _create_kernel(cfg, mi_wave_group=mi_wave_group)
+    kernel = _create_kernel(cfg, mi_wave_group=mi_wave_group, inst_k=inst_k, bpe=bpe)
 
-    tileInfoA = TileInfo(AB_B16, 'A', writer, kernel)
-    tileInfoB = TileInfo(AB_B16, 'B', writer, kernel)
+    tileInfoA = TileInfo(geometry, 'A', writer, kernel)
+    tileInfoB = TileInfo(geometry, 'B', writer, kernel)
 
     writer.agprPool = RegisterPool(0, RegisterType.Accvgpr,
                                     defaultPreventOverflow=False, printRP=False)
@@ -185,6 +196,71 @@ def create_writer(cfg, mi_wave_group=None):
     writer.ldsStartOffsetB = compute_lds_start_offset_b(tileInfoA)
 
     return writer, kernel, tileInfoA, tileInfoB
+
+
+def _generate_tile_asm(cfg, emitter, geometry=None, inst_k=32, bpe=2):
+    """Common setup for GR/LR tile assignment asm generation.
+
+    Args:
+        cfg:     TileConfig with tile geometry and stride parameters.
+        emitter: Callable (writer, kernel) -> module that generates the tile asm.
+        geometry, inst_k, bpe: passed to create_writer.
+
+    Returns:
+        (asm, writer, tileInfoA, tileInfoB, kernel)
+    """
+    writer, kernel, tileInfoA, tileInfoB = create_writer(cfg, geometry=geometry, inst_k=inst_k, bpe=bpe)
+    init_rocisa()
+    # Reserve s0-s11: s[0:1]=kernarg ptr (HW), s[2:3]=workgroup IDs (HW),
+    # s[4:5]=output ptr, s[6:9]=padding, s10=StrideA0I, s11=StrideB1J
+    writer.sgprPool.checkOut(12)
+    writer.sgprs["StrideA0I"] = 10
+    writer.sgprs["StrideB1J"] = 11
+    tileInfoA.allocOffsetRegisters(writer, kernel)
+    tileInfoB.allocOffsetRegisters(writer, kernel)
+    # Kernarg layout (same for all data types — strides are always u32, ptr is u64):
+    # (dst_sgpr, count_dwords, byte_offset, comment)
+    load_params = (
+        (4,           2, 0x00, "output_ptr"),  # s[4:5] = 64-bit output buffer pointer
+        ("StrideA0I", 1, 0x08, "strideA"),    # s10    = stride for A (elements)
+        ("StrideB1J", 1, 0x0c, "strideB"),    # s11    = stride for B (elements)
+    )
+    prologue = generate_load_params(load_params)
+    module = emitter(writer, kernel)
+    asm = f"{prologue}\n{module}"
+    return asm, writer, tileInfoA, tileInfoB, kernel
+
+
+def generate_gra_asm(cfg, geometry=None, inst_k=32, bpe=2):
+    """Run graTileAssignment and return (gra_asm, writer, tileInfoA, tileInfoB, kernel)."""
+    return _generate_tile_asm(
+        cfg,
+        lambda w, k: graTileAssignment(w, k, useSwizzling=cfg.use_swizzling),
+        geometry=geometry, inst_k=inst_k, bpe=bpe,
+    )
+
+
+def generate_lra_asm(cfg, geometry=None, inst_k=32, bpe=2):
+    """Run lraTileAssignment and return (lra_asm, writer, tileInfoA, tileInfoB, kernel)."""
+    return _generate_tile_asm(cfg, lraTileAssignment, geometry=geometry, inst_k=inst_k, bpe=bpe)
+
+
+def export_register(writer, test_asm, export_reg, is_sgpr, cfg, tmp_path, label):
+    """Generate export kernel, assemble, run, return per-thread u32 results."""
+    # Must match load_params layout in generate_gra_asm (same for all data types)
+    # (name, size_bytes, value_kind, value_type)
+    export_args = (
+        ("output_ptr", 8, "global_buffer", "u32"),  # 64-bit pointer to output buffer
+        ("strideA",    4, "by_value",      "u32"),  # stride for A in elements
+        ("strideB",    4, "by_value",      "u32"),  # stride for B in elements
+    )
+    epilogue, allocated = generate_export_epilogue(writer, export_reg, is_sgpr)
+    kernel_asm = generate_kernel_asm(f"{test_asm}\n{epilogue}", writer, export_args)
+    for v in allocated:
+        writer.vgprPool.checkIn(v)
+    raw = assemble_and_run(kernel_asm, tmp_path, label, NUM_THREADS * 4,
+                           scalars=(cfg.stride_a, cfg.stride_b))
+    return struct.unpack(f"{NUM_THREADS}I", raw)
 
 
 def generate_set_directives(sgprs):

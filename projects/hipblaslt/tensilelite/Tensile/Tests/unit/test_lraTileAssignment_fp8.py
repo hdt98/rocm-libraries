@@ -29,35 +29,13 @@ from gpu_test_helpers import (
     HAS_HIP,
     TileConfig,
     LOAD_WIDTH, WAVESIZE, NUM_THREADS, NUM_WAVES,
-    init_rocisa,
-    generate_load_params,
+    AB_B8,
+    generate_lra_asm,
+    export_register,
     print_offset_grid,
 )
-from Tensile.Components.Subtile.SubtileLREmit import lraTileAssignment
-from test_graTileAssignment_fp8 import (
-    BPE,
-    AB_B8_DU128,
-    EXPORT_LOAD_PARAMS,
-    create_writer_fp8,
-    export_register_fp8,
-)
 
-
-# ---- Setup helpers ----
-
-def generate_lra_asm_fp8(cfg):
-    """Generate lraTileAssignment asm for FP8 config."""
-    writer, kernel, tileInfoA, tileInfoB = create_writer_fp8(cfg)
-    init_rocisa()
-    writer.sgprPool.checkOut(12)
-    writer.sgprs["StrideA0I"] = 10
-    writer.sgprs["StrideB1J"] = 11
-    tileInfoA.allocOffsetRegisters(writer, kernel)
-    tileInfoB.allocOffsetRegisters(writer, kernel)
-    prologue = generate_load_params(EXPORT_LOAD_PARAMS)
-    module = lraTileAssignment(writer, kernel)
-    lra_asm = f"{prologue}\n{module}"
-    return lra_asm, writer, tileInfoA, tileInfoB, kernel
+BPE = 1  # fp8: 1 byte per element
 
 
 # ---- Reference implementation ----
@@ -128,7 +106,7 @@ class TestLraTileAssignmentFP8GPU:
     @pytest.fixture(params=TILE_CONFIGS_FP8, ids=lambda c: c.label)
     def lra_env(self, request, tmp_path):
         cfg = request.param
-        lra_asm, writer, tileInfoA, tileInfoB, kernel = generate_lra_asm_fp8(cfg)
+        lra_asm, writer, tileInfoA, tileInfoB, kernel = generate_lra_asm(cfg, geometry=AB_B8, inst_k=128, bpe=BPE)
         return SimpleNamespace(
             cfg=cfg, lra_asm=lra_asm, writer=writer,
             tileInfoA=tileInfoA, tileInfoB=tileInfoB,
@@ -138,7 +116,7 @@ class TestLraTileAssignmentFP8GPU:
     def test_offset_a(self, lra_env):
         cfg = lra_env.cfg
         for idx, reg in enumerate(lra_env.tileInfoA.sharedVgprLROffset):
-            results = export_register_fp8(
+            results = export_register(
                 lra_env.writer, lra_env.lra_asm, reg, False,
                 cfg, lra_env.tmp_path, f"lr_offsetA_v{reg}_{cfg.label}")
             for tid in range(NUM_THREADS):
@@ -152,7 +130,7 @@ class TestLraTileAssignmentFP8GPU:
     def test_offset_b(self, lra_env):
         cfg = lra_env.cfg
         for idx, reg in enumerate(lra_env.tileInfoB.sharedVgprLROffset):
-            results = export_register_fp8(
+            results = export_register(
                 lra_env.writer, lra_env.lra_asm, reg, False,
                 cfg, lra_env.tmp_path, f"lr_offsetB_v{reg}_{cfg.label}")
             for tid in range(NUM_THREADS):
@@ -177,7 +155,7 @@ if __name__ == "__main__":
         print(f"\n{'='*60}")
         print(f"  FP8 LRA Config: {cfg.label}")
         print(f"{'='*60}")
-        lra_asm, writer, tileInfoA, tileInfoB, kernel = generate_lra_asm_fp8(cfg)
+        lra_asm, writer, tileInfoA, tileInfoB, kernel = generate_lra_asm(cfg, geometry=AB_B8, inst_k=128, bpe=BPE)
 
         print(f"  numLRPerSubtile A={tileInfoA.numLRPerSubtile}, B={tileInfoB.numLRPerSubtile}")
         print(f"  loadRatioGR A={tileInfoA.loadRatioGR}, B={tileInfoB.loadRatioGR}")
@@ -189,7 +167,7 @@ if __name__ == "__main__":
             if HAS_HIP:
                 for tc, tileInfo in [("A", tileInfoA), ("B", tileInfoB)]:
                     for idx, reg in enumerate(tileInfo.sharedVgprLROffset):
-                        results = export_register_fp8(writer, lra_asm, reg, False, cfg,
+                        results = export_register(writer, lra_asm, reg, False, cfg,
                                                       tmp_path, f"lr_offset{tc}_v{reg}_{cfg.label}")
                         expected_all = [compute_expected_lr_offset_fp8(
                                             tid, cfg, tileInfo, writer.ldsStartOffsetB)

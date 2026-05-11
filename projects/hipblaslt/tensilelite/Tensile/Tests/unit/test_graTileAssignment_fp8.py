@@ -3,7 +3,35 @@
 # GPU functional test for graTileAssignment with FP8 tile configs
 #
 # Config: MT=256x256, DU=128, 2x2 wave group
-#   bpe=1, instK=128, blockSize=8, numRowsPerLDSBanks=2, loadRatioGR=1.0
+#   bpe=1 (bytes per element, fp8), instM=16, instK=128, waveSize=64, numWaves=4, subtileShape=(1,1),
+#   loadWidth=16 bytes (128-bit load)
+#
+#   loadRatioGR: fraction of the global GR tile covered by one cooperative buffer_load
+#     (i.e., all waves issuing buffer_load together: loadWidth bytes per lane across all waves)
+#     loadRatioGR      = bytesPerLoad / globalGRTileSize
+#     bytesPerLoad    = loadWidth * waveSize * numWaves
+#     globalGRTileSize = subtileSize * subtileCount
+#       mmaTileSize  = bytes in one MMA tile (instM * instK elements) = instM * instK * bpe
+#       subtileSize  = bytes in one subtile (subtileShape[0]*subtileShape[1] MMA tiles)
+#                    = subtileShape[0] * subtileShape[1] * mmaTileSize
+#       subtileCount = wg_m  (number of M-dimension wave partners, derived from wave group)
+#     For 2x2 wave group: wg_m=2
+#       mmaTileSize  = 16 * 128 * 1 = 2048
+#       subtileSize  = 1 * 1 * 2048 = 2048
+#       bytesPerLoad = 16 * 64 * 4 = 4096
+#       globalGRTileSize = 2048 * 2 = 4096
+#       loadRatioGR  = 4096 / 4096 = 1.0
+#
+#   blockSize: number of lanes needed to cover the full K depth (depthU * bpe bytes),
+#     also defines the number of colIds in the K direction
+#     blockSize = depthU * bpe / loadWidth = 128 * 1 / 16 = 8
+#
+#   numRowsPerLDSBanks: number of consecutive M rows that span one LDS bank period
+#     (1 bank period = LDS_BANK_COUNT * LDS_BANK_WIDTH = 256 bytes)
+#     after numRowsPerLDSBanks rows the bank assignment repeats
+#     (e.g. row 2 maps to same banks as row 0, row 3 same as row 1)
+#     numRowsPerLDSBanks = LDS_BANK_COUNT * LDS_BANK_WIDTH / (depthU * bpe)
+#                        = 64 * 4 / 128 = 2
 #
 # FP8 GR swizzle = two-step zero-conflict scheme:
 #   Step 1 (block-swap):
@@ -26,135 +54,21 @@ import tempfile
 
 import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-
 from gpu_test_helpers import (
     HAS_HIP,
     TileConfig,
     LOAD_WIDTH, WAVESIZE, NUM_THREADS, NUM_WAVES,
-    init_rocisa,
-    assemble_and_run,
-    generate_kernel_asm,
-    generate_load_params,
-    generate_export_epilogue,
+    AB_B8,
+    create_writer,
+    generate_gra_asm,
+    export_register,
     print_offset_grid,
-    compute_lds_start_offset_b,
-)
-from rocisa.register import RegisterPool
-from rocisa.enum import RegisterType
-from Tensile.Components.Subtile.SubtileGREmit import graTileAssignment
-from Tensile.Components.Subtile.Kernel import TileInfo
-from Tensile.Components.Subtile.SubtileGeometry import (
-    ABTilePair, ABGRGeometry, ABLRGeometry, LoadShape,
-    MFMA_16x16_1B_4K_8V, GRTag_1x2, LRTag_1x2,
 )
 
 # FP8 constants
 BPE = 1        # fp8: 1 byte per element (shadows gpu_test_helpers.BPE=2)
 LDS_BANK_COUNT = 64
 LDS_BANK_WIDTH = 4  # bytes
-
-# FP8 geometry for DU=128: subtileShape=(1,1) so globalSubtileGrid[1] = DU/instK/1 = 1
-# AB_B8 has subtileShape=(1,2) which requires DU>=256; (1,1) allows DU=128.
-_FP8 = dict(mmaLayout=MFMA_16x16_1B_4K_8V, instK=128, bpe=1, supportedTypes=('fp8', 'bf8'))
-AB_B8_DU128 = ABTilePair(
-    gr=ABGRGeometry(tag=GRTag_1x2(), **_FP8, subtileShape=(1, 1), loadShape=LoadShape(m=1, k=16)),
-    lr=ABLRGeometry(tag=LRTag_1x2(), **_FP8, subtileShape=(1, 1), loadShape=LoadShape(m=1, k=16), loadWidth=16),
-)
-
-EXPORT_LOAD_PARAMS = (
-    (4, 2, 0x00, "output_ptr"),
-    ("StrideA0I", 1, 0x08, "strideA"),
-    ("StrideB1J", 1, 0x0c, "strideB"),
-)
-
-EXPORT_ARGS = (
-    ("output_ptr", 8, "global_buffer", "u32"),
-    ("strideA",    4, "by_value",      "u32"),
-    ("strideB",    4, "by_value",      "u32"),
-)
-
-
-# ---- Setup helpers ----
-
-def _create_kernel_fp8(cfg, mi_wave_group=None):
-    """Minimal kernel dict for FP8 MFMA 16x16x128, 2x2 wave group."""
-    dtype = MagicMock(**{"numBytes.return_value": BPE})
-    if mi_wave_group is not None:
-        MIWaveGroup = mi_wave_group
-    elif ((cfg.mt_a // 16) % 2 == 0) and ((cfg.mt_b // 16) % 2 == 0):
-        MIWaveGroup = [2, 2]
-    else:
-        raise ValueError(f"Only 2x2 WG supported for FP8 DU=128: mt_a={cfg.mt_a}, mt_b={cfg.mt_b}")
-    return {
-        "DepthU": cfg.depth_u, "_DepthU": cfg.depth_u,
-        "_DepthUA": cfg.depth_u, "_DepthUB": cfg.depth_u,
-        "MacroTileA": cfg.mt_a, "MacroTileB": cfg.mt_b,
-        "MacroTile0": cfg.mt_a, "MacroTile1": cfg.mt_b,
-        "MatrixInstM": 16, "MatrixInstN": 16, "MatrixInstK": 128,
-        "MIWaveGroup": MIWaveGroup,
-        "WavefrontSize": WAVESIZE,
-        "UseSubtileImpl": True,
-        "NonTemporalA": 0, "NonTemporalB": 0,
-        "ProblemType": {
-            "DataTypeA": dtype,
-            "DataTypeB": dtype,
-            "ComputeDataType": MagicMock(**{"numBytes.return_value": 4}),
-        },
-    }
-
-
-def create_writer_fp8(cfg, mi_wave_group=None):
-    """Create mock writer with AB_B8_DU128 geometry (FP8, DU=128)."""
-    writer = SimpleNamespace()
-    writer.vgprPool = RegisterPool(0, RegisterType.Vgpr,
-                                   defaultPreventOverflow=False, printRP=False)
-    writer.sgprPool = RegisterPool(0, RegisterType.Sgpr,
-                                   defaultPreventOverflow=False, printRP=False)
-    writer.sgprs = {}
-    writer.vgprPool.checkOut(1)   # v0 = Serial
-
-    kernel = _create_kernel_fp8(cfg, mi_wave_group=mi_wave_group)
-    tileInfoA = TileInfo(AB_B8_DU128, 'A', writer, kernel)
-    tileInfoB = TileInfo(AB_B8_DU128, 'B', writer, kernel)
-
-    writer.agprPool = RegisterPool(0, RegisterType.Accvgpr,
-                                    defaultPreventOverflow=False, printRP=False)
-    writer.states = SimpleNamespace(
-        a=SimpleNamespace(tileInfo=tileInfoA),
-        b=SimpleNamespace(tileInfo=tileInfoB),
-        regCaps={"MaxSgpr": 106, "MaxVgpr": 256, "PhysicalMaxVgpr": 512},
-        archCaps={"LDSBankCount": 64, "LDSBankWidth": 4},
-    )
-    writer.ldsStartOffsetA = 0
-    writer.ldsStartOffsetB = compute_lds_start_offset_b(tileInfoA)
-    return writer, kernel, tileInfoA, tileInfoB
-
-
-def generate_gra_asm_fp8(cfg):
-    """Generate graTileAssignment asm for FP8 config."""
-    writer, kernel, tileInfoA, tileInfoB = create_writer_fp8(cfg)
-    init_rocisa()
-    writer.sgprPool.checkOut(12)
-    writer.sgprs["StrideA0I"] = 10
-    writer.sgprs["StrideB1J"] = 11
-    tileInfoA.allocOffsetRegisters(writer, kernel)
-    tileInfoB.allocOffsetRegisters(writer, kernel)
-    prologue = generate_load_params(EXPORT_LOAD_PARAMS)
-    module = graTileAssignment(writer, kernel, useSwizzling=cfg.use_swizzling)
-    gra_asm = f"{prologue}\n{module}"
-    return gra_asm, writer, tileInfoA, tileInfoB, kernel
-
-
-def export_register_fp8(writer, test_asm, export_reg, is_sgpr, cfg, tmp_path, label):
-    """Export one register via GPU kernel, return per-thread u32 values."""
-    epilogue, allocated = generate_export_epilogue(writer, export_reg, is_sgpr)
-    kernel_asm = generate_kernel_asm(f"{test_asm}\n{epilogue}", writer, EXPORT_ARGS)
-    for v in allocated:
-        writer.vgprPool.checkIn(v)
-    raw = assemble_and_run(kernel_asm, tmp_path, label, NUM_THREADS * 4,
-                           scalars=(cfg.stride_a, cfg.stride_b))
-    return struct.unpack(f"{NUM_THREADS}I", raw)
 
 
 # ---- Reference implementations ----
@@ -257,7 +171,7 @@ class TestGraTileAssignmentFP8GPU:
     @pytest.fixture(params=TILE_CONFIGS_FP8, ids=lambda c: c.label)
     def gra_env(self, request, tmp_path):
         cfg = request.param
-        gra_asm, writer, tileInfoA, tileInfoB, kernel = generate_gra_asm_fp8(cfg)
+        gra_asm, writer, tileInfoA, tileInfoB, kernel = generate_gra_asm(cfg, geometry=AB_B8, inst_k=128, bpe=BPE)
         return SimpleNamespace(
             cfg=cfg, gra_asm=gra_asm, writer=writer,
             tileInfoA=tileInfoA, tileInfoB=tileInfoB,
@@ -268,7 +182,7 @@ class TestGraTileAssignmentFP8GPU:
         """Validate sharedVgprGROffset vgprs for matrix A across all threads."""
         cfg = gra_env.cfg
         for idx, reg in enumerate(gra_env.tileInfoA.sharedVgprGROffset):
-            results = export_register_fp8(
+            results = export_register(
                 gra_env.writer, gra_env.gra_asm, reg, False,
                 cfg, gra_env.tmp_path, f"offsetA_v{reg}_{cfg.label}")
             for tid in range(NUM_THREADS):
@@ -282,7 +196,7 @@ class TestGraTileAssignmentFP8GPU:
         """Validate sharedVgprGROffset vgprs for matrix B across all threads."""
         cfg = gra_env.cfg
         for idx, reg in enumerate(gra_env.tileInfoB.sharedVgprGROffset):
-            results = export_register_fp8(
+            results = export_register(
                 gra_env.writer, gra_env.gra_asm, reg, False,
                 cfg, gra_env.tmp_path, f"offsetB_v{reg}_{cfg.label}")
             for tid in range(NUM_THREADS):
@@ -310,7 +224,7 @@ class TestGraTileAssignmentFP8GPU:
                 continue
             seen.add(regId)
             for reg in tileInfo.localSubtilesRegister[regId]:
-                results = export_register_fp8(
+                results = export_register(
                     gra_env.writer, gra_env.gra_asm, reg, st.useSgpr,
                     cfg, gra_env.tmp_path, f"subtile{tc}_s{reg}_{cfg.label}")
                 expected = compute_expected_subtile_fp8(regId, stride, tileInfo)
@@ -340,7 +254,7 @@ if __name__ == "__main__":
         print(f"\n{'='*60}")
         print(f"  FP8 Config: {cfg.label}")
         print(f"{'='*60}")
-        gra_asm, writer, tileInfoA, tileInfoB, kernel = generate_gra_asm_fp8(cfg)
+        gra_asm, writer, tileInfoA, tileInfoB, kernel = generate_gra_asm(cfg, geometry=AB_B8, inst_k=128, bpe=BPE)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = type('P', (), {'__truediv__': lambda s, n: os.path.join(tmp_dir, n)})()
@@ -357,7 +271,7 @@ if __name__ == "__main__":
                 for tc, tileInfo, stride in [("A", tileInfoA, cfg.stride_a),
                                               ("B", tileInfoB, cfg.stride_b)]:
                     for idx, reg in enumerate(tileInfo.sharedVgprGROffset):
-                        results = export_register_fp8(writer, gra_asm, reg, False, cfg,
+                        results = export_register(writer, gra_asm, reg, False, cfg,
                                                       tmp_path, f"offset{tc}_v{reg}_{cfg.label}")
                         if args.grid:
                             print_offset_grid(
@@ -391,7 +305,7 @@ if __name__ == "__main__":
                             continue
                         seen.add(regId)
                         for reg in tileInfo.localSubtilesRegister[regId]:
-                            results = export_register_fp8(
+                            results = export_register(
                                 writer, gra_asm, reg, st.useSgpr,
                                 cfg, tmp_path, f"subtile{tc}_s{reg}_{cfg.label}")
                             expected = compute_expected_subtile_fp8(regId, stride, tileInfo)

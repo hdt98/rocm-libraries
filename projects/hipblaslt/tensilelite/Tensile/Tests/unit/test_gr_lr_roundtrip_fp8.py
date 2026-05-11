@@ -48,11 +48,9 @@ from rocisa.code import Module
 from rocisa.container import sgpr
 from rocisa.instruction import SMovB32, SMovB64, SWaitCnt, SBarrier
 
-from test_graTileAssignment_fp8 import (
-    BPE,
-    AB_B8_DU128,
-    create_writer_fp8,
-)
+from gpu_test_helpers import create_writer, AB_B8
+
+BPE = 1  # fp8: 1 byte per element
 
 
 assert NUM_THREADS == 256, f"Roundtrip test requires exactly 256 threads (4 waves × 64), got {NUM_THREADS}"
@@ -179,7 +177,7 @@ def generate_roundtrip_kernel_fp8(cfg, wave_id=0):
     """Generate a complete FP8 kernel using production GR/LR code paths."""
     init_rocisa()
 
-    writer, kernel, tileInfoA, tileInfoB = create_writer_fp8(cfg)
+    writer, kernel, tileInfoA, tileInfoB = create_writer(cfg, geometry=AB_B8, inst_k=128, bpe=BPE)
 
     writer.sgprPool.checkOut(12)
     writer.sgprs["StrideA0I"] = 10
