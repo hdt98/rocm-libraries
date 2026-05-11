@@ -164,20 +164,22 @@ std::optional<std::string>
     return std::nullopt;
 }
 
-// Walk the chosen registry and return a pointer to the row that matches the
-// requested tuple, or nullptr when no row matches.  The registry type (CFG)
-// is the std::unordered_map alias emitted by codegen.py.
-const fmha_v3_bwdConfig* findConfig(const CFG& registry,
-                                    const std::string& archId,
-                                    const std::string& dataType,
-                                    int hdimQ,
-                                    int hdimV,
-                                    int mask,
-                                    int atomic32,
-                                    int pssk,
-                                    int pddv,
-                                    int mode,
-                                    int bf16Cvt)
+// Walk the chosen registry and return a copy of the row that matches the
+// requested tuple, or std::nullopt when no row matches.  The registry type
+// (CFG) is the std::unordered_map alias emitted by codegen.py; returning a
+// copy decouples the caller from the registry's storage so the result is
+// stable regardless of any subsequent mutation to the underlying map.
+std::optional<fmha_v3_bwdConfig> findConfig(const CFG& registry,
+                                            const std::string& archId,
+                                            const std::string& dataType,
+                                            int hdimQ,
+                                            int hdimV,
+                                            int mask,
+                                            int atomic32,
+                                            int pssk,
+                                            int pddv,
+                                            int mode,
+                                            int bf16Cvt)
 {
     for(const auto& [unusedKey, cfg] : registry)
     {
@@ -219,9 +221,9 @@ const fmha_v3_bwdConfig* findConfig(const CFG& registry,
         {
             continue;
         }
-        return &cfg;
+        return cfg;
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 // Query the HIP device string for the stream, logging `logPrefix` on failure.
@@ -290,7 +292,7 @@ std::string lookupKernelNameKey(PipelineStage stage,
                                 int mode,
                                 int bf16Cvt)
 {
-    const fmha_v3_bwdConfig* cfg = nullptr;
+    std::optional<fmha_v3_bwdConfig> cfg;
     switch(stage)
     {
     case PipelineStage::ODO:
@@ -335,7 +337,7 @@ std::string lookupKernelNameKey(PipelineStage stage,
     default:
         break;
     }
-    return cfg != nullptr ? cfg->arch + cfg->knl_name : std::string{};
+    return cfg.has_value() ? cfg->arch + cfg->knl_name : std::string{};
 }
 
 } // namespace bwd_dispatch
@@ -714,18 +716,19 @@ void SdpaBwdPlanBuilder::buildPlan(
                                                     : static_cast<int>(getRoundingMode(sdpaAttrs));
     auto dispatchTuples = computeDispatchTuples(maskType, bf16CvtValue);
 
-    auto resolveStage = [&](const char* stageName,
-                            const fmha_v3_bwdConfig* cfgPtr) -> std::optional<ResolvedKernel> {
-        if(cfgPtr == nullptr)
+    auto resolveStage
+        = [&](const char* stageName,
+              std::optional<fmha_v3_bwdConfig> cfgOpt) -> std::optional<ResolvedKernel> {
+        if(!cfgOpt)
         {
             HIPDNN_PLUGIN_LOG_ERROR("Failed to resolve "
                                     << stageName << " kernel for arch=" << deviceString
                                     << " dtype=" << dataTypeId << " hdim=" << headDimQk);
             return std::nullopt;
         }
-        return ResolvedKernel{getKernelCoPath(cfgPtr->co_name),
-                              cfgPtr->knl_name,
-                              SdpaBwdParams::KernelTiles{static_cast<unsigned int>(cfgPtr->ts)}};
+        return ResolvedKernel{getKernelCoPath(cfgOpt->co_name),
+                              cfgOpt->knl_name,
+                              SdpaBwdParams::KernelTiles{static_cast<unsigned int>(cfgOpt->ts)}};
     };
 
     const auto& odtuple = dispatchTuples[static_cast<size_t>(bwd_dispatch::PipelineStage::ODO)];
