@@ -27,24 +27,29 @@ def _setup_hipdnn():
         pytest.skip(f"PyTorch not available: {e}")
 
     try:
+        import os
+
         import hipdnn_frontend
 
-        # Auto-discover and set plugin path
-        project_root = Path(__file__).parent.parent.parent
-        candidates = [
-            project_root.parent.parent.parent.parent
-            / "dnn-providers"
-            / "miopen-provider"
-            / "build"
-            / "lib"
-            / "hipdnn_plugins"
-            / "engines",
-            Path("/opt/rocm/lib/hipdnn_plugins/engines"),
-        ]
-        for p in candidates:
-            if p.is_dir() and any(p.glob("*.so")):
-                hipdnn_frontend.set_engine_plugin_paths([str(p)])
-                break
+        env_path = os.environ.get("DNN_BENCHMARKING_HIPDNN_PLUGIN_PATH")
+        if env_path and Path(env_path).is_dir():
+            hipdnn_frontend.set_engine_plugin_paths([env_path])
+        else:
+            project_root = Path(__file__).parent.parent.parent
+            candidates = [
+                project_root.parent.parent.parent.parent
+                / "dnn-providers"
+                / "miopen-provider"
+                / "build"
+                / "lib"
+                / "hipdnn_plugins"
+                / "engines",
+                Path("/opt/rocm/lib/hipdnn_plugins/engines"),
+            ]
+            for p in candidates:
+                if p.is_dir() and any(p.glob("*.so")):
+                    hipdnn_frontend.set_engine_plugin_paths([str(p)])
+                    break
 
         hipdnn_frontend.Handle()
         return hipdnn_frontend

@@ -25,8 +25,14 @@ set(HIPDNN_FRONTEND_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../frontend/include
 
 # Find HIP (if needed)
 find_package(hip REQUIRED)
-find_package(hipdnn_frontend CONFIG REQUIRED)
-find_package(hipdnn_backend REQUIRED)
+
+# Only find_package for hipDNN targets when built standalone
+if(NOT TARGET hipdnn_frontend)
+    find_package(hipdnn_frontend CONFIG REQUIRED)
+endif()
+if(NOT TARGET hipdnn_backend)
+    find_package(hipdnn_backend REQUIRED)
+endif()
 
 # Create the Python module
 nanobind_add_module(
@@ -51,5 +57,48 @@ set_target_properties(hipdnn_frontend_python PROPERTIES INSTALL_RPATH_USE_LINK_P
 # actual library structure
 target_link_libraries(hipdnn_frontend_python PRIVATE hipdnn_frontend hipdnn_backend hip::host)
 
-# Install the module - scikit-build-core handles the destination
-install(TARGETS hipdnn_frontend_python LIBRARY DESTINATION .)
+# ============================================================================
+# Installation
+# ============================================================================
+
+# Use a relative path so the install respects CMAKE_INSTALL_PREFIX.
+set(HIPDNN_PYTHON_SITE_DIR
+    "lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages"
+    CACHE PATH "Python module install directory (relative to CMAKE_INSTALL_PREFIX)")
+
+# scikit-build-core (pip wheel / pip install) install rules.
+# SKBUILD is set by scikit-build-core when building a wheel.
+if(DEFINED SKBUILD)
+    install(TARGETS hipdnn_frontend_python DESTINATION hipdnn_frontend)
+    install(FILES hipdnn_frontend/__init__.py DESTINATION hipdnn_frontend)
+else()
+    # Regular cmake install — place in dist-packages under CMAKE_INSTALL_PREFIX.
+    install(TARGETS hipdnn_frontend_python
+        LIBRARY DESTINATION ${HIPDNN_PYTHON_SITE_DIR}/hipdnn_frontend
+    )
+    install(FILES hipdnn_frontend/__init__.py
+        DESTINATION ${HIPDNN_PYTHON_SITE_DIR}/hipdnn_frontend
+    )
+endif()
+
+# Build wheels and stage them in the install prefix.
+# Skipped when scikit-build-core drives cmake (SKBUILD) to avoid recursion.
+if(NOT DEFINED SKBUILD)
+    install(CODE "
+        set(_wheel_dir \"\${CMAKE_INSTALL_PREFIX}/share/hipdnn/wheels\")
+        file(MAKE_DIRECTORY \"\${_wheel_dir}\")
+
+        message(STATUS \"Building hipdnn-frontend wheel\")
+        execute_process(
+            COMMAND \"${Python_EXECUTABLE}\" -m pip wheel --no-deps
+                -w \"\${_wheel_dir}\"
+                \"${CMAKE_CURRENT_SOURCE_DIR}\"
+                -C \"cmake.define.CMAKE_PREFIX_PATH=\${CMAKE_INSTALL_PREFIX}\"
+            RESULT_VARIABLE _result
+        )
+        if(_result)
+            message(FATAL_ERROR \"Failed to build hipdnn-frontend wheel\")
+        endif()
+
+    ")
+endif()
