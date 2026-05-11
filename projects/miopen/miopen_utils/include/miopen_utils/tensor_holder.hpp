@@ -186,7 +186,7 @@ struct tensor
     }
 
     template <class X>
-    tensor(miopenTensorLayout_t layout,
+    tensor(miopenTensorLayout_t /*layout*/,
            const std::vector<X>& dims,
            const std::vector<X>& strides)
         : desc(miopen_type<T>{},
