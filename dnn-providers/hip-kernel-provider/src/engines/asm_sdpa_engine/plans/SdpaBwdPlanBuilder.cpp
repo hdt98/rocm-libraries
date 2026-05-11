@@ -255,6 +255,10 @@ std::string getKernelCoPath(const std::string& coName)
     return asm_kernels::getAsmKernelPath(coName);
 }
 
+constexpr int64_t K_U32_MAX_AS_I64 = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
+constexpr int64_t K_BF16_BYTES = 2;
+constexpr int64_t K_FP32_BYTES = 4;
+
 // Validates that every byte stride consumed by the backward kernels fits in
 // the uint32_t fields of the kernarg structs.  Catches overflow at
 // applicability time so the engine can be excluded from heuristics for graphs
@@ -277,10 +281,6 @@ bool wouldBwdByteStridesFitUint32(
     int64_t tsKv,
     bool useA32)
 {
-    constexpr int64_t K_U32_MAX_AS_I64 = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
-    constexpr int64_t K_BF16_BYTES = 2;
-    constexpr int64_t K_FP32_BYTES = 4;
-
     auto check = [](const char* name, int64_t elements, int64_t elementBytes) {
         if(elements >= 0 && elements * elementBytes <= K_U32_MAX_AS_I64)
         {
