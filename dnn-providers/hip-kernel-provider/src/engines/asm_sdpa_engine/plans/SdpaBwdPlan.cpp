@@ -15,9 +15,6 @@
 namespace
 {
 
-using asm_sdpa_engine::alignUp;
-using asm_sdpa_engine::K_WORKSPACE_ALIGNMENT_BYTES;
-
 // =============================================================================
 // MhaBwdArgs — convenience struct mirroring AITER's mha_bwd_args
 // =============================================================================
@@ -455,7 +452,7 @@ bool checkLaunchPreconditions(const char* stage, unsigned int gridX)
 // would propagate silently to the next stage.
 bool checkLaunchPostError(const char* stage)
 {
-    hipError_t err = hipPeekAtLastError();
+    const hipError_t err = hipPeekAtLastError();
     if(err != hipSuccess)
     {
         HIPDNN_PLUGIN_LOG_ERROR(stage << ": post-launch error: " << hipGetErrorString(err));
@@ -545,7 +542,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     }
 
     // 5. Build convenience args struct (mirrors AITER mha_bwd_args)
-    MhaBwdArgs mhaArgs = buildMhaBwdArgs(
+    const MhaBwdArgs mhaArgs = buildMhaBwdArgs(
         _params, qPtr, kPtr, vPtr, oPtr, doPtr, lsePtr, dqPtr, dkPtr, dvPtr, dBufPtr, dqAccPtr);
 
     // 5a. Reject oversized graphs whose byte strides would silently truncate
@@ -565,7 +562,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     // 6a. Build args and launch kernel 1: ODO
     auto odoArgs = buildOdoArgs(mhaArgs);
 
-    unsigned int gdxOdo = _params.odoTiles.gridDim(mhaArgs.seqlen_q);
+    const unsigned int gdxOdo = _params.odoTiles.gridDim(mhaArgs.seqlen_q);
 
     if(!checkLaunchPreconditions("SDPA backward ODO", gdxOdo))
     {
@@ -591,7 +588,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     // 6b. Build args and launch kernel 2: DQDKDV
     auto dqdkdvArgs = buildDqdkdvArgs(mhaArgs, _params.dqdkdvTiles.ts);
 
-    unsigned int gdxDqdkdv = _params.dqdkdvTiles.gridDim(mhaArgs.seqlen_k);
+    const unsigned int gdxDqdkdv = _params.dqdkdvTiles.gridDim(mhaArgs.seqlen_k);
 
     // A32: zero dq_acc before DQDKDV. The atomic-accumulator kernel adds per-K-tile
     // dQ contributions atomically and does not pre-zero; stale residue from a
@@ -602,7 +599,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     {
         const size_t dqAccBytes = sdpaBwdDqAccBufferSize(
             _params.batchSize, _params.numHeadsQ, _params.seqLenQ, _params.headDimQk);
-        hipError_t memsetErr = hipMemsetAsync(dqAccPtr, 0, dqAccBytes, stream);
+        const hipError_t memsetErr = hipMemsetAsync(dqAccPtr, 0, dqAccBytes, stream);
         if(memsetErr != hipSuccess)
         {
             HIPDNN_PLUGIN_LOG_ERROR("Failed to zero dq_acc workspace before SDPA backward DQDKDV, "
@@ -641,7 +638,7 @@ void SdpaBwdPlan::execute(const HipKernelHandle& handle,
     {
         auto postArgs = buildPostArgs(mhaArgs);
 
-        unsigned int gdxPost = _params.dqConvertTiles.gridDim(mhaArgs.seqlen_q);
+        const unsigned int gdxPost = _params.dqConvertTiles.gridDim(mhaArgs.seqlen_q);
 
         if(!checkLaunchPreconditions("SDPA backward DQ_CONVERT", gdxPost))
         {

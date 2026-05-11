@@ -29,7 +29,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicableReturnsFalseForNonSdpaBwdGraph)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
 
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
 
     EXPECT_FALSE(_planBuilder.isApplicable(_handle, graphWrapper));
@@ -68,7 +68,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicableSdpaBwdVariations)
         GTEST_SKIP();
     }
 
-    std::vector<std::pair<GraphTest, bool>> applicabilityTests = {
+    const std::vector<std::pair<GraphTest, bool>> applicabilityTests = {
         // Valid backward graph: BF16, HD=128, FP32 stats, no masking — only
         // configuration with a calibrated CPU reference today.
         {GraphTest{createSdpaBwdGraph(), "Valid BF16 HD128 backward"}, true},
@@ -119,10 +119,10 @@ TEST_F(TestSdpaBwdPlanBuilder, BackwardWorkspaceSizeSmallUnaligned)
     // B=1, H=3, S=255, D=128 — chosen so D buffer raw size (3060) is NOT a multiple of 64,
     // exercising the alignUp() rounding: 3060 → 3072
     auto builder = createSdpaBwdGraph({1, 3, 255, 128});
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
-    HipKernelSettings settings;
-    size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
+    const HipKernelSettings settings;
+    const size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
 
     // D buffer: 1*3*255*4 = 3060, aligned to 64 → 3072  (exercises alignment rounding)
     // dq_acc:   1*3*255*128*4 = 391680, aligned to 64 → 391680 (already aligned)
@@ -133,10 +133,10 @@ TEST_F(TestSdpaBwdPlanBuilder, BackwardWorkspaceSizeMedium)
 {
     // B=2, H=8, S=512, D=128
     auto builder = createSdpaBwdGraph({2, 8, 512, 128});
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
-    HipKernelSettings settings;
-    size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
+    const HipKernelSettings settings;
+    const size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
 
     // D buffer: 2*8*512*4 = 32768, aligned to 64 → 32768
     // dq_acc:   2*8*512*128*4 = 4194304, aligned to 64 → 4194304
@@ -147,10 +147,10 @@ TEST_F(TestSdpaBwdPlanBuilder, BackwardWorkspaceSizeLarge)
 {
     // B=4, H=16, S=1024, D=128
     auto builder = createSdpaBwdGraph({4, 16, 1024, 128});
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
-    HipKernelSettings settings;
-    size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
+    const HipKernelSettings settings;
+    const size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
 
     // D buffer: 4*16*1024*4 = 262144, aligned to 64 → 262144
     // dq_acc:   4*16*1024*128*4 = 33554432, aligned to 64 → 33554432
@@ -364,7 +364,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsHd96)
     }
 
     auto builder = createSdpaBwdGraph({2, 8, 256, 96});
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
 
     EXPECT_FALSE(_planBuilder.isApplicable(_handle, graphWrapper));
@@ -380,7 +380,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsFp8)
     }
 
     auto builder = createSdpaBwdGraph({2, 8, 256, 128}, DataType::FP8_E4M3);
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
 
     EXPECT_FALSE(_planBuilder.isApplicable(_handle, graphWrapper));
@@ -398,7 +398,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsGfx950)
     }
 
     auto builder = createSdpaBwdGraph();
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
 
     EXPECT_FALSE(_planBuilder.isApplicable(_handle, graphWrapper));
@@ -415,10 +415,10 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsFractionalGqaRatio)
 
     // nhead_q = 6, nhead_k = 4 → 6 % 4 = 2.  SdpaBwdPlan would silently
     // truncate ratio = 6/4 = 1, dropping K/V heads in dispatch.
-    std::vector<int64_t> qDims = {2, 6, 256, 128};
-    std::vector<int64_t> kDims = {2, 4, 256, 128};
-    std::vector<int64_t> vDims = {2, 4, 256, 128};
-    std::vector<int64_t> oDims = {2, 6, 256, 128};
+    const std::vector<int64_t> qDims = {2, 6, 256, 128};
+    const std::vector<int64_t> kDims = {2, 4, 256, 128};
+    const std::vector<int64_t> vDims = {2, 4, 256, 128};
+    const std::vector<int64_t> oDims = {2, 6, 256, 128};
 
     auto builder = hipdnn_test_sdk::utilities::createValidSdpaBwdGraph(
         qDims,
@@ -431,7 +431,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsFractionalGqaRatio)
         hipdnn_data_sdk::utilities::generateStrides(oDims),
         DataType::BFLOAT16);
 
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
 
     EXPECT_FALSE(_planBuilder.isApplicable(_handle, graphWrapper));
@@ -450,10 +450,10 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsAsymmetricHdim)
     // directly to exercise an asymmetric layout (D_qk=128, D_v=64).
     // V tensor has D_v = 64 while Q/K have D_qk = 128 — backward kernels
     // require square head dimensions (D_qk == D_v).
-    std::vector<int64_t> qDims = {2, 8, 256, 128};
-    std::vector<int64_t> kDims = {2, 8, 256, 128};
-    std::vector<int64_t> vDims = {2, 8, 256, 64};
-    std::vector<int64_t> oDims = {2, 8, 256, 64};
+    const std::vector<int64_t> qDims = {2, 8, 256, 128};
+    const std::vector<int64_t> kDims = {2, 8, 256, 128};
+    const std::vector<int64_t> vDims = {2, 8, 256, 64};
+    const std::vector<int64_t> oDims = {2, 8, 256, 64};
 
     auto builder = hipdnn_test_sdk::utilities::createValidSdpaBwdGraph(
         qDims,
@@ -466,7 +466,7 @@ TEST_F(TestSdpaBwdPlanBuilder, IsApplicable_RejectsAsymmetricHdim)
         hipdnn_data_sdk::utilities::generateStrides(oDims),
         DataType::BFLOAT16);
 
-    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
+    const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(
         builder.GetBufferPointer(), builder.GetSize());
 
     EXPECT_FALSE(_planBuilder.isApplicable(_handle, graphWrapper));

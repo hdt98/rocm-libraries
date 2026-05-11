@@ -87,7 +87,8 @@ MaskType getMaskType(const hipdnn_flatbuffers_sdk::data_objects::SdpaBackwardAtt
 {
     using namespace hipdnn_flatbuffers_sdk::data_objects;
 
-    bool leftAndRightBoundsSet = attrs.left_bound().has_value() && attrs.right_bound().has_value();
+    const bool leftAndRightBoundsSet
+        = attrs.left_bound().has_value() && attrs.right_bound().has_value();
     if(!leftAndRightBoundsSet)
     {
         if(attrs.causal_mask())
@@ -393,14 +394,14 @@ bool SdpaBwdPlanBuilder::isApplicable(
     // Validate required tensors
     const auto& tensorMap = opGraph.getTensorMap();
 
-    int64_t qUid = attrs.q_tensor_uid();
-    int64_t kUid = attrs.k_tensor_uid();
-    int64_t vUid = attrs.v_tensor_uid();
-    int64_t doUid = attrs.do_tensor_uid();
-    int64_t statsUid = attrs.stats_tensor_uid();
-    int64_t dqUid = attrs.dq_tensor_uid();
-    int64_t dkUid = attrs.dk_tensor_uid();
-    int64_t dvUid = attrs.dv_tensor_uid();
+    const int64_t qUid = attrs.q_tensor_uid();
+    const int64_t kUid = attrs.k_tensor_uid();
+    const int64_t vUid = attrs.v_tensor_uid();
+    const int64_t doUid = attrs.do_tensor_uid();
+    const int64_t statsUid = attrs.stats_tensor_uid();
+    const int64_t dqUid = attrs.dq_tensor_uid();
+    const int64_t dkUid = attrs.dk_tensor_uid();
+    const int64_t dvUid = attrs.dv_tensor_uid();
 
     auto findTensor = [&](const char* name, int64_t uid) -> const TensorAttributes* {
         auto it = tensorMap.find(uid);
@@ -502,8 +503,8 @@ bool SdpaBwdPlanBuilder::isApplicable(
                                "Masked attention not currently dispatched (Mask type ordinal: "
                                    + std::to_string(static_cast<int>(maskType)) + ")");
 
-    int bf16CvtValue = (dataTypeId == "fp16") ? BF16_CVT_FP16_SENTINEL
-                                              : static_cast<int>(getRoundingMode(attrs));
+    const int bf16CvtValue = (dataTypeId == "fp16") ? BF16_CVT_FP16_SENTINEL
+                                                    : static_cast<int>(getRoundingMode(attrs));
     auto dispatchTuples = computeDispatchTuples(maskType, bf16CvtValue);
 
     auto checkRegistry = [&](const char* registryName,
@@ -604,15 +605,15 @@ void SdpaBwdPlanBuilder::buildPlan(
         = sdpaNode.attributesAs<hipdnn_flatbuffers_sdk::data_objects::SdpaBackwardAttributes>();
     auto& tensorMap = opGraph.getTensorMap();
 
-    int64_t qUid = sdpaAttrs.q_tensor_uid();
-    int64_t kUid = sdpaAttrs.k_tensor_uid();
-    int64_t vUid = sdpaAttrs.v_tensor_uid();
-    int64_t oUid = sdpaAttrs.o_tensor_uid();
-    int64_t doUid = sdpaAttrs.do_tensor_uid();
-    int64_t statsUid = sdpaAttrs.stats_tensor_uid();
-    int64_t dqUid = sdpaAttrs.dq_tensor_uid();
-    int64_t dkUid = sdpaAttrs.dk_tensor_uid();
-    int64_t dvUid = sdpaAttrs.dv_tensor_uid();
+    const int64_t qUid = sdpaAttrs.q_tensor_uid();
+    const int64_t kUid = sdpaAttrs.k_tensor_uid();
+    const int64_t vUid = sdpaAttrs.v_tensor_uid();
+    const int64_t oUid = sdpaAttrs.o_tensor_uid();
+    const int64_t doUid = sdpaAttrs.do_tensor_uid();
+    const int64_t statsUid = sdpaAttrs.stats_tensor_uid();
+    const int64_t dqUid = sdpaAttrs.dq_tensor_uid();
+    const int64_t dkUid = sdpaAttrs.dk_tensor_uid();
+    const int64_t dvUid = sdpaAttrs.dv_tensor_uid();
 
     auto* qTensor = tensorMap.at(qUid);
     auto* kTensor = tensorMap.at(kUid);
@@ -709,8 +710,8 @@ void SdpaBwdPlanBuilder::buildPlan(
     const auto& dataTypeId = *dataTypeIdOpt;
     auto maskType = getMaskType(sdpaAttrs);
     auto batchMode = getBatchMode(sdpaAttrs);
-    int bf16CvtValue = (dataTypeId == "fp16") ? BF16_CVT_FP16_SENTINEL
-                                              : static_cast<int>(getRoundingMode(sdpaAttrs));
+    const int bf16CvtValue = (dataTypeId == "fp16") ? BF16_CVT_FP16_SENTINEL
+                                                    : static_cast<int>(getRoundingMode(sdpaAttrs));
     auto dispatchTuples = computeDispatchTuples(maskType, bf16CvtValue);
 
     auto resolveStage = [&](const char* stageName,
