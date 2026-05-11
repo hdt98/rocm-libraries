@@ -348,14 +348,23 @@ def compare_tiles(actual_bytes, expected_tiles, tileInfoA, tileInfoB, wave_id, d
 
 
 def _build_tile_to_mma(tileInfo):
-    """Build map from vgprTile index to (mmaId0, mmaId1)."""
+    """Build map from vgprTile index to (mmaId0, mmaId1).
+
+    Uses the same indexing formula as emitMfmaInstructions (Kernel.py):
+      tileId = (sId1 * lrLocalGrid0 + sId0) * numMmaTilePerSubtile + _mmak
+    """
+    lrSubtileShape = tileInfo.lr.subtileShape
+    lrLocalGrid0 = tileInfo.localMMATileGrid[0] // lrSubtileShape[0]
+    numMmaTilePerSubtile = lrSubtileShape[0] * lrSubtileShape[1]
+
     tile_to_mma = {}
-    for sId0 in range(tileInfo.lrLocalSubtileGrid[0]):
-        for sId1 in range(tileInfo.lrLocalSubtileGrid[1]):
-            mma_tiles = tileInfo.waveMmaTilesForSubtile(sId0, sId1)
-            for mfmaId, (mmaId0, mmaId1) in enumerate(mma_tiles):
-                tileIdx = tileInfo.lrTileIndexForSubtile(sId0, sId1, mfmaId)
-                tile_to_mma[tileIdx] = (mmaId0, mmaId1)
+    for mmak in range(tileInfo.localMMATileGrid[1]):
+        for mma0 in range(tileInfo.localMMATileGrid[0]):
+            sId0 = mma0 // lrSubtileShape[0]
+            sId1 = mmak // lrSubtileShape[1]
+            _mmak = mmak % lrSubtileShape[1]
+            tileId = (sId1 * lrLocalGrid0 + sId0) * numMmaTilePerSubtile + _mmak
+            tile_to_mma[tileId] = (mma0, mmak)
     return tile_to_mma
 
 
