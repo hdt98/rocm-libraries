@@ -38,6 +38,8 @@ class GemmPreshuffleKernelBuilder(GemmKernelBuilder):
         config_json=None,
         max_instances=None,
         seed=None,
+        tier=None,
+        manifest_path=None,
     ):
         super().__init__(
             kernel_name_prefix,
@@ -48,6 +50,8 @@ class GemmPreshuffleKernelBuilder(GemmKernelBuilder):
             config_json,
             max_instances=max_instances,
             seed=seed,
+            tier=tier,
+            manifest_path=manifest_path,
         )
 
     def _generate_all_individual(self, num_workers=None):
@@ -77,29 +81,14 @@ class GemmPreshuffleKernelBuilder(GemmKernelBuilder):
                     )
                 )
 
-        # Deterministic sampling when max_instances is set
+        # Apply RFC-compliant sampling (Sobol + LHS + maximin)
         if self.max_instances is not None and len(work_items) > self.max_instances:
-            import hashlib
-            import datetime
-            import random
-
-            if self.seed is not None:
-                effective_seed = self.seed
-            else:
-                date_str = datetime.date.today().isoformat()
-                seed_material = (
-                    f"{date_str}:{self.gpu_target}:{self.datatype}:{self.layout}"
-                )
-                effective_seed = int(
-                    hashlib.sha256(seed_material.encode()).hexdigest(), 16
-                ) % (2**32)
-            rng = random.Random(effective_seed)
-            rng.shuffle(work_items)
-            work_items = work_items[: self.max_instances]
-            print(
-                f"Sampled {len(work_items)} instances from {len(tile_configs) * len(trait_combos)} feasible set "
-                f"(max_instances={self.max_instances}, seed={effective_seed})"
-            )
+            kernel_dicts = [
+                {"tile_config": item[0], "trait_combo": item[1], "_work_item": item}
+                for item in work_items
+            ]
+            sampled = self._apply_sampling(kernel_dicts)
+            work_items = [k["_work_item"] for k in sampled]
 
         print(
             f"Generating {len(work_items)} individual kernel files using {num_workers} workers..."
@@ -257,6 +246,16 @@ def main():
         default=None,
         help="RNG seed for deterministic sampling; if omitted, derived from today's date",
     )
+    parser.add_argument(
+        "--tier",
+        default=None,
+        help="Sampling tier (daily/weekly)",
+    )
+    parser.add_argument(
+        "--manifest-path",
+        default=None,
+        help="Directory for chosen_instances.json",
+    )
 
     args = parser.parse_args()
 
@@ -286,6 +285,8 @@ def main():
         args.config_json,
         max_instances=args.max_instances,
         seed=args.seed,
+        tier=args.tier,
+        manifest_path=args.manifest_path,
     )
 
     if args.list_kernels:
