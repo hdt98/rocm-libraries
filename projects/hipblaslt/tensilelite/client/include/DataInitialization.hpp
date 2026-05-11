@@ -54,7 +54,7 @@ namespace TensileLite
                 || isMXFP4Tensor(problem.b(), problem.mxBlockB());
         }
 
-        inline bool isMXFP4OrFP8Tensor(const TensorDescriptor& tensor, size_t mxBlock)
+        inline bool isMXTensor(const TensorDescriptor& tensor, size_t mxBlock)
         {
             if(mxBlock == 0)
                 return false;
@@ -64,10 +64,10 @@ namespace TensileLite
                 || dt == rocisa::DataType::BFloat8;
         }
 
-        inline bool isMXFP4OrFP8Problem(const ContractionProblemGemm& problem)
+        inline bool isMXProblem(const ContractionProblemGemm& problem)
         {
-            return isMXFP4OrFP8Tensor(problem.a(), problem.mxBlockA())
-                || isMXFP4OrFP8Tensor(problem.b(), problem.mxBlockB());
+            return isMXTensor(problem.a(), problem.mxBlockA())
+                || isMXTensor(problem.b(), problem.mxBlockB());
         }
 
         // Problem-indept. from 0~7, and 16, and 23~26 (fixed values for every problem)
@@ -891,8 +891,8 @@ namespace TensileLite
                    && m_currentGemmProblem != nullptr
                    && !m_gpuPtrs.empty())
                 {
-                    bool isMXFP4OrFP8 = isMXFP4OrFP8Problem(*m_currentGemmProblem);
-                    if(isMXFP4OrFP8)
+                    bool isMX = isMXProblem(*m_currentGemmProblem);
+                    if(isMX)
                     {
                         initializeMXDataForFP4OrFP8(*m_currentGemmProblem);
                         copyValidToGPUBuffer(*m_currentGemmProblem);

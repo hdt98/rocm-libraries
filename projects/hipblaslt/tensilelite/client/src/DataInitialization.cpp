@@ -1793,7 +1793,7 @@ namespace TensileLite
             // bytes the kernel sees are identical to the bytes the reference reads. We
             // gate on m_mxScaleFormat > 0 because that is the user-visible signal that
             // they opted into the subtile / pre-swizzle layout.
-            bool useMXGenerator = isMXFP4OrFP8Problem(problem) && m_mxScaleFormat > 0;
+            bool useMXGenerator = isMXProblem(problem) && m_mxScaleFormat > 0;
             if(useMXGenerator)
                 initializeMXDataForFP4OrFP8(problem);
 
@@ -1964,7 +1964,7 @@ namespace TensileLite
                 }
             }
 
-            if(isMXFP4OrFP8Tensor(problem.a(), problem.mxBlockA()))
+            if(isMXTensor(problem.a(), problem.mxBlockA()))
             {
                 auto const& tensorA = problem.a();
                 auto        rows    = tensorA.sizes()[0];
@@ -2072,7 +2072,7 @@ namespace TensileLite
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
             }
 
-            if(isMXFP4OrFP8Tensor(problem.b(), problem.mxBlockB()))
+            if(isMXTensor(problem.b(), problem.mxBlockB()))
             {
                 auto const& tensorB = problem.b();
                 auto        rows    = tensorB.sizes()[0];

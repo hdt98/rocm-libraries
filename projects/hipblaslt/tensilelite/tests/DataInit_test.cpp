@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <gtest/gtest.h>
-#include "DataInitialization.hpp"             // isMXFP4OrFP8Tensor / Problem
+#include "DataInitialization.hpp"             // isMXTensor / Problem
 #include "DataInitializationHelpers.hpp"    // detail::* (MX-only, internally guarded)
 #include <Tensile/ContractionProblem.hpp>
 #include <Tensile/DataTypes.hpp>
@@ -30,8 +30,8 @@
 using TensileLite::ContractionProblemGemm;
 using TensileLite::DataTypeInfo;
 using TensileLite::TensorDescriptor;
-using TensileLite::Client::isMXFP4OrFP8Problem;
-using TensileLite::Client::isMXFP4OrFP8Tensor;
+using TensileLite::Client::isMXProblem;
+using TensileLite::Client::isMXTensor;
 
 // Shorthand for the production helper namespace under test (MX builds only).
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
@@ -44,9 +44,9 @@ namespace
     // Mirrors tests/MXScalePadding_test.cpp::makeMXProblem so the geometry
     // matches what the real client produces, then enables MX scaling on each
     // side independently. mxBlock==0 means "do NOT call setMXScale*", so the
-    // problem's mxBlockA() / mxBlockB() stays 0 and isMXFP4OrFP8Tensor returns
+    // problem's mxBlockA() / mxBlockB() stays 0 and isMXTensor returns
     // false on that side. This is exactly the lever needed to drive every
-    // branch of isMXFP4OrFP8Problem.
+    // branch of isMXProblem.
     // -----------------------------------------------------------------------
     ContractionProblemGemm makeProblem(rocisa::DataType aType,
                                        rocisa::DataType bType,
@@ -78,11 +78,11 @@ namespace
 } // namespace
 
 // =============================================================================
-//   Section 1 — TensileLite::Client::isMXFP4OrFP8Tensor
+//   Section 1 - TensileLite::Client::isMXTensor
 //
-//       bool isMXFP4OrFP8Tensor(t, mxBlock) {
+//       bool isMXTensor(t, mxBlock) {
 //           if(mxBlock == 0) return false;            // (a) short-circuit
-//           return dt ∈ {Float4, Float8, BFloat8};    // (b) dtype gate
+//           return dt in {Float4, Float8, BFloat8};    // (b) dtype gate
 //       }
 // =============================================================================
 struct TensorParam
@@ -92,15 +92,15 @@ struct TensorParam
     bool             expected;
     char const*      name;
 };
-class IsMXFP4OrFP8TensorTest : public ::testing::TestWithParam<TensorParam>
+class IsMXTensorTest : public ::testing::TestWithParam<TensorParam>
 {
 };
-TEST_P(IsMXFP4OrFP8TensorTest, MatchesContract)
+TEST_P(IsMXTensorTest, MatchesContract)
 {
     auto const& p = GetParam();
-    // 1×1 descriptor is enough; the helper only inspects .dataType().
+    // 1x1 descriptor is enough; the helper only inspects .dataType().
     TensorDescriptor t("t", p.dtype, {1, 1}, {1, 1});
-    EXPECT_EQ(isMXFP4OrFP8Tensor(t, p.mxBlock), p.expected)
+    EXPECT_EQ(isMXTensor(t, p.mxBlock), p.expected)
         << "case=" << p.name
         << " dtype=" << static_cast<int>(p.dtype)
         << " mxBlock=" << p.mxBlock;
@@ -108,7 +108,7 @@ TEST_P(IsMXFP4OrFP8TensorTest, MatchesContract)
 
 INSTANTIATE_TEST_SUITE_P(
     MXFP4OrFP8Coverage,
-    IsMXFP4OrFP8TensorTest,
+    IsMXTensorTest,
     ::testing::Values(
         // ----- (a) mxBlock==0 must short-circuit even for MX dtypes --------
         TensorParam{rocisa::DataType::Float4,   0, false, "Float4_block0"},
@@ -134,67 +134,67 @@ INSTANTIATE_TEST_SUITE_P(
 );
 
 // =============================================================================
-//   Section 2 — TensileLite::Client::isMXFP4OrFP8Problem
+//   Section 2 - TensileLite::Client::isMXProblem
 //
 //   Contract:
-//       isMXFP4OrFP8Problem(P)
-//         = isMXFP4OrFP8Tensor(P.a, P.mxBlockA)
-//        || isMXFP4OrFP8Tensor(P.b, P.mxBlockB)
+//       isMXProblem(P)
+//         = isMXTensor(P.a, P.mxBlockA)
+//        || isMXTensor(P.b, P.mxBlockB)
 // =============================================================================
-TEST(IsMXFP4OrFP8Problem, BothFP4)
+TEST(IsMXProblem, BothFP4)
 {
     auto p = makeProblem(rocisa::DataType::Float4, rocisa::DataType::Float4,
                          /*mxBlockA=*/32, /*mxBlockB=*/32);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, BothFP8)
+TEST(IsMXProblem, BothFP8)
 {
     auto p = makeProblem(rocisa::DataType::Float8, rocisa::DataType::Float8,
                          /*mxBlockA=*/32, /*mxBlockB=*/32);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, BothBFloat8)
+TEST(IsMXProblem, BothBFloat8)
 {
     auto p = makeProblem(rocisa::DataType::BFloat8, rocisa::DataType::BFloat8,
                          /*mxBlockA=*/32, /*mxBlockB=*/32);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, MixedFP4AandFP8B)
+TEST(IsMXProblem, MixedFP4AandFP8B)
 {
     auto p = makeProblem(rocisa::DataType::Float4, rocisa::DataType::Float8,
                          /*mxBlockA=*/32, /*mxBlockB=*/32);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, MixedBFloat8AandFP4B)
+TEST(IsMXProblem, MixedBFloat8AandFP4B)
 {
     auto p = makeProblem(rocisa::DataType::BFloat8, rocisa::DataType::Float4,
                          /*mxBlockA=*/32, /*mxBlockB=*/32);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, OnlyA_isMX_BIsBF16)
+TEST(IsMXProblem, OnlyA_isMX_BIsBF16)
 {
     // First disjunct true, second disjunct short-circuits false (mxBlockB=0).
     auto p = makeProblem(rocisa::DataType::Float8, rocisa::DataType::BFloat16,
                          /*mxBlockA=*/32, /*mxBlockB=*/0);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, OnlyB_isMX_AIsBF16)
+TEST(IsMXProblem, OnlyB_isMX_AIsBF16)
 {
     auto p = makeProblem(rocisa::DataType::BFloat16, rocisa::DataType::Float4,
                          /*mxBlockA=*/0, /*mxBlockB=*/32);
-    EXPECT_TRUE(isMXFP4OrFP8Problem(p));
+    EXPECT_TRUE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, NeitherIsMX)
+TEST(IsMXProblem, NeitherIsMX)
 {
     auto p = makeProblem(rocisa::DataType::BFloat16, rocisa::DataType::BFloat16,
                          /*mxBlockA=*/0, /*mxBlockB=*/0);
-    EXPECT_FALSE(isMXFP4OrFP8Problem(p));
+    EXPECT_FALSE(isMXProblem(p));
 }
-TEST(IsMXFP4OrFP8Problem, FloatABIsFalse)
+TEST(IsMXProblem, FloatABIsFalse)
 {
     auto p = makeProblem(rocisa::DataType::Float, rocisa::DataType::Float,
                          /*mxBlockA=*/0, /*mxBlockB=*/0);
-    EXPECT_FALSE(isMXFP4OrFP8Problem(p));
+    EXPECT_FALSE(isMXProblem(p));
 }
 
 // =============================================================================
