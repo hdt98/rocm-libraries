@@ -157,9 +157,10 @@ struct FmhaBwdDQDKDVTypes
                                                 0>;            // kMaxSeqLenQ (0 = unlimited)
 
     // --- Mask type ---
-    // has_mask=true  -> GenericAttentionMask<true, true> (full masking)
-    // has_mask=false -> GenericAttentionMask<false>      (no masking)
-    using Mask = std::conditional_t<K.has_mask,
+    // mask_type==NO_MASK -> GenericAttentionMask<false>      (no masking)
+    // mask_type!=NO_MASK -> GenericAttentionMask<true, true> (full masking;
+    //                       runtime window/anchor selected via MASK_TYPE slot)
+    using Mask = std::conditional_t<hasMask(K),
                                     ck_tile::GenericAttentionMask<true, true>,
                                     ck_tile::GenericAttentionMask<false>>;
 
@@ -483,7 +484,7 @@ __device__ void runFmhaBwdDQDKDV(Args args)
             kargs.batch_stride_dbias = static_cast<index_t>(t_dbias.strides[2]);
     }
 
-    if constexpr(K.has_mask)
+    if constexpr(hasMask(K))
     {
         kargs.window_size_left  = args.scalars[S::WINDOW_SIZE_LEFT].i32;
         kargs.window_size_right = args.scalars[S::WINDOW_SIZE_RIGHT].i32;
