@@ -163,7 +163,7 @@ static inline bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[may
 template <typename T, typename I>
 static inline I split_n(I const n)
 {
-    I const nb = POTF2_MAX_SMALL_SIZE(T);
+    I const nb = POTF2_MAX_SMALL_SIZE(T) - 1;
 
     // ------------------------------------
     // split at maximum of 1024 * nb may be sufficient
@@ -208,6 +208,13 @@ static inline I potrf_get_block_size(I const n)
     return std::min(n, nb);
 }
 
+template <typename T>
+static inline int potrf_get_NB()
+{
+    int const nb = POTF2_MAX_SMALL_SIZE(T) - 1;
+    return (nb);
+}
+
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO = I>
 void rocsolver_potrf_recursion_getMemorySize(const I n,
                                              const rocblas_fill uplo,
@@ -240,7 +247,7 @@ void rocsolver_potrf_recursion_getMemorySize(const I n,
         return ((n % NB) == 0) && is_power_of_2(n / NB);
     };
 
-    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    I const NB = potrf_get_NB<T>();
 
     if(n <= NB)
     {
@@ -883,7 +890,7 @@ static inline rocblas_status rocsolver_potrf_NB_template(rocblas_handle handle,
                                                          const I row_offset_in)
 
 {
-    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    I const NB = potrf_get_NB<T>();
 
     if(n != (K * NB))
     {
@@ -1280,7 +1287,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
     // constants for rocblas functions calls
     // ------------------------------------
 
-    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    I const NB = potrf_get_NB<T>();
+
     rocblas_status istat = rocblas_status_success;
 
     auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
@@ -1589,7 +1597,8 @@ rocblas_status rocsolver_potrf_recursion_template_org(rocblas_handle handle,
 
     auto idx2D = [](I const i, I const j, I const ld) { return (i + j * static_cast<int64_t>(ld)); };
 
-    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    I const NB = potrf_get_NB<T>();
+
     if(n <= NB)
     {
         // -------------------
