@@ -15,6 +15,9 @@
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_direct_load.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck {
 
 template <typename ALayout,
@@ -506,35 +509,35 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
 
     // Disable vector load from lds to vgpr for direct load (backward weight store with continous M
     // or N dimension)
-    //static constexpr bool LdsScalarLoadToVgpr = DirectLoad;
-    using BlockwiseGemmPipe                   = remove_cvref_t<
-                          decltype(BlockGemmPipeline_Selector<
-                                   BlkGemmPipelineVer,
-                                   BlkGemmPipeSched,
-                                   BlockSize,
-                                   ADataType,
-                                   BDataType,
-                                   ComputeTypeA,
-                                   AccDataType,
-                                   decltype(GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch())),
-                                   decltype(GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch())),
-                                   decltype(MakeAMmaTileDescriptor_M0_M1_M2_K(
+    // static constexpr bool LdsScalarLoadToVgpr = DirectLoad;
+    using BlockwiseGemmPipe = remove_cvref_t<
+        decltype(BlockGemmPipeline_Selector<
+                 BlkGemmPipelineVer,
+                 BlkGemmPipeSched,
+                 BlockSize,
+                 ADataType,
+                 BDataType,
+                 ComputeTypeA,
+                 AccDataType,
+                 decltype(GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch())),
+                 decltype(GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch())),
+                 decltype(MakeAMmaTileDescriptor_M0_M1_M2_K(
                      GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch()))),
-                                   decltype(MakeBMmaTileDescriptor_N0_N1_N2_K(
+                 decltype(MakeBMmaTileDescriptor_N0_N1_N2_K(
                      GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch()))),
-                                   ABlockTransferSrcScalarPerVector,
-                                   BBlockTransferSrcScalarPerVector,
-                                   MPerBlock,
-                                   NPerBlock,
-                                   KPerBlock,
-                                   MPerXdl,
-                                   NPerXdl,
-                                   MXdlPerWave,
-                                   NXdlPerWave,
-                                   KPack,
-                                   DirectLoad,
-                                   ALdsScalarLoadToVgpr,
-                                   BLdsScalarLoadToVgpr>())>;
+                 ABlockTransferSrcScalarPerVector,
+                 BBlockTransferSrcScalarPerVector,
+                 MPerBlock,
+                 NPerBlock,
+                 KPerBlock,
+                 MPerXdl,
+                 NPerXdl,
+                 MXdlPerWave,
+                 NXdlPerWave,
+                 KPack,
+                 DirectLoad,
+                 ALdsScalarLoadToVgpr,
+                 BLdsScalarLoadToVgpr>())>;
 
     template <typename DeviceArch>
     __device__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)
@@ -1063,3 +1066,5 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
 };
 
 } // namespace ck
+
+#pragma clang diagnostic pop

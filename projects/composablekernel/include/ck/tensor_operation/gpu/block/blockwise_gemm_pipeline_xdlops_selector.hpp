@@ -32,7 +32,7 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool DirectLoad          = false,
+          bool DirectLoad           = false,
           bool ALdsScalarLoadToVgpr = false,
           bool BLdsScalarLoadToVgpr = false>
 constexpr auto BlockGemmPipeline_Selector()
