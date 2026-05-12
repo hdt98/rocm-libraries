@@ -175,7 +175,7 @@ jobs:
           elif [ ${{ github.event_name }} == "push" ]; then
             ref_hash=$(git rev-parse HEAD~1)
           fi
-          gh workflow run remote-workflow-filename.yml \
+          gh workflow run therock-pts-ci.yml \
             --repo ROCm/rocPTS \
             --ref users/madkasul/githubMigration \
             -f artifact_run_id=${{ github.run_id }} \
