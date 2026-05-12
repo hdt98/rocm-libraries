@@ -178,6 +178,7 @@ jobs:
           gh workflow run therock-pts-ci.yml \
             --repo ROCm/rocPTS \
             --ref users/madkasul/githubMigration \
+            -f artifact_repo=${{ github.repository }} \
             -f artifact_run_id=${{ github.run_id }} \
             -f amdgpu_family=${{ inputs.amdgpu_family }} \
             -f branch=${{ github.ref_name }} \
