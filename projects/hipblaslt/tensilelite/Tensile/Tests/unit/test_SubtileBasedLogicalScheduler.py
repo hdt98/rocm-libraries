@@ -16,7 +16,7 @@ Organized by pass:
 """
 
 from Tensile.Components.Subtile.Kernel import (
-    TileInfo, AB_B16, AB_B4, MXSA_B4, MXSB_B4, CD_F32,
+    TileInfo, AB_B16, AB_B4, AB_B8, MXSA_E8M0, MXSB_E8M0, CD_F32,
 )
 from Tensile.Components.Subtile.LogicalScheduler import (
     LogicalScheduler,
@@ -35,12 +35,17 @@ from unittest.mock import MagicMock
 
 def makeTileInfo(tc, kernel):
     """Compatibility wrapper: select geometry from kernel config and return TileInfo."""
-    fp4 = kernel["ProblemType"].get("MXBlockA", 0) > 0
+    mx = kernel["ProblemType"].get("MXBlockA", 0) > 0
+    if mx:
+        abbrev = kernel["ProblemType"]["DataTypeA"].toNameAbbrev()
+        ab_geo = AB_B8 if abbrev in ('fp8', 'bf8') else AB_B4
+    else:
+        ab_geo = AB_B16
     _geo = {
-        'A': AB_B4 if fp4 else AB_B16,
-        'B': AB_B4 if fp4 else AB_B16,
-        'MXSA': MXSA_B4,
-        'MXSB': MXSB_B4,
+        'A': ab_geo,
+        'B': ab_geo,
+        'MXSA': MXSA_E8M0,
+        'MXSB': MXSB_E8M0,
         'D': CD_F32,
     }
     return TileInfo(_geo[tc], tc, None, kernel)
@@ -51,22 +56,30 @@ def makeTileInfo(tc, kernel):
 def _mock_dtype(num_bytes=2):
     mock = MagicMock()
     mock.numBytes.return_value = num_bytes
+    mock.toNameAbbrev.return_value = {0.5: 'fp4', 1: 'fp8', 2: 'bf16', 4: 'f32'}[num_bytes]
     return mock
 
 
-def create_kernel(MT0=256, MT1=256, fp4=False, depthU=None):
-    mxblock = 32 if fp4 else 0
-    bpe = 0.5 if fp4 else 2
-    matrixInstK = 128 if fp4 else 32
+def create_kernel(MT0=256, MT1=256, dtype='bf16', depthU=None):
+    _BPE    = {'fp4': 0.5, 'fp8': 1, 'bf8': 1, 'bf16': 2, 'f32': 4}
+    _MIK    = {'fp4': 128, 'fp8': 128, 'bf8': 128, 'bf16': 32, 'f32': 32}
+    _MXBLK  = {'fp4': 32,  'fp8': 32,  'bf8': 32,  'bf16': 0,  'f32': 0}
+    _DU_DEF = {'fp4': 256, 'fp8': 128, 'bf8': 128, 'bf16': 64, 'f32': 64}
+    if dtype not in _BPE:
+        raise ValueError(f"create_kernel: unknown dtype {dtype!r}, expected one of {list(_BPE)}")
+    bpe = _BPE[dtype]
+    matrixInstK = _MIK[dtype]
+    mxblock = _MXBLK[dtype]
+    mx = mxblock > 0
     if depthU is None:
-        depthU = 256 if fp4 else 64
-    dtype = _mock_dtype(bpe)
+        depthU = _DU_DEF[dtype]
+    ab_dtype = _mock_dtype(bpe)
     problemType = {
-        "DataTypeA": dtype,
-        "DataTypeB": dtype,
+        "DataTypeA": ab_dtype,
+        "DataTypeB": ab_dtype,
         "ComputeDataType": _mock_dtype(4),
     }
-    if fp4:
+    if mx:
         problemType["MXBlockA"] = mxblock
         problemType["MXBlockB"] = mxblock
     kernel = {
@@ -90,7 +103,7 @@ def create_kernel(MT0=256, MT1=256, fp4=False, depthU=None):
         "NonTemporalMXSB": 0,
         "ProblemType": problemType,
     }
-    if fp4:
+    if mx:
         kernel["_DepthUMXSA"] = depthU // mxblock
         kernel["_DepthUMXSB"] = depthU // mxblock
     return kernel
@@ -98,7 +111,7 @@ def create_kernel(MT0=256, MT1=256, fp4=False, depthU=None):
 
 def make_cfg_256x256_fp4(depthU=256, k_gran=1, numPartM=1, numPartN=1):
     """Build FP4 config with scale tensors. k_gran applies to LR A/B."""
-    kernel = create_kernel(256, 256, fp4=True, depthU=depthU)
+    kernel = create_kernel(256, 256, dtype='fp4', depthU=depthU)
     tiA = makeTileInfo('A', kernel)
     tiB = makeTileInfo('B', kernel)
     scaleTiA = makeTileInfo('MXSA', kernel)
@@ -122,7 +135,7 @@ def make_cfg_256x256_fp4(depthU=256, k_gran=1, numPartM=1, numPartN=1):
 
 def make_cfg_bf16(MT0=256, MT1=256, depthU=64, numPartM=1, numPartN=1):
     """Build BF16 config without scale tensors."""
-    kernel = create_kernel(MT0, MT1, fp4=False, depthU=depthU)
+    kernel = create_kernel(MT0, MT1, depthU=depthU)
     tiA = makeTileInfo('A', kernel)
     tiB = makeTileInfo('B', kernel)
     return SchedulerConfig(
@@ -133,6 +146,32 @@ def make_cfg_bf16(MT0=256, MT1=256, depthU=64, numPartM=1, numPartN=1):
         lrB=ReadGranularity(mn=1, k=1),
         grA=ReadGranularity(mn=1, k=2),
         grB=ReadGranularity(mn=1, k=2),
+        numPartitionsM=numPartM,
+        numPartitionsN=numPartN,
+    )
+
+
+def make_cfg_256x256_fp8(depthU=128, k_gran=1, numPartM=1, numPartN=1):
+    """Build FP8 config with scale tensors.
+    AB_B8 subtileShape=(1,1): grA/B k=1. Scale grid [8,1]: lrSA/B k=numSubIterK=1."""
+    kernel = create_kernel(256, 256, dtype='fp8', depthU=depthU)
+    tiA = makeTileInfo('A', kernel)
+    tiB = makeTileInfo('B', kernel)
+    scaleTiA = makeTileInfo('MXSA', kernel)
+    scaleTiB = makeTileInfo('MXSB', kernel)
+    numSubIterK = tiA.localMMATileGrid[1]
+    return SchedulerConfig(
+        numMFMATilesM=tiA.localMMATileGrid[0],
+        numMFMATilesN=tiB.localMMATileGrid[0],
+        numSubIterK=numSubIterK,
+        lrA=ReadGranularity(mn=1, k=k_gran),
+        lrB=ReadGranularity(mn=1, k=k_gran),
+        grA=ReadGranularity(mn=tiA.subtileShape[0], k=tiA.subtileShape[1]),
+        grB=ReadGranularity(mn=tiB.subtileShape[0], k=tiB.subtileShape[1]),
+        lrSA=ReadGranularity(mn=2, k=numSubIterK),
+        lrSB=ReadGranularity(mn=2, k=numSubIterK),
+        grSA=ReadGranularity(mn=scaleTiA.localMMATileGrid[0], k=scaleTiA.localMMATileGrid[1]),
+        grSB=ReadGranularity(mn=scaleTiB.localMMATileGrid[0], k=scaleTiB.localMMATileGrid[1]),
         numPartitionsM=numPartM,
         numPartitionsN=numPartN,
     )
@@ -155,7 +194,7 @@ def make_example_granularities_1():
     )
 
 
-def make_writer_and_tileinfos(kernel, fp4=False):
+def make_writer_and_tileinfos(kernel):
     """Create writer with register pools and TileInfos for integration tests."""
     from types import SimpleNamespace
     from rocisa import rocIsa
@@ -171,8 +210,9 @@ def make_writer_and_tileinfos(kernel, fp4=False):
 
     tiA = makeTileInfo('A', kernel)
     tiB = makeTileInfo('B', kernel)
-    scaleTiA = makeTileInfo('MXSA', kernel) if fp4 else None
-    scaleTiB = makeTileInfo('MXSB', kernel) if fp4 else None
+    mx = kernel["ProblemType"].get("MXBlockA", 0) > 0
+    scaleTiA = makeTileInfo('MXSA', kernel) if mx else None
+    scaleTiB = makeTileInfo('MXSB', kernel) if mx else None
 
     writer = SimpleNamespace()
     writer.vgprPool = RegisterPool(0, RegisterType.Vgpr, False)
@@ -1260,7 +1300,7 @@ class TestFromTileInfo:
 
     def test_64x64_fp4(self):
         """MT=64, FP4 — matches design doc Example Granularities 1 tile counts."""
-        kernel = create_kernel(64, 64, fp4=True)
+        kernel = create_kernel(64, 64, dtype='fp4')
         tiA = makeTileInfo('A', kernel)
         tiB = makeTileInfo('B', kernel)
         scaleTiA = makeTileInfo('MXSA', kernel)
@@ -1374,7 +1414,7 @@ class TestGetNumVgpr:
 
     def test_with_scale(self):
         """Including SA+SB increases total."""
-        kernel = create_kernel(256, 256, fp4=True)
+        kernel = create_kernel(256, 256, dtype='fp4')
         tiA = makeTileInfo('A', kernel)
         tiB = makeTileInfo('B', kernel)
         scaleTiA = makeTileInfo('MXSA', kernel)
@@ -1390,7 +1430,7 @@ class TestGetNumVgpr:
 
     def test_decreases_with_partitions(self):
         """More partitions → fewer VGPRs."""
-        kernel = create_kernel(256, 256, fp4=True)
+        kernel = create_kernel(256, 256, dtype='fp4')
         tiA = makeTileInfo('A', kernel)
         tiB = makeTileInfo('B', kernel)
         scaleTiA = makeTileInfo('MXSA', kernel)
@@ -1420,8 +1460,8 @@ class TestIntegration:
         """Full pipeline: emit → populate_instructions → instructionSchedule."""
         from Tensile.Components.Subtile.InstructionScheduler import instructionSchedule
 
-        kernel = create_kernel(256, 256, fp4=True)
-        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel, fp4=True)
+        kernel = create_kernel(256, 256, dtype='fp4')
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel)
 
         cfg = make_cfg_256x256_fp4()
         sched = LogicalScheduler(cfg)
@@ -1470,10 +1510,115 @@ class TestIntegration:
 
     def test_emitAllLoops_256x256_fp4(self):
         """emitAllLoops: label structure and per-unroll VGPR differences."""
-        kernel = create_kernel(256, 256, fp4=True)
-        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel, fp4=True)
+        kernel = create_kernel(256, 256, dtype='fp4')
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel)
 
         cfg = make_cfg_256x256_fp4()
+        sched = LogicalScheduler(cfg)
+        sched.build()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                              scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+
+            uf = sched.unroll_factor
+            module = sched.emitAllLoops(writer, kernel)
+            asm = str(module)
+
+            assert "LoopBeginL:" in asm
+            assert "SkipToNGLL:" in asm
+
+            if uf > 1:
+                for ui in range(uf):
+                    assert f"MAINLOOP_C{ui}" in asm
+                    assert f"NGLL_C{ui}" in asm
+                    assert f"NLL_C{ui}" in asm
+                assert "SkipToEnd:" in asm
+                assert "SkipToNLL:" in asm
+
+                def get_mfma_vgprs(emitted_3d):
+                    vgprs = set()
+                    for partition in emitted_3d:
+                        for group in partition:
+                            for em in group:
+                                if em.opType == 'mfma':
+                                    for inst in em.instructions:
+                                        vgprs.add(str(inst))
+                    return vgprs
+
+                vgprs_0 = get_mfma_vgprs(sched._emitted_per_unroll[0])
+                vgprs_1 = get_mfma_vgprs(sched._emitted_per_unroll[1])
+                assert vgprs_0 != vgprs_1, \
+                    "Per-unroll copies should differ in MFMA instructions"
+            else:
+                assert "MAINLOOP" in asm
+                assert "NGLL" in asm
+                assert "NLL" in asm
+
+        finally:
+            sched.deallocVgprTiles(writer)
+
+    def test_populate_instructions_256x256_fp8(self):
+        """Full pipeline: emit → populate_instructions → instructionSchedule (FP8)."""
+        from Tensile.Components.Subtile.InstructionScheduler import instructionSchedule
+
+        kernel = create_kernel(256, 256, dtype='fp8')
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel)
+
+        cfg = make_cfg_256x256_fp8()
+        sched = LogicalScheduler(cfg)
+        sched.emit()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                              scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+
+            assert len(sched._emitted_per_unroll) == sched.unroll_factor
+            assert len(sched._ngll_per_unroll) == sched.unroll_factor
+            assert len(sched._nll_per_unroll) == sched.unroll_factor
+
+            for pi, partition_emitted in enumerate(sched._emitted_per_unroll[0]):
+                for k, emitted in enumerate(partition_emitted):
+                    for em in emitted:
+                        assert len(em.instructions) > 0, \
+                            f"P{pi} k={k} [{em.moduleId}] {em.opType}: no instructions"
+
+            for pi, slots in enumerate(sched._partitions):
+                for slot in slots:
+                    if slot.mfma and slot.lrs:
+                        for lr in slot.lrs:
+                            if lr.vgpr_tile_map and lr.tensor in ('A', 'B'):
+                                mfma_map = slot.mfma.vgpr_tile_maps.get(lr.tensor, [])
+                                if mfma_map:
+                                    assert set(mfma_map[0].values()).isdisjoint(
+                                        set(lr.vgpr_tile_map[0].values()))
+
+            for pi, partition_emitted in enumerate(sched._emitted_per_unroll[0]):
+                for k, emitted in enumerate(partition_emitted):
+                    scheduled = instructionSchedule(emitted)
+                    assert len(list(scheduled.flatitems())) > 0
+
+        finally:
+            sched.deallocVgprTiles(writer)
+
+    def test_emitAllLoops_256x256_fp8(self):
+        """emitAllLoops: label structure and per-unroll VGPR differences (FP8)."""
+        kernel = create_kernel(256, 256, dtype='fp8')
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel)
+
+        cfg = make_cfg_256x256_fp8()
         sched = LogicalScheduler(cfg)
         sched.build()
         sched.allocVgprTiles(writer, tiA, tiB,
@@ -1534,7 +1679,7 @@ if __name__ == "__main__":
     use_bf16 = "--bf16" in sys.argv
 
     if use_bf16:
-        kernel = create_kernel(384, 256, fp4=False, depthU=64)
+        kernel = create_kernel(384, 256, depthU=64)
         tiA = makeTileInfo('A', kernel)
         tiB = makeTileInfo('B', kernel)
         scaleTiA = None
@@ -1552,7 +1697,7 @@ if __name__ == "__main__":
             numPartitionsN=1,
         )
     else:
-        kernel = create_kernel(128, 128, fp4=True, depthU=512)
+        kernel = create_kernel(128, 128, dtype='fp4', depthU=512)
         tiA = makeTileInfo('A', kernel)
         tiB = makeTileInfo('B', kernel)
         scaleTiA = makeTileInfo('MXSA', kernel)
@@ -1633,7 +1778,7 @@ if __name__ == "__main__":
     if interactive:
         input("Press Enter for next step...")
 
-    writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel, fp4=not use_bf16)
+    writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel)
 
     sched.allocVgprTiles(writer, tiA, tiB,
                          scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)

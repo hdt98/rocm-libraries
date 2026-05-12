@@ -309,12 +309,13 @@ AB_B16_TLU1_16x1 = ABTilePair(
     lr=ABLRGeometry(tag=LRTag_TLU1(), **_B16, tlu=True, subtileShape=(16, 1), loadShape=LoadShape(m=16, k=1), loadWidth=32),                            # 256-bit LR: 16 bf16 along M
 )
 
-# MX scale factor inputs (one scale per mxBlock data elements)
-_MXS_B4 = dict(scaleLayout=MFMA_SCALE_16x16_1B_MX32_8V, instK=128, bpe=1, supportedTypes=('fp4',))
+# MX scale factor inputs: E8M0 format (mxBlock=32), same for all MX data types (fp4, fp6, fp8)
+_MXS = dict(scaleLayout=MFMA_SCALE_16x16_1B_MX32_8V, instK=128, bpe=1, supportedTypes=())
 # GR: subtileShape=None -> derived from kernel as (mt_mma, du_scale) to span entire macro tile
-# LR: subtileShape=(2,2) -> 2 scale MMA tiles in M x 2 in K per local read
-MXSA_B4 = MXScaleTilePair(gr=MXScaleGRGeometry(**_MXS_B4, loadWidth=16), lr=MXScaleLRGeometry(**_MXS_B4, loadWidth=4))
-MXSB_B4 = MXScaleTilePair(gr=MXScaleGRGeometry(**_MXS_B4, loadWidth=16), lr=MXScaleLRGeometry(**_MXS_B4, loadWidth=4))
+# GR: subtileShape derived per-kernel (spans full scale macrotile)
+# LR: subtileShape derived per-kernel via for_kernel (s1=depthU//instK, s0 fills one LR load)
+MXSA_E8M0 = MXScaleTilePair(gr=MXScaleGRGeometry(**_MXS, loadWidth=16), lr=MXScaleLRGeometry(**_MXS, loadWidth=4))
+MXSB_E8M0 = MXScaleTilePair(gr=MXScaleGRGeometry(**_MXS, loadWidth=16), lr=MXScaleLRGeometry(**_MXS, loadWidth=4))
 
 # C/D output: 128-bit store = 4 f32 elements along N
 CD_F32 = CDTile_1x1(mmaLayout=MFMA_16x16_1B_4N_4V, bpe=4, supportedTypes=('f32',), storeShape=LoadShape(m=1, k=4))
@@ -322,10 +323,9 @@ CD_F32 = CDTile_1x1(mmaLayout=MFMA_16x16_1B_4N_4V, bpe=4, supportedTypes=('f32',
 def selectMXScaleGeometry(kernel: dict, tc: str) -> MXScaleTilePair:
   """Return the MXScaleTilePair for scale tensor tc ('MXSA' or 'MXSB')."""
   data_tc = 'A' if tc == 'MXSA' else 'B'
-  dtype = kernel["ProblemType"][f"DataType{data_tc}"]
-  if dtype.is6bitFloat() or dtype.isFloat4():
-    return MXSA_B4 if tc == 'MXSA' else MXSB_B4
-  raise NotImplementedError(f"selectMXScaleGeometry: unsupported dtype {dtype} for tc={tc}")
+  if not kernel["ProblemType"][f"MXBlock{data_tc}"] > 0:
+    raise ValueError(f"selectMXScaleGeometry called for non-MX problem type (tc={tc}, MXBlock{data_tc}={kernel['ProblemType'][f'MXBlock{data_tc}']})")
+  return MXSA_E8M0 if tc == 'MXSA' else MXSB_E8M0
 
 
 AB_GEOMETRY_MAP = {
@@ -464,7 +464,7 @@ class TileInfo:
 
     elif isinstance(geometry, MXScaleTilePair):
       gr_cfg = geometry.gr.for_kernel(kernel, _tc)
-      lr_cfg = geometry.lr
+      lr_cfg = geometry.lr.for_kernel(kernel, _tc)
       self.gr = None
       self.lr = None
       self.globalMMATileGrid   = list(gr_cfg.globalMMATileGrid(self.macroTile, self.depthU))
@@ -530,7 +530,7 @@ class TileInfo:
       # GR covers the full scale MMA tile grid (subtileShape = entire grid, globalSubtileGrid=[1,1])
       # LR uses subtileShape; check coverage in scale MMA tile units.
       mmaM, mmaK = geometry.mmaTileShape
-      lr_st = geometry.lr.subtileShape
+      lr_st = lr_cfg.subtileShape
       scale_K_tiles = self.depthU // geometry.instK  # data depthU → scale MMA K tile count
       self._check_dim(self.macroTile // mmaM, lr_st[0], self.lrGlobalSubtileGrid[0], self.waveGroupSize, 'macroTile[LR]')
       self._check_dim(scale_K_tiles,          lr_st[1], self.lrGlobalSubtileGrid[1], 1,                 'depthU[LR]')
@@ -959,10 +959,30 @@ def emitMfmaInstruction(writer, kernel, vgprTileA, vgprTileB, vgprTileC, vgprTil
   miK = kernel["MatrixInstK"]
 
   if miK == 128:
-    # MX FP4: 16x16x128
+    # MX 16x16x128 — derive instType from A/B data types (mirrors dataTypeToMfmaInstTypePair)
+    dtA = kernel["ProblemType"]["DataTypeA"]
+    dtB = kernel["ProblemType"]["DataTypeB"]
+    sourceSwap = kernel["SourceSwap"]
+    abbrevA = dtA.toNameAbbrev()
+    abbrevB = dtB.toNameAbbrev()
+    abbrev = abbrevA + "_" + abbrevB if abbrevA != abbrevB else abbrevA
+    _ABBREV_TO_INST_TYPE = {
+      'fp4':      InstType.INST_F4,
+      'fp8':      InstType.INST_F8,
+      'bf8':      InstType.INST_BF8,
+      'fp8_bf8':  InstType.INST_F8_BF8 if not sourceSwap else InstType.INST_BF8_F8,
+      'bf8_fp8':  InstType.INST_BF8_F8 if not sourceSwap else InstType.INST_F8_BF8,
+      'fp8_fp4':  InstType.INST_F8_F4  if not sourceSwap else InstType.INST_F4_F8,
+      'fp4_fp8':  InstType.INST_F4_F8  if not sourceSwap else InstType.INST_F8_F4,
+      'bf8_fp4':  InstType.INST_B8_F4  if not sourceSwap else InstType.INST_F4_B8,
+      'fp4_bf8':  InstType.INST_F4_B8  if not sourceSwap else InstType.INST_B8_F4,
+    }
+    if abbrev not in _ABBREV_TO_INST_TYPE:
+      raise NotImplementedError(f"emitMfmaInstruction: unsupported miK=128 dtype pair ({dtA}, {dtB})")
+    instType = _ABBREV_TO_INST_TYPE[abbrev]
     if scaleAVgpr >= 0 and scaleBVgpr >= 0:
       # Use actual loaded scale VGPRs
-      module.add(MXMFMAInstruction(instType=InstType.INST_F4, accType=InstType.INST_F32, variant=[16,16,miK,1], \
+      module.add(MXMFMAInstruction(instType=instType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
                                    acc=dAccAlias(vgprDStart,opDSize), \
                                    a=aOperand, \
                                    b=bOperand, \
@@ -974,7 +994,7 @@ def emitMfmaInstruction(writer, kernel, vgprTileA, vgprTileB, vgprTileC, vgprTil
       # Fallback: hardcoded scale 0x7f (scale=1.0 for all elements)
       tmpVgprScale = writer.vgprPool.checkOut(1)
       module.add(VMovB32(dst=vgpr(tmpVgprScale), src=hex(0x7f7f7f7f), comment="hardcoded scale 0x7f (E8M0)"))
-      module.add(MXMFMAInstruction(instType=InstType.INST_F4, accType=InstType.INST_F32, variant=[16,16,miK,1], \
+      module.add(MXMFMAInstruction(instType=instType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
                                    acc=dAccAlias(vgprDStart,opDSize), \
                                    a=aOperand, \
                                    b=bOperand, \
@@ -1051,17 +1071,21 @@ def emitMfmaCode(writer, kernel):
         dtiles = dtileInfo.vgprTiles[mma0 + mma1 * dtileInfo.localMMATileGrid[0]]
 
         if hasScaleA:
-          # Scale group index: one VGPR per 2 M-adjacent subtiles (ds_read_b32 loads 4 bytes)
+          # Scale group index: one VGPR per lrSubtileShape[0] M-tiles x lrSubtileShape[1] K-tiles
           subtileKShape = lrSubtileShapeA[1]
           subtileKGrid = tiA.localSubtileGrid[1]
-          scaleGroupA = (mma0 // 2) * subtileKGrid + mmak // subtileKShape
-          scaleGroupB = (mma1 // 2) * subtileKGrid + mmak // subtileKShape
+          scaleMShapeA = tiMXSA.lrSubtileShape[0]  # M tiles per scale LR subtile (2 fp4, 4 fp8)
+          scaleMShapeB = tiMXSB.lrSubtileShape[0]
+          scaleKShapeA = tiMXSA.lrSubtileShape[1]  # K tiles per scale LR subtile (2 fp4, 1 fp8)
+          scaleKShapeB = tiMXSB.lrSubtileShape[1]
+          scaleGroupA = (mma0 // scaleMShapeA) * subtileKGrid + mmak // subtileKShape
+          scaleGroupB = (mma1 // scaleMShapeB) * subtileKGrid + mmak // subtileKShape
 
           scaleAVgpr = tiMXSA.vgprTiles[4 * scaleGroupA].regList.indices[0] if tiMXSA.mxBlock else -1
           scaleBVgpr = tiMXSB.vgprTiles[4 * scaleGroupB].regList.indices[0] if tiMXSB.mxBlock else -1
 
-          sAsel = (mma0 % 2) + 2 * (mmak % 2)
-          sBsel = (mma1 % 2) + 2 * (mmak % 2)
+          sAsel = (mma0 % scaleMShapeA) + scaleMShapeA * (mmak % scaleKShapeA)
+          sBsel = (mma1 % scaleMShapeB) + scaleMShapeB * (mmak % scaleKShapeB)
         else:
           scaleAVgpr = -1
           scaleBVgpr = -1
@@ -1217,10 +1241,13 @@ def mainLoop(writer, kernel):
 
     lrAGran = ReadGranularity(mn=1, k=1)
     lrBGran = ReadGranularity(mn=1, k=1)
-    grAGran = ReadGranularity(mn=1, k=2) if tiA.loadRatioGR <= 1.0 else ReadGranularity(mn=2, k=2)
-    grBGran = ReadGranularity(mn=1, k=2) if tiB.loadRatioGR <= 1.0 else ReadGranularity(mn=2, k=2)
-    lrSAGran = ReadGranularity(mn=2, k=2) if scaleTiA else None
-    lrSBGran = ReadGranularity(mn=2, k=2) if scaleTiB else None
+    grMNA, grKA = tiA.subtileShape[0], tiA.subtileShape[1]
+    grMNB, grKB = tiB.subtileShape[0], tiB.subtileShape[1]
+    grAGran = ReadGranularity(mn=grMNA,   k=grKA) if tiA.loadRatioGR <= 1.0 else ReadGranularity(mn=2*grMNA, k=grKA)
+    grBGran = ReadGranularity(mn=grMNB,   k=grKB) if tiB.loadRatioGR <= 1.0 else ReadGranularity(mn=2*grMNB, k=grKB)
+    numSubIterK = tiA.localMMATileGrid[1]
+    lrSAGran = ReadGranularity(mn=2, k=numSubIterK) if scaleTiA else None
+    lrSBGran = ReadGranularity(mn=2, k=numSubIterK) if scaleTiB else None
     grSAGran = ReadGranularity(mn=scaleTiA.localMMATileGrid[0], k=scaleTiA.localMMATileGrid[1]) if scaleTiA else None
     grSBGran = ReadGranularity(mn=scaleTiB.localMMATileGrid[0], k=scaleTiB.localMMATileGrid[1]) if scaleTiB else None
 

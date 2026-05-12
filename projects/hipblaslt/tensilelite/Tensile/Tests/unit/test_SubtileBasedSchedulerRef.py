@@ -5,7 +5,7 @@ to detect unintended regressions.
 """
 
 from Tensile.Components.Subtile.Kernel import (
-    TileInfo, AB_B16, AB_B4, MXSA_B4, MXSB_B4, CD_F32,
+    TileInfo, AB_B16, AB_B4, MXSA_E8M0, MXSB_E8M0, CD_F32,
 )
 from Tensile.Components.Subtile.LogicalScheduler import (
     LogicalScheduler,
@@ -20,8 +20,8 @@ def makeTileInfo(tc, kernel):
     _geo = {
         'A': AB_B4 if fp4 else AB_B16,
         'B': AB_B4 if fp4 else AB_B16,
-        'MXSA': MXSA_B4,
-        'MXSB': MXSB_B4,
+        'MXSA': MXSA_E8M0,
+        'MXSB': MXSB_E8M0,
         'D': CD_F32,
     }
     return TileInfo(_geo[tc], tc, None, kernel)

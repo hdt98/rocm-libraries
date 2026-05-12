@@ -622,10 +622,23 @@ class MXScaleGRGeometry(MXScaleInputGeometry):
 class MXScaleLRGeometry(MXScaleInputGeometry):
   """LR geometry for MX scale factors.
 
-  subtileShape is fixed at (2, 2) — 2 scale MMA tiles in M × 2 in K.
-  This matches the 2×2 VGPR packing used by the MX scale LDS layout.
+  subtileShape is derived from the kernel via for_kernel:
+    s1 = depthU // instK                               (K scale tiles per depth-U)
+    s0 = (loadWidth * waveSize) // (s1 * mmaTileSize)  (M tiles to fill one LR load)
+
+  Examples (loadWidth=4, waveSize=64, mmaTileSize=64):
+    fp4 depthU=256: s1=2, s0=2 -> subtileShape=(2,2)  [2M x 2K = 4 tiles = 4 B/lane = ds_read_b32]
+    fp8 depthU=128: s1=1, s0=4 -> subtileShape=(4,1)  [4M x 1K = 4 tiles = 4 B/lane = ds_read_b32]
   """
-  subtileShape: Tuple[int, int] = (2, 2)
+  subtileShape: Optional[Tuple[int, int]] = None
+
+  def for_kernel(self, kernel: dict, tc: str) -> 'MXScaleLRGeometry':
+    if self.subtileShape is not None:
+      return self
+    waveSize = kernel["WavefrontSize"]
+    s1 = kernel[f"_DepthU{tc}"] // self.instK
+    s0 = (self.loadWidth * waveSize) // (s1 * self.mmaTileSize)
+    return replace(self, subtileShape=(s0, s1))
 
   def globalSubtileGrid(self, macroTile: int, depthU: int) -> Tuple[float, float]:
     glbl = self.globalMMATileGrid(macroTile, depthU)
@@ -653,7 +666,7 @@ class MXScaleTilePair(TileGeometry):
   lr: MXScaleLRGeometry
 
   def for_kernel(self, kernel: dict, tc: str) -> 'MXScaleTilePair':
-    return replace(self, gr=self.gr.for_kernel(kernel, tc))
+    return replace(self, gr=self.gr.for_kernel(kernel, tc), lr=self.lr.for_kernel(kernel, tc))
 
   @property
   def scaleLayout(self):    return self.gr.scaleLayout

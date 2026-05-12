@@ -179,7 +179,9 @@ def _generate_single_solution(perm, problemType, constantParams, assembler, debu
         elif debugConfig.printSolutionRejectionReason:
             print1("rejecting solution " + str(solution))
     except Exception as e:
+        import traceback
         print(f"Error processing permutation {perm}: {e}")
+        traceback.print_exc()
     return None
 
 def _generateForkedSolutions(problemType, constantParams, forkPermutations, assembler: Assembler,

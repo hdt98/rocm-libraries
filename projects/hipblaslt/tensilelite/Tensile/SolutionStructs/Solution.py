@@ -573,8 +573,12 @@ class Solution(collections.abc.Mapping):
     # set ASEM=minASEMforMX for not TLUA or not TLUB
     # so far, kernel code can support 16, but host code cannot hanlde it
     # TODO: enable 16 (or less)
-    # TODO: enable less than 256 for Subtile
-    minASEMforMX = 32 if not state["UseSubtileImpl"] else 256
+    if state["UseSubtileImpl"]:
+      # Subtile has no tail loop: K must be a multiple of DepthU.
+      # PGR=2 needs K >= 2*DU so the prefetch pipeline can fill both buffers.
+      minASEMforMX = state["DepthU"] * max(1, state["PrefetchGlobalRead"])
+    else:
+      minASEMforMX = 32
     if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) and \
        ((not state["ProblemType"]["TLUA"]) or (not state["ProblemType"]["TLUB"])):
       if state["AssertSummationElementMultiple"] % minASEMforMX != 0:
@@ -702,12 +706,16 @@ class Solution(collections.abc.Mapping):
       state["Use64bShadowLimit"] = False
       state["Use64bShadowLimitMX"] = False
 
-      # DepthU should be multiple of 2 * MIK. DepthU=-1 case, set DepthU=2*MIK*LSU
-      duUnit = 2 * state["MatrixInstK"] * state["LocalSplitU"]
+      # DepthU must be a multiple of numSubIterK * MIK * LSU, where numSubIterK is the
+      # number of K-subtiles per depth-U iteration: 1 for fp8 (AB_B8, subtileShape K=1),
+      # 2 for fp4/bf16 (AB_B4/AB_B16, subtileShape K=2).
+      dtype_a = state["ProblemType"]["DataTypeA"]
+      numSubIterK = 1 if dtype_a.is8bitFloat() else 2
+      duUnit = numSubIterK * state["MatrixInstK"] * state["LocalSplitU"]
       if state["DepthU"] == -1:
         state["DepthU"] = duUnit
       if state["DepthU"] % duUnit != 0:
-        reject(state, printRejectionReason, "UseSubtileImpl=1 support only DepthU multiple of 2 * MatrixInstK * LocalSplitU")
+        reject(state, printRejectionReason, f"UseSubtileImpl=1 support only DepthU multiple of {numSubIterK} * MatrixInstK * LocalSplitU")
 
       for tc in ('A', 'B'):
         dtype = state["ProblemType"][f"DataType{tc}"]
@@ -2344,12 +2352,12 @@ class Solution(collections.abc.Mapping):
           else:
             optPadA //= 2
             readRegsA //= 2
-        if (not isaInfoMap[isa].asmCaps['HasWMMA']) and (readRegsA > 6 or readRegsB > 6):
-          reject(state, "LocalReadVectorWidth results in attemping to read LDS larger than b192, reject")
-          return ldsPadA, ldsPadB, ldsPadM, 0, 0
         # SubtileImpl does not need LDS padding.
         if state["UseSubtileImpl"]:
           return 0, 0, 0, 0, 0
+        if (not isaInfoMap[isa].asmCaps['HasWMMA']) and (readRegsA > 6 or readRegsB > 6):
+          reject(state, "LocalReadVectorWidth results in attemping to read LDS larger than b192, reject")
+          return ldsPadA, ldsPadB, ldsPadM, 0, 0
         if state["EnableMatrixInstruction"]:
           # for readRegs = 1 or 4, we need to double pad for MI16x16xNx1 to avoid bank conflict.
           if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
