@@ -292,9 +292,14 @@ std::vector<float> generateData(T                           dgen,
     }
 
     // For types smaller than 8-bit, mxDataGenerator returns packed data (i.e., two FP4 will be
-    // stored in a uint8_t), so unpacking the data is required before converting them to float
+    // stored in a uint8_t), so unpacking the data is required before converting them to float.
+    // F8 data is already 1 byte per element regardless of which scale variant is used.
     if constexpr(std::is_same_v<DT, DGen::ocp_e5m2_mxfp8>
-                 || std::is_same_v<DT, DGen::ocp_e4m3_mxfp8>)
+                 || std::is_same_v<DT, DGen::ocp_e5m2_mxfp8_e5m3>
+                 || std::is_same_v<DT, DGen::ocp_e5m2_mxfp8_e4m3>
+                 || std::is_same_v<DT, DGen::ocp_e4m3_mxfp8>
+                 || std::is_same_v<DT, DGen::ocp_e4m3_mxfp8_e5m3>
+                 || std::is_same_v<DT, DGen::ocp_e4m3_mxfp8_e4m3>)
     {
         auto ret = getAlignedFloat<DT>(
             dataBytes, scaleBytes, {sizes[0], sizes[1]}, elementsPerMXBlock, isMatrixA);
@@ -357,6 +362,17 @@ std::vector<float> generateMXInput(hipDataType            dataType,
 {
     using namespace DGen;
 
+    // Loud failure on (data, scale) combos that mxDataGenerator can't actually
+    // generate. The dispatch below would otherwise silently fall through to the
+    // E8M0-scale branch and write E8M0 bytes into a buffer the kernel reads as
+    // the requested scale type, producing wrong-but-plausible results that pass
+    // shape checks and only fail validation. See `generateMXInputSupported`.
+    if(!generateMXInputSupported(dataType, scaleType))
+        throw std::runtime_error(
+            "generateMXInput: unsupported (dataType, scaleType) combination -- "
+            "mxDataGenerator only supports E8M0 scale for F8/F6 data, and "
+            "{E8M0, E4M3, E5M3} scale for F4 data");
+
     DataGeneratorOptions opt;
     opt.min          = initMethod == "uniform_01" ? 0. : (initMethod == "hpl" ? -.5 : min_val);
     opt.max          = initMethod == "uniform_01" ? 1. : (initMethod == "hpl" ? .5 : max_val);
@@ -398,33 +414,103 @@ std::vector<float> generateMXInput(hipDataType            dataType,
 
     if(dataType == HIP_R_8F_E5M2)
     {
-        DGen::DataGenerator<DGen::ocp_e5m2_mxfp8> dgen;
-        return generateData<decltype(dgen), DGen::ocp_e5m2_mxfp8>(dgen,
-                                                                  data,
-                                                                  scale,
-                                                                  sizes,
-                                                                  strides,
-                                                                  seed,
-                                                                  opt,
-                                                                  elementsPerMXBlock,
-                                                                  isTranspose,
-                                                                  isMatrixA,
-                                                                  scaleLayout);
+        // gfx1250 supports MXFP8 with E5M3 / E4M3 scales as a hardware
+        // extension on top of the OCP MXFP8 (UE8M0) format. Pick the
+        // matching variant; for HIP_R_8F_UE8M0 (the spec default) we land
+        // on the original E8M0 variant.
+        if(scaleType == HIP_R_8F_E4M3)
+        {
+            DGen::DataGenerator<DGen::ocp_e5m2_mxfp8_e4m3> dgen;
+            return generateData<decltype(dgen), DGen::ocp_e5m2_mxfp8_e4m3>(dgen,
+                                                                           data,
+                                                                           scale,
+                                                                           sizes,
+                                                                           strides,
+                                                                           seed,
+                                                                           opt,
+                                                                           elementsPerMXBlock,
+                                                                           isTranspose,
+                                                                           isMatrixA,
+                                                                           scaleLayout);
+        }
+        else if(scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
+        {
+            DGen::DataGenerator<DGen::ocp_e5m2_mxfp8_e5m3> dgen;
+            return generateData<decltype(dgen), DGen::ocp_e5m2_mxfp8_e5m3>(dgen,
+                                                                           data,
+                                                                           scale,
+                                                                           sizes,
+                                                                           strides,
+                                                                           seed,
+                                                                           opt,
+                                                                           elementsPerMXBlock,
+                                                                           isTranspose,
+                                                                           isMatrixA,
+                                                                           scaleLayout);
+        }
+        else
+        {
+            DGen::DataGenerator<DGen::ocp_e5m2_mxfp8> dgen;
+            return generateData<decltype(dgen), DGen::ocp_e5m2_mxfp8>(dgen,
+                                                                      data,
+                                                                      scale,
+                                                                      sizes,
+                                                                      strides,
+                                                                      seed,
+                                                                      opt,
+                                                                      elementsPerMXBlock,
+                                                                      isTranspose,
+                                                                      isMatrixA,
+                                                                      scaleLayout);
+        }
     }
     else if(dataType == HIP_R_8F_E4M3)
     {
-        DGen::DataGenerator<DGen::ocp_e4m3_mxfp8> dgen;
-        return generateData<decltype(dgen), DGen::ocp_e4m3_mxfp8>(dgen,
-                                                                  data,
-                                                                  scale,
-                                                                  sizes,
-                                                                  strides,
-                                                                  seed,
-                                                                  opt,
-                                                                  elementsPerMXBlock,
-                                                                  isTranspose,
-                                                                  isMatrixA,
-                                                                  scaleLayout);
+        if(scaleType == HIP_R_8F_E4M3)
+        {
+            DGen::DataGenerator<DGen::ocp_e4m3_mxfp8_e4m3> dgen;
+            return generateData<decltype(dgen), DGen::ocp_e4m3_mxfp8_e4m3>(dgen,
+                                                                           data,
+                                                                           scale,
+                                                                           sizes,
+                                                                           strides,
+                                                                           seed,
+                                                                           opt,
+                                                                           elementsPerMXBlock,
+                                                                           isTranspose,
+                                                                           isMatrixA,
+                                                                           scaleLayout);
+        }
+        else if(scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
+        {
+            DGen::DataGenerator<DGen::ocp_e4m3_mxfp8_e5m3> dgen;
+            return generateData<decltype(dgen), DGen::ocp_e4m3_mxfp8_e5m3>(dgen,
+                                                                           data,
+                                                                           scale,
+                                                                           sizes,
+                                                                           strides,
+                                                                           seed,
+                                                                           opt,
+                                                                           elementsPerMXBlock,
+                                                                           isTranspose,
+                                                                           isMatrixA,
+                                                                           scaleLayout);
+        }
+        else
+        {
+            DGen::DataGenerator<DGen::ocp_e4m3_mxfp8> dgen;
+            return generateData<decltype(dgen), DGen::ocp_e4m3_mxfp8>(dgen,
+                                                                      data,
+                                                                      scale,
+                                                                      sizes,
+                                                                      strides,
+                                                                      seed,
+                                                                      opt,
+                                                                      elementsPerMXBlock,
+                                                                      isTranspose,
+                                                                      isMatrixA,
+                                                                      scaleLayout);
+        }
     }
     else if(static_cast<hipDataType>(dataType) == HIP_R_6F_E2M3)
     {
@@ -665,6 +751,15 @@ std::vector<float> generateMXInput(hipDataType            dataType,
                                    float                  min_val,
                                    float                  max_val)
 {
+    // Same loud-failure precheck as the CPU overload, so the easy-layout GPU
+    // path below doesn't silently mis-dispatch on (data, scale) combos that
+    // don't have a generator template.
+    if(!generateMXInputSupported(dataType, scaleType))
+        throw std::runtime_error(
+            "generateMXInput: unsupported (dataType, scaleType) combination -- "
+            "mxDataGenerator only supports E8M0 scale for F8/F6 data, and "
+            "{E8M0, E4M3, E5M3} scale for F4 data");
+
     // CPU init: straight delegation to the host overload.
     if(initDevice == MXInitDevice::Cpu)
     {
@@ -752,11 +847,29 @@ std::vector<float> generateMXInput(hipDataType            dataType,
     int const elementsPerMXBlock = scaleBlockRowSize * scaleBlockColSize;
 
     if(dataType == HIP_R_8F_E5M2)
+    {
+        // gfx1250 hardware extensions: F8 data with E5M3 / E4M3 scales.
+        // Same dispatch shape as the F4 branch below.
+        if(scaleType == HIP_R_8F_E4M3)
+            return generateOnDevice<DGen::ocp_e5m2_mxfp8_e4m3>(
+                data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
+        if(scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
+            return generateOnDevice<DGen::ocp_e5m2_mxfp8_e5m3>(
+                data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
         return generateOnDevice<DGen::ocp_e5m2_mxfp8>(
             data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
+    }
     if(dataType == HIP_R_8F_E4M3)
+    {
+        if(scaleType == HIP_R_8F_E4M3)
+            return generateOnDevice<DGen::ocp_e4m3_mxfp8_e4m3>(
+                data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
+        if(scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
+            return generateOnDevice<DGen::ocp_e4m3_mxfp8_e5m3>(
+                data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
         return generateOnDevice<DGen::ocp_e4m3_mxfp8>(
             data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);
+    }
     if(static_cast<hipDataType>(dataType) == HIP_R_6F_E2M3)
         return generateOnDevice<DGen::ocp_e2m3_mxfp6>(
             data, scale, sizes, strides, opt, kSeed, elementsPerMXBlock, scaleLayout);

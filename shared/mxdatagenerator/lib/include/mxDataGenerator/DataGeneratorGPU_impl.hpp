@@ -233,6 +233,66 @@ namespace DGen
             static constexpr ScaleType scaleKind = ScaleType::E8M0;
         };
 
+        // gfx1250 extensions: MXFP8 with E5M3 / E4M3 scales. Only the `Scale`
+        // typedef and `scaleKind` differ from the spec-mandated UE8M0 variants;
+        // the data-side traits stay identical because the data element format
+        // is unchanged.
+        template <>
+        struct GpuTraits<ocp_e4m3_mxfp8_e5m3>
+        {
+            static constexpr int   signBits     = 1;
+            static constexpr int   expBits      = 4;
+            static constexpr int   mantBits     = 3;
+            static constexpr int   bias         = 7;
+            static constexpr float maxNormal    = 448.0f;
+            static constexpr float minSubnormal = 0.001953125f;
+            static constexpr int   bitsPerElem  = 8;
+            using Scale                         = ScaleInfo<ScaleType::E5M3>;
+            static constexpr ScaleType scaleKind = ScaleType::E5M3;
+        };
+
+        template <>
+        struct GpuTraits<ocp_e4m3_mxfp8_e4m3>
+        {
+            static constexpr int   signBits     = 1;
+            static constexpr int   expBits      = 4;
+            static constexpr int   mantBits     = 3;
+            static constexpr int   bias         = 7;
+            static constexpr float maxNormal    = 448.0f;
+            static constexpr float minSubnormal = 0.001953125f;
+            static constexpr int   bitsPerElem  = 8;
+            using Scale                         = ScaleInfo<ScaleType::E4M3>;
+            static constexpr ScaleType scaleKind = ScaleType::E4M3;
+        };
+
+        template <>
+        struct GpuTraits<ocp_e5m2_mxfp8_e5m3>
+        {
+            static constexpr int   signBits     = 1;
+            static constexpr int   expBits      = 5;
+            static constexpr int   mantBits     = 2;
+            static constexpr int   bias         = 15;
+            static constexpr float maxNormal    = 57344.0f;
+            static constexpr float minSubnormal = 1.52587890625e-05f;
+            static constexpr int   bitsPerElem  = 8;
+            using Scale                         = ScaleInfo<ScaleType::E5M3>;
+            static constexpr ScaleType scaleKind = ScaleType::E5M3;
+        };
+
+        template <>
+        struct GpuTraits<ocp_e5m2_mxfp8_e4m3>
+        {
+            static constexpr int   signBits     = 1;
+            static constexpr int   expBits      = 5;
+            static constexpr int   mantBits     = 2;
+            static constexpr int   bias         = 15;
+            static constexpr float maxNormal    = 57344.0f;
+            static constexpr float minSubnormal = 1.52587890625e-05f;
+            static constexpr int   bitsPerElem  = 8;
+            using Scale                         = ScaleInfo<ScaleType::E4M3>;
+            static constexpr ScaleType scaleKind = ScaleType::E4M3;
+        };
+
         // ----------------------------------------------------------------------
         // Device PRNG (xorshift32 seeded per element)
         //

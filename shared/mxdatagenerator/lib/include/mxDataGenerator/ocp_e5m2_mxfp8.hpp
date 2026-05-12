@@ -25,10 +25,13 @@ namespace DGen
         static constexpr bool hasZero = true;
     };
 
-    struct ocp_e5m2_mxfp8
+    // Data-type constants shared by all ocp_e5m2_mxfp8 scale variants. Only
+    // `scaleInfo` differs between the variants (E8M0 / E5M3 / E4M3); all of
+    // the data-side bit patterns and ranges stay identical because the data
+    // element format is E5M2 in every case.
+    struct ocp_e5m2_mxfp8_base
     {
-        static constexpr OCP_E5M2_MXFP8_DATA        dataInfo{};
-        static constexpr ScaleInfo<ScaleType::E8M0> scaleInfo{};
+        static constexpr OCP_E5M2_MXFP8_DATA dataInfo{};
 
         static constexpr uint8_t oneMask         = 0b00111100;
         static constexpr uint8_t signBitMask     = 0b10000000;
@@ -53,6 +56,28 @@ namespace DGen
 
         static constexpr std::array<uint8_t, 6> dataNaNMasks{
             0b11111101, 0b11111110, 0b11111111, 0b01111101, 0b01111110, 0b01111111};
+    };
+
+    // OCP MXFP8 (E5M2 data) with the spec-mandated UE8M0 scale.
+    struct ocp_e5m2_mxfp8 : ocp_e5m2_mxfp8_base
+    {
+        static constexpr ScaleInfo<ScaleType::E8M0> scaleInfo{};
+    };
+
+    // gfx1250 extension: MXFP8 (E5M2 data) with an OCP E5M3 8-bit-float scale.
+    // Spec MXFP8 mandates UE8M0; this combination is exercised by the
+    // gfx1250 scaled-WMMA matrix_*_scale_fmt:E5M3 mode.
+    struct ocp_e5m2_mxfp8_e5m3 : ocp_e5m2_mxfp8_base
+    {
+        static constexpr ScaleInfo<ScaleType::E5M3> scaleInfo{};
+    };
+
+    // gfx1250 extension: MXFP8 (E5M2 data) with an OCP E4M3 8-bit-float scale.
+    // Spec MXFP8 mandates UE8M0; this combination is exercised by the
+    // gfx1250 scaled-WMMA matrix_*_scale_fmt:E4M3 mode.
+    struct ocp_e5m2_mxfp8_e4m3 : ocp_e5m2_mxfp8_base
+    {
+        static constexpr ScaleInfo<ScaleType::E4M3> scaleInfo{};
     };
 
 #include "ocp_e5m2_mxfp8_impl.hpp"

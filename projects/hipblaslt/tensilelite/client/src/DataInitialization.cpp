@@ -1941,7 +1941,9 @@ namespace TensileLite
             // mxDataGenerator so the values are coordinated with their scales; for any
             // non-MX side (e.g. mixed-mode A=MX, B=BF16) we fall back to the same
             // initArray path the default loop would have taken, to avoid leaving the
-            // malloc'd buffers uninitialized.
+            // malloc'd buffers uninitialized. Unsupported MX (data, scale) combinations
+            // throw out of `generateMXInput` -- there is no random-byte fallback for an
+            // MX side.
             auto const& tensors = problem.tensors();
 
             auto initTensorFromDefault = [&](int i) {
@@ -2149,6 +2151,13 @@ namespace TensileLite
                   }
               };
 
+            // Per-side dispatch. For any MX side (FP4 / FP6 / FP8) we drive
+            // mxDataGenerator via `initOneMXSide`; if the (data, scale) combination
+            // is not one mxDataGenerator templates for, `generateMXInput` throws
+            // (see `generateMXInputSupported` in `mxDataGen.hpp`) -- the test fails
+            // loudly rather than silently mis-dispatching to a wrong scale type.
+            // Non-MX sides (e.g. mixed-mode A=MX, B=BF16) just go through the same
+            // default initArray path the main init loop would have used.
             if(isMXTensor(problem.a(), problem.mxBlockA()))
             {
                 initOneMXSide(ContractionProblemGemm::TENSOR::A,
@@ -2164,9 +2173,12 @@ namespace TensileLite
             }
             else
             {
-                // A is not MX (or mxBlockA == 0). The default-init loop will skip A and
-                // MXSA because useMXGenerator is true, so seed them here with the same
-                // initArray path the default loop would have used.
+                // A is not an MX-typed tensor; fall back to the default initArray
+                // path the main init loop would have used. The MXSA branch is for
+                // the malformed edge case where mxBlockA > 0 but the data type is
+                // not in the MX family (isMXTensor returns false on data type, not
+                // on mxBlock); we still seed MXSA so the buffer isn't left
+                // uninitialised.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::A);
                 if(problem.mxBlockA() > 0)
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
@@ -2187,7 +2199,7 @@ namespace TensileLite
             }
             else
             {
-                // B is not MX (or mxBlockB == 0). Same fallback rationale as the A side.
+                // Same rationale as the A side.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::B);
                 if(problem.mxBlockB() > 0)
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);

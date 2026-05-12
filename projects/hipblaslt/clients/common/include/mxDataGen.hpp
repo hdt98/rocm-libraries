@@ -96,6 +96,37 @@ enum class MXScaleLayout
 #include <string_view>
 #include <vector>
 
+// Whether mxDataGenerator has a generator template for this (data, scale)
+// combination. mxDataGenerator's templated dispatch in `generateMXInput`
+// only knows about specific MX type tuples:
+//   F8 (E4M3 / E5M2) data  -> E8M0 scale (OCP MXFP8 spec) plus the
+//                             gfx1250 hardware extensions E5M3 / E4M3
+//   F6 (E2M3 / E3M2) data  -> E8M0 scale only
+//   F4 (E2M1)        data  -> E8M0, E4M3 (HIP_R_8F_E4M3) or
+//                             E5M3 (HIP_R_8F_E5M3_EXT) scale
+// `generateMXInput` checks this predicate and throws on any unsupported
+// combination so callers fail loudly instead of silently mis-dispatching
+// to an E8M0 scale variant when a different scale type was requested.
+inline bool generateMXInputSupported(hipDataType dataType, hipDataType scaleType)
+{
+    bool const isF8Data = (dataType == HIP_R_8F_E4M3) || (dataType == HIP_R_8F_E5M2);
+    bool const isF6Data = (static_cast<hipDataType>(dataType) == HIP_R_6F_E2M3)
+                          || (static_cast<hipDataType>(dataType) == HIP_R_6F_E3M2);
+    bool const isF4Data = static_cast<hipDataType>(dataType) == HIP_R_4F_E2M1;
+
+    bool const isE8M0Scale = scaleType == HIP_R_8F_UE8M0;
+    bool const isE4M3Scale = scaleType == HIP_R_8F_E4M3;
+    bool const isE5M3Scale = scaleType == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT);
+
+    if(isF6Data)
+        return isE8M0Scale;
+    if(isF8Data)
+        return isE8M0Scale || isE4M3Scale || isE5M3Scale;
+    if(isF4Data)
+        return isE8M0Scale || isE4M3Scale || isE5M3Scale;
+    return false;
+}
+
 // CPU-only overload (kept for callers that don't want to opt into the
 // GPU backend). Equivalent to passing `MXInitDevice::Cpu` to the overload
 // below. `scaleLayout` selects the post-generation scale memory layout
