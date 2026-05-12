@@ -211,7 +211,7 @@ static inline I potrf_get_block_size(I const n)
 template <typename T>
 static inline int potrf_get_NB()
 {
-    int const nb = POTF2_MAX_SMALL_SIZE(T) - 1;
+    int const nb = POTF2_MAX_SMALL_SIZE(T);
     return (nb);
 }
 
