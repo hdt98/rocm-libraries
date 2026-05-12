@@ -161,22 +161,22 @@ hipBLASLt and is invoked by its own CLI entry point.
 
 ## Source file to concept map
 
-| Source file(s) | Concept |
-|---|---|
-| `Tensile.py` | Top-level workflow orchestration |
-| `BenchmarkProblems.py`, `BenchmarkStructs.py`, `BenchmarkSplitter.py` | Benchmarking pipeline |
-| `LibraryLogic.py`, `SolutionLibrary.py`, `SolutionSelectionLibrary.py` | Solution selection and library logic |
-| `Contractions.py`, `Properties.py`, `Hardware.py` | Problem and hardware description |
-| `KernelWriter.py`, `KernelWriterBase.py`, `KernelWriterAssembly.py`, `KernelWriterModules.py` | Main kernel code generation |
-| `KernelWriterBetaOnly.py`, `KernelWriterReduction.py`, `KernelWriterConversion.py`, `KernelHelperNaming.py` | Auxiliary kernel generation |
-| `KernelWriterActivationFunction.py`, `KernelWriterActivationEnumHeader.py`, `Activation.py` | Activation functions |
-| `Component.py` | Pluggable component registry |
-| `AsmAddressCalculation.py`, `AsmStoreState.py`, `AsmMemoryInstruction.py`, `AsmMemoryHelpers.py` | Assembly store/address helpers |
-| `LibraryIO.py`, `CustomYamlLoader.py`, `EmbeddedData.py` | IO and serialization |
-| `ClientWriter.py`, `ClientExecutable.py`, `TensileClientConfig.py` | Benchmark client |
-| `ParallelExecution.py` | Multi-GPU benchmark execution |
-| `CustomKernels.py` | Hand-written kernels |
-| `TensileMergeLibrary.py`, `TensileUpdateLibrary.py`, `TensileRetuneLibrary.py`, `TensileLibLogicToYaml.py` | Library management utilities |
+| Source file(s)                                                                                              | Concept                              |
+|-------------------------------------------------------------------------------------------------------------|--------------------------------------|
+| `Tensile.py`                                                                                                | Top-level workflow orchestration     |
+| `BenchmarkProblems.py`, `BenchmarkStructs.py`, `BenchmarkSplitter.py`                                       | Benchmarking pipeline                |
+| `LibraryLogic.py`, `SolutionLibrary.py`, `SolutionSelectionLibrary.py`                                      | Solution selection and library logic |
+| `Contractions.py`, `Properties.py`, `Hardware.py`                                                           | Problem and hardware description     |
+| `KernelWriter.py`, `KernelWriterBase.py`, `KernelWriterAssembly.py`, `KernelWriterModules.py`               | Main kernel code generation          |
+| `KernelWriterBetaOnly.py`, `KernelWriterReduction.py`, `KernelWriterConversion.py`, `KernelHelperNaming.py` | Auxiliary kernel generation          |
+| `KernelWriterActivationFunction.py`, `KernelWriterActivationEnumHeader.py`, `Activation.py`                 | Activation functions                 |
+| `Component.py`                                                                                              | Pluggable component registry         |
+| `AsmAddressCalculation.py`, `AsmStoreState.py`, `AsmMemoryInstruction.py`, `AsmMemoryHelpers.py`            | Assembly store/address helpers       |
+| `LibraryIO.py`, `CustomYamlLoader.py`, `EmbeddedData.py`                                                    | IO and serialization                 |
+| `ClientWriter.py`, `ClientExecutable.py`, `TensileClientConfig.py`                                          | Benchmark client                     |
+| `ParallelExecution.py`                                                                                      | Multi-GPU benchmark execution        |
+| `CustomKernels.py`                                                                                          | Hand-written kernels                 |
+| `TensileMergeLibrary.py`, `TensileUpdateLibrary.py`, `TensileRetuneLibrary.py`, `TensileLibLogicToYaml.py`  | Library management utilities         |
 
 ---
 

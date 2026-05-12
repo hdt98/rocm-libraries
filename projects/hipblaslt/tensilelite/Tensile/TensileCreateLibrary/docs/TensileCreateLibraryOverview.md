@@ -18,12 +18,12 @@ rebuilt for a new compiler version without re-running benchmarks.
 
 ## Source Files
 
-| File | Role |
-|---|---|
-| `Run.py` | All substantive logic: orchestration, library loading, code generation, assembly, linking, manifest writing. |
-| `ParseArguments.py` | `parseArguments()` defines the CLI schema and returns a `Dict[str, Any]`. |
-| `__main__.py` | Entry point for `python -m`; calls `run()`. |
-| `__init__.py` | Re-exports the public API. |
+| File                | Role                                                                                                         |
+|---------------------|--------------------------------------------------------------------------------------------------------------|
+| `Run.py`            | All substantive logic: orchestration, library loading, code generation, assembly, linking, manifest writing. |
+| `ParseArguments.py` | `parseArguments()` defines the CLI schema and returns a `Dict[str, Any]`.                                    |
+| `__main__.py`       | Entry point for `python -m`; calls `run()`.                                                                  |
+| `__init__.py`       | Re-exports the public API.                                                                                   |
 
 ## `run()` Orchestration
 
@@ -156,32 +156,32 @@ Positional:
 
 Optional (long form, dest, default):
 
-| Flag | Dest | Default | Notes |
-|---|---|---|---|
-| `--cxx-compiler` | `CxxCompiler` | `ToolchainDefaults.CXX_COMPILER` | |
-| `--c-compiler` | `CCompiler` | `ToolchainDefaults.C_COMPILER` | |
-| `--cmake-cxx-compiler` | `CmakeCxxCompiler` | none | exported into `CMAKE_CXX_COMPILER` env var |
-| `--offload-bundler` | `OffloadBundler` | `ToolchainDefaults.OFFLOAD_BUNDLER` | |
-| `--assembler` | `Assembler` | `ToolchainDefaults.ASSEMBLER` | |
-| `--code-object-version` | `CodeObjectVersion` | `4` | choices `4`, `5`, `V4`, `V5`, `default`; mapped via `coVersionMap` |
-| `--architecture` | `Architecture` | `all` | `_` or `;` separated, e.g. `gfx942_gfx1100` |
-| `--no-compress` | `NoCompress` | false | inverted into `UseCompression` |
-| `--experimental` | `Experimental` | false | include logic files under `Experimental/` |
-| `--no-enumerate` | — | false | parsed but not consumed by `run()` |
-| `--version` | — | none | parsed but not consumed by `run()` |
-| `--logic-format` | `LogicFormat` | `yaml` | `yaml` or `json` |
-| `--library-format` | `LibraryFormat` | `msgpack` | `msgpack` or `yaml` |
-| `--jobs` / `-j` | `CpuThreads` | `-1` | |
-| `--verbose` / `-v` | `PrintLevel` | `1` | |
-| `--no-lazy-library-loading` | `LazyLibraryLoading` | true | flag turns lazy loading off |
-| `--enable-marker` | `EnableMarker` | false | |
-| `--no-generate-solution-table` | `GenSolTable` | true | flag turns the MatchTable off |
-| `--asm-debug` | `AsmDebug` | false | |
-| `--build-id` | `BuildIdKind` | `sha1` | |
-| `--address-sanitizer` | `AsanBuild` | false | |
-| `--keep-build-tmp` | `KeepBuildTmp` | false | preserves `.s` and `.o` |
-| `--logic-filter` | `LogicFilter` | `*` | glob pattern joined into `<LogicPath>/**/<filter><ext>` |
-| `--disable-asm-comments` | `DisableAsmComments` | false | |
+| Flag                           | Dest                 | Default                             | Notes                                                              |
+|--------------------------------|----------------------|-------------------------------------|--------------------------------------------------------------------|
+| `--cxx-compiler`               | `CxxCompiler`        | `ToolchainDefaults.CXX_COMPILER`    |                                                                    |
+| `--c-compiler`                 | `CCompiler`          | `ToolchainDefaults.C_COMPILER`      |                                                                    |
+| `--cmake-cxx-compiler`         | `CmakeCxxCompiler`   | none                                | exported into `CMAKE_CXX_COMPILER` env var                         |
+| `--offload-bundler`            | `OffloadBundler`     | `ToolchainDefaults.OFFLOAD_BUNDLER` |                                                                    |
+| `--assembler`                  | `Assembler`          | `ToolchainDefaults.ASSEMBLER`       |                                                                    |
+| `--code-object-version`        | `CodeObjectVersion`  | `4`                                 | choices `4`, `5`, `V4`, `V5`, `default`; mapped via `coVersionMap` |
+| `--architecture`               | `Architecture`       | `all`                               | `_` or `;` separated, e.g. `gfx942_gfx1100`                        |
+| `--no-compress`                | `NoCompress`         | false                               | inverted into `UseCompression`                                     |
+| `--experimental`               | `Experimental`       | false                               | include logic files under `Experimental/`                          |
+| `--no-enumerate`               | —                    | false                               | parsed but not consumed by `run()`                                 |
+| `--version`                    | —                    | none                                | parsed but not consumed by `run()`                                 |
+| `--logic-format`               | `LogicFormat`        | `yaml`                              | `yaml` or `json`                                                   |
+| `--library-format`             | `LibraryFormat`      | `msgpack`                           | `msgpack` or `yaml`                                                |
+| `--jobs` / `-j`                | `CpuThreads`         | `-1`                                |                                                                    |
+| `--verbose` / `-v`             | `PrintLevel`         | `1`                                 |                                                                    |
+| `--no-lazy-library-loading`    | `LazyLibraryLoading` | true                                | flag turns lazy loading off                                        |
+| `--enable-marker`              | `EnableMarker`       | false                               |                                                                    |
+| `--no-generate-solution-table` | `GenSolTable`        | true                                | flag turns the MatchTable off                                      |
+| `--asm-debug`                  | `AsmDebug`           | false                               |                                                                    |
+| `--build-id`                   | `BuildIdKind`        | `sha1`                              |                                                                    |
+| `--address-sanitizer`          | `AsanBuild`          | false                               |                                                                    |
+| `--keep-build-tmp`             | `KeepBuildTmp`       | false                               | preserves `.s` and `.o`                                            |
+| `--logic-filter`               | `LogicFilter`        | `*`                                 | glob pattern joined into `<LogicPath>/**/<filter><ext>`            |
+| `--disable-asm-comments`       | `DisableAsmComments` | false                               |                                                                    |
 
 ## Output Directory Layout
 

@@ -172,15 +172,15 @@ assembly-generation utilities (e.g. `tdmWait` and the wait-count helpers) built 
 
 ## Source Files
 
-| File | Defines |
-|---|---|
-| `KernelWriterBase.py` | `KernelWriterBase`, `KERNEL_HELPER_FILENAME_*` |
-| `KernelWriter.py` | `KernelWriter`, `StateValues`, `MatrixInfo`, `ABMatrixInfo`, `ConstValues`, `StateVgprs`, `CodeModules`, `ExternClasses` |
-| `KernelWriterAssembly.py` | `KernelWriterAssembly`, `GlobalReadGprRecord`, `GprInfo`, `TailOptParams` |
-| `KernelWriterBetaOnly.py` | `KernelWriterBetaOnly` |
-| `KernelWriterReduction.py` | `KernelWriterReduction` |
-| `KernelWriterConversion.py` | `KernelWriterConversion` |
-| `KernelWriterActivationFunction.py` | `KernelWriterActivationFunction` |
-| `KernelWriterActivationEnumHeader.py` | `KernelWriterActivationEnumHeader` |
-| `KernelHelperNaming.py` | `KernelHelperEnum`, `initHelperKernelObjects` and per-type name/object factories |
-| `KernelWriterModules.py` | shared codegen helpers (star-imported) |
+| File                                  | Defines                                                                                                                  |
+|---------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| `KernelWriterBase.py`                 | `KernelWriterBase`, `KERNEL_HELPER_FILENAME_*`                                                                           |
+| `KernelWriter.py`                     | `KernelWriter`, `StateValues`, `MatrixInfo`, `ABMatrixInfo`, `ConstValues`, `StateVgprs`, `CodeModules`, `ExternClasses` |
+| `KernelWriterAssembly.py`             | `KernelWriterAssembly`, `GlobalReadGprRecord`, `GprInfo`, `TailOptParams`                                                |
+| `KernelWriterBetaOnly.py`             | `KernelWriterBetaOnly`                                                                                                   |
+| `KernelWriterReduction.py`            | `KernelWriterReduction`                                                                                                  |
+| `KernelWriterConversion.py`           | `KernelWriterConversion`                                                                                                 |
+| `KernelWriterActivationFunction.py`   | `KernelWriterActivationFunction`                                                                                         |
+| `KernelWriterActivationEnumHeader.py` | `KernelWriterActivationEnumHeader`                                                                                       |
+| `KernelHelperNaming.py`               | `KernelHelperEnum`, `initHelperKernelObjects` and per-type name/object factories                                         |
+| `KernelWriterModules.py`              | shared codegen helpers (star-imported)                                                                                   |
