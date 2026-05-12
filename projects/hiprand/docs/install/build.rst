@@ -4,37 +4,9 @@
 
 .. _installation:
 
-*******************************************************************
-Installing and building hipRAND
-*******************************************************************
-
-To install hipRAND, choose between the following two methods:
-
--   :ref:`Using prebuilt packages from the ROCm repositories <prebuilt-packages>`
--   :ref:`Building from source <build-from-source>`   
-
-.. _prebuilt-packages:
-
-Install using prebuilt packages
-===============================
-
-The prebuilt hipRAND packages require a ROCm-enabled platform.
-For information on installing ROCm, see the `ROCm installation guide <https://rocm.docs.amd.com/projects/install-on-linux/en/latest/>`_.
-After installing ROCm or enabling the ROCm repositories, use the system package manager to install hipRAND.
-
-For Ubuntu and Debian:
-
-.. code-block:: shell
-
-   sudo apt-get install hiprand
-
-For SLES:
-
-.. code-block:: shell
-
-   sudo dnf install hiprand
-
-These commands install hipRAND in the ``/opt/rocm`` directory.
+*************************
+Build hipRAND from source
+*************************
 
 .. _build-from-source:
 
