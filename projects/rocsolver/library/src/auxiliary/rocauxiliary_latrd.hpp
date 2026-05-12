@@ -61,6 +61,8 @@ static bool print_debug_messages_latrd_forsytrd
 
 static bool latrd_forsytrd_multi_kernel = std::getenv("LATRD_MULTI_KERNEL") != nullptr ? true : false;
 
+static bool force_coop_launch = std::getenv("COOP_LAUNCH") != nullptr ? true : false;
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 template <int MAX_THDS, typename T, typename I, typename U>
@@ -3127,6 +3129,8 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             std::cout << "Using latrd's lower path" << std::endl;
         }
 
+        bool select_coop_launch = true || force_coop_launch;
+
         // reduce the first k columns of A
         // main loop running forwards (for each column)
         const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
@@ -3137,10 +3141,10 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             = ((256 / props->warpSize) + 2 * nn + 1 + nn * nn + nn * k) * sizeof(T);
         constexpr size_t small_switch_size = 128;
         bool use_small_kernel
-            = false && (n < small_switch_size) && (lmemsize_small <= props->sharedMemPerBlock);
+            = !select_coop_launch && (n < small_switch_size) && (lmemsize_small <= props->sharedMemPerBlock);
 
         const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * n + 2 * k * k) * sizeof(T);
-        bool use_fused_kernel = (lmemsize_fused <= props->sharedMemPerBlock);
+        bool use_fused_kernel = select_coop_launch && !rocblas_is_complex<T> && (lmemsize_fused <= props->sharedMemPerBlock);
 
         if(!latrd_forsytrd_multi_kernel && use_small_kernel)
         {
@@ -3186,9 +3190,11 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             }
 
             rocblas_int shiftA_ = shiftA + idx2D(j, j, lda);
-            void* kernelArgs[] = {(void*)&n,      (void*)&j,       (void*)&A,    (void*)&shiftA_,
-                                  (void*)&lda,    (void*)&strideA, (void*)&E[j], (void*)&strideE,
-                                  (void*)&tau[j], (void*)&strideP, (void*)&W,    (void*)&shiftW,
+            T* tau_j_ = tau + j;
+            S* E_j_ = E + j;
+            void* kernelArgs[] = {(void*)&n,      (void*)&k,       (void*)&A,    (void*)&shiftA_,
+                                  (void*)&lda,    (void*)&strideA, (void*)&E_j_, (void*)&strideE,
+                                  (void*)&tau_j_, (void*)&strideP, (void*)&W,    (void*)&shiftW,
                                   (void*)&ldw,    (void*)&strideW, (void*)&work};
 
             hipStream_t stream2;
@@ -3198,10 +3204,6 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                 (void*)(latrd_lower_kernel_naive<256, T, rocblas_int, S, U>),
                 dim3(1, 1, batch_count), dim3(256), kernelArgs, lmemsize_fused, stream2));
             HIP_TRACE(hipDeviceSynchronize());
-
-            /* n, k, A, */
-            /*                         shiftA_, lda, strideA, E + j, strideE, */
-            /*                         tau + j, strideP, W, shiftW, ldw, strideW, work); */
         }
         else
         {
