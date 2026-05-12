@@ -2087,8 +2087,9 @@ class Solution(collections.abc.Mapping):
       if state["PrefetchGlobalRead"] != 1:
         reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires PGR == 1")
         return
-      if (state["ProblemType"]["TransposeA"], state["ProblemType"]["TransposeB"]) != (True, False):
-        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent supports TN only")
+      if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) \
+          and (state["ProblemType"]["TransposeA"], state["ProblemType"]["TransposeB"]) != (True, False):
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent with MX supports TN only")
         return
       if math.prod(state["MIWaveGroup"]) <= 1:
         reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires wave-separated mode (prod(MIWaveGroup) > 1)")
