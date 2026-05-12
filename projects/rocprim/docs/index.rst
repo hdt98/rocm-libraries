@@ -15,12 +15,10 @@ The rocPRIM project is located in https://github.com/ROCm/rocm-libraries/tree/de
 .. grid:: 2
   :gutter: 3
 
-  .. grid-item-card:: Installation
+  .. grid-item-card:: Install
 
-    * :doc:`rocPRIM prerequisites <install/rocPRIM-prerequisites>`
-    * :doc:`rocPRIM installation overview <install/rocPRIM-install-overview>`
-    * :doc:`Installing rocPRIM on Linux <install/rocPRIM-build-install-linux>`
-    * :doc:`Installing rocPRIM on Windows <install/rocPRIM-build-install-windows>`
+    * :doc:`Install rocPRIM <install/installation>`
+    * :doc:`Build from source <install/build>`
   
   .. grid-item-card:: Conceptual
 
