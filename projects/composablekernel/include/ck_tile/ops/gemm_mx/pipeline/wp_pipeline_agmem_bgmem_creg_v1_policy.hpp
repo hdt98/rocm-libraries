@@ -135,12 +135,12 @@ struct MXGemmPipelineAgBgCrPolicy : UniversalGemmPipelineAgBgCrPolicy
         auto&& byte_ptr = reinterpret_cast<const uint8_t*>(&(tensor_view_tmp.get_buffer_view()(0)));
         auto&& byte_tensor_view = make_tensor_view<address_space_enum::global>(byte_ptr, desc);
 
-        auto&& origin_tmp       = window_tmp.get_window_origin();
-        constexpr index_t test1 = APackedSize / sizeof(ADataType);
-        return make_tile_window(byte_tensor_view,
-                                make_tuple(number<MPerBlock>{}, number<KPerBlock / test1>{}),
-                                {origin_tmp[0], origin_tmp[1] / test1},
-                                MakeMX_ABytesDramTileDistribution());
+        auto&& origin_tmp = window_tmp.get_window_origin();
+        return make_tile_window(
+            byte_tensor_view,
+            make_tuple(number<MPerBlock>{}, number<KPerBlock / APackedSize * sizeof(ADataType)>{}),
+            {origin_tmp[0], origin_tmp[1] / APackedSize * static_cast<index_t>(sizeof(ADataType))},
+            MakeMX_ABytesDramTileDistribution());
     }
 
     CK_TILE_DEVICE static constexpr auto MakeMX_ALdsBytesBlockDescriptor()
@@ -148,7 +148,9 @@ struct MXGemmPipelineAgBgCrPolicy : UniversalGemmPipelineAgBgCrPolicy
         constexpr index_t K2     = AK1 / APackedSize;
         constexpr index_t K2_Pad = 16;
         constexpr index_t K1     = kDramLoadPackBytes / DWORDx4;
-        constexpr index_t K0     = KPerBlock / (K1 * AK1);
+        constexpr index_t K0     = KPerBlock * sizeof(ADataType) / (K1 * AK1);
+        static_assert(K0 >= 1,
+                      "KPerBlock is too small for the selected ADataType and tile dimensions");
         static_assert(K0 * K1 * K2 / sizeof(ADataType) * APackedSize == KPerBlock,
                       "K0, K1, K2 must cover whole KPerBlock!");
 
