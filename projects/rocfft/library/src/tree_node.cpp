@@ -531,6 +531,13 @@ void MultiPlanItem::WaitCommRequests()
     if(rcmpi != MPI_SUCCESS)
         throw std::runtime_error("MPI_Waitall failed: " + std::to_string(rcmpi));
     comm_requests.clear();
+
+    // MPI_Waitall completes the GPU-side receive but does not order
+    // it against the user-supplied HIP stream the next plan item runs
+    // on. Barrier here so the receive is visible to it.
+    // TODO: replace with a per-op event + hipStreamWaitEvent chain.
+    if(hipDeviceSynchronize() != hipSuccess)
+        throw std::runtime_error("post-MPI hipDeviceSynchronize failed");
 #endif
 }
 
@@ -551,7 +558,15 @@ void CommPointToPoint::ExecuteAsync(const rocfft_plan                     plan,
                                     size_t                                multiPlanIdx,
                                     const std::map<int, device_callback_t>&)
 {
-    rocfft_scoped_device dev(srcLocation.device);
+    // Set the current HIP device to the device that owns the buffer
+    // touched on this rank: destLocation when we are the cross-rank
+    // receiver, srcLocation otherwise. GPU-aware MPI keys IPC and
+    // peer-access state off the current device.
+    const int scope_device
+        = (local_comm_rank == destLocation.comm_rank && local_comm_rank != srcLocation.comm_rank)
+              ? destLocation.device
+              : srcLocation.device;
+    rocfft_scoped_device dev(scope_device);
 
     if(LOG_PLAN_ENABLED())
     {
@@ -665,6 +680,10 @@ void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
                                size_t                                multiPlanIdx,
                                const std::map<int, device_callback_t>&)
 {
+    // Default scope is the source device, which is the correct device
+    // for the sender side of cross-rank ops and for any same-rank
+    // memcpy. The cross-rank receive branch in the loop below switches
+    // to its own destination device before posting MPI_Irecv.
     rocfft_scoped_device dev(srcLocation.device);
 
     if(LOG_PLAN_ENABLED())
@@ -729,8 +748,12 @@ void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
             }
             else if(local_comm_rank == op.destLocation.comm_rank)
             {
-                MPI_Request request;
-                const auto  mpiret = MPI_Irecv(destWithOffset,
+                // Switch to the destination device for MPI_Irecv so
+                // any IPC / peer-access state set up by GPU-aware MPI
+                // is created on the device that owns the recv buffer.
+                rocfft_scoped_device recv_dev(op.destLocation.device);
+                MPI_Request          request;
+                const auto           mpiret = MPI_Irecv(destWithOffset,
                                               op.numElems,
                                               rocfft_type_to_mpi_type(precision, arrayType),
                                               srcLocation.comm_rank,
@@ -864,8 +887,12 @@ void CommGather::ExecuteAsync(const rocfft_plan                     plan,
             }
             else if(local_comm_rank == destLocation.comm_rank)
             {
-                MPI_Request request;
-                auto        rcmpi = MPI_Irecv(destWithOffset,
+                // Switch to the destination device for MPI_Irecv so
+                // any IPC / peer-access state set up by GPU-aware MPI
+                // is created on the device that owns the recv buffer.
+                rocfft_scoped_device recv_dev(destLocation.device);
+                MPI_Request          request;
+                auto                 rcmpi = MPI_Irecv(destWithOffset,
                                        op.numElems,
                                        rocfft_type_to_mpi_type(precision, arrayType),
                                        op.srcLocation.comm_rank,
