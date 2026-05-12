@@ -97,4 +97,3 @@ public:
 
     std::vector<miopenTensorDescriptor_t> descs;
 };
-

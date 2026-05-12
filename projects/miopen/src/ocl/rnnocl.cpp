@@ -1510,8 +1510,8 @@ void RNNDescriptor::RNNForwardInferencePacked(const Handle& handle,
 
     for(int li = 0; li < nLayers; li++)
     {
-        size_t hid_shift        = static_cast<size_t>(li) * batch_n * hy_stride;
-        int hx_shift            = li * hy_n * bi_stride;
+        size_t hid_shift           = static_cast<size_t>(li) * batch_n * hy_stride;
+        int hx_shift               = li * hy_n * bi_stride;
         size_t wei_shift_bias_temp = wei_shift_bias + static_cast<size_t>(li) * 2 * wei_stride;
 
         // from input
@@ -2946,8 +2946,8 @@ void RNNDescriptor::RNNForwardTrainingPackedTensors(
 
     for(int li = 0; li < nLayers; li++)
     {
-        size_t hid_shift        = static_cast<size_t>(li) * batch_n * hy_stride;
-        int hx_shift            = li * hy_n * bi_stride;
+        size_t hid_shift           = static_cast<size_t>(li) * batch_n * hy_stride;
+        int hx_shift               = li * hy_n * bi_stride;
         size_t wei_shift_bias_temp = wei_shift_bias + static_cast<size_t>(li) * 2 * wei_stride;
 
         // from input
@@ -3036,10 +3036,9 @@ void RNNDescriptor::RNNForwardTrainingPackedTensors(
                 size_t drop_in_offset = prelayer_shift;
                 size_t drop_out_offset =
                     drop_rsv_start + (static_cast<size_t>(li) - 1) * batch_n * hy_h * bi;
-                size_t drop_rsv_offset =
-                    (drop_rsv_start + (nLayers - 1) * batch_n * hy_h * bi) *
-                        (wDesc.GetType() == miopenFloat ? 4 : 2) +
-                    (li - 1) * drop_rsv_size;
+                size_t drop_rsv_offset = (drop_rsv_start + (nLayers - 1) * batch_n * hy_h * bi) *
+                                             (wDesc.GetType() == miopenFloat ? 4 : 2) +
+                                         (li - 1) * drop_rsv_size;
 
                 miopen::deref(dropoutDesc)
                     .Dropout(handle,
@@ -4465,8 +4464,8 @@ void RNNDescriptor::RNNBackwardDataPackedTensors(
 
     for(int li = static_cast<int>(nLayers) - 1; li >= 0; li--)
     {
-        size_t wei_shift = (in_h + hy_h) * wei_stride +
-                           static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
+        size_t wei_shift =
+            (in_h + hy_h) * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
         size_t hid_shift = static_cast<size_t>(li) * batch_n * hy_stride;
         int hx_shift     = li * hy_n * bi_stride;
         size_t weitime_shift =
@@ -4547,10 +4546,9 @@ void RNNDescriptor::RNNBackwardDataPackedTensors(
                               static_cast<size_t>(nLayers) * batch_n * hy_h * bi
                         : 2 * static_cast<size_t>(nLayers) * batch_n * hy_stride;
 
-                size_t drop_rsv_offset =
-                    (drop_rsv_start + (nLayers - 1) * batch_n * hy_h * bi) *
-                        (rnn_data_type == miopenFloat ? 4 : 2) +
-                    li * drop_rsv_size;
+                size_t drop_rsv_offset = (drop_rsv_start + (nLayers - 1) * batch_n * hy_h * bi) *
+                                             (rnn_data_type == miopenFloat ? 4 : 2) +
+                                         li * drop_rsv_size;
 
                 miopen::deref(dropoutDesc)
                     .Dropout(handle,
@@ -6109,10 +6107,9 @@ void RNNDescriptor::RNNBackwardWeightsPackedTensors(
         size_t hid_shift = static_cast<size_t>(li) * batch_n * hy_stride;
         // Only used in the li > 0 branch and the bias path overwrites it below; cast inside the
         // ternary to avoid (li - 1) underflowing size_t when li == 0.
-        size_t wei_shift = li > 0
-                               ? (in_h + hy_h) * wei_stride +
-                                     static_cast<size_t>(li - 1) * (bi * hy_h + hy_h) * wei_stride
-                               : 0;
+        size_t wei_shift = li > 0 ? (in_h + hy_h) * wei_stride + static_cast<size_t>(li - 1) *
+                                                                     (bi * hy_h + hy_h) * wei_stride
+                                  : 0;
 
         size_t dw_bias_offset = wei_shift_bias + static_cast<size_t>(li) * 2 * wei_stride;
 
@@ -6387,7 +6384,7 @@ void RNNDescriptor::RNNBackwardWeightsPackedTensors(
 
         if(comb_check)
         {
-            hx_shift  = li * hy_n * bi_stride;
+            hx_shift = li * hy_n * bi_stride;
             wei_shift =
                 in_h * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
 
@@ -6533,7 +6530,7 @@ void RNNDescriptor::RNNBackwardWeightsPackedTensors(
             {
                 baccbi -= in_n.at(seqLen - 1 - ti);
 
-                hx_shift  = li * hy_n * bi_stride;
+                hx_shift = li * hy_n * bi_stride;
                 wei_shift =
                     in_h * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
 
