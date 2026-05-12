@@ -8,6 +8,13 @@
 Build hipRAND from source
 *************************
 
+To build hipRAND as part of the ROCm Core SDK, see `TheRock build instructions
+<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
+TheRock is the recommended way to build ROCm components from source.
+
+Alternatively, you can build hipRAND standalone using the following
+instructions.
+
 .. _build-from-source:
 
 Build hipRAND from source
