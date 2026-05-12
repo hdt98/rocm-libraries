@@ -38,7 +38,7 @@ class TestBuildInnerArgv:
         assert "--seed" in argv and argv[argv.index("--seed") + 1] == "7"
         assert "--plugin-path" in argv
         # Critically, no opt-in profiling flags leak into the inner argv.
-        for forbidden in ("--emit-trace", "--perf"):
+        for forbidden in ("--pmc", "--emit-trace", "--perf", "--roofline"):
             assert forbidden not in argv
 
     def test_omits_seed_when_unset(self):
@@ -87,12 +87,18 @@ class TestDispatch:
         assert result == {}
 
     def test_dispatches_each_requested_source(self, tmp_path):
-        cfg = MetricsConfig(emit_trace="pftrace", perf=True)
+        cfg = MetricsConfig(
+            pmc_set="basic", emit_trace="pftrace", perf=True, roofline=True
+        )
         with patch.object(
+            orch._pmc_mod, "run", return_value={"pmc": {"ok": True}}
+        ) as pmc, patch.object(
             orch._trace_mod, "run", return_value={"trace": {"ok": True}}
         ) as trace, patch.object(
             orch._perf_mod, "run", return_value={"perf": {"ok": True}}
-        ) as perf:
+        ) as perf, patch.object(
+            orch._roofline_mod, "run", return_value={"roofline": {"ok": True}}
+        ) as roof:
             result = orch.run_profiling_passes(
                 graph_path=tmp_path / "g.json",
                 engine_id=1,
@@ -103,12 +109,12 @@ class TestDispatch:
                 plugin_path=None,
                 out_dir=tmp_path,
             )
-        assert trace.called and perf.called
-        assert set(result) == {"trace", "perf"}
+        assert pmc.called and trace.called and perf.called and roof.called
+        assert set(result) == {"pmc", "trace", "perf", "roofline"}
 
     def test_source_exception_does_not_propagate(self, tmp_path):
-        cfg = MetricsConfig(emit_trace="pftrace")
-        with patch.object(orch._trace_mod, "run", side_effect=RuntimeError("boom")):
+        cfg = MetricsConfig(pmc_set="basic")
+        with patch.object(orch._pmc_mod, "run", side_effect=RuntimeError("boom")):
             result = orch.run_profiling_passes(
                 graph_path=tmp_path / "g.json",
                 engine_id=1,
@@ -119,22 +125,22 @@ class TestDispatch:
                 plugin_path=None,
                 out_dir=tmp_path,
             )
-        assert result["trace"]["unexpected_error"] == "boom"
+        assert result["pmc"]["unexpected_error"] == "boom"
 
     def test_subdir_per_source_is_created(self, tmp_path):
-        cfg = MetricsConfig(emit_trace="pftrace", perf=True)
+        cfg = MetricsConfig(pmc_set="basic", emit_trace="pftrace")
         captured = {}
+
+        def fake_pmc(inner_argv, out_dir, pmc_set):
+            captured["pmc_dir"] = out_dir
+            return {"pmc": {}}
 
         def fake_trace(inner_argv, out_dir, fmt):
             captured["trace_dir"] = out_dir
             return {"trace": {}}
 
-        def fake_perf(inner_argv, out_dir):
-            captured["perf_dir"] = out_dir
-            return {"perf": {}}
-
-        with patch.object(orch._trace_mod, "run", side_effect=fake_trace), patch.object(
-            orch._perf_mod, "run", side_effect=fake_perf
+        with patch.object(orch._pmc_mod, "run", side_effect=fake_pmc), patch.object(
+            orch._trace_mod, "run", side_effect=fake_trace
         ):
             orch.run_profiling_passes(
                 graph_path=Path("graphs/sample_conv.json"),
@@ -146,5 +152,5 @@ class TestDispatch:
                 plugin_path=None,
                 out_dir=tmp_path,
             )
+        assert captured["pmc_dir"].name == "sample_conv_42_pmc_basic"
         assert captured["trace_dir"].name == "sample_conv_42_trace_pftrace"
-        assert captured["perf_dir"].name == "sample_conv_42_perf"
