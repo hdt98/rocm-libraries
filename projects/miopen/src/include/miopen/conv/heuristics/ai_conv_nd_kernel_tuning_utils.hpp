@@ -217,6 +217,7 @@ RunParameterPredictionModel(
         auto result = ai::tuning::candidate_selection::ModelSelectBestCandidate(
             arch,
             solver_name,
+            problem,
             features,
             heuristic_kernels,
             use_split_k,
@@ -477,7 +478,7 @@ bool RunAIHeuristics(const SolverHeuristicConfig& solver_cfg,
             };
 
             auto result = ai::tuning::candidate_selection::ModelSelectBestCandidate(
-                arch, solver_name, features, heuristic_kernels, use_split_k, is_valid);
+                arch, solver_name, problem, features, heuristic_kernels, use_split_k, is_valid);
 
             if(logging)
             {

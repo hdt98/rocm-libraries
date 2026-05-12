@@ -32,6 +32,7 @@
 #include <map>
 #include <functional>
 #include <miopen/config.hpp>
+#include <miopen/conv/problem_description.hpp>
 
 namespace miopen {
 namespace ai {
@@ -151,6 +152,7 @@ MIOPEN_INTERNALS_EXPORT
 CandidateSelectionResult
 ModelSelectBestCandidate(const std::string& arch,
                          const std::string& solver,
+                         const conv::ProblemDescription& problem,
                          const std::map<std::string, float>& features,
                          const std::vector<std::vector<std::string>>& valid_kernel_params,
                          bool use_split_k,

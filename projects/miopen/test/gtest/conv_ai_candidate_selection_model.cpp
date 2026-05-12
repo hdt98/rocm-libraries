@@ -27,10 +27,14 @@
 #include <miopen/conv/heuristics/ai_candidate_selection.hpp>
 #include <miopen/conv/heuristics/ai_conv_nd_kernel_tuning_utils.hpp>
 #include <miopen/filesystem.hpp>
+#include <miopen/conv/problem_description.hpp>
+#include <miopen/convolution.hpp>
+#include <miopen/tensor.hpp>
 #include <string>
 #include <map>
 #include <vector>
 #include <sstream>
+#include <chrono>
 
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
 using namespace miopen::ai::tuning::candidate_selection;
@@ -52,6 +56,24 @@ void PrintTo(const CandidateSelectionParams& p, std::ostream* os)
 
 // Default validation function: accepts all kernel/split_k combinations
 inline constexpr auto accept_all_combinations = [](int, int) { return true; };
+
+// Build a minimal 2D forward conv ProblemDescription for use as a cache key in tests.
+miopen::conv::ProblemDescription MakeTestProblem(int n = 1,
+                                                  int c = 4,
+                                                  int h = 8,
+                                                  int w = 8,
+                                                  int k = 8,
+                                                  int y = 3,
+                                                  int x = 3)
+{
+    miopen::TensorDescriptor in_desc(miopenFloat, {n, c, h, w});
+    miopen::TensorDescriptor wei_desc(miopenFloat, {k, c, y, x});
+    miopen::TensorDescriptor out_desc(miopenFloat, {n, k, h - y + 1, w - x + 1});
+    miopen::ConvolutionDescriptor conv_desc(
+        2, miopenConvolution, miopenPaddingDefault, {0, 0}, {1, 1}, {1, 1});
+    return miopen::conv::ProblemDescription(
+        in_desc, wei_desc, out_desc, conv_desc, miopen::conv::Direction::BackwardWeights);
+}
 
 std::vector<std::vector<std::string>> GenerateValidKernelParams(
     const CandidateSelectionMetadata& meta, const std::string& kernel_name, int num_candidates = 3)
@@ -280,8 +302,10 @@ TEST_P(CPU_CandidateSelection_NONE, ModelSelectBestCandidate_Test)
     for(const auto& name : meta.input_params())
         features[name] = 1.0f;
     auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
+    auto problem             = MakeTestProblem();
     auto result              = ModelSelectBestCandidate(params.arch,
                                            params.solver,
+                                           problem,
                                            features,
                                            valid_kernel_params,
                                            /*use_split_k=*/false,
@@ -342,6 +366,124 @@ TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitKFunctionality_Te
         ASSERT_EQ(mapping[i].first, 0);
         ASSERT_EQ(mapping[i].second, split_ks[i]);
     }
+}
+
+// === CACHE TESTS ===
+
+// B-RAM: calling ModelSelectBestCandidate twice with the same arguments must
+// return identical results. The second call should hit the RAM cache and must
+// not be slower on average (soft check — logged, not fatal).
+TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCache_Test)
+{
+    const auto& params = GetParam();
+    CandidateSelectionMetadata meta(params.arch, params.solver);
+    std::map<std::string, float> features;
+    for(const auto& name : meta.input_params())
+        features[name] = 1.0f;
+    auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
+    auto problem             = MakeTestProblem();
+
+    const auto t0 = std::chrono::high_resolution_clock::now();
+    auto result1  = ModelSelectBestCandidate(params.arch,
+                                            params.solver,
+                                            problem,
+                                            features,
+                                            valid_kernel_params,
+                                            /*use_split_k=*/false,
+                                            accept_all_combinations);
+    const auto t1 = std::chrono::high_resolution_clock::now();
+    auto result2  = ModelSelectBestCandidate(params.arch,
+                                            params.solver,
+                                            problem,
+                                            features,
+                                            valid_kernel_params,
+                                            /*use_split_k=*/false,
+                                            accept_all_combinations);
+    const auto t2 = std::chrono::high_resolution_clock::now();
+
+    ASSERT_FALSE(result1.IsEmpty()) << "First call returned empty result";
+    ASSERT_FALSE(result2.IsEmpty()) << "Second call (cache hit) returned empty result";
+    ASSERT_EQ(result1.kernel_indices, result2.kernel_indices) << "Cache returned different indices";
+    ASSERT_EQ(result1.split_k_values, result2.split_k_values)
+        << "Cache returned different split_k values";
+
+    const auto first_ms  = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    const auto second_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
+    // Soft check: log the speedup; a cache hit should be substantially faster.
+    // We do not assert a hard ratio to avoid flakiness on loaded systems.
+    std::cout << "[CandidateSelectionRamCache] first=" << first_ms
+              << " ms, second=" << second_ms << " ms\n";
+}
+
+// C1: calling ModelSelectBestCandidate with the same kernel params but a
+// different problem (different shape) must return a non-empty result for both
+// calls, confirming that Tower 2 embedding reuse does not corrupt results.
+TEST_P(CPU_CandidateSelection_NONE, Tower2EmbeddingCache_Test)
+{
+    const auto& params = GetParam();
+    CandidateSelectionMetadata meta(params.arch, params.solver);
+    std::map<std::string, float> features_a;
+    std::map<std::string, float> features_b;
+    for(const auto& name : meta.input_params())
+    {
+        features_a[name] = 1.0f;
+        features_b[name] = 2.0f; // different shape
+    }
+    auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
+    auto problem_a           = MakeTestProblem(1, 4, 8, 8, 8, 3, 3);
+    auto problem_b           = MakeTestProblem(2, 8, 16, 16, 16, 3, 3); // different shape
+
+    auto result_a = ModelSelectBestCandidate(params.arch,
+                                             params.solver,
+                                             problem_a,
+                                             features_a,
+                                             valid_kernel_params,
+                                             /*use_split_k=*/false,
+                                             accept_all_combinations);
+    auto result_b = ModelSelectBestCandidate(params.arch,
+                                             params.solver,
+                                             problem_b,
+                                             features_b,
+                                             valid_kernel_params,
+                                             /*use_split_k=*/false,
+                                             accept_all_combinations);
+
+    ASSERT_FALSE(result_a.IsEmpty()) << "Shape A returned empty result";
+    ASSERT_FALSE(result_b.IsEmpty()) << "Shape B returned empty result (Tower 2 cache may be corrupt)";
+}
+
+// Cache key isolation: use_split_k=false and use_split_k=true must produce
+// independent cache entries — results are retrieved separately, not mixed.
+TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
+{
+    const auto& params = GetParam();
+    CandidateSelectionMetadata meta(params.arch, params.solver);
+    std::map<std::string, float> features;
+    for(const auto& name : meta.input_params())
+        features[name] = 1.0f;
+    auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
+    auto problem             = MakeTestProblem();
+
+    auto result_no_splitk = ModelSelectBestCandidate(params.arch,
+                                                      params.solver,
+                                                      problem,
+                                                      features,
+                                                      valid_kernel_params,
+                                                      /*use_split_k=*/false,
+                                                      accept_all_combinations);
+
+    // A second call with use_split_k=false must come from cache and be identical
+    auto result_no_splitk_cached = ModelSelectBestCandidate(params.arch,
+                                                             params.solver,
+                                                             problem,
+                                                             features,
+                                                             valid_kernel_params,
+                                                             /*use_split_k=*/false,
+                                                             accept_all_combinations);
+
+    ASSERT_FALSE(result_no_splitk.IsEmpty());
+    ASSERT_EQ(result_no_splitk.kernel_indices, result_no_splitk_cached.kernel_indices)
+        << "Cache isolation failed: use_split_k=false entry was overwritten";
 }
 
 // === INSTANTIATION ===

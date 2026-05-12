@@ -43,6 +43,8 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <numeric>
+#include <sstream>
 
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
 namespace miopen {
@@ -602,19 +604,143 @@ EncodeKernelParams(const std::vector<std::vector<std::string>>& valid_kernel_par
     return encoded_candidates;
 }
 
+// ---- B-RAM: per-process RAM cache for CandidateSelectionResult --------------
+//
+// Mirrors the TunaNet RAM cache (GetCachedPrediction / StorePredictionCache in
+// ai_heuristics.cpp). A cache hit at this level bypasses all fdeep inference.
+namespace {
+
+struct CandidateSelectionCache
+{
+    std::unordered_map<std::string, CandidateSelectionResult> map;
+    std::mutex mtx;
+
+    static CandidateSelectionCache& Get(const std::string& arch)
+    {
+        static std::mutex instances_mtx;
+        static std::unordered_map<std::string, std::unique_ptr<CandidateSelectionCache>> instances;
+        std::lock_guard<std::mutex> lk(instances_mtx);
+        auto& ptr = instances[arch];
+        if(!ptr)
+            ptr = std::make_unique<CandidateSelectionCache>();
+        return *ptr;
+    }
+};
+
+std::string MakeCandidateSelectionKey(const std::string& solver,
+                                      const conv::ProblemDescription& problem,
+                                      bool use_split_k)
+{
+    std::ostringstream ss;
+    ss << solver << "|split_k=" << use_split_k << "|";
+    problem.Serialize(ss);
+    return ss.str();
+}
+
+std::optional<CandidateSelectionResult>
+GetCachedCandidateSelection(const std::string& arch,
+                             const std::string& solver,
+                             const conv::ProblemDescription& problem,
+                             bool use_split_k)
+{
+    auto& cache = CandidateSelectionCache::Get(arch);
+    std::lock_guard<std::mutex> lk(cache.mtx);
+    const auto it = cache.map.find(MakeCandidateSelectionKey(solver, problem, use_split_k));
+    if(it == cache.map.end())
+        return std::nullopt;
+    MIOPEN_LOG_I2("CandidateSelection RAM cache hit for solver: " << solver);
+    return it->second;
+}
+
+void StoreCandidateSelectionCache(const std::string& arch,
+                                   const std::string& solver,
+                                   const conv::ProblemDescription& problem,
+                                   bool use_split_k,
+                                   const CandidateSelectionResult& result)
+{
+    if(result.IsEmpty())
+        return;
+    auto& cache = CandidateSelectionCache::Get(arch);
+    std::lock_guard<std::mutex> lk(cache.mtx);
+    cache.map.emplace(MakeCandidateSelectionKey(solver, problem, use_split_k), result);
+}
+
+// ---- C1: Tower 2 kernel-config embedding cache ------------------------------
+//
+// The config encoder (Tower 2) depends only on the encoded kernel parameter
+// matrix, not on the input problem shape. Cache the embedding vectors so they
+// are computed at most once per unique (arch, solver, kernel-set).
+struct KernelEmbeddingCache
+{
+    std::unordered_map<std::string, std::vector<std::vector<float>>> map;
+    std::mutex mtx;
+
+    static KernelEmbeddingCache& Get()
+    {
+        static KernelEmbeddingCache instance;
+        return instance;
+    }
+};
+
+std::string HashEncodedCandidates(const std::vector<std::vector<float>>& enc)
+{
+    // FNV-1a inspired combination over the flat matrix
+    std::size_t h = enc.size();
+    for(const auto& row : enc)
+        for(float v : row)
+            h ^= std::hash<float>{}(v) + 0x9e3779b9u + (h << 6) + (h >> 2);
+    return std::to_string(h);
+}
+
+std::string MakeEmbeddingKey(const std::string& arch,
+                              const std::string& solver,
+                              const std::vector<std::vector<float>>& encoded_candidates)
+{
+    return arch + "|" + solver + "|" + HashEncodedCandidates(encoded_candidates);
+}
+
+std::vector<std::vector<float>>
+GetOrComputeKernelEmbeddings(const std::string& arch,
+                              const std::string& solver,
+                              const std::vector<std::vector<float>>& encoded_candidates,
+                              const CandidateSelectionModel& model)
+{
+    auto& cache   = KernelEmbeddingCache::Get();
+    auto emb_key  = MakeEmbeddingKey(arch, solver, encoded_candidates);
+    std::lock_guard<std::mutex> lk(cache.mtx);
+    const auto it = cache.map.find(emb_key);
+    if(it != cache.map.end())
+    {
+        MIOPEN_LOG_I2("Tower 2 embedding cache hit for solver: " << solver);
+        return it->second;
+    }
+    auto embeddings = model.EncodeKernelConfigs(encoded_candidates);
+    cache.map.emplace(emb_key, embeddings);
+    return embeddings;
+}
+
+} // anonymous namespace
+
 MIOPEN_INTERNALS_EXPORT
 CandidateSelectionResult
 ModelSelectBestCandidate(const std::string& arch,
                          const std::string& solver,
+                         const conv::ProblemDescription& problem,
                          const std::map<std::string, float>& features,
                          const std::vector<std::vector<std::string>>& valid_kernel_params,
                          const bool use_split_k,
                          ValidationFunc&& is_valid)
 {
+    // B-RAM cache: bypass all model inference on repeated calls for the same problem
+    {
+        auto cached = GetCachedCandidateSelection(arch, solver, problem, use_split_k);
+        if(cached)
+            return *cached;
+    }
+
     try
     {
         const auto& model = GetCandidateSelectionModel(arch, solver);
-        // debug: show that we successfully retrieved the model
         MIOPEN_LOG_I2("Retrieved CandidateSelectionModel for arch: " << arch
                                                                      << ", solver: " << solver);
         std::vector<std::vector<std::string>> expanded_params = valid_kernel_params;
@@ -661,7 +787,9 @@ ModelSelectBestCandidate(const std::string& arch,
         }
 
         const auto& encoded_features = model.EncodeInputFeatures(features);
-        const auto& encoded_configs  = model.EncodeKernelConfigs(encoded_candidates);
+        // C1: reuse Tower 2 embeddings if the kernel set hasn't changed
+        const auto encoded_configs =
+            GetOrComputeKernelEmbeddings(arch, solver, encoded_candidates, model);
 
         // Get all candidates sorted by score (best to worst)
         auto scored_candidates =
@@ -681,6 +809,7 @@ ModelSelectBestCandidate(const std::string& arch,
             }
         }
 
+        StoreCandidateSelectionCache(arch, solver, problem, use_split_k, result);
         return result;
     }
     catch(const miopen::Exception& ex)
