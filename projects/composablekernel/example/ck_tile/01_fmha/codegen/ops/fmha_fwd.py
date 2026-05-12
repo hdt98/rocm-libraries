@@ -1052,6 +1052,8 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
                     or (
                         (problem_ctx.hdim, problem_ctx.hdim_v) != (128, 128)
                         and kernel_ctx.tile.F_bm0 != 128
+                        and kernel_ctx.pipeline.tag
+                        not in ("qr_async_trload_v3", "qr_async")
                     )
                     or (
                         (problem_ctx.hdim, problem_ctx.hdim_v) == (128, 128)
@@ -1060,6 +1062,7 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
                     )
                 ):
                     # non qr_async_trload only support km0=128 tile size when hdim is not 128
+                    # qr_async and qr_async_trload_v3 can handle bm0!=128 (gated by other rules)
                     # non qr_async only support kn0=128 tile size when hdim is 128
                     return False
             return True
@@ -1115,28 +1118,28 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
         def check_qr_async_d256_tiles(
             problem_ctx: ProblemContext, kernel_ctx: KernelContext
         ) -> bool:
-            # qr_async for d256 requires bn0 >= 128; smaller bn0 causes
-            # SFC decomposition failures in async tile distribution.
+            # qr_async for d256 with small bn0 causes SFC decomposition failures
+            # when bm0 <= 128. Tiles with bm0 >= 256 are OK.
             tile = kernel_ctx.tile
             if kernel_ctx.pipeline.tag == "qr_async" and tile.F_bk0max == 256:
-                if tile.F_bn0 < 128:
+                if tile.F_bn0 < 128 and tile.F_bm0 <= 128:
                     return False
             return True
 
         rules.append(check_qr_async_d256_tiles)
 
-        def check_qr_async_d256_tiles(
+        def check_qr_async_k0_lt_k1(
             problem_ctx: ProblemContext, kernel_ctx: KernelContext
         ) -> bool:
-            # qr_async for d256 requires bn0 >= 128; smaller bn0 causes
-            # SFC decomposition failures in async tile distribution.
+            # qr_async K-LDS layout uses kK1 for distribution. When kK0 < kK1,
+            # the DRAM tile (kK0) is smaller than LDS expects, causing invalid
+            # SFC decomposition (e.g. d32: kK0=16, kK1=32 -> NumIssues=0).
             tile = kernel_ctx.tile
-            if kernel_ctx.pipeline.tag == "qr_async" and tile.F_bk0max == 256:
-                if tile.F_bn0 < 128:
-                    return False
+            if kernel_ctx.pipeline.tag == "qr_async" and tile.F_bk0 < tile.F_bk1:
+                return False
             return True
 
-        rules.append(check_qr_async_d256_tiles)
+        rules.append(check_qr_async_k0_lt_k1)
         return rules
 
 
@@ -1171,7 +1174,11 @@ class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
                 and (kernel_ctx.tile.F_rm1 * kernel_ctx.tile.F_rn1 * kernel_ctx.tile.F_rk1) == 8
             )  # fmt: skip
             is_v3_pipeline = kernel_ctx.pipeline.tag == "qr_async_trload_v3"
-            return is_v3_dedicated_tile == is_v3_pipeline
+            # v3 pipeline requires v3-dedicated tile, but v3-dedicated tiles
+            # can also use other pipelines (e.g. qr_async) gated by other rules
+            if is_v3_pipeline and not is_v3_dedicated_tile:
+                return False
+            return True
 
         rules.extend([check_tile_pipeline])
         return rules
@@ -1257,11 +1264,13 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
             extra[(256, 256)] = [
                 FmhaFwdTileSize(128, 128,  64, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
                 FmhaFwdTileSize(128, 128, 128, 256,  64, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-                FmhaFwdTileSize(128, 128, 256, 256,  32, 256,  8, 1, 1,  8, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
-                FmhaFwdTileSize(128, 192,  32, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1),
+                # b128x128x256 removed: with correct kK0 LDS sizing, K-LDS (128*256*2*2=128KB)
+                # plus other LDS exceeds the 163840-byte local memory limit on qr_async.
+                # Also blocked on qr (bk0>=bk0max). No viable pipeline.
                 FmhaFwdTileSize(128, 256,  32, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1),
                 FmhaFwdTileSize(256, 128,  32, 256,  32, 256,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
                 FmhaFwdTileSize(256, 128,  64, 256,  32, 256,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
+                FmhaFwdTileSize(256,  32, 256, 256,  32, 256,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,   8),
             ]  # fmt: skip
         return extra
 

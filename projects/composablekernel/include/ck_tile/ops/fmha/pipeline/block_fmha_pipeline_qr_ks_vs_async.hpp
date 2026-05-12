@@ -879,6 +879,15 @@ struct BlockFmhaPipelineQRKSVSAsync
                         sequence<(LdsSeq.at(number<k0_loops + k1_loops - 1>{}) + 1) * kN1, kK1>{}));
             }
 
+            // When k1_loops == 1 (bn0 == kK1), neither the inner k1 loop body nor
+            // the pre-loop V window advance execute, so the V DRAM window stays at
+            // position 0. Explicitly advance it so the next outer iteration reads
+            // the correct V slice corresponding to the new seqlen_k position.
+            if constexpr(k1_loops == 1)
+            {
+                move_tile_window(v_dram_window, {0, kK1});
+            }
+
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
             {
                 tile_elementwise_inout(
