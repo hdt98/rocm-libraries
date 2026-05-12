@@ -883,9 +883,10 @@ struct GroupedConvolutionBackwardWeightKernel
                                                      amd_buffer_coherence_enum::coherence_default,
                                                      LargeTensors>(c_ptr, kargs.c_grid_desc_m_n);
 
-        // For bf16_t and atomic_add global_atomic_add is used instead of buffer_atomic_add
-        // Add padding for not contiguous dim due to the lack of OOB check
-        // Not needed from gfx950.
+        // For bf16_t and atomic_add global_atomic_add is used instead of buffer_atomic_add.
+        // Add padding for not contiguous dim due to the lack of OOB check.
+        // On gfx950, the bf16 atomic_add-specific padding is not needed, but LargeTensors
+        // still require padding.
 #if defined(__gfx950__)
         constexpr bool pad_not_contiguous_dim = LargeTensors;
 #else

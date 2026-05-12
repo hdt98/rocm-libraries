@@ -734,8 +734,9 @@ struct GroupedConvolutionBackwardDataKernel
                              LargeTensors>(c_ptr, kargs.c_grid_descs_m_n[group_id]);
 
         // For bf16_t and atomic_add global_atomic_add is used instead of buffer_atomic_add
-        // Add padding for not contiguous dim due to the lack of OOB check
-        // Not needed from gfx950.
+        // Add padding for not contiguous dim due to the lack of OOB check.
+        // On gfx950 this padding is only needed for LargeTensors; on other targets it is also
+        // needed for bf16_t with atomic_add.
 #if defined(__gfx950__)
         constexpr bool pad_not_contiguous_dim = LargeTensors;
 #else
