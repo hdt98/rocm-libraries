@@ -4,39 +4,23 @@
 
 .. _building-installing-hipfft-and-hipfftw:
 
-********************************************************************
-Building and installing hipFFT and hipFFTW
-********************************************************************
+************************************************
+Build and install hipFFT and hipFFTW from source
+************************************************
 
-This topic explains how to install hipFFT and hipFFTW from the prebuilt packages or build it from the source code.
-hipFTT and hipFFTW require a ROCm-enabled platform. For more information,
-see the :doc:`Linux system requirements <rocm-install-on-linux:reference/system-requirements>`.
+To build rocFFT as part of the ROCm Core SDK, see `TheRock build
+instructions
+<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
+TheRock is the recommended way to build ROCm components from source.
 
-Installing prebuilt packages
-=============================
-
-For information on downloading and installing ROCm, see the
-:doc:`ROCm installation guide <rocm-install-on-linux:install/quick-start>`.
-
-To install hipFFT and hipFFTW, use the package manager for the Linux distribution, which
-handles all dependencies.
-This lets you run programs that use hipFFT or hipFFTW, but not compile them.
-
-On the Ubuntu distribution, run the following command:
-
-.. code-block:: shell
-
-   sudo apt update && sudo apt install hipfft
-
-.. note::
-
-   To compile programs, you must install the development package, which
-   contains the header files and CMake infrastructure.
-   This package is named ``hipfft-dev`` on Ubuntu/Debian systems and
-   ``hipfft-devel`` on RHEL and related variants.
+Alternatively, you can build rocFFT standalone using the following
+instructions.
 
 Building hipFFT and hipFFTW from source
 =======================================
+
+hipFTT and hipFFTW require a ROCm-enabled platform. For more information,
+see the :doc:`ROCm compatibility matrix <rocm:compatibility/compatibility-matrix>`.
 
 To build hipFFT and hipFFTW from source, follow these steps:
 
