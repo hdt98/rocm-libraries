@@ -1,0 +1,90 @@
+GlobalParameters:
+  SleepPercent: 50
+  NumElementsToValidate: -1
+  NumBenchmarks: 1
+  NumWarmups: 20
+  EnqueuesPerSync: 1000
+  DataInitTypeA: 12 # TrigSin
+  DataInitTypeB: 13 # TrigCos
+  DataInitTypeBeta: 0 # Zeros
+  DataInitTypeAlpha: 1 # Ones
+  CSVExportWinner: 1
+  CSVMergeSameProblemID: 1
+  Device: 0
+  PrintSolutionRejectionReason: True
+  KeepBuildTmp: True
+  ClientLogLevel: 3
+  KernelTime: True
+  BoundsCheck: 2
+
+BenchmarkProblems:
+  ########################################
+  # TN - gfx942 (CDNA3) - 128x224x64
+  # hipblaslt-bench winner for 2048x4096x4096
+  # Solution index 415 / global 82729
+  ########################################
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: b
+      DestDataType: b
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: 1 # T
+      TransposeB: 0 # N
+      UseBeta: True
+      Batched: True
+      UseBias: 1
+      BiasDataTypeList: [s, b]
+      UseScaleAlphaVec: 1
+      Activation: true
+      ActivationType: hipblaslt_all
+      ActivationFuncCall: true
+    - # BenchmarkProblemSizeGroup
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [
+              # M x N x K x B
+              16, 16, 16, 1,
+              # MIBlockM
+              1,
+              # WaveTileM x WaveTileN (4*2*16=128, 7*2*16=224)
+              4, 7,
+              # WaveM x WaveN
+              2, 2
+            ]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - DepthU: [64]
+        - ScheduleIterAlg: [3]
+        - ExpandPointerSwap: [0]
+        - TransposeLDS: [1]
+        - LocalReadVectorWidth: [8]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - LdsPadA: [16]
+        - LdsPadB: [16]
+        - StaggerU: [0]
+        - 1LDSBuffer: [1]
+        - SourceSwap: [1]
+        - UseSgprForGRO: [-1]
+        - NumElementsPerBatchStore: [16]
+        - NonTemporalD: [4]
+        - GlobalSplitU: [-1]
+        - GlobalSplitUAlgorithm: [MultipleBufferSingleKernel]
+        - GlobalSplitUCoalesced: [1]
+        - GlobalSplitUWorkGroupMappingRoundRobin: [1]
+        - WorkGroupMapping: [1]
+        - WorkGroupMappingXCC: [8]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [2048, 4096, 1, 4096]
+        - BiasTypeArgs: ['b']
+
+LibraryLogic:
+    ScheduleName: "gfx942"
+    ArchitectureName: "gfx942"

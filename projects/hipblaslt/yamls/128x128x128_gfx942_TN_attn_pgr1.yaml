@@ -1,0 +1,75 @@
+GlobalParameters:
+  SleepPercent: 50
+  NumElementsToValidate: -1
+  NumBenchmarks: 1
+  NumWarmups: 20
+  EnqueuesPerSync: 1000
+  DataInitTypeA: 12 # TrigSin
+  DataInitTypeB: 13 # TrigCos
+  DataInitTypeBeta: 0 # Zeros
+  DataInitTypeAlpha: 1 # Ones
+  CSVExportWinner: 1
+  CSVMergeSameProblemID: 1
+  Device: 0
+  PrintSolutionRejectionReason: True
+  KeepBuildTmp: True
+  ClientLogLevel: 3
+  KernelTime: True
+  BoundsCheck: 2
+
+BenchmarkProblems:
+  ########################################
+  # TN - gfx942 (CDNA3) - 128x128x128
+  # Pure GEMM for attention Q@K^T
+  # PrefetchGlobalRead=1 (less register pressure)
+  ########################################
+  -
+    - # ProblemType
+      OperationType: GEMM
+      DataType: b
+      DestDataType: b
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: 1 # T
+      TransposeB: 0 # N
+      UseBeta: True
+      Batched: True
+    - # BenchmarkProblemSizeGroup
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [
+              # M x N x K x B
+              16, 16, 16, 1,
+              # MIBlockM
+              1,
+              # WaveTileM x WaveTileN (4*2*16=128, 4*2*16=128)
+              4, 4,
+              # WaveM x WaveN
+              2, 2
+            ]
+        - PrefetchGlobalRead: [1]
+        - PrefetchLocalRead: [1]
+        - DepthU: [64]
+        - ScheduleIterAlg: [3]
+        - ExpandPointerSwap: [0]
+        - TransposeLDS: [1]
+        - LocalReadVectorWidth: [8]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - StaggerU: [0]
+        - 1LDSBuffer: [1]
+        - SourceSwap: [1]
+        - UseSgprForGRO: [0]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [128, 128, 1, 128]
+
+LibraryLogic:
+    ScheduleName: "gfx942"
+    ArchitectureName: "gfx942"
