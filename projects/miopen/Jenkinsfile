@@ -221,6 +221,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                     """.stripIndent()
                     sh """#!/bin/bash
                         export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
+                        export ASAN_OPTIONS="\${ASAN_OPTIONS}:print_stats=1"
                         . /opt/venv/bin/activate
                         cd /TheRock
                         SHARD_LOGS_DIR=${env.WORKSPACE}/shard_logs
@@ -235,11 +236,19 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                                 SHARD_INDEX=\$i \\
                                 TOTAL_SHARDS=4 \\
                                 python build_tools/github_actions/test_executable_scripts/test_miopen.py
+                                echo \$? > \$SHARD_LOGS_DIR/asan_shard_\$i.exit
                             ) 2>&1 | tee \$SHARD_LOGS_DIR/asan_shard_\$i.log | sed "s/^/[shard \$i] /" &
                             pids+=(\$!)
                         done
                         for pid in "\${pids[@]}"; do
-                            wait \$pid || overall_exit=1
+                            wait \$pid
+                        done
+                        for i in \$(seq 1 4); do
+                            shard_exit=\$(cat \$SHARD_LOGS_DIR/asan_shard_\$i.exit 2>/dev/null || echo 1)
+                            if [ "\$shard_exit" != "0" ]; then
+                                echo "[shard \$i] FAILED with exit code \$shard_exit"
+                                overall_exit=1
+                            fi
                         done
                         exit \$overall_exit
                     """.stripIndent()
