@@ -867,7 +867,10 @@ pipeline {
                     post {
                         always {
                             archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
-                            sh "docker rmi ${env.ASAN_CANDIDATE_IMAGE ?: \"${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan\"} || true"
+                            script {
+                                def imageToRemove = env.ASAN_CANDIDATE_IMAGE ?: "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
+                                sh "docker rmi ${imageToRemove} || true"
+                            }
                             cleanWs()
                         }
                     }
