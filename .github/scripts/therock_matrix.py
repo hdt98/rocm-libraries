@@ -205,9 +205,18 @@ def collect_projects_to_run(subtrees):
     # For each component, get tests from TheRock's script.
     # If TheRock returns meaningful deps (more than just the component itself),
     # use them; otherwise fall back to project_map.
+    # Also track which components belong to which project.
     component_names = extract_component_names_from_subtrees(subtrees)
     tests_per_component = {}
     components_needing_fallback = set()
+    component_to_project = {}
+
+    # Build mapping from component to project
+    for subtree in subtrees:
+        if subtree in subtree_to_project_map:
+            component = subtree.split("/")[-1] if "/" in subtree else subtree
+            project = subtree_to_project_map[subtree]
+            component_to_project[component] = project
 
     for component in component_names:
         deps = get_test_dependencies_from_therock([component])
@@ -286,14 +295,20 @@ def collect_projects_to_run(subtrees):
 
             # Collect tests: use TheRock deps for components that have them,
             # fall back to hardcoded for components that don't.
+            # Only include test deps for components that belong to this project.
             tests_to_run = set()
 
-            # Add test deps for components that have them from TheRock
+            # Add test deps only for components that belong to this project
             for component, deps in tests_per_component.items():
-                tests_to_run.update(deps)
+                if component_to_project.get(component) == project:
+                    tests_to_run.update(deps)
 
-            # For components needing fallback, use hardcoded projects_to_test
-            if components_needing_fallback:
+            # For components needing fallback that belong to this project,
+            # use hardcoded projects_to_test
+            project_needs_fallback = any(
+                component_to_project.get(c) == project for c in components_needing_fallback
+            )
+            if project_needs_fallback:
                 tests_to_run.update(project_map_data["projects_to_test"])
 
             project_map_data["projects_to_test"] = list(tests_to_run)
