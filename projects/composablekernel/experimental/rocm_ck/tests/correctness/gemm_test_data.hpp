@@ -16,6 +16,7 @@
 //
 // Supported generators:
 //   ConstantGen    — every element = value
+//   IdentityGen    — 1 on diagonal, 0 elsewhere
 //   SequentialGen  — (m * N + n) % modulus
 //   UniformGen     — uniform random in [lo, hi) via xorshift32
 
@@ -26,6 +27,8 @@
 #include <rocm_ck/hip_check.hpp>
 
 #include <hip/hip_runtime.h>
+#include <hip/hip_fp16.h>
+#include <hip/hip_bfloat16.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -134,6 +137,18 @@ inline void fillConstant2D(rocm_ck::Args& args,
 }
 
 // ============================================================================
+// Generator: identity matrix — 1.0 on diagonal, 0.0 elsewhere
+// ============================================================================
+
+struct IdentityGen
+{
+    __device__ float operator()(int m, int n, int, int) const
+    {
+        return (m == n) ? 1.0f : 0.0f;
+    }
+};
+
+// ============================================================================
 // Generator: sequential (modular) — value = float((m * N + n) % modulus)
 // ============================================================================
 
@@ -176,6 +191,22 @@ struct UniformGen
         s          = detail::xorshift32(s); // extra round for better mixing
         float t    = static_cast<float>(s) / static_cast<float>(0xFFFFFFFFu);
         return lo + (hi - lo) * t;
+    }
+};
+
+// ============================================================================
+// Generator: Rademacher — +1 or -1 with equal probability
+// ============================================================================
+
+struct RademacherGen
+{
+    uint32_t seed;
+
+    __device__ float operator()(int m, int n, int, int N) const
+    {
+        uint32_t s = seed ^ static_cast<uint32_t>(m * N + n + 1);
+        s          = detail::xorshift32(s);
+        return (s & 1u) ? 1.0f : -1.0f;
     }
 };
 

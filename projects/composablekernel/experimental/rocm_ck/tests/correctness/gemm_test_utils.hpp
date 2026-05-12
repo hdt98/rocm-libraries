@@ -19,6 +19,9 @@
 #include <hip/hip_runtime.h>
 #include <gtest/gtest.h>
 
+#include <cstdio>
+#include <string_view>
+
 namespace rocm_ck::test {
 
 /// Skip the current test if no GPU is available.
@@ -65,6 +68,37 @@ dim3 gemmGrid(const Spec& spec, int M, int N)
     int grid_n = (N + spec.block_tile.n - 1) / spec.block_tile.n;
     return dim3(static_cast<unsigned>(grid_m * grid_n), 1u,
                 static_cast<unsigned>(spec.k_batch));
+}
+
+/// CPU reference GEMM: C = A * B using strides from Args tensor slots.
+/// Reads strides from the Args struct so it matches whatever layout
+/// the spec set.  Replace with a GPU reference later.
+inline void cpuGemm(const float* a,
+                    const float* b,
+                    float* c,
+                    int M,
+                    int N,
+                    int K,
+                    const rocm_ck::Args& args,
+                    int a_slot,
+                    int b_slot,
+                    int c_slot)
+{
+    int64_t a_s0 = args.tensors[a_slot].strides[0];
+    int64_t a_s1 = args.tensors[a_slot].strides[1];
+    int64_t b_s0 = args.tensors[b_slot].strides[0];
+    int64_t b_s1 = args.tensors[b_slot].strides[1];
+    int64_t c_s0 = args.tensors[c_slot].strides[0];
+    int64_t c_s1 = args.tensors[c_slot].strides[1];
+
+    for(int m = 0; m < M; ++m)
+        for(int n = 0; n < N; ++n)
+        {
+            float sum = 0.0f;
+            for(int k = 0; k < K; ++k)
+                sum += a[m * a_s0 + k * a_s1] * b[k * b_s0 + n * b_s1];
+            c[m * c_s0 + n * c_s1] = sum;
+        }
 }
 
 } // namespace rocm_ck::test
