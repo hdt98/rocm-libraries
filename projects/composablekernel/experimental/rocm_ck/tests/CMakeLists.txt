@@ -107,3 +107,12 @@ option(ROCM_CK_GPU_TESTS "Build GPU integration tests (requires HIP)" OFF)
 if(ROCM_CK_GPU_TESTS)
     add_subdirectory(gpu)
 endif()
+
+# =============================================================================
+# Correctness tests (opt-in, requires HIP + GPU)
+# =============================================================================
+
+option(ROCM_CK_CORRECTNESS_TESTS "Build correctness tests (requires HIP + GPU)" OFF)
+if(ROCM_CK_CORRECTNESS_TESTS)
+    add_subdirectory(correctness)
+endif()
