@@ -144,9 +144,9 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE CACHE BOOL "Add paths to linker searc
 
 if(DEFINED BUILD_SHARED_LIBS)
   set(PKG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-else()  
+else()
   set(PKG_BUILD_SHARED_LIBS ON)
-endif()  
+endif()
 set(BUILD_SHARED_LIBS OFF) # don't build client dependencies as shared
 
 # Get dependencies (required here to get rocm-cmake)
@@ -265,7 +265,7 @@ if (ROCPRIM_PROJECT_IS_TOP_LEVEL)
 
   rocm_create_package(
     NAME rocprim
-    DESCRIPTION "rocPRIM is a header-only library that provides HIP parallel primitives." 
+    DESCRIPTION "rocPRIM is a header-only library that provides HIP parallel primitives."
     MAINTAINER "rocPRIM Maintainer <rocprim-maintainer@amd.com>"
     HEADER_ONLY
   )
@@ -309,15 +309,6 @@ if(BUILD_CODE_COVERAGE)
     REQUIRED
     HINTS ${ROCM_PATH}/llvm/bin
     PATHS /opt/rocm/llvm/bin
-  )
-
-  add_custom_target(
-    coverage_analysis
-    COMMAND echo Coverage GTEST_FILTER=\${GTEST_FILTER}
-    COMMAND ${CMAKE_COMMAND} -E rm -rf ./coverage-report
-    COMMAND ${CMAKE_COMMAND} -E make_directory ./coverage-report/profraw
-    COMMAND ctest --output-on-failure -E "rocprim.linking*" --gtest_filter=\"\${GTEST_FILTER}\"
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
   )
 
   get_property(LLVM_COV_OBJECT_ARGS GLOBAL PROPERTY LLVM_COV_OBJECT_ARGS)
