@@ -389,8 +389,9 @@ What to do:
 3. Fix every error you find. If a claim cannot be verified or is wrong, either correct it from the source or remove it. Do not paper over uncertainty with vague language.
 4. Apply the prose rules from §1.1 of the writer's spec: plain technical prose, no banned filler ("essentially", "leverages", "robust", "powerful", "serves as", etc.), no restated headings, no marketing tone.
 5. Preserve the source-file-to-concept map (corrected if wrong) and concrete file/class references. A developer should be able to read the doc and know where to look in the source.
-6. Length target: 100-200 lines per file.
-7. Save the corrected version back to the same path.
+6. Check every Markdown table for column-alignment in the source. Every cell in a column must be padded so the `|` delimiters line up vertically across header, separator row, and all data rows. The separator row's dashes must span the full padded column width. Preserve `:` alignment markers (`:---`, `---:`, `:---:`). Re-pad any table where the delimiters zig-zag.
+7. Length target: 100-200 lines per file.
+8. Save the corrected version back to the same path.
 
 Constraints: do not modify any source code; do not commit, push, or touch git.
 
@@ -457,6 +458,7 @@ The voice rules in §1.1 apply to every line you write. To make this concrete:
 - Tables and bullet lists are tools, not defaults. Use a table when comparing several items along the same axes. Use a bullet list when items are genuinely parallel and three or more. Use prose otherwise.
 - Code references (`ClassName`, `function_name`, file paths) go in backticks. Section headings, prose nouns, and English words do not.
 - When you have to describe a sequence of steps in code, prefer numbered prose over a bullet list — it forces order to be meaningful.
+- Markdown tables must be column-aligned in the source. Pad every cell in a column with spaces so the `|` delimiters line up vertically across the header, the separator row, and every data row. The separator row's dashes must span the full padded column width (e.g. `| name      | description |` pairs with `|-----------|-------------|`). Preserve any `:` alignment markers (`:---`, `---:`, `:---:`). A table whose `|` delimiters zig-zag down the page is a bug — fix it before saving the file.
 
 # 7. Special File Instructions
 
