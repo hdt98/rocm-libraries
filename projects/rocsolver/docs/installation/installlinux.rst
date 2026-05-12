@@ -33,14 +33,14 @@ Install ROCm solver libraries on Linux
 ======================================
 
 Alternatively, if you want to install rocSOLVER as part of the ROCm
-rand package (a subset of the ROCm Core SDK ``amdrocm-core-sdk``) without
+solver package (a subset of the ROCm Core SDK ``amdrocm-core-sdk``) without
 additional ROCm libraries and tools, install the ``amdrocm-solver`` package.
 This includes rocSOLVER and hipSOLVER.
 
 1. Complete the :doc:`ROCm installation prerequisites <rocm:install/rocm>` to
    install dependencies and configure GPU access permissions.
 
-2. Install the ROCm rand package that matches your desired ROCm version,
+2. Install the ROCm solver package that matches your desired ROCm version,
    development package needs, and AMD GPU architecture. Package names use the
    following format:
 

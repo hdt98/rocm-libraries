@@ -1,5 +1,5 @@
 .. meta::
-   :description: Installation instructions for hipBLASLt
+   :description: Installation instructions for rocFFT
    :keywords: lib, rocfft, fast, fourier, transform, fft, algorithm, install, sdk, rocm
 
 .. _installation:

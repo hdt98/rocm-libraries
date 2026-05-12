@@ -40,7 +40,7 @@ package. This includes the ROCm runtime and system dependencies.
 1. Complete the :doc:`ROCm installation prerequisites <rocm:install/rocm>` to
    install dependencies and configure GPU access permissions.
 
-2. Install the ROCm video decode package that matches your desired ROCm version.
+2. Install the ROCm common math libraries package that matches your desired ROCm version.
    Package names use the following format:
 
    .. code-block:: shell-session
