@@ -2051,8 +2051,24 @@ class Solution(collections.abc.Mapping):
       return
 
     if state.get("PrefetchAcrossPersistent", 0) and (state["enableTDMA"] or state["enableTDMB"]):
-      reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with TDM (enableTDMA/enableTDMB)")
-      return
+      if not (state["enableTDMA"] and state["enableTDMB"]):
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires TDMInst == 3 (enableTDMA and enableTDMB)")
+        return
+      if state["StreamK"] != 3:
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires StreamK == 3")
+        return
+      if state["PrefetchGlobalRead"] < 1:
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires PGR >= 1")
+        return
+      if state["PrefetchGlobalRead"] != 1:
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires PGR == 1")
+        return
+      if (state["ProblemType"]["TransposeA"], state["ProblemType"]["TransposeB"]) != (True, False):
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent supports TN only")
+        return
+      if math.prod(state["MIWaveGroup"]) <= 1:
+        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires wave-separated mode (prod(MIWaveGroup) > 1)")
+        return
 
     # DepthU == -1?
     if state["DepthU"] == -1:

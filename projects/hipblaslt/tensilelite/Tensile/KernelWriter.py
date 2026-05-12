@@ -2849,6 +2849,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.addComment0("local write addresses: reset inc")
           module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
 
+        if (tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1
+            and kernel.get("PrefetchAcrossPersistent", 0) and kernel["StreamK"]):
+          module.add(self.tdmRestorePapLdsBank(kernel, tensorParametersA, tensorParametersB))
+
       if self.do["executeToInitEnd"] and not forPrefetchAcrossPersistent:
         module.add(self.functionEnd(kernel, addLabel=False))
 
@@ -2873,8 +2877,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         )
         lbl_prefetchPrimedMerge = Label(self.labels.getNameInc("SK_PrefetchPrimedMerge"), "")
         if usePrimedSkip:
-          module.add(SCmpEQU32(src0=sgpr("SkPrefetchPrimed"), src1=1, comment="tail prefetch already issued first PGR group?"))
-          module.add(SCBranchSCC1(labelName=lbl_prefetchPrimedMerge.getLabelName(), comment="skip first PGR group if primed"))
+          module.add(SCmpEQU32(src0=sgpr("SkPrefetchPrimed"), src1=0, comment="tail prefetch already issued first PGR group?"))
+          module.add(SCBranchSCC0(labelName=lbl_prefetchPrimedMerge.getLabelName(), comment="skip first PGR group if primed"))
         moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st)
         module.add(replaceHolder(moduleTmp, 0))
         module.add(self.globalReadDo(kernel, 0, tensorParameters1st))
@@ -3625,8 +3629,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self._wait(kernel, tensorParametersA, tensorParametersB, 0, -1, -1, "wait for tensor load to finish"))
       module.add(self._syncThreads(kernel))
 
-    if (not isOptNLL and not isNGLL and NLLindex == NLLnum - 1
-        and self.isPrefetchAcrossPersistentEnabled(kernel)):
+    isPapNll = (not isOptNLL and not isNGLL and NLLindex == NLLnum - 1
+                and self.isPrefetchAcrossPersistentEnabled(kernel))
+
+    if isPapNll:
       module.add(self.prefetchAcrossPersistent(kernel, tensorParametersA, tensorParametersB))
 
     # generate no Load Loop Body code
@@ -5371,10 +5377,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       if kernel["enableTDMA"] and kernel["enableTDMB"]:
         if prod(kernel["MIWaveGroup"]) > 1:
-          module.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA, tensorParametersB))
+          if self.isPrefetchAcrossPersistentEnabled(kernel):
+            module.add(self.resetTDMDescriptorForTailPapWaveSeparated(kernel, tensorParametersA, tensorParametersB))
+          else:
+            module.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA, tensorParametersB))
           if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
-            module.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA["MX"], \
-                                                                   tensorParametersB["MX"]))
+            if self.isPrefetchAcrossPersistentEnabled(kernel):
+              module.add(self.resetTDMDescriptorForTailPapWaveSeparated(kernel, tensorParametersA["MX"], \
+                                                                        tensorParametersB["MX"]))
+            else:
+              module.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA["MX"], \
+                                                                     tensorParametersB["MX"]))
         else:
           module.add(self.resetTDMDescriptorForTail(kernel, tensorParametersA))
           module.add(self.resetTDMDescriptorForTail(kernel, tensorParametersB))
@@ -5624,6 +5637,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.localReadResetOffsets(kernel, tPM))
           module.addComment1("local read init pointers metadata")
           module.add(self.localReadInitPointers(kernel, tensorParametersA, tPM))
+
+        if (kernel["enableTDMA"] and kernel["enableTDMB"]
+            and self.isPrefetchAcrossPersistentEnabled(kernel)):
+          module.add(self.tdmShiftTailLdsBank(kernel, tensorParametersA, tensorParametersB))
 
       # tail: macs
       module.addComment1("tail loop: macs")
@@ -9696,6 +9713,21 @@ class KernelWriter(metaclass=abc.ABCMeta):
     assert False, "Should be overrided"
 
   def tdmApplyStreamKOffsetWaveSeparated(self, kernel, tPA, tPB) -> Module:
+    assert False, "Should be overrided"
+
+  def resetTDMDescriptorForTailPapWaveSeparated(self, kernel, tPA, tPB) -> Module:
+    assert False, "Should be overrided"
+
+  def tdmUpdateDescriptorForPAP(self, kernel, tPA, tPB, preservePapBank=True) -> Module:
+    assert False, "Should be overrided"
+
+  def tdmSavePapLdsBank(self, kernel) -> Module:
+    assert False, "Should be overrided"
+
+  def tdmRestorePapLdsBank(self, kernel, tPA, tPB) -> Module:
+    assert False, "Should be overrided"
+
+  def tdmShiftTailLdsBank(self, kernel, tPA, tPB) -> Module:
     assert False, "Should be overrided"
 
   def tdmIncrementAB(self, kernel, tP) -> Module:
