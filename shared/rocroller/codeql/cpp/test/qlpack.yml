@@ -1,8 +1,6 @@
-# TODO: Fix the name and the location of the package as per the structure of
-# rocm/rocm-libraries repo.
-name: rocmsoftwareplatform/rocroller-tests
+name: rocm/rocroller-tests
 version: 0.0.1
 libraryPathDependencies:
   - codeql/cpp-all
-  - ROCm/rocroller
+  - rocm/rocroller
 extractor: cpp
