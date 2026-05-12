@@ -63,10 +63,10 @@ target_link_libraries(hipdnn_frontend_python PRIVATE hipdnn_frontend hipdnn_back
 
 # SKBUILD is set by scikit-build-core when building a wheel.
 if(DEFINED SKBUILD)
-    install(TARGETS hipdnn_frontend_python DESTINATION hipdnn_frontend)
-    install(FILES hipdnn_frontend/__init__.py DESTINATION hipdnn_frontend)
+    # pip install . / pip wheel . → scikit-build-core packages the extension into a wheel
+    install(TARGETS hipdnn_frontend_python DESTINATION .)
 else()
-    # Build wheel and stage it in the install prefix.
+    # cmake --install → calls pip wheel to build .whl, stages it in share/hipdnn/wheels/
     install(CODE "
         set(_wheel_dir \"\${CMAKE_INSTALL_PREFIX}/share/hipdnn/wheels\")
         file(MAKE_DIRECTORY \"\${_wheel_dir}\")

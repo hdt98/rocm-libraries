@@ -51,9 +51,10 @@ build-dir = "build"
 cmake.minimum-version = "3.18"
 # Build type
 cmake.build-type = "Release"
-# No pure-Python packages to scan; the wheel contents come entirely from
-# cmake install() rules (hipdnn_frontend_python.so + __init__.py → hipdnn_frontend/).
-wheel.packages = []
+# Where the Python module will be installed
+wheel.install-dir = "hipdnn_frontend"
+# Package data
+wheel.packages = ["hipdnn_frontend"]
 
 [tool.scikit-build.cmake.define]
 # Pass any additional CMake definitions if needed
