@@ -1281,14 +1281,20 @@ CK_TILE_DEVICE void async_buffer_load_dwordxn_v(void* smem,
                                                 index_t /*flag*/       = 0,
                                                 bool_constant<pre_nop> = {})
 {
+// #define CK_TILE_ASYNC_LOAD_WITH_INSTR(instr)                            \
+//     if constexpr(pre_nop)                                               \
+//         asm volatile("s_nop 4\n" instr " %1, %2, 0 offen offset:%3 lds" \
+//                      : "=r"(smem) /*dummy dependency for smem*/         \
+//                      : "v"(voffset), "s"(rsrc), "n"(ioffset)            \
+//                      : "memory");                                       \
+//     else                                                                \
+//         asm volatile(instr " %1, %2, 0 offen offset:%3 lds"             \
+//                      : "=r"(smem) /*dummy dependency for smem*/         \
+//                      : "v"(voffset), "s"(rsrc), "n"(ioffset)            \
+//                      : "memory");
+
 #define CK_TILE_ASYNC_LOAD_WITH_INSTR(instr)                            \
-    if constexpr(pre_nop)                                               \
         asm volatile("s_nop 4\n" instr " %1, %2, 0 offen offset:%3 lds" \
-                     : "=r"(smem) /*dummy dependency for smem*/         \
-                     : "v"(voffset), "s"(rsrc), "n"(ioffset)            \
-                     : "memory");                                       \
-    else                                                                \
-        asm volatile(instr " %1, %2, 0 offen offset:%3 lds"             \
                      : "=r"(smem) /*dummy dependency for smem*/         \
                      : "v"(voffset), "s"(rsrc), "n"(ioffset)            \
                      : "memory");
