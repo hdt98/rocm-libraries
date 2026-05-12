@@ -17,9 +17,9 @@ The rocPRIM project is located in https://github.com/ROCm/rocm-libraries/tree/de
 
   .. grid-item-card:: Install
 
-    * :doc:`Install rocPRIM <install/installation>`
+    * :doc:`Install rocPRIM <install/install>`
     * :doc:`Build from source <install/build>`
-  
+
   .. grid-item-card:: Conceptual
 
     * :doc:`Block and stripe arrangements <./conceptual/rocPRIM-stripe-block>`
@@ -31,8 +31,7 @@ The rocPRIM project is located in https://github.com/ROCm/rocm-libraries/tree/de
 
     * :doc:`Use the SPIR-V target with rocPRIM <./how-to/rocPRIM-spir-v>`
     * :doc:`Use primbench for benchmarking <./how-to/rocPRIM-primbench>`
-    
-   
+
   .. grid-item-card:: Reference
 
     * :ref:`glossary`
