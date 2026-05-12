@@ -1195,8 +1195,7 @@ struct pk_fp6_legacy_t
         // corrupting any element that places its low bits in the upper region of a
         // word (e.g. fp6 1.0 = 0x08 at idx=10 puts bit 31 of data_[1] high; an
         // arithmetic >> 28 returns 0xFFFFFFF8 instead of 0x8 -> read back as -4).
-        int32_t bits =
-            static_cast<int32_t>(static_cast<uint32_t>(pk.data_[arr_idx]) >> bit_offset);
+        int32_t bits = static_cast<int32_t>(static_cast<uint32_t>(pk.data_[arr_idx]) >> bit_offset);
         if(overhang > 0 && (arr_idx + 1) < vector_size)
         {
             bits |= (pk.data_[arr_idx + 1] & ((1u << overhang) - 1)) << (num_bits_elem - overhang);
