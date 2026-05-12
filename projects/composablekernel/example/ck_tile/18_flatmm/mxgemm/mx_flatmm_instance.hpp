@@ -141,6 +141,7 @@ float mx_flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                   << "Shape: " << FlatmmShape::GetName() << "\n"
                   << "problem: " << MXPipelineProblem::GetName() << "\n"
                   << "pipeline: " << MXFlatmmPipeline::GetName() << "\n"
+                  << "epilogue: " << GemmEpilogue::GetName() << "\n"
                   << "grid: {" << grids.x << ", " << grids.y << ", " << grids.z << "}"
                   << ", blocks: {" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}"
                   << std::endl;

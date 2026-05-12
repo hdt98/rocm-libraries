@@ -96,7 +96,7 @@ struct MXFlatmmConfigBase32TDM
 template <ck_tile::core::arch::TargetId Arch, typename FlatmmConfig>
 struct MXFlatmmArchTraits
 {
-    static constexpr int BlockedXDLN_PerWarp = 2; // determined by scale shuffle pattern
+    static constexpr int BlockedXDLN_PerWarp = 2; // (NXdlPack) determined by scale shuffle pattern
 
     using Config = FlatmmConfig;
 
@@ -104,47 +104,6 @@ struct MXFlatmmArchTraits
     using MXFlatmmPipeline = ck_tile::MXFlatmmPipelineAGmemBGmemCRegV1<MXPipelineProblem>;
 
     static constexpr int GetNLane() { return Config::N_Warp_Tile; }
-
-    template <typename dtype>
-    static auto preShuffleWeight(ck_tile::HostTensor<dtype>& src)
-    {
-        constexpr ck_tile::index_t NLane = Config::N_Warp_Tile;
-        auto src_lengths                 = src.get_lengths();
-        const int K                      = src_lengths[0];
-        const int N                      = src_lengths[1];
-        constexpr int packed_size        = ck_tile::numeric_traits<dtype>::PackedSize;
-        int KPack                        = std::is_same_v<dtype, ck_tile::pk_fp6x16_t>
-                                               ? 32
-                                               : 16 * packed_size; // fp4/fp6:32 or fp8:16
-
-        int KLane = ck_tile::get_warp_size() / NLane;
-        int K0    = K / (KLane * KPack);
-
-        ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor({N * K}, {1}));
-
-        // K -> K0 KLane KPack
-        // N -> N0 NLane
-        // N, K -> N0 K0 KLane NLane KPack
-        for(int n = 0; n < N; ++n)
-        {
-            for(int k = 0; k < K; k += packed_size)
-            {
-                int n0 = n / NLane;
-                int n1 = n % NLane;
-
-                int k0    = k / (KLane * KPack);
-                int tempk = k % (KLane * KPack);
-                int k1    = tempk / KPack;
-                int k2    = tempk % KPack;
-
-                int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
-                                  k1 * KPack * NLane + n1 * KPack + k2;
-
-                shuffled(outputIndex) = src(k, n);
-            }
-        }
-        return shuffled;
-    }
 
     template <bool KLast, typename dtype>
     static auto preShuffleScale(ck_tile::HostTensor<dtype>& src)
@@ -211,6 +170,50 @@ using MXFlatmm_GFX950_FP8FP4_Traits =
     MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase16>;
 using MXFlatmm_GFX950_FP4FP8_Traits =
     MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase16>;
+
+template <typename FlatmmConfig>
+struct MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250, FlatmmConfig>
+    : public MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, FlatmmConfig>
+{
+
+    template <bool KLast, typename dtype>
+    static auto preShuffleScale(ck_tile::HostTensor<dtype>& src)
+    {
+        auto src_lengths = src.get_lengths();
+        const auto MN    = KLast ? src_lengths[0] : src_lengths[1];
+        const auto K     = KLast ? src_lengths[1] : src_lengths[0];
+        // K  -> K/KPack,     KPack(KPack is used to make sure int32 alignment)
+        // MN -> MN/WarpSize, WarpSize
+        //  MN/WarpSize, K/KPack, WarpSize, KPack
+        size_t KPack = sizeof(int32_t) / sizeof(dtype); // scale always use fp8; KPack = 4
+        size_t K0    = K / KPack;
+        size_t M1    = 32; // this is used to align 32x32x128 block scaled wmma
+
+        const auto MN_Paded = ck_tile::integer_least_multiple(MN, 32);
+
+        ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor({MN_Paded * K}, {1}));
+
+        for(size_t n = 0; n < MN_Paded; ++n)
+        {
+            for(size_t k = 0; k < K; ++k)
+            {
+                auto n0 = n / M1; // i MNRepeat
+                auto n1 = n % M1; // i M1
+
+                auto k0 = k / KPack; // i KRepeat
+                auto k2 = k % KPack; // i K1
+
+                auto outputIndex = n0 * K0 * M1 * KPack + k0 * M1 * KPack + n1 * KPack + k2;
+
+                if constexpr(KLast)
+                    shuffled(outputIndex) = n < MN ? src(n, k) : dtype{};
+                else
+                    shuffled(outputIndex) = n < MN ? src(k, n) : dtype{};
+            }
+        }
+        return shuffled;
+    }
+};
 
 template <ck_tile::core::arch::TargetId Arch, typename FlatmmConfig>
 struct MXFlatmmTDMArchTraits;
@@ -280,6 +283,17 @@ using MXFlatmmTDM_GFX1250_FP8FP4_Traits =
 using MXFlatmmTDM_GFX1250_FP4FP8_Traits =
     MXFlatmmTDMArchTraits<ck_tile::core::arch::TargetId::GFX1250, MXFlatmmConfigBase32TDM>;
 
+using MXFlatmm_GFX1250_FP4FP4_Traits =
+    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250, MXfp4_FlatmmConfig16>;
+using MXFlatmm_GFX1250_FP8FP8_Traits =
+    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250, MXFlatmmConfigBase16>;
+using MXFlatmm_GFX1250_FP6FP6_Traits =
+    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250, MXFlatmmConfigBase16>;
+using MXFlatmm_GFX1250_FP8FP4_Traits =
+    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250, MXFlatmmConfigBase16>;
+using MXFlatmm_GFX1250_FP4FP8_Traits =
+    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250, MXFlatmmConfigBase16>;
+
 // Helper to get current target ID based on compile-time macros
 constexpr ck_tile::core::arch::TargetId GetCurrentTargetId()
 {
@@ -289,28 +303,3 @@ constexpr ck_tile::core::arch::TargetId GetCurrentTargetId()
     return ck_tile::core::arch::TargetId::GFX950; // Default fallback
 #endif
 }
-
-using MXFlatmm_GFX1250_FP4FP4_Traits =
-    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase32TDM>;
-using MXFlatmm_GFX1250_FP8FP8_Traits =
-    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase32TDM>;
-using MXFlatmm_GFX1250_FP6FP6_Traits =
-    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase32TDM>;
-using MXFlatmm_GFX1250_FP8FP4_Traits =
-    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase32TDM>;
-using MXFlatmm_GFX1250_FP4FP8_Traits =
-    MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase32TDM>;
-
-#if defined(CK_USE_GFX1250)
-using MXFlatmm_FP4FP4_Traits = MXFlatmm_GFX1250_FP4FP4_Traits;
-using MXFlatmm_FP8FP8_Traits = MXFlatmm_GFX1250_FP8FP8_Traits;
-using MXFlatmm_FP6FP6_Traits = MXFlatmm_GFX1250_FP6FP6_Traits;
-using MXFlatmm_FP8FP4_Traits = MXFlatmm_GFX1250_FP8FP4_Traits;
-using MXFlatmm_FP4FP8_Traits = MXFlatmm_GFX1250_FP4FP8_Traits;
-#else
-using MXFlatmm_FP4FP4_Traits = MXFlatmm_GFX950_FP4FP4_Traits;
-using MXFlatmm_FP8FP8_Traits = MXFlatmm_GFX950_FP8FP8_Traits;
-using MXFlatmm_FP6FP6_Traits = MXFlatmm_GFX950_FP6FP6_Traits;
-using MXFlatmm_FP8FP4_Traits = MXFlatmm_GFX950_FP8FP4_Traits;
-using MXFlatmm_FP4FP8_Traits = MXFlatmm_GFX950_FP4FP8_Traits;
-#endif

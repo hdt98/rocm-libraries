@@ -442,7 +442,7 @@ CK_TILE_HOST_DEVICE constexpr bf16_t pk_fp4_t::to_bf16(float scale) const
 #if CK_TILE_FP4_CVT_DEVICE
     return impl::_from_f4<bf16_t>(data, scale);
 #else
-    return bf16_t{type_convert<bf16_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
+    return bf16_t{float_to_bf16(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
 #endif
 }
 
@@ -451,8 +451,8 @@ CK_TILE_HOST_DEVICE constexpr bf16x2_t pk_fp4_t::to_bf16x2(float scale) const
 #if CK_TILE_FP4_CVT_DEVICE
     return impl::_from_f4<bf16x2_t>(data, scale);
 #else
-    return bf16x2_t{type_convert<bf16_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
-                    type_convert<bf16_t>(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
+    return bf16x2_t{float_to_bf16(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
+                    float_to_bf16(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
 #endif
 }
 
@@ -479,7 +479,7 @@ CK_TILE_HOST_DEVICE constexpr pk_fp4_t fp16_to_pk_fp4(const fp16_t& x, float sca
 #if CK_TILE_FP4_CVT_DEVICE
     return impl::_to_f4(x, scale);
 #else
-    auto res = float_to_mxfp4(type_convert<float>(x), scale);
+    auto res = float_to_mxfp4(fp16_to_float(x), scale);
     return pk_fp4_t::_pack(res, res);
 #endif
 }
@@ -488,7 +488,7 @@ CK_TILE_HOST_DEVICE constexpr pk_fp4_t bf16_to_pk_fp4(const bf16_t& x, float sca
 #if CK_TILE_FP4_CVT_DEVICE
     return impl::_to_f4(x, scale);
 #else
-    auto res = float_to_mxfp4(type_convert<float>(x), scale);
+    auto res = float_to_mxfp4(bf16_to_float(x), scale);
     return pk_fp4_t::_pack(res, res);
 #endif
 }
@@ -645,7 +645,7 @@ CK_TILE_HOST_DEVICE constexpr fp16_t pk_fp4_t::to_fp16(float scale) const
 #if CK_TILE_FP4_CVT_DEVICE
     return impl::_from_f4<fp16_t>(data, scale);
 #else
-    return fp16_t{type_convert<fp16_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
+    return fp16_t{float_to_fp16(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
 #endif
 }
 CK_TILE_HOST_DEVICE constexpr fp16x2_t pk_fp4_t::to_fp16x2(float scale) const
@@ -653,8 +653,8 @@ CK_TILE_HOST_DEVICE constexpr fp16x2_t pk_fp4_t::to_fp16x2(float scale) const
 #if CK_TILE_FP4_CVT_DEVICE
     return impl::_from_f4<fp16x2_t>(data, scale);
 #else
-    return fp16x2_t{type_convert<fp16_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
-                    type_convert<fp16_t>(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
+    return fp16x2_t{float_to_fp16(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
+                    float_to_fp16(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
 #endif
 }
 CK_TILE_HOST_DEVICE constexpr fp8_t pk_fp4_t::to_fp8(float scale) const
@@ -664,7 +664,7 @@ CK_TILE_HOST_DEVICE constexpr fp8_t pk_fp4_t::to_fp8(float scale) const
     // #if CK_TILE_FP4_CVT_DEVICE
     //    return impl::_from_f4<fp8_t>(data, scale);
     // #else
-    return fp8_t{type_convert<fp8_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
+    return fp8_t{float_to_fp8(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
     // #endif
 }
 CK_TILE_HOST_DEVICE constexpr fp8x2_t pk_fp4_t::to_fp8x2(float scale) const
@@ -674,8 +674,8 @@ CK_TILE_HOST_DEVICE constexpr fp8x2_t pk_fp4_t::to_fp8x2(float scale) const
     // #if CK_TILE_FP4_CVT_DEVICE
     //    return impl::_from_f4<fp8x2_t>(data, scale);
     // #else
-    return fp8x2_t{type_convert<fp8_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
-                   type_convert<fp8_t>(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
+    return fp8x2_t{float_to_fp8(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
+                   float_to_fp8(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
     // #endif
 }
 #else
@@ -690,24 +690,21 @@ CK_TILE_HOST_DEVICE constexpr fp32x2_t pk_fp4_t::to_fp32x2(float scale) const
 }
 CK_TILE_HOST_DEVICE constexpr fp16_t pk_fp4_t::to_fp16(float scale) const
 {
-    return type_convert<float>(e2m1_to_fp16_table[_unpack(number<0>{})]) * scale;
+    return fp16_to_float(e2m1_to_fp16_table[_unpack(number<0>{})]) * scale;
 }
 CK_TILE_HOST_DEVICE constexpr fp16x2_t pk_fp4_t::to_fp16x2(float scale) const
 {
-    return fp16x2_t{
-        type_convert<fp16_t>(type_convert<float>(e2m1_to_fp16_table[_unpack(number<0>{})]) * scale),
-        type_convert<fp16_t>(type_convert<float>(e2m1_to_fp16_table[_unpack(number<1>{})]) *
-                             scale)};
+    return fp16x2_t{float_to_fp16(fp16_to_float(e2m1_to_fp16_table[_unpack(number<0>{})]) * scale),
+                    float_to_fp16(fp16_to_float(e2m1_to_fp16_table[_unpack(number<1>{})]) * scale)};
 }
 CK_TILE_HOST_DEVICE constexpr fp8_t pk_fp4_t::to_fp8(float scale) const
 {
-    return type_convert<float>(e2m1_to_fp8_table[_unpack(number<0>{})]) * scale;
+    return fp8_to_float(e2m1_to_fp8_table[_unpack(number<0>{})]) * scale;
 }
 CK_TILE_HOST_DEVICE constexpr fp8x2_t pk_fp4_t::to_fp8x2(float scale) const
 {
-    return fp8x2_t{
-        type_convert<fp8_t>(type_convert<float>(e2m1_to_fp8_table[_unpack(number<0>{})]) * scale),
-        type_convert<fp8_t>(type_convert<float>(e2m1_to_fp8_table[_unpack(number<1>{})]) * scale)};
+    return fp8x2_t{float_to_fp8(fp8_to_float(e2m1_to_fp8_table[_unpack(number<0>{})]) * scale),
+                   float_to_fp8(fp8_to_float(e2m1_to_fp8_table[_unpack(number<1>{})]) * scale)};
 }
 #endif
 
@@ -718,7 +715,7 @@ CK_TILE_HOST_DEVICE constexpr bf8_t pk_fp4_t::to_bf8(float scale) const
     // #if CK_TILE_FP4_CVT_DEVICE
     //    return impl::_from_f4<fp8_t>(data, scale);
     // #else
-    return bf8_t{type_convert<bf8_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
+    return bf8_t{float_to_bf8(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale))};
     // #endif
 }
 
@@ -729,8 +726,8 @@ CK_TILE_HOST_DEVICE constexpr bf8x2_t pk_fp4_t::to_bf8x2(float scale) const
     // #if CK_TILE_FP4_CVT_DEVICE
     //    return impl::_from_f4<fp8x2_t>(data, scale);
     // #else
-    return bf8x2_t{type_convert<bf8_t>(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
-                   type_convert<bf8_t>(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
+    return bf8x2_t{float_to_bf8(convert_to_float<pk_fp4_t>(_unpack(number<0>{}), scale)),
+                   float_to_bf8(convert_to_float<pk_fp4_t>(_unpack(number<1>{}), scale))};
     // #endif
 }
 
