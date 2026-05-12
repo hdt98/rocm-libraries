@@ -306,7 +306,8 @@ def collect_projects_to_run(subtrees):
             # For components needing fallback that belong to this project,
             # use hardcoded projects_to_test
             project_needs_fallback = any(
-                component_to_project.get(c) == project for c in components_needing_fallback
+                component_to_project.get(c) == project
+                for c in components_needing_fallback
             )
             if project_needs_fallback:
                 tests_to_run.update(project_map_data["projects_to_test"])
