@@ -109,7 +109,7 @@ def get_results(benchmarks, threshold):
         data = benchmark["data"]
         name = benchmark["name"]
         context = data["context"]
-        cli_settings = context["cli_settings"]
+        cli_settings = context["settings"]
         specializations = data["specializations"]
 
         noise_percents = [
