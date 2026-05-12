@@ -183,4 +183,5 @@ jobs:
             -f branch=${{ github.ref_name }} \
             -f hash=${{ github.sha }} \
             -f ref_hash=${{ ref_hash }} \
-            -f components=${{ inputs.projects_to_test }}
+            -f components=${{ inputs.projects_to_test }} \
+            --wait
