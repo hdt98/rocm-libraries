@@ -400,10 +400,9 @@ bool RunAIHeuristics(const SolverHeuristicConfig& solver_cfg,
     MIOPEN_LOG_I2(solver_cfg.solver_name << ": RunAIHeuristics on " << arch
                                          << " (use_tf32=" << std::boolalpha << use_tf32 << ")");
 
-
     const bool logging = miopen::IsLogging(LoggingLevel::Info2);
     const auto start   = logging ? std::chrono::high_resolution_clock::now()
-                                : std::chrono::high_resolution_clock::time_point{};
+                                 : std::chrono::high_resolution_clock::time_point{};
 
     // Only applicable for supported architectures
     if(arch != "gfx90a" && arch != "gfx942" && arch != "gfx950")
@@ -483,7 +482,8 @@ bool RunAIHeuristics(const SolverHeuristicConfig& solver_cfg,
             if(logging)
             {
                 const auto end = std::chrono::high_resolution_clock::now();
-                MIOPEN_LOG_I2("Heuristic candidate selection inference time: " << (end - start).count() * .000001f << " ms");
+                MIOPEN_LOG_I2("Heuristic candidate selection inference time: "
+                              << (end - start).count() * .000001f << " ms");
             }
 
             if(!result.IsEmpty())

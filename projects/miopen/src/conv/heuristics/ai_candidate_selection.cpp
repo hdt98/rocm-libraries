@@ -639,9 +639,9 @@ std::string MakeCandidateSelectionKey(const std::string& solver,
 
 std::optional<CandidateSelectionResult>
 GetCachedCandidateSelection(const std::string& arch,
-                             const std::string& solver,
-                             const conv::ProblemDescription& problem,
-                             bool use_split_k)
+                            const std::string& solver,
+                            const conv::ProblemDescription& problem,
+                            bool use_split_k)
 {
     auto& cache = CandidateSelectionCache::Get(arch);
     std::lock_guard<std::mutex> lk(cache.mtx);
@@ -653,10 +653,10 @@ GetCachedCandidateSelection(const std::string& arch,
 }
 
 void StoreCandidateSelectionCache(const std::string& arch,
-                                   const std::string& solver,
-                                   const conv::ProblemDescription& problem,
-                                   bool use_split_k,
-                                   const CandidateSelectionResult& result)
+                                  const std::string& solver,
+                                  const conv::ProblemDescription& problem,
+                                  bool use_split_k,
+                                  const CandidateSelectionResult& result)
 {
     if(result.IsEmpty())
         return;
@@ -693,20 +693,20 @@ std::string HashEncodedCandidates(const std::vector<std::vector<float>>& enc)
 }
 
 std::string MakeEmbeddingKey(const std::string& arch,
-                              const std::string& solver,
-                              const std::vector<std::vector<float>>& encoded_candidates)
+                             const std::string& solver,
+                             const std::vector<std::vector<float>>& encoded_candidates)
 {
     return arch + "|" + solver + "|" + HashEncodedCandidates(encoded_candidates);
 }
 
 std::vector<std::vector<float>>
 GetOrComputeKernelEmbeddings(const std::string& arch,
-                              const std::string& solver,
-                              const std::vector<std::vector<float>>& encoded_candidates,
-                              const CandidateSelectionModel& model)
+                             const std::string& solver,
+                             const std::vector<std::vector<float>>& encoded_candidates,
+                             const CandidateSelectionModel& model)
 {
-    auto& cache   = KernelEmbeddingCache::Get();
-    auto emb_key  = MakeEmbeddingKey(arch, solver, encoded_candidates);
+    auto& cache  = KernelEmbeddingCache::Get();
+    auto emb_key = MakeEmbeddingKey(arch, solver, encoded_candidates);
     std::lock_guard<std::mutex> lk(cache.mtx);
     const auto it = cache.map.find(emb_key);
     if(it != cache.map.end())
@@ -794,7 +794,6 @@ ModelSelectBestCandidate(const std::string& arch,
         // Get all candidates sorted by score (best to worst)
         auto scored_candidates =
             model.SelectBestCandidateIndices(encoded_features, encoded_configs);
-        ;
 
         CandidateSelectionResult result;
         result.kernel_indices.reserve(scored_candidates.size());

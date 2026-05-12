@@ -58,13 +58,8 @@ void PrintTo(const CandidateSelectionParams& p, std::ostream* os)
 inline constexpr auto accept_all_combinations = [](int, int) { return true; };
 
 // Build a minimal 2D forward conv ProblemDescription for use as a cache key in tests.
-miopen::conv::ProblemDescription MakeTestProblem(int n = 1,
-                                                  int c = 4,
-                                                  int h = 8,
-                                                  int w = 8,
-                                                  int k = 8,
-                                                  int y = 3,
-                                                  int x = 3)
+miopen::conv::ProblemDescription
+MakeTestProblem(int n = 1, int c = 4, int h = 8, int w = 8, int k = 8, int y = 3, int x = 3)
 {
     miopen::TensorDescriptor in_desc(miopenFloat, {n, c, h, w});
     miopen::TensorDescriptor wei_desc(miopenFloat, {k, c, y, x});
@@ -411,8 +406,8 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCache_Test)
     const auto second_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
     // Soft check: log the speedup; a cache hit should be substantially faster.
     // We do not assert a hard ratio to avoid flakiness on loaded systems.
-    std::cout << "[CandidateSelectionRamCache] first=" << first_ms
-              << " ms, second=" << second_ms << " ms\n";
+    std::cout << "[CandidateSelectionRamCache] first=" << first_ms << " ms, second=" << second_ms
+              << " ms\n";
 }
 
 // C1: calling ModelSelectBestCandidate with the same kernel params but a
@@ -449,11 +444,13 @@ TEST_P(CPU_CandidateSelection_NONE, Tower2EmbeddingCache_Test)
                                              accept_all_combinations);
 
     ASSERT_FALSE(result_a.IsEmpty()) << "Shape A returned empty result";
-    ASSERT_FALSE(result_b.IsEmpty()) << "Shape B returned empty result (Tower 2 cache may be corrupt)";
+    ASSERT_FALSE(result_b.IsEmpty())
+        << "Shape B returned empty result (Tower 2 cache may be corrupt)";
 }
 
 // Cache key isolation: use_split_k=false and use_split_k=true must produce
-// independent cache entries — results are retrieved separately, not mixed.
+// independent cache entries. Populate both, then verify a second call for each
+// returns its own result uncontaminated by the other.
 TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
 {
     const auto& params = GetParam();
@@ -464,26 +461,50 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
     auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
     auto problem             = MakeTestProblem();
 
+    // First populate both cache entries
     auto result_no_splitk = ModelSelectBestCandidate(params.arch,
-                                                      params.solver,
-                                                      problem,
-                                                      features,
-                                                      valid_kernel_params,
-                                                      /*use_split_k=*/false,
-                                                      accept_all_combinations);
+                                                     params.solver,
+                                                     problem,
+                                                     features,
+                                                     valid_kernel_params,
+                                                     /*use_split_k=*/false,
+                                                     accept_all_combinations);
+    auto result_splitk    = ModelSelectBestCandidate(params.arch,
+                                                  params.solver,
+                                                  problem,
+                                                  features,
+                                                  valid_kernel_params,
+                                                  /*use_split_k=*/true,
+                                                  accept_all_combinations);
 
-    // A second call with use_split_k=false must come from cache and be identical
+    // Both must be non-empty
+    ASSERT_FALSE(result_no_splitk.IsEmpty()) << "use_split_k=false returned empty";
+    ASSERT_FALSE(result_splitk.IsEmpty()) << "use_split_k=true returned empty";
+
+    // Re-fetch from cache — each must return its own entry unchanged
     auto result_no_splitk_cached = ModelSelectBestCandidate(params.arch,
-                                                             params.solver,
-                                                             problem,
-                                                             features,
-                                                             valid_kernel_params,
-                                                             /*use_split_k=*/false,
-                                                             accept_all_combinations);
+                                                            params.solver,
+                                                            problem,
+                                                            features,
+                                                            valid_kernel_params,
+                                                            /*use_split_k=*/false,
+                                                            accept_all_combinations);
+    auto result_splitk_cached    = ModelSelectBestCandidate(params.arch,
+                                                         params.solver,
+                                                         problem,
+                                                         features,
+                                                         valid_kernel_params,
+                                                         /*use_split_k=*/true,
+                                                         accept_all_combinations);
 
-    ASSERT_FALSE(result_no_splitk.IsEmpty());
     ASSERT_EQ(result_no_splitk.kernel_indices, result_no_splitk_cached.kernel_indices)
         << "Cache isolation failed: use_split_k=false entry was overwritten";
+    ASSERT_EQ(result_splitk.kernel_indices, result_splitk_cached.kernel_indices)
+        << "Cache isolation failed: use_split_k=true entry was overwritten";
+
+    // The two entries must differ from each other (split_k expands the candidate list)
+    EXPECT_NE(result_no_splitk.split_k_values, result_splitk.split_k_values)
+        << "Expected use_split_k=false and use_split_k=true to produce different split_k_values";
 }
 
 // === INSTANTIATION ===
