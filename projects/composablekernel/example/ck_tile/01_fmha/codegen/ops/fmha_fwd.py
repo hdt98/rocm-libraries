@@ -222,6 +222,15 @@ float {F_func_name}([[maybe_unused]] fmha_fwd_traits t, [[maybe_unused]] fmha_fw
 """
 FMHA_FWD_API_FOOTER_TEMPLATE = """
 float fmha_fwd(fmha_fwd_traits traits, fmha_fwd_args args, const ck_tile::stream_config& config) {{
+    // Force-kernel override: dispatch a specific kernel via fmha_fwd_all()
+    {{ const char* fk = std::getenv("CK_TILE_FMHA_FWD_FORCE_KERNEL");
+       if(fk && fk[0]) {{
+           auto results = fmha_fwd_all(traits, args, config);
+           if(!results.empty()) return results[0].second;
+           return -1;
+       }}
+    }}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunreachable-code"
     if ({F_is_v3_enabled}) {{
@@ -230,6 +239,63 @@ float fmha_fwd(fmha_fwd_traits traits, fmha_fwd_args args, const ck_tile::stream
     }}
 #pragma clang diagnostic pop
     return fmha_fwd_v2(traits, args, config);
+}}
+"""
+
+# --- Templates for fmha_fwd_all() "run all kernels" benchmarking mode ---
+FMHA_FWD_ALL_API_FUNC_TEMPLATE = """
+std::vector<std::pair<std::string, float>> {F_func_name}([[maybe_unused]] fmha_fwd_traits t, [[maybe_unused]] fmha_fwd_args a, [[maybe_unused]] const ck_tile::stream_config& s) {{
+    std::vector<std::pair<std::string, float>> results;
+
+    // Force-kernel filter: when set, only the matching kernel is dispatched.
+    // Used by per-kernel verification (-v=1 -run_all_kernels=1).
+    std::string __fmha_force_kernel;
+    {{ const char* __fk = std::getenv("CK_TILE_FMHA_FWD_FORCE_KERNEL");
+       if(__fk && __fk[0]) __fmha_force_kernel = __fk; }}
+
+    [[maybe_unused]] const float min_cu_util_rate = 0.8; // minimum CU utilization rate
+
+    unsigned num_cus;
+    if(!get_num_cus(num_cus)) {{
+        return results;
+    }}
+
+    [[maybe_unused]] auto get_num_blocks = [&](unsigned kM0) {{
+        return get_num_thread_blocks(a.batch, a.nhead_q, a.max_seqlen_q, kM0);
+    }};
+
+    [[maybe_unused]] const std::string device_name = ck_tile::get_device_name();
+
+{F_dispatch}
+    return results;
+}}
+"""
+
+FMHA_FWD_ALL_API_PER_ARCH = """{F_if}({F_arch.device_name_check}) {{
+{F_dtype_case}
+}}
+"""
+
+FMHA_FWD_ALL_API_PER_DTYPE = """{F_if}(t.data_type.compare(\"{F_dtype}\") == 0) {{
+{F_hdim_case}
+}}
+"""
+
+FMHA_FWD_ALL_API_PER_HDIM_CASE = """{F_if}(t.hdim_q <= {F_hdim} && t.hdim_v <= {F_hdim_v}) {{
+{F_inner_dispatch}
+}}
+"""
+
+# Key differences from FMHA_FWD_API_INNER_DISPATCH:
+# 1. Always uses "if" (not "else if") — doesn't skip after first match
+# 2. No seqtune heuristic — runs all tile sizes
+# 3. Pushes result into vector instead of returning
+FMHA_FWD_ALL_API_INNER_DISPATCH = """if((__fmha_force_kernel.empty() || __fmha_force_kernel == \"{F_kname}\") &&
+   (t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.qscale_type == {F_qscale_check}) && (t.skip_min_seqlen_q == {F_skip}) &&(t.has_sink == {F_sink}) &&
+        ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck}) && ({F_constraint})) {{
+    using trait_ = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_trload}, {F_skip}, {F_sink}>;
+    float t_ = fmha_fwd_<trait_, {F_arch.tag}>(s, a);
+    if(t_ >= 0) results.push_back({{ \"{F_kname}\", t_ }});
 }}
 """
 
@@ -299,6 +365,9 @@ class FmhaFwdApiTrait:
     tr_load: str
     sink: str
     constraint: CppConstraint
+    is_tuning_extra: bool = (
+        False  # True for extended tiles from get_tuning_extra_tiles()
+    )
 
     @property
     def name(self) -> str:
@@ -618,6 +687,111 @@ class FmhaFwdApiPool:
             F_func_name=func_name, F_dispatch=indent(per_arch)
         )
 
+    def render_all(
+        self, func_name, filter_fn: Optional[Callable[[FmhaFwdApiTrait], bool]] = None
+    ) -> str:
+        """Render a function that runs ALL matching kernel instances (no heuristic tile selection)."""
+        if filter_fn is None:
+
+            def accept_all(trait: FmhaFwdApiTrait) -> bool:
+                return True
+
+            filter_fn = accept_all
+
+        def has_traits(node) -> bool:
+            if isinstance(node, list):
+                return any(filter_fn(elem) for elem in node)
+            elif isinstance(node, OrderedDict):
+                return any(has_traits(val) for val in node.values())
+            return False
+
+        per_arch = str()
+        for i_arch, (arch, pool_by_arch) in enumerate(
+            item for item in self.pool.items() if has_traits(item[1])
+        ):
+            per_dtypes = str()
+            for i_dtype, (dtype, pool_by_dtype) in enumerate(
+                item for item in pool_by_arch.items() if has_traits(item[1])
+            ):
+                per_hdim_case = str()
+                for i_hdim, ((hdim, hdim_v), pool_by_hdim) in enumerate(
+                    item for item in pool_by_dtype.items() if has_traits(item[1])
+                ):
+                    inners = str()
+                    for trait in (trait for trait in pool_by_hdim if filter_fn(trait)):
+                        # Build the kernel name string matching FmhaFwdKernel.name format
+                        pad_suffix = ""
+                        for flag, tag in [
+                            (trait.spad, "s"),
+                            (trait.skpad, "sk"),
+                            (trait.dpad, "d"),
+                            (trait.dvpad, "dv"),
+                        ]:
+                            if flag == "t":
+                                pad_suffix += tag
+                        pad_suffix = f"_p{pad_suffix}" if pad_suffix else "_npad"
+                        kname = (
+                            f"fmha_fwd_d{hdim}_{dtype}"
+                            f"_{'group' if trait.mode == 'group' else 'batch'}"
+                            f"_b{trait.bm0}x{trait.bn0}x{trait.bk0}x{trait.bn1}x{trait.bk1}x{trait.bk0max}"
+                            f"{pad_suffix}"
+                        )
+                        if trait.is_tuning_extra:
+                            kname += " [ext]"
+                        inners += FMHA_FWD_ALL_API_INNER_DISPATCH.format(
+                            F_arch=arch,
+                            F_mode=MODE_MAP[trait.mode],
+                            F_vlayout=LAYOUT_MAP[trait.vlayout],
+                            F_pipeline_enum=PIPELINE_ENUM_MAP[trait.pipeline_tag],
+                            F_logits=BOOL_MAP[trait.logits],
+                            F_mask=get_mask_cpp_type(trait.mask),
+                            F_mask_check=get_mask_cpp_check_expr(trait.mask),
+                            F_bias_check=BIAS_CHECK_MAP[trait.bias],
+                            F_bias=BIAS_MAP[trait.bias],
+                            F_lse=BOOL_MAP[trait.lse],
+                            F_dropout=BOOL_MAP[trait.dropout],
+                            F_skip=BOOL_MAP[trait.skip],
+                            F_trload=BOOL_MAP[trait.tr_load],
+                            F_qscale_check=QSCALE_CHECK_MAP[trait.qscale],
+                            F_qscale=QSCALE_MAP[trait.qscale],
+                            F_sink=BOOL_MAP[trait.sink],
+                            F_scheck=trait.scheck,
+                            F_skcheck=trait.skcheck,
+                            F_dcheck=trait.dcheck,
+                            F_dvcheck=trait.dvcheck,
+                            F_constraint=trait.constraint,
+                            F_spad=BOOL_MAP[trait.spad],
+                            F_skpad=BOOL_MAP[trait.skpad],
+                            F_dpad=BOOL_MAP[trait.dpad],
+                            F_dvpad=BOOL_MAP[trait.dvpad],
+                            F_bm0=trait.bm0,
+                            F_bn0=trait.bn0,
+                            F_bk0=trait.bk0,
+                            F_bn1=trait.bn1,
+                            F_bk1=trait.bk1,
+                            F_bk0max=trait.bk0max,
+                            F_hdim=hdim,
+                            F_dtype=FWD_DTYPE_MAP[dtype],
+                            F_kname=kname,
+                        )
+                    per_hdim_case += FMHA_FWD_ALL_API_PER_HDIM_CASE.format(
+                        F_if=if_(i_hdim),
+                        F_hdim=hdim,
+                        F_hdim_v=hdim_v,
+                        F_inner_dispatch=indent(inners),
+                    )
+                per_dtypes += FMHA_FWD_ALL_API_PER_DTYPE.format(
+                    F_if=if_(i_dtype), F_dtype=dtype, F_hdim_case=indent(per_hdim_case)
+                )
+            per_arch += FMHA_FWD_ALL_API_PER_ARCH.format(
+                F_if=if_(i_arch),
+                F_arch=arch,
+                F_dtype_case=indent(per_dtypes),
+            )
+        return FMHA_FWD_ALL_API_FUNC_TEMPLATE.format(
+            F_func_name=func_name, F_dispatch=indent(per_arch)
+        )
+
 
 @dataclass
 class FmhaFwdTileSize:
@@ -891,6 +1065,78 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
             return True
 
         rules.append(check_hdim_tile)
+
+        def check_qr_k0_loops(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # qr pipeline requires k0_loops >= 2 (bk0max / bk0 >= 2)
+            if (
+                kernel_ctx.pipeline.tag == "qr"
+                and kernel_ctx.tile.F_bk0 >= kernel_ctx.tile.F_bk0max
+            ):
+                return False
+            return True
+
+        rules.append(check_qr_k0_loops)
+
+        def check_qr_d256_mfma_schedule(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # qr pipeline for d256 requires NumMfmaInsts % 8 == 0 due to sched_group_barrier layout
+            # NumMfmaInsts = (bm0/wm0) * (bn0/wn0) * (bk0/wk0) / (rm0 * rn0)
+            tile = kernel_ctx.tile
+            if kernel_ctx.pipeline.tag == "qr" and tile.F_bk0max == 256:
+                num_mfma = (
+                    (tile.F_bm0 // tile.F_wm0)
+                    * (tile.F_bn0 // tile.F_wn0)
+                    * (tile.F_bk0 // tile.F_wk0)
+                    // (tile.F_rm0 * tile.F_rn0)
+                )
+                if num_mfma % 8 != 0:
+                    return False
+            return True
+
+        rules.append(check_qr_d256_mfma_schedule)
+
+        def check_qr_d256_extra_tiles(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # For d256, only base tiles (bk0=32, bm0<=128, bn0<=128) are validated with qr.
+            # Extra tiles with non-base params may hit tile distribution asserts;
+            # they should use qr_async instead.
+            tile = kernel_ctx.tile
+            if kernel_ctx.pipeline.tag == "qr" and tile.F_bk0max == 256:
+                if tile.F_bk0 != 32 or tile.F_bm0 > 128 or tile.F_bn0 > 128:
+                    return False
+            return True
+
+        rules.append(check_qr_d256_extra_tiles)
+
+        def check_qr_async_d256_tiles(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # qr_async for d256 requires bn0 >= 128; smaller bn0 causes
+            # SFC decomposition failures in async tile distribution.
+            tile = kernel_ctx.tile
+            if kernel_ctx.pipeline.tag == "qr_async" and tile.F_bk0max == 256:
+                if tile.F_bn0 < 128:
+                    return False
+            return True
+
+        rules.append(check_qr_async_d256_tiles)
+
+        def check_qr_async_d256_tiles(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # qr_async for d256 requires bn0 >= 128; smaller bn0 causes
+            # SFC decomposition failures in async tile distribution.
+            tile = kernel_ctx.tile
+            if kernel_ctx.pipeline.tag == "qr_async" and tile.F_bk0max == 256:
+                if tile.F_bn0 < 128:
+                    return False
+            return True
+
+        rules.append(check_qr_async_d256_tiles)
         return rules
 
 
@@ -999,6 +1245,26 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 (128, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
             }  # fmt: skip
 
+    @classmethod
+    def get_tuning_extra_tiles(cls, dtype: str) -> dict:
+        """Additional tile sizes merged for tuning/benchmarking receipts (0, 3).
+        These are tagged is_tuning_extra and excluded from heuristic."""
+        extra = {}
+        if dtype in cls._DT_FP16_BF16:
+            extra[(128, 128)] = [
+                FmhaFwdTileSize( 16, 128,  64, 128,  32, 128,  1, 1, 1,  1, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
+            ]  # fmt: skip
+            extra[(256, 256)] = [
+                FmhaFwdTileSize(128, 128,  64, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
+                FmhaFwdTileSize(128, 128, 128, 256,  64, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
+                FmhaFwdTileSize(128, 128, 256, 256,  32, 256,  8, 1, 1,  8, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
+                FmhaFwdTileSize(128, 192,  32, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1),
+                FmhaFwdTileSize(128, 256,  32, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1),
+                FmhaFwdTileSize(256, 128,  32, 256,  32, 256,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
+                FmhaFwdTileSize(256, 128,  64, 256,  32, 256,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
+            ]  # fmt: skip
+        return extra
+
     # TODO: we don't support tuning yet, so pick up one value for vlayout/pipeline/pad
     #       support this in future
     @classmethod
@@ -1040,6 +1306,10 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                     # the below two is used for hdim vectorize load
                     pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                     pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                    if bias != "bias":
+                        # qr_async needed for tiles where bk0 == bk0max (k0_loops == 1)
+                        pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "f", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                        pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                 else:
                     if bias == "bias":
                         # TODO: rocm 6.2 compiler problem if using qr_async for bias case
@@ -1506,8 +1776,24 @@ def get_fwd_blobs(
 
     factories = get_factories_for_targets(targets, get_factory)
 
+    # Receipts that include extended tuning tiles from get_tuning_extra_tiles().
+    # - 0/3: CK standalone build receipts (tiles are compiled but excluded from
+    #   the heuristic via is_tuning_extra flag)
+    _EXTRA_TILE_RECEIPTS = frozenset({0, 3})
+
     for factory, dtype in ((f, t) for f in factories for t in f.supported_dtypes()):
         d = factory.get_hdim_tile_size_dict(dtype)
+        # Track which tiles are standard so we can tag extras with is_tuning_extra.
+        standard_tile_ids = {key: set(id(t) for t in tiles) for key, tiles in d.items()}
+        if receipt in _EXTRA_TILE_RECEIPTS and hasattr(
+            factory, "get_tuning_extra_tiles"
+        ):
+            for key, extra_tiles in factory.get_tuning_extra_tiles(dtype).items():
+                if key in d:
+                    d[key] = sorted(d[key] + extra_tiles, key=lambda t: t.F_bm0)
+                else:
+                    d[key] = sorted(extra_tiles, key=lambda t: t.F_bm0)
+                    standard_tile_ids[key] = set()  # all tiles in new key are extra
         # for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
         for ((hdim, hdim_v), tiles), mode in itertools.product(
             d.items(), MODE_MAP.keys()
@@ -1540,7 +1826,11 @@ def get_fwd_blobs(
                     if not fnmatch.fnmatch(k.name, kernel_filter):
                         continue
 
-                api_pool.register_traits(k.api_trait())
+                trait = k.api_trait()
+                trait.is_tuning_extra = id(tile) not in standard_tile_ids.get(
+                    (hdim, hdim_v), set()
+                )
+                api_pool.register_traits(trait)
                 gen.append(k)
 
     return (api_pool, gen)
@@ -1555,10 +1845,10 @@ def write_fwd_api(
     autogen_dir: Path,
 ) -> None:
     def accept_only_v3(trait: FmhaFwdApiTrait) -> bool:
-        return trait.pipeline_tag == "qr_async_trload_v3"
+        return trait.pipeline_tag == "qr_async_trload_v3" and not trait.is_tuning_extra
 
     def accept_only_v2(trait: FmhaFwdApiTrait) -> bool:
-        return not accept_only_v3(trait)
+        return trait.pipeline_tag != "qr_async_trload_v3" and not trait.is_tuning_extra
 
     content = "".join(
         [
@@ -1572,6 +1862,8 @@ def write_fwd_api(
                     # False
                 ]
             ),
+            # --- additive: fmha_fwd_all() for "run all kernels" benchmarking ---
+            api_pool.render_all("fmha_fwd_all"),
         ]
     )
     update_file(autogen_dir / FMHA_FWD_API_FILENAME, content)
