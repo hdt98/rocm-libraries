@@ -214,27 +214,59 @@ def validate_prebuilt_artifacts_config(args):
         )
 
 
+DEFAULT_AMDGPU_FAMILIES = {
+    "linux": "gfx94X, gfx950",
+    "windows": "gfx1151",
+}
+
+
+def resolve_amdgpu_families(args):
+    """Resolve amdgpu_families based on event type and input.
+
+    For workflow_dispatch: use the input directly (empty means skip platform)
+    For other events (push, pull_request, workflow_call): apply defaults if empty
+    """
+    platform = args.get("platform")
+    amdgpu_families_input = args.get("amdgpu_families_input", "")
+
+    if args.get("is_workflow_dispatch"):
+        # For workflow_dispatch, use input directly (empty means skip)
+        return amdgpu_families_input
+    else:
+        # For other events, apply defaults if empty
+        return amdgpu_families_input or DEFAULT_AMDGPU_FAMILIES.get(platform, "")
+
+
 def run(args):
     platform = args.get("platform")
 
     # Validate prebuilt artifacts configuration
     validate_prebuilt_artifacts_config(args)
 
-    # For workflow_dispatch: skip platform if amdgpu_families_input is empty
-    if args.get("is_workflow_dispatch"):
-        amdgpu_families_input = args.get("amdgpu_families_input", "")
-        if not amdgpu_families_input:
-            logging.info(
-                f"Skipping {platform} - no amdgpu_families specified in workflow_dispatch"
-            )
-            set_github_output(
-                {f"{platform}_projects": json.dumps([]), "test_type": "standard"}
-            )
-            return
+    # Resolve amdgpu_families with appropriate defaults
+    amdgpu_families = resolve_amdgpu_families(args)
+
+    # Skip platform if amdgpu_families is empty (workflow_dispatch with no input)
+    if not amdgpu_families:
+        logging.info(
+            f"Skipping {platform} - no amdgpu_families specified in workflow_dispatch"
+        )
+        set_github_output(
+            {
+                f"{platform}_projects": json.dumps([]),
+                "test_type": "standard",
+                "amdgpu_families": "",
+            }
+        )
+        return
 
     project_to_run, test_type = retrieve_projects(args)
     set_github_output(
-        {f"{platform}_projects": json.dumps(project_to_run), "test_type": test_type}
+        {
+            f"{platform}_projects": json.dumps(project_to_run),
+            "test_type": test_type,
+            "amdgpu_families": amdgpu_families,
+        }
     )
 
 

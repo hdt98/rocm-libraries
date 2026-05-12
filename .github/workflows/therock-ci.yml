@@ -116,9 +116,7 @@ jobs:
       - name: Fetch Linux targets for build and test
         env:
           THEROCK_PACKAGE_PLATFORM: "linux"
-          # For workflow_dispatch, use the input directly (empty means skip platform)
-          # For other events (push, pull_request, workflow_call), apply defaults
-          AMDGPU_FAMILIES: ${{ github.event_name == 'workflow_dispatch' && inputs.linux_amdgpu_families || inputs.linux_amdgpu_families || 'gfx94X, gfx950' }}
+          AMDGPU_FAMILIES: ${{ steps.linux_projects.outputs.amdgpu_families }}
           # Variable comes from ROCm organization variable 'ROCM_THEROCK_TEST_RUNNERS'
           ROCM_THEROCK_TEST_RUNNERS: ${{ vars.ROCM_THEROCK_TEST_RUNNERS }}
           # TODO(#2656): Migrate the organization variable to S3 file. Below code is a temporary resolution
@@ -131,9 +129,7 @@ jobs:
       - name: Fetch Windows targets for build and test
         env:
           THEROCK_PACKAGE_PLATFORM: "windows"
-          # For workflow_dispatch, use the input directly (empty means skip platform)
-          # For other events (push, pull_request, workflow_call), apply defaults
-          AMDGPU_FAMILIES: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_amdgpu_families || inputs.windows_amdgpu_families || 'gfx1151' }}
+          AMDGPU_FAMILIES: ${{ steps.windows_projects.outputs.amdgpu_families }}
           # Variable comes from ROCm organization variable 'ROCM_THEROCK_TEST_RUNNERS'
           ROCM_THEROCK_TEST_RUNNERS: ${{ vars.ROCM_THEROCK_TEST_RUNNERS }}
           # TODO(#2656): Migrate the organization variable to S3 file. Below code is a temporary resolution
