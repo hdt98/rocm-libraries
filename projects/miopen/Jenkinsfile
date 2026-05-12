@@ -219,7 +219,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
 
                         ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
                     """.stripIndent()
-                    sh """
+                    sh """#!/bin/bash
                         export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
                         . /opt/venv/bin/activate
                         cd /TheRock
