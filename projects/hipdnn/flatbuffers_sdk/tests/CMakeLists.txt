@@ -72,3 +72,10 @@ if(ENABLE_CLANG_TIDY AND _fb_include_dirs)
 endif()
 
 add_unit_test_target(hipdnn_flatbuffers_sdk_tests ${CMAKE_CURRENT_BINARY_DIR})
+
+# Apply YAML-driven CTest category labels to tests registered in this
+# directory scope (set_property(TEST ...) and the TESTS directory
+# property are per-directory).
+if(COMMAND apply_hipdnn_test_categories)
+    apply_hipdnn_test_categories()
+endif()

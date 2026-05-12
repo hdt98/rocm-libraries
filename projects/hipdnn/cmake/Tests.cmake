@@ -13,6 +13,43 @@ find_package(Python3 COMPONENTS Interpreter)
 
 findandcheckllvmsymbolizer()
 
+# YAML-driven CTest test categorisation. Shared across rocm-libraries
+# components -- defines apply_ctest_category_labels(yaml_file) which we
+# wrap below as apply_hipdnn_test_categories() so each test directory can
+# call it with a single line. set_property(TEST ...) and the TESTS
+# directory property are scoped per-directory, so the wrapper must be
+# invoked from each scope that registers tests.
+set(_HIPDNN_TEST_CATEGORIES_YAML "${PROJECT_SOURCE_DIR}/test_categories.yaml")
+set(_HIPDNN_SHARED_CTEST "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+if(EXISTS "${_HIPDNN_SHARED_CTEST}" AND EXISTS "${_HIPDNN_TEST_CATEGORIES_YAML}")
+    include("${_HIPDNN_SHARED_CTEST}")
+    message(STATUS "hipDNN: YAML-based CTest categorization enabled")
+else()
+    if(NOT EXISTS "${_HIPDNN_SHARED_CTEST}")
+        message(STATUS
+            "hipDNN: shared/ctest not found at ${_HIPDNN_SHARED_CTEST}; skipping CTest categories"
+        )
+    endif()
+    if(NOT EXISTS "${_HIPDNN_TEST_CATEGORIES_YAML}")
+        message(STATUS
+            "hipDNN: ${_HIPDNN_TEST_CATEGORIES_YAML} not found; skipping CTest categories"
+        )
+    endif()
+endif()
+
+# Convenience wrapper around apply_ctest_category_labels() so test
+# sub-directories don't have to repeat the YAML path. Must be called
+# from the directory scope that contains add_test()/add_*_test_target().
+function(apply_hipdnn_test_categories)
+    if(NOT COMMAND apply_ctest_category_labels)
+        return()
+    endif()
+    if(NOT EXISTS "${_HIPDNN_TEST_CATEGORIES_YAML}")
+        return()
+    endif()
+    apply_ctest_category_labels("${_HIPDNN_TEST_CATEGORIES_YAML}")
+endfunction()
+
 set(CHECK_DEPENDS_GLOBAL "" CACHE INTERNAL "Accumulated global dependencies for test name validation" FORCE)
 set(CHECK_EXECUTABLE_PATHS_GLOBAL "" CACHE INTERNAL "Accumulated global check executable paths" FORCE)
 

@@ -35,3 +35,10 @@ add_dependencies(hipdnn_backend_logging_shutdown_tests test_good_default_plugin)
 
 clang_tidy_check(hipdnn_backend_logging_shutdown_tests)
 add_integration_test_target(hipdnn_backend_logging_shutdown_tests ${CMAKE_CURRENT_BINARY_DIR})
+
+# Apply YAML-driven CTest category labels to tests registered in this
+# directory scope (set_property(TEST ...) and the TESTS directory
+# property are per-directory).
+if(COMMAND apply_hipdnn_test_categories)
+    apply_hipdnn_test_categories()
+endif()

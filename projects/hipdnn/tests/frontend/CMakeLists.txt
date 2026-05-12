@@ -108,3 +108,10 @@ add_dependencies(
 
 clang_tidy_check(hipdnn_public_frontend_tests)
 add_integration_test_target(hipdnn_public_frontend_tests ${CMAKE_CURRENT_BINARY_DIR})
+
+# Apply YAML-driven CTest category labels to tests registered in this
+# directory scope (set_property(TEST ...) and the TESTS directory
+# property are per-directory).
+if(COMMAND apply_hipdnn_test_categories)
+    apply_hipdnn_test_categories()
+endif()
