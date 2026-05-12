@@ -207,12 +207,11 @@ def validate_prebuilt_artifacts_config(args):
     platform = args.get("platform")
 
     if use_prebuilt == "true" and not artifact_run_id:
-        logging.error(
+        raise ValueError(
             f"Prebuilt artifacts option is enabled for {platform} but artifact_run_id is empty. "
             "When using prebuilt artifacts, you must provide the artifact_run_id of a previous "
             "workflow run that contains the build artifacts."
         )
-        sys.exit(1)
 
 
 def run(args):
