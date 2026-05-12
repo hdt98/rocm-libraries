@@ -33,7 +33,7 @@ struct TileBlockGemmSpec
 struct TileOptimizations
 {
     int num_groups_to_merge = 1;
-    bool large_tensors        = false;
+    bool large_tensors      = false;
     bool explicit_gemm      = false;
     bool two_stage          = false;
 };
@@ -182,7 +182,7 @@ consteval TileOptimizations SetTileOptimizations()
     constexpr auto& OPT = ALGORITHM.optimizations;
 
     return TileOptimizations{.num_groups_to_merge = OPT.num_groups_to_merge,
-                             .large_tensors         = OPT.large_tensors,
+                             .large_tensors       = OPT.large_tensors,
                              .explicit_gemm       = OPT.explicit_gemm,
                              .two_stage           = OPT.two_stage};
 }

@@ -81,6 +81,7 @@ struct InstanceTraits<ck_tile::GroupedConvolutionForwardKernel<GroupedConvTraits
     static constexpr ck_tile::GemmPipelineScheduler kPipelineScheduler = GemmPipeline_::Scheduler;
     static constexpr bool kDoubleSmemBuffer = GemmPipeline_::DoubleSmemBuffer;
     static constexpr int kNumWaveGroups     = GemmPipeline_::NumWaveGroups;
+    static constexpr bool kLargeTensors     = GemmPipeline_::LargeTensors;
 
     // Epilogue Pipeline
     using AccDataType             = typename EpiloguePipeline_::AccDataType;
@@ -130,6 +131,7 @@ struct InstanceTraits<ck_tile::GroupedConvolutionForwardKernel<GroupedConvTraits
         oss << ","
             << detail::elementwise_op_name<CDEElementwiseOperation>(); // 30.
                                                                        // CDEElementwiseOperation
+        oss << "," << kLargeTensors;                                   // 31. LargeTensors
         oss << ">";
 
         return oss.str();

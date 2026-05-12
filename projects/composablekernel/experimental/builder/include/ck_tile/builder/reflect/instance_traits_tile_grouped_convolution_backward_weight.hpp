@@ -85,6 +85,7 @@ struct InstanceTraits<ck_tile::GroupedConvolutionBackwardWeightKernel<GroupedCon
     static constexpr ck_tile::GemmPipelineScheduler kPipelineScheduler = GemmPipeline_::Scheduler;
     static constexpr bool kDoubleSmemBuffer = GemmPipeline_::DoubleSmemBuffer;
     static constexpr int kNumWaveGroups     = GemmPipeline_::NumWaveGroups;
+    static constexpr bool kLargeTensors     = GemmPipeline_::LargeTensors;
 
     // Epilogue Pipeline
     using AccDataType             = typename EpiloguePipeline_::AccDataType;
@@ -141,6 +142,7 @@ struct InstanceTraits<ck_tile::GroupedConvolutionBackwardWeightKernel<GroupedCon
                 << static_cast<int>(TilePartitioner_::ReductionStrategy); // 32. ReductionStrategy
             oss << "," << TilePartitioner_::PERSISTENT;                   // 33. PersistentDP
         }
+        oss << "," << kLargeTensors; // 34. LargeTensors
         oss << ">";
 
         return oss.str();

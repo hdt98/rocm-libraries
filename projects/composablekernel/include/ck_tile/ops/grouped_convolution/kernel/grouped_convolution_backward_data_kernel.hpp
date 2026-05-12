@@ -574,7 +574,9 @@ struct GroupedConvolutionBackwardDataKernel
             "MergedGroups",
             NumGroupsToMerge,
             "ExplicitGemm",
-            GroupedConvTraitsType_::ExplicitGemm
+            GroupedConvTraitsType_::ExplicitGemm,
+            "LargeTensor",
+            LargeTensors
         );
         // clang-format on
     }

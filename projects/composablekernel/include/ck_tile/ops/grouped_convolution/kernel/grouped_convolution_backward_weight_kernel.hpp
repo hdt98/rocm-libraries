@@ -523,7 +523,9 @@ struct GroupedConvolutionBackwardWeightKernel
             NumGroupsToMerge,
             "ExplicitGemm",
             GroupedConvTraitsType_::ExplicitGemm,
-            IsStreamK ? "StreamK" : "SplitK"
+            IsStreamK ? "StreamK" : "SplitK",
+            "LargeTensor",
+            LargeTensors
         );
         // clang-format on
     }

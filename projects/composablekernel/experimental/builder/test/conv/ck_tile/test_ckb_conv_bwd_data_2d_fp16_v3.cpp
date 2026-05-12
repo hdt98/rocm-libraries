@@ -26,7 +26,7 @@ TEST(BwdDataConvInstances, Create_ConvAlgorithm_Tile_GroupedConvolutionKernel_2D
             .with_tile_block_gemm(TileBlockGemmDesc_16x16_v3_intrawave)
             .with_tile_transfer(TileTransfer_4x4x4)
             .with_tile_optimizations(TileOptimizations{.num_groups_to_merge = 1,
-                                                       .large_tensors         = false,
+                                                       .large_tensors       = false,
                                                        .explicit_gemm       = false,
                                                        .two_stage           = false});
 

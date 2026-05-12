@@ -277,6 +277,9 @@ def parse_fwd_instances(instances, problem_name):
         if pipeline_version == "ASYNC_V4":
             print(f"Skipping instance {instance_id} with ASYNC_V4 since it's not supported yet.")
             continue
+        if k_per_block > (warp_size * a_scalar_per_vector) or k_per_block > (warp_size * b_scalar_per_vector):
+            print(f"Skipping instance {instance_id} with multiple warps per continous tile dim since it's not supported yet.")
+            continue
 
         is_two_stage = False
 
