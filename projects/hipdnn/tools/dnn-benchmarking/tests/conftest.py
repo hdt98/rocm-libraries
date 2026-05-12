@@ -167,16 +167,9 @@ def skip_if_no_gpu():
 def _find_plugin_path() -> str:
     """Find the hipDNN engine plugin directory.
 
-    Checks DNN_BENCHMARKING_HIPDNN_PLUGIN_PATH env var first, then
-    searches worktree build dir and standard install locations.
+    Searches worktree build dir and standard install locations.
     Returns the path as a string, or None if not found.
     """
-    import os
-
-    env_path = os.environ.get("DNN_BENCHMARKING_HIPDNN_PLUGIN_PATH")
-    if env_path and Path(env_path).is_dir():
-        return env_path
-
     project_root = Path(__file__).parent.parent
     candidates = [
         # Worktree/superbuild: relative to dnn-benchmarking tool

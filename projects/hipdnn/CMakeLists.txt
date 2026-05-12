@@ -249,7 +249,6 @@ add_subdirectory(tools)
 
 if(HIPDNN_BUILD_PYTHON_BINDINGS)
     add_subdirectory(python)
-    add_subdirectory(tools/dnn-benchmarking)
 endif()
 
 if(NOT HIPDNN_SKIP_TESTS)

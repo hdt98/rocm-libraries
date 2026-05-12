@@ -61,29 +61,12 @@ target_link_libraries(hipdnn_frontend_python PRIVATE hipdnn_frontend hipdnn_back
 # Installation
 # ============================================================================
 
-# Use a relative path so the install respects CMAKE_INSTALL_PREFIX.
-set(HIPDNN_PYTHON_SITE_DIR
-    "lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/dist-packages"
-    CACHE PATH "Python module install directory (relative to CMAKE_INSTALL_PREFIX)")
-
-# scikit-build-core (pip wheel / pip install) install rules.
 # SKBUILD is set by scikit-build-core when building a wheel.
 if(DEFINED SKBUILD)
     install(TARGETS hipdnn_frontend_python DESTINATION hipdnn_frontend)
     install(FILES hipdnn_frontend/__init__.py DESTINATION hipdnn_frontend)
 else()
-    # Regular cmake install — place in dist-packages under CMAKE_INSTALL_PREFIX.
-    install(TARGETS hipdnn_frontend_python
-        LIBRARY DESTINATION ${HIPDNN_PYTHON_SITE_DIR}/hipdnn_frontend
-    )
-    install(FILES hipdnn_frontend/__init__.py
-        DESTINATION ${HIPDNN_PYTHON_SITE_DIR}/hipdnn_frontend
-    )
-endif()
-
-# Build wheels and stage them in the install prefix.
-# Skipped when scikit-build-core drives cmake (SKBUILD) to avoid recursion.
-if(NOT DEFINED SKBUILD)
+    # Build wheel and stage it in the install prefix.
     install(CODE "
         set(_wheel_dir \"\${CMAKE_INSTALL_PREFIX}/share/hipdnn/wheels\")
         file(MAKE_DIRECTORY \"\${_wheel_dir}\")
@@ -99,6 +82,5 @@ if(NOT DEFINED SKBUILD)
         if(_result)
             message(FATAL_ERROR \"Failed to build hipdnn-frontend wheel\")
         endif()
-
     ")
 endif()
