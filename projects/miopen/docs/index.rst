@@ -27,7 +27,6 @@ The MIOpen public repository is located at
   .. grid-item-card:: Install
 
     * :doc:`Install MIOpen <./install/install>`
-    * :doc:`MIOpen build prerequisites <./install/prerequisites>`
     * :doc:`Build from source <./install/build-source>`
     * :doc:`Build for embedded systems <./install/embed>`
     * :doc:`Build MIOpen using Docker <./install/docker-build>`

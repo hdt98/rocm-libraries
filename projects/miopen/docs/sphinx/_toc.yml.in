@@ -8,8 +8,6 @@ subtrees:
   entries:
   - file: install/install.rst
     title: Install MIOpen
-  - file: install/prerequisites.rst
-    title: MIOpen build prerequisites
   - file: install/build-source.rst
     title: Build from source
   - file: install/embed.rst
