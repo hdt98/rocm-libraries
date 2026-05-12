@@ -364,6 +364,16 @@ void rocfft_plan_t::Execute(void*                                 in_buffer[],
 
     auto callbacks = DeviceCallbackMap(info, desc, local_comm_rank);
 
+    // The first Comm* item in a multi-device plan reads from user
+    // buffers on rocFFT's own per-op streams, not the user-supplied
+    // stream. Drain the device here so writes the caller queued on
+    // its stream are visible before our internal streams begin.
+    // TODO: replace with per-(buffer, device) hipStreamWaitEvent edges
+    // recorded from the user stream onto each per-op stream that reads
+    // a user buffer.
+    if(hipDeviceSynchronize() != hipSuccess)
+        throw std::runtime_error("plan entry hipDeviceSynchronize failed");
+
     for(auto i = sortedIdx.begin(); i != sortedIdx.end(); ++i)
     {
         const auto idx = *i;
