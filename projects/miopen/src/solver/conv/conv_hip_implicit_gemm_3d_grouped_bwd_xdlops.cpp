@@ -51,6 +51,8 @@ namespace conv {
 
 using ProblemDescription = miopen::conv::ProblemDescription;
 
+#if MIOPEN_ENABLE_AI_KERNEL_TUNING
+
 namespace {
 
 // ============================================================================
@@ -76,6 +78,12 @@ constexpr SolverHeuristicConfig k3DBwdSolverConfig = {
     /* supports_ktn                */ false,
 };
 // clang-format on
+
+} // namespace
+
+#endif // MIOPEN_ENABLE_AI_KERNEL_TUNING
+
+namespace {
 
 // clang-format off
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables, cert-err58-cpp)
@@ -156,52 +164,61 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::DefaultKernelFromList(
 void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
     const miopen::ExecutionContext& ctx, const ProblemDescription& problem)
 {
-    HeuristicInitState state(valid_kernels, index, split_k, kernel_id);
-    state.Reset(k3DBwdSolverConfig.uses_split_k);
-
     const auto& loader = CkImplLibLoader::Get(ctx.GetStream().GetDeviceName());
     if(!loader.IsLoaded())
         return;
 
         // AI heuristics (if enabled)
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
-    if(&ctx != &GetDummyCtx() &&
-       !env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS_AI_HEUR))
     {
-        bool mode_use_tf32 = (problem.GetInDataType() == miopenFloat) && problem.UseTF32();
+        HeuristicInitState state(valid_kernels, index, split_k, kernel_id);
+        state.Reset(k3DBwdSolverConfig.uses_split_k);
 
-        auto fill_valid_kernels = [&loader](const ProblemDescription& p, bool try_tf32) {
-            return loader.FillValidKernels(
-                CKSolverType::GrpConv3dBwd, p, p.GetInDataType(), try_tf32);
-        };
-
-        auto ck_val_creator = MakeCKValidatorCreator(
-            loader, CKSolverType::GrpConv3dBwd, problem.GetInDataType(), mode_use_tf32);
-
-        // Note: No KTN runner needed for 3D (supports_ktn = false)
-        if(RunAIHeuristics(k3DBwdSolverConfig,
-                           state,
-                           ctx,
-                           problem,
-                           false,
-                           fill_valid_kernels,
-                           nullptr,
-                           ck_val_creator,
-                           mode_use_tf32))
+        if(&ctx != &GetDummyCtx() &&
+           !env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS_AI_HEUR))
         {
-            return;
+            bool mode_use_tf32 = (problem.GetInDataType() == miopenFloat) && problem.UseTF32();
+
+            auto fill_valid_kernels = [&loader](const ProblemDescription& p, bool try_tf32) {
+                return loader.FillValidKernels(
+                    CKSolverType::GrpConv3dBwd, p, p.GetInDataType(), try_tf32);
+            };
+
+            auto ck_val_creator = MakeCKValidatorCreator(
+                loader, CKSolverType::GrpConv3dBwd, problem.GetInDataType(), mode_use_tf32);
+
+            // Note: No KTN runner needed for 3D (supports_ktn = false)
+            if(RunAIHeuristics(k3DBwdSolverConfig,
+                               state,
+                               ctx,
+                               problem,
+                               false,
+                               fill_valid_kernels,
+                               nullptr,
+                               ck_val_creator,
+                               mode_use_tf32))
+            {
+                return;
+            }
+        }
+
+        // Fallback to default initialization
+        InitValidKernels(problem);
+        if(!valid_kernels.empty())
+        {
+            if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
+                DefaultKernelFromList(ctx);
+            state.SetResult(index, split_k, k3DBwdSolverConfig.uses_split_k);
         }
     }
-#endif
-
-    // Fallback to default initialization
+#else
     InitValidKernels(problem);
     if(!valid_kernels.empty())
     {
         if(!env::disabled(MIOPEN_DEBUG_CK_DEFAULT_KERNELS))
             DefaultKernelFromList(ctx);
-        state.SetResult(index, split_k, k3DBwdSolverConfig.uses_split_k);
     }
+#endif
 }
 
 bool PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::SetNextValue(
