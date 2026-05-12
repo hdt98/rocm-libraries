@@ -1250,10 +1250,10 @@ TEST_CASE("Heuristics: Default parameters", "[heuristics]") {
   // Per-VW BW dampening / efficiency (new modeling tunables)
   REQUIRE(defaults.vw_dampening_exponent ==
           origami::heuristic_defaults_t::VW_DAMPENING_EXPONENT);
-  REQUIRE(defaults.vw_efficiency_short  == origami::heuristic_defaults_t::VW_EFFICIENCY_SHORT);
-  REQUIRE(defaults.vw_efficiency_float  == origami::heuristic_defaults_t::VW_EFFICIENCY_FLOAT);
-  REQUIRE(defaults.vw_efficiency_float2 == origami::heuristic_defaults_t::VW_EFFICIENCY_FLOAT2);
-  REQUIRE(defaults.vw_efficiency_float4 == origami::heuristic_defaults_t::VW_EFFICIENCY_FLOAT4);
+  REQUIRE(defaults.vw_efficiency_bytes2  == origami::heuristic_defaults_t::VW_EFFICIENCY_BYTES2);
+  REQUIRE(defaults.vw_efficiency_bytes4  == origami::heuristic_defaults_t::VW_EFFICIENCY_BYTES4);
+  REQUIRE(defaults.vw_efficiency_bytes8  == origami::heuristic_defaults_t::VW_EFFICIENCY_BYTES8);
+  REQUIRE(defaults.vw_efficiency_bytes16 == origami::heuristic_defaults_t::VW_EFFICIENCY_BYTES16);
 
   // Edge-tile padding penalty
   REQUIRE(defaults.edge_padding_penalty ==
@@ -1272,10 +1272,10 @@ TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   override.weight_memory            = 3.0;
   override.main_memory_load_latency = 300.0;
   override.main_loop_efficiency     = 0.8;
-  override.vw_efficiency_short      = 1.10;
-  override.vw_efficiency_float      = 0.80;
-  override.vw_efficiency_float2     = 1.20;
-  override.vw_efficiency_float4     = 0.95;
+  override.vw_efficiency_bytes2     = 1.10;
+  override.vw_efficiency_bytes4     = 0.80;
+  override.vw_efficiency_bytes8     = 1.20;
+  override.vw_efficiency_bytes16    = 0.95;
   override.edge_padding_penalty     = 0.05;
 
   // Merge override into base
@@ -1286,10 +1286,10 @@ TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   REQUIRE(base.weight_memory == 3.0);
   REQUIRE(base.main_memory_load_latency == 300.0);
   REQUIRE(base.main_loop_efficiency == 0.8);
-  REQUIRE(base.vw_efficiency_short  == 1.10);
-  REQUIRE(base.vw_efficiency_float  == 0.80);
-  REQUIRE(base.vw_efficiency_float2 == 1.20);
-  REQUIRE(base.vw_efficiency_float4 == 0.95);
+  REQUIRE(base.vw_efficiency_bytes2  == 1.10);
+  REQUIRE(base.vw_efficiency_bytes4  == 0.80);
+  REQUIRE(base.vw_efficiency_bytes8  == 1.20);
+  REQUIRE(base.vw_efficiency_bytes16 == 0.95);
   REQUIRE(base.edge_padding_penalty == 0.05);
 
   // Check that non-overridden values remain default
@@ -1847,17 +1847,17 @@ TEST_CASE("Hardware: per-level cache_line_sizes_t and per-VW BW arrays (gfx950)"
   REQUIRE(hardware.cache_lines.hbm      > 0);
   REQUIRE(hardware.cache_lines.epilogue > 0);
 
-  // Per-level per-VW BW arrays: Float4 should yield the largest absolute
-  // B/cycle for both L2 reads and HBM reads (microbench-fitted).
+  // Per-level per-VW BW arrays: Bytes16 (widest load) should yield the largest
+  // absolute B/cycle for both L2 reads and HBM reads (microbench-fitted).
   using vw = origami::mem_vector_width_t;
   const double cus = static_cast<double>(hardware.N_CU);
-  const double l2_short  = origami::hardware_t::eval_bw(hardware.l2_bw_read[static_cast<size_t>(vw::Short)],  cus);
-  const double l2_float4 = origami::hardware_t::eval_bw(hardware.l2_bw_read[static_cast<size_t>(vw::Float4)], cus);
-  REQUIRE(l2_float4 > l2_short);
+  const double l2_b2  = origami::hardware_t::eval_bw(hardware.l2_bw_read[static_cast<size_t>(vw::Bytes2)],  cus);
+  const double l2_b16 = origami::hardware_t::eval_bw(hardware.l2_bw_read[static_cast<size_t>(vw::Bytes16)], cus);
+  REQUIRE(l2_b16 > l2_b2);
 
-  const double hbm_short  = origami::hardware_t::eval_bw(hardware.hbm_bw_read[static_cast<size_t>(vw::Short)],  cus);
-  const double hbm_float4 = origami::hardware_t::eval_bw(hardware.hbm_bw_read[static_cast<size_t>(vw::Float4)], cus);
-  REQUIRE(hbm_float4 > hbm_short);
+  const double hbm_b2  = origami::hardware_t::eval_bw(hardware.hbm_bw_read[static_cast<size_t>(vw::Bytes2)],  cus);
+  const double hbm_b16 = origami::hardware_t::eval_bw(hardware.hbm_bw_read[static_cast<size_t>(vw::Bytes16)], cus);
+  REQUIRE(hbm_b16 > hbm_b2);
 
   // eval_bw is the quadratic `a*CU^2 + b*CU + c` — sanity check by computing
   // a known coefficient tuple manually.
@@ -1888,9 +1888,9 @@ TEST_CASE("Heuristics: per-VW efficiency factors scale L_mem (gfx950)", "[heuris
   origami::context_t ctx0(problem, hardware, config);
   const double L_mem0 = origami::compute_memory_latency(problem, hardware, config, ctx0);
 
-  // Penalize Float4 efficiency by half — the Float4-VW kernel must look
-  // proportionally slower on memory.
-  hp.vw_efficiency_float4 = 0.50;
+  // Penalize the 16-byte VW efficiency by half — the Bytes16-VW kernel must
+  // look proportionally slower on memory.
+  hp.vw_efficiency_bytes16 = 0.50;
   origami::heuristics_database_t::get_instance().set_default_params(hp);
   origami::context_t ctx1(problem, hardware, config);
   const double L_mem1 = origami::compute_memory_latency(problem, hardware, config, ctx1);

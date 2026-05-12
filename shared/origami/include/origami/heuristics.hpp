@@ -79,15 +79,10 @@ struct heuristic_defaults_t {
 
   static constexpr double VW_DAMPENING_EXPONENT = 1.25;
 
-  // Per-VW achievable-fraction-of-peak coefficients. The per-level BW arrays
-  // (l2_bw_read[vw], mall_bw_read[vw], hbm_bw_read[vw]) carry microbench-fitted
-  // peaks; real GEMMs at higher VW often miss those peaks because of register
-  // pressure / scheduling. These factors scale the BW per VW. Default 1.0 =
-  // trust the peak; <1.0 = penalize a VW that misses its peak in practice.
-  static constexpr double VW_EFFICIENCY_SHORT  = 1.09;
-  static constexpr double VW_EFFICIENCY_FLOAT  = 0.81;
-  static constexpr double VW_EFFICIENCY_FLOAT2 = 1.20;
-  static constexpr double VW_EFFICIENCY_FLOAT4 = 0.95;
+  static constexpr double VW_EFFICIENCY_BYTES2  = 1.09;
+  static constexpr double VW_EFFICIENCY_BYTES4  = 0.81;
+  static constexpr double VW_EFFICIENCY_BYTES8  = 1.20;
+  static constexpr double VW_EFFICIENCY_BYTES16 = 0.95;
 
   // Multiplicative penalty for tiles whose M- or N-edge tile wastes >50%
   // of MT_M / MT_N. 0.0 = neutral. The penalty scales linearly with the
@@ -145,10 +140,10 @@ struct heuristic_params_t {
   double postgsu_kernel_launch_overhead   = heuristic_defaults_t::POSTGSU_KERNEL_LAUNCH_OVERHEAD;
 
   double vw_dampening_exponent = heuristic_defaults_t::VW_DAMPENING_EXPONENT;
-  double vw_efficiency_short   = heuristic_defaults_t::VW_EFFICIENCY_SHORT;
-  double vw_efficiency_float   = heuristic_defaults_t::VW_EFFICIENCY_FLOAT;
-  double vw_efficiency_float2  = heuristic_defaults_t::VW_EFFICIENCY_FLOAT2;
-  double vw_efficiency_float4  = heuristic_defaults_t::VW_EFFICIENCY_FLOAT4;
+  double vw_efficiency_bytes2  = heuristic_defaults_t::VW_EFFICIENCY_BYTES2;
+  double vw_efficiency_bytes4  = heuristic_defaults_t::VW_EFFICIENCY_BYTES4;
+  double vw_efficiency_bytes8  = heuristic_defaults_t::VW_EFFICIENCY_BYTES8;
+  double vw_efficiency_bytes16 = heuristic_defaults_t::VW_EFFICIENCY_BYTES16;
   double edge_padding_penalty  = heuristic_defaults_t::EDGE_PADDING_PENALTY;
 
   // === Main Loop Efficiency ===

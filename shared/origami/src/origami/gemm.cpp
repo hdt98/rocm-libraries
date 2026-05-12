@@ -199,10 +199,10 @@ double calculate_output_utilization(const problem_t& problem,
 }
 
 static mem_vector_width_t bytes_to_vw(size_t vec_bytes) {
-  if (vec_bytes <= 2) return mem_vector_width_t::Short;
-  if (vec_bytes <= 4) return mem_vector_width_t::Float;
-  if (vec_bytes <= 8) return mem_vector_width_t::Float2;
-  return mem_vector_width_t::Float4;
+  if (vec_bytes <= 2) return mem_vector_width_t::Bytes2;
+  if (vec_bytes <= 4) return mem_vector_width_t::Bytes4;
+  if (vec_bytes <= 8) return mem_vector_width_t::Bytes8;
+  return mem_vector_width_t::Bytes16;
 }
 
 static mem_vector_width_t get_operand_vw(size_t grvw, data_type_t dtype) {
@@ -241,14 +241,15 @@ operand_cache_layout_t make_b_cache_layout(const problem_t& problem, const confi
   return l;
 }
 
-size_t count_cache_lines(size_t contiguous_elems,
-                         size_t strided_elems,
-                         size_t leading_dim_elems,
-                         double element_bytes,
-                         size_t cache_line_bytes) {
-  if (contiguous_elems == 0 || strided_elems == 0 || leading_dim_elems == 0 || element_bytes <= 0)
-    return 0;
-
+// Reference implementation: walks every column, merging cache-line intervals.
+// O(strided_elems). Correct for all inputs including fractional element_bytes
+// (sub-byte dtypes) and non-aligned strides. Used as the fallback when the
+// closed-form fast paths below don't apply.
+static size_t count_cache_lines_reference(size_t contiguous_elems,
+                                          size_t strided_elems,
+                                          size_t leading_dim_elems,
+                                          double element_bytes,
+                                          size_t cache_line_bytes) {
   size_t total_lines    = 0;
   bool has_interval     = false;
   uint64_t active_begin = 0;
@@ -281,6 +282,78 @@ size_t count_cache_lines(size_t contiguous_elems,
   }
   if (has_interval) total_lines += static_cast<size_t>(active_end - active_begin);
   return total_lines;
+}
+
+size_t count_cache_lines(size_t contiguous_elems,
+                         size_t strided_elems,
+                         size_t leading_dim_elems,
+                         double element_bytes,
+                         size_t cache_line_bytes) {
+  if (contiguous_elems == 0 || strided_elems == 0 || leading_dim_elems == 0 ||
+      element_bytes <= 0 || cache_line_bytes == 0)
+    return 0;
+
+  const uint64_t contig_bytes =
+      static_cast<uint64_t>(std::ceil(static_cast<double>(contiguous_elems) * element_bytes));
+  if (contig_bytes == 0) return 0;
+  const uint64_t lines_per_col =
+      (contig_bytes + cache_line_bytes - 1) / cache_line_bytes;
+
+  // ---- Fast path: single column ----
+  if (strided_elems == 1) return static_cast<size_t>(lines_per_col);
+
+  // Stride between consecutive column starts, in bytes (may be fractional for sub-byte dtypes).
+  const double ld_bytes_d = static_cast<double>(leading_dim_elems) * element_bytes;
+
+  // ---- Fast path: cache-line-aligned integer stride ----
+  // Conditions: ld_bytes_d is an exact integer AND that integer is a multiple of cache_line_bytes.
+  // When this holds, every column starts on a cache-line boundary, so the per-column line count
+  // is identical (= lines_per_col) and intercolumn merging is fully deterministic.
+  if (ld_bytes_d > 0.0 && std::floor(ld_bytes_d) == ld_bytes_d) {
+    const uint64_t s_int = static_cast<uint64_t>(ld_bytes_d);
+    if (s_int % cache_line_bytes == 0) {
+      const uint64_t stride_lines = s_int / cache_line_bytes;
+      if (stride_lines >= lines_per_col) {
+        // Disjoint per-column line ranges. Total = N * lines_per_col.
+        return static_cast<size_t>(strided_elems * lines_per_col);
+      }
+      // Columns overlap into one contiguous run from line 0 to (N-1)*stride_lines + lines_per_col.
+      return static_cast<size_t>((strided_elems - 1) * stride_lines + lines_per_col);
+    }
+  }
+
+  // ---- Fast path: integer stride, periodicity short-circuit ----
+  // For integer s, the per-column cache-line alignment repeats every
+  //   period = cache_line_bytes / gcd(s, cache_line_bytes)
+  // columns. Beyond the first period, each subsequent period adds the same
+  // number of unique cache lines (call it dpp). So for N = q*period + tail:
+  //   total(N) = total(2*period + tail) + (q - 2) * dpp                (q >= 2)
+  // The reference loop for 2*period + tail runs both warm-up periods AND the
+  // tail; the (q - 2) middle periods are skipped via multiplication.
+  // Profitable when running (P) + (2P) + (2P + tail) reference calls = 5P + tail
+  // iterations is cheaper than the original qP + tail, i.e. q > 5.
+  if (ld_bytes_d > 0.0 && std::floor(ld_bytes_d) == ld_bytes_d) {
+    const uint64_t s_int  = static_cast<uint64_t>(ld_bytes_d);
+    if (s_int > 0) {
+      const uint64_t period = cache_line_bytes / std::gcd(s_int, cache_line_bytes);
+      const uint64_t q      = strided_elems / period;
+      if (period > 0 && q >= 6) {
+        const uint64_t tail   = strided_elems % period;
+        const size_t   T_p    = count_cache_lines_reference(
+            contiguous_elems, period, leading_dim_elems, element_bytes, cache_line_bytes);
+        const size_t   T_2p   = count_cache_lines_reference(
+            contiguous_elems, 2 * period, leading_dim_elems, element_bytes, cache_line_bytes);
+        const size_t   T_head = count_cache_lines_reference(
+            contiguous_elems, 2 * period + tail, leading_dim_elems, element_bytes, cache_line_bytes);
+        const uint64_t dpp    = static_cast<uint64_t>(T_2p - T_p);
+        return static_cast<size_t>(T_head + (q - 2) * dpp);
+      }
+    }
+  }
+
+  // ---- Fallback: full reference loop ----
+  return count_cache_lines_reference(
+      contiguous_elems, strided_elems, leading_dim_elems, element_bytes, cache_line_bytes);
 }
 
 double operand_cache_bytes(const operand_cache_layout_t& layout,
@@ -1561,10 +1634,11 @@ double compute_memory_latency(const problem_t& problem,
     };
     auto vw_eff = [&](mem_vector_width_t vw) -> double {
       switch (vw) {
-        case mem_vector_width_t::Short:  return heuristic.vw_efficiency_short;
-        case mem_vector_width_t::Float:  return heuristic.vw_efficiency_float;
-        case mem_vector_width_t::Float2: return heuristic.vw_efficiency_float2;
-        case mem_vector_width_t::Float4: return heuristic.vw_efficiency_float4;
+        case mem_vector_width_t::Bytes2:  return heuristic.vw_efficiency_bytes2;
+        case mem_vector_width_t::Bytes4:  return heuristic.vw_efficiency_bytes4;
+        case mem_vector_width_t::Bytes8:  return heuristic.vw_efficiency_bytes8;
+        case mem_vector_width_t::Bytes16: return heuristic.vw_efficiency_bytes16;
+        case mem_vector_width_t::Count:   break;
       }
       return 1.0;
     };
@@ -1590,7 +1664,7 @@ double compute_memory_latency(const problem_t& problem,
     L_mem_dram = safe_lat(Ld_A_dram, hbm_bw_a) + safe_lat(Ld_B_dram, hbm_bw_b);
     L_mem_dram += heuristic.main_memory_load_latency;
   } else {
-    constexpr auto vw_f4 = static_cast<size_t>(mem_vector_width_t::Float4);
+    constexpr auto vw_f4 = static_cast<size_t>(mem_vector_width_t::Bytes16);
     const double vw_exp  = heuristic.vw_dampening_exponent;
     auto vw_fraction     = [&](const hardware_t::bw_coef_array_t& coefs,
                                mem_vector_width_t vw) -> double {
@@ -1713,7 +1787,7 @@ double compute_epilogue_latency(const problem_t& problem,
     store_bw      = hardware_t::eval_bw(hardware.hbm_bw_write[static_cast<size_t>(store_vw)],
                                         static_cast<double>(num_active_cus));
     reduce_bw =
-        hardware_t::eval_bw(hardware.mall_bw_read[static_cast<size_t>(mem_vector_width_t::Float)],
+        hardware_t::eval_bw(hardware.mall_bw_read[static_cast<size_t>(mem_vector_width_t::Bytes4)],
                             static_cast<double>(num_output_tiles));
   } else {
     store_bw  = hardware.mem3_perf_ratio * context.mem_bw_limited;
@@ -2018,10 +2092,10 @@ double compute_parallel_reduction_latency(const problem_t& problem,
   double read_bw, write_bw;
   if (hardware.uses_absolute_bw) {
     read_bw =
-        hardware_t::eval_bw(hardware.mall_bw_read[static_cast<size_t>(mem_vector_width_t::Float)],
+        hardware_t::eval_bw(hardware.mall_bw_read[static_cast<size_t>(mem_vector_width_t::Bytes4)],
                             static_cast<double>(active_wgs));
     write_bw =
-        hardware_t::eval_bw(hardware.hbm_bw_write[static_cast<size_t>(mem_vector_width_t::Float)],
+        hardware_t::eval_bw(hardware.hbm_bw_write[static_cast<size_t>(mem_vector_width_t::Bytes4)],
                             static_cast<double>(active_wgs));
   } else {
     read_bw  = hardware.mem2_perf_ratio * compute_mem_bw_from_occupancy(hardware, active_wgs);

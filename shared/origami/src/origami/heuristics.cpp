@@ -53,14 +53,12 @@ void heuristic_params_t::merge_with(const heuristic_params_t& other) {
   epilogue_store_drain_cycles      = other.epilogue_store_drain_cycles;
   epilogue_k_padding_penalty       = other.epilogue_k_padding_penalty;
   postgsu_kernel_launch_overhead   = other.postgsu_kernel_launch_overhead;
-
-  // Per-VW dampening + per-VW efficiency + edge-padding penalty
-  vw_dampening_exponent = other.vw_dampening_exponent;
-  vw_efficiency_short   = other.vw_efficiency_short;
-  vw_efficiency_float   = other.vw_efficiency_float;
-  vw_efficiency_float2  = other.vw_efficiency_float2;
-  vw_efficiency_float4  = other.vw_efficiency_float4;
-  edge_padding_penalty  = other.edge_padding_penalty;
+  vw_dampening_exponent            = other.vw_dampening_exponent;
+  vw_efficiency_bytes2             = other.vw_efficiency_bytes2;
+  vw_efficiency_bytes4             = other.vw_efficiency_bytes4;
+  vw_efficiency_bytes8             = other.vw_efficiency_bytes8;
+  vw_efficiency_bytes16            = other.vw_efficiency_bytes16;
+  edge_padding_penalty             = other.edge_padding_penalty;
 
   // Main loop efficiency
   main_loop_efficiency = other.main_loop_efficiency;

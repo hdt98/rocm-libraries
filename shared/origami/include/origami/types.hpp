@@ -227,9 +227,17 @@ enum class transpose_t {
 };
 
 /**
- * @brief Memory vector width categories for BW coefficient indexing.
+ * @brief Memory load-instruction widths in bytes, used to index per-VW BW
+ * coefficient arrays (l2_bw_read[vw], mall_bw_read[vw], hbm_bw_read[vw]).
+ *
+ * Widths correspond to the four GPU global-load instruction families:
+ *   Bytes2  -> 2-byte load  (e.g. global_load_short_d16)
+ *   Bytes4  -> 4-byte load  (e.g. global_load_dword)
+ *   Bytes8  -> 8-byte load  (e.g. global_load_dwordx2)
+ *   Bytes16 -> 16-byte load (e.g. global_load_dwordx4)
+ *
  */
-enum class mem_vector_width_t : size_t { Short, Float, Float2, Float4, Count };
+enum class mem_vector_width_t : size_t { Bytes2, Bytes4, Bytes8, Bytes16, Count };
 
 /**
  * @brief A compact 3-D dimension triple (M, N, K).
