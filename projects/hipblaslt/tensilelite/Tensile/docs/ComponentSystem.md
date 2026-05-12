@@ -1,141 +1,151 @@
 # Component System
 
-## What It Is and Why It Exists
+A capability-based registry for kernel sub-routines. Each sub-routine (a
+multiply-accumulate block, a local-read block, an epilogue store helper, etc.) is a
+`Component` subclass that declares the hardware and kernel conditions under which it
+applies. The kernel writer asks `Component.<SubType>.find(writer)` for the matching
+implementation; if none matches it gets `None` and falls back to legacy code. New
+architecture-specific implementations can be added by dropping a class into the
+`Components/` directory and registering its module in `Components/__init__.py`.
 
-The Component system is a capability-based plug-in registry for kernel sub-routines. Rather
-than selecting code paths with large `if arch == ...` chains, each sub-routine (e.g., a
-multiply-accumulate block or a local-read block) is packaged as an independent `Component`
-subclass that declares the hardware and kernel conditions under which it applies. At kernel
-generation time the writer calls `Component.<SubType>.find(writer)` and gets back the single
-matching implementation — or `None` if no component matches, allowing a graceful fallback to
-legacy code.
+## Source layout
 
-This pattern makes it possible to add a new architecture-specific implementation without
-touching existing code: just create a new class in the `Components/` directory, declare its
-matching conditions, and it is automatically discovered.
+- `Tensile/Component.py` — base class, metaclass, partial-match helper, and the
+  abstract category bases that ship out-of-the-box.
+- `Tensile/Components/` — concrete implementations and additional category bases
+  (`GSU`, `LSU`, `Priority`, `PersistentLoop`, `StreamK`, `XCCMapping`,
+  `StreamKMemoryOrdering`).
+- `Tensile/Components/__init__.py` — `__all__` lists every module that the wildcard
+  import at the bottom of `Component.py` will pull in.
 
----
+## Key classes
 
-## Key Classes
+### `ComponentMeta`
 
-### `ComponentMeta` (`Component.py`)
+Metaclass derived from `abc.ABCMeta`. When a class is created, `ComponentMeta.__init__`
+adds the new class to each base's `implementations` dict (and as a named attribute on
+the base) so that `Component.MAC` resolves to the `MAC` class and
+`Component.MAC.implementations` lists every concrete `MAC` subclass. If the class is
+itself abstract, it gets a fresh empty `implementations` dict of its own. Registration
+runs at import time, which is why merely importing the module is enough to register
+the class.
 
-A metaclass (inherits `abc.ABCMeta`) that intercepts class creation. Every time a new
-`Component` subclass is defined, `ComponentMeta.__init__()` registers it in the `implementations`
-dict of each of its parent classes. This builds the hierarchical registry automatically at
-import time.
+### `Component`
 
-### `Component` (`Component.py`)
+Base class for every pluggable sub-routine. Declared with
+`metaclass=ComponentMeta`. Concrete subclasses use class-level attributes to declare
+their match conditions:
 
-Base class for all pluggable sub-routines. Key class-level attributes on concrete subclasses:
+- `asmCaps` (dict) — required assembly capabilities, matched against
+  `writer.states.asmCaps`.
+- `archCaps` (dict) — required architecture capabilities, matched against
+  `writer.states.archCaps`.
+- `kernel` (dict) — required kernel parameter values, matched against
+  `writer.states.kernel`. Values may be plain values or callables for predicates
+  that need more than equality.
+- `versions` (optional) — restricts to specific ISA versions; matched against
+  `writer.version` (not `writer.states.version`).
 
-- `asmCaps` (dict) — required assembly capabilities (e.g., `{"v_fma_f16": True}`). Matched
-  against `writer.states.asmCaps`.
-- `archCaps` (dict) — required architecture capabilities. Matched against `writer.states.archCaps`.
-- `kernel` (dict) — required kernel parameter values. Matched against `writer.states.kernel`.
-  Values may be plain values or callables for complex predicates.
-- `versions` (list, optional) — restrict to specific ISA versions (tuples); matched against
-  `writer.version`.
+Class methods:
 
-Key class methods:
+- `matches(writer, debug=False) -> bool` — checks `versions` if present, then runs
+  `PartialMatch` for each declared dict against the corresponding attribute on
+  `writer.states`. Missing attributes are skipped, so a class that omits `archCaps`
+  is treated as having no architecture constraint.
+- `findAll(writer, debug=False, *args, **kwargs) -> list` — walks the
+  `implementations` registry. Abstract subclasses are recursed into; concrete
+  subclasses are tested with `matches` and collected when they pass.
+- `find(writer, debug=False, *args, **kwargs) -> Component | None` — returns
+  `None` for zero matches, raises `RuntimeError` for more than one (ambiguity is a
+  configuration error), and otherwise returns a fresh instance via `found[0]()`.
+- `componentPath(path=None, bases=None) -> list[str]` — walks `__bases__[0]` up to
+  `Component` and returns the chain of class names.
 
-- `Component.matches(cls, writer, debug=False) -> bool` — checks all declared attributes
-  against the writer state using `PartialMatch()`. Returns `True` if this implementation
-  applies.
-- `Component.findAll(cls, writer, debug=False) -> list` — recursively walks the
-  `implementations` registry, returning all matching concrete implementations.
-- `Component.find(cls, writer, debug=False) -> Component | None` — calls `findAll()` and
-  returns the single match. Raises `RuntimeError` if more than one implementation matches
-  (ambiguity is a configuration error).
-- `Component.componentPath(cls) -> list[str]` — returns the class hierarchy as a list of
-  names, used for comment headers in generated code.
+Instance methods:
 
-Abstract method: `__call__(self)` — concrete subclasses must implement this to emit the actual
-assembly code.
+- `__call__` is `@abc.abstractmethod`; concrete subclasses must implement it. This is
+  what `find` calls (after instantiation) to emit the actual code.
+- `commentHeader()` returns `'.'.join(self.componentPath())`, used as a header in
+  generated assembly so a reader can see which component produced a block.
 
-### `PartialMatch(pattern, obj) -> bool` (`Component.py`)
+### `PartialMatch(pattern, obj, debug=False, level=0) -> bool`
 
-A recursive matcher used internally by `Component.matches()`. It handles three cases:
-- If `pattern` is callable, call it with `obj` and return its boolean result.
-- If both `pattern` and `obj` are `Mapping` instances, recurse on each key-value pair.
-- Otherwise, use plain equality `pattern == obj`.
+Module-level function. Three cases, in order:
 
-This is what allows lambda predicates in `asmCaps`, `archCaps`, and `kernel` dicts.
+1. If `pattern` is callable, return `pattern(obj)` coerced to bool.
+2. If both `pattern` and `obj` are `Mapping`, recurse on each key in `pattern`. A
+   key missing from `obj` fails the match. Keys present in `obj` but not in
+   `pattern` are ignored — that is what makes the match partial.
+3. Otherwise return `pattern == obj`.
 
-### `LraTileProperties` (`Component.py`)
+This is what allows lambda predicates inside `asmCaps`, `archCaps`, and `kernel`
+dicts.
 
-A frozen dataclass that carries properties of the LRA (Local Read Address) tile assignment.
-Used as a return value by `LraTileAssignment` components.
+### `LraTileProperties`
 
----
+Plain `@dataclass` (not frozen) declared in `Component.py` as a placeholder for
+properties carried by `LraTileAssignment` implementations.
 
-## Concrete Component Types
+## Category base classes in `Component.py`
 
-All of these are abstract base classes (themselves subclasses of `Component`) whose concrete
-implementations live in the `Components/` subdirectory:
+Each is a direct subclass of `Component` and is the search root for `find`:
 
-| Class | Role |
-|---|---|
-| `MAC` | Multiply-accumulate instruction block (MFMA, WMMA, FMA, etc.) |
-| `Signature` | Kernel function signature |
-| `LocalRead` | LDS read block; provides `_emitLdsRead()` helper with memory token tracking |
-| `SumUnroll` | Inner summation unroll loop; abstract methods: `initSumUnroll()`, `loopSum()`, `storeSumLDS()` |
-| `ShiftVectorComponents` | Tail-loop vector shift |
-| `ComputeStoreVgprs` | Compute VGPR assignments for the store epilogue |
-| `NotLocalFullTileElements` | Predicate for partial tile edge handling |
-| `LraTileAssignment` | Local-read address tile mapping |
-| `PackData` | Data packing (e.g., fp16 packing) |
-| `SIA` | Schedule-Iter-Algorithm; abstract method: `schedIntoIteration()` |
-| `GlobalWriteComponents` | Global write (epilogue store) helper |
-| `TensorDataMover` (`TDM`) | Moves tensor data between global memory and registers |
+- `MAC` — multiply-accumulate block (FMA, MFMA, dot, mad-mix, etc.).
+- `Signature` — kernel function signature.
+- `LocalRead` — LDS read block. Provides `_getLdsReadMemToken` and `_emitLdsRead`
+  helpers that wrap an LDS read instruction with a memory token from
+  `writer.states.ldsReadTokenIdx`.
+- `SumUnroll` — inner summation unroll. Abstract methods: `initSumUnroll`,
+  `loopSum`, `storeSumLDS`.
+- `ShiftVectorComponents` — tail-loop vector shift.
+- `ComputeStoreVgprs` — VGPR assignment for the store epilogue.
+- `NotLocalFullTileElements` — partial tile / edge handling.
+- `LraTileAssignment` — local-read address tile mapping.
+- `PackData` — data packing (fp16, bf16, fp8, int8, etc.).
+- `SIA` — schedule-iter-algorithm. Abstract method: `schedIntoIteration`.
+- `GlobalWriteComponents` — epilogue / global store; concrete implementation lives
+  in `Components/GlobalWriteBatch.py` as `GlobalWriteBatchComponent`.
+- `TensorDataMover` — moves tensor data between global memory and registers.
 
----
+Additional category bases declared in `Components/`:
 
-## How Components Are Registered
+- `GSU` (`GSU.py`) — global split-U.
+- `LSU` (`LSU.py`) — local split-U.
+- `Priority` (`Priority.py`) — workgroup priority control.
+- `PersistentLoop` (`PersistentLoop.py`) — persistent kernel loop.
+- `StreamK`, `XCCMapping`, `StreamKMemoryOrdering` (`StreamK.py`) — Stream-K
+  scheduling support.
 
-At the bottom of `Component.py`:
+## Registration
+
+The last line of `Component.py` is:
 
 ```python
 from .Components import *  # noqa
 ```
 
-This wildcard import loads every module listed in `Components/__init__.__all__`. Each module
-defines one or more concrete `Component` subclasses. The `ComponentMeta` metaclass registers
-each subclass automatically as the class body is executed, so no explicit registration call
-is needed.
+The wildcard pulls in every module named in `Components/__init__.__all__`. As each
+module's class bodies execute, `ComponentMeta.__init__` registers the classes in
+their parents' `implementations` dicts. Adding a new module to the directory means
+also adding its name to `__all__`; otherwise the wildcard import will not see it
+and the class never registers.
 
----
-
-## Usage Pattern in Kernel Writers
+## Usage in kernel writers
 
 ```python
-# In KernelWriter or KernelWriterAssembly:
 component = Component.MAC.find(self)
 if component:
     return component(self, m, innerUnroll)
-# else fall back to older code path
+# fall back to existing code
 ```
 
-The `find()` call searches the entire `MAC.implementations` tree for an implementation whose
-`asmCaps`, `archCaps`, and `kernel` conditions all match `self.states`. The returned object
-is a fresh instance (constructed via `found[0]()`), so `__call__` is invoked on it with
-the kernel writer and any extra arguments.
+`find` returns an already-instantiated component; the call after the assignment
+invokes `__call__` with the writer and any extra arguments the category expects.
+For categories whose abstract base declares additional methods (`SIA`, `SumUnroll`,
+`GSU`, etc.), the writer calls those methods directly on the returned instance,
+e.g. `siaComponent.schedIntoIteration(self, kernel, ...)` in
+`KernelWriter.py`.
 
----
-
-## Interaction with Other Concepts
-
-- **`KernelWriter` / `KernelWriterAssembly`** — the `writer` argument passed to `find()` and
-  `matches()`. Its `states` attribute (a `StateValues` dataclass) holds `asmCaps`, `archCaps`,
-  `kernel`, and `version`.
-- **`Components/` subdirectory** — contains all concrete implementations. Adding a new
-  implementation only requires creating a class there; no changes to `Component.py` itself.
-- **`rocisa`** — the assembly IR library used by most component implementations to emit
-  instructions.
-
----
-
-## Source Files
-
-- `Tensile/Component.py` — base classes and registry metaclass.
-- `Tensile/Components/` — all concrete component implementations.
+The `writer` argument is a `KernelWriter` (or `KernelWriterAssembly`). Its
+`states` attribute (a `StateValues` dataclass) carries `asmCaps`, `archCaps`, and
+`kernel`; the ISA version is on `writer.version` directly.

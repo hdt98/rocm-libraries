@@ -1,170 +1,214 @@
 # TensileCreateLibrary Overview
 
-## Purpose and Responsibility
-
-`TensileCreateLibrary` is a standalone sub-package (also invokable as
+`TensileCreateLibrary` is a sub-package of Tensile (also runnable as
 `python -m Tensile.TensileCreateLibrary`) that takes a directory of library-logic YAML files
-and produces deployable GPU kernel libraries. It is the packaging and compilation step that
-follows library-logic analysis: it reads the winning-solution YAML files, code-generates and
-assembles the kernels, links them into HIP code-object (`.co`) files, and writes the master
-solution library manifests that the runtime uses to dispatch kernels at inference time.
+and produces deployable GPU kernel libraries. It reads the winning-solution YAML files,
+generates and assembles the kernels, links them into HIP code-object (`.co`) files, and
+writes the master library manifests the runtime uses to dispatch kernels.
 
-This sub-package is separate from the benchmarking pipeline (`BenchmarkProblems`) so that
-pre-tuned libraries can be rebuilt for a new compiler version without re-running benchmarks.
-
----
+This sub-package is separate from the benchmarking pipeline so pre-tuned libraries can be
+rebuilt for a new compiler version without re-running benchmarks.
 
 ## Entry Points
 
-- **CLI**: `python -m Tensile.TensileCreateLibrary <LogicPath> <OutputPath> HIP [options]`
-- **Function**: `TensileCreateLibrary.Run.run()` — the `@profile`-decorated top-level function.
-- **`__main__.py`** — calls `run()` when the package is executed as a script.
+- CLI: `python -m Tensile.TensileCreateLibrary <LogicPath> <OutputPath> <RuntimeLanguage> [options]`
+- Function: `Tensile.TensileCreateLibrary.run()` — `@profile`-decorated.
+- `__main__.py` calls `run()` when the package is executed as a script.
+- `__init__.py` re-exports `run`, `libraryDir`, `writeSolutionsAndKernels`, and `copyStaticFiles`.
 
----
-
-## Source Files and Their Roles
+## Source Files
 
 | File | Role |
 |---|---|
-| `Run.py` | All the substantive logic: argument handling, library loading, code generation, assembly, linking, manifest writing. |
-| `ParseArguments.py` | `parseArguments()` — defines and parses the CLI argument schema. Returns a plain `dict`. |
-| `__main__.py` | Entry point for `python -m` invocation; delegates entirely to `run()`. |
-| `__init__.py` | Re-exports `run`, `libraryDir`, `writeSolutionsAndKernels`, `copyStaticFiles` for use by `BenchmarkProblems.py`. |
+| `Run.py` | All substantive logic: orchestration, library loading, code generation, assembly, linking, manifest writing. |
+| `ParseArguments.py` | `parseArguments()` defines the CLI schema and returns a `Dict[str, Any]`. |
+| `__main__.py` | Entry point for `python -m`; calls `run()`. |
+| `__init__.py` | Re-exports the public API. |
 
----
+## `run()` Orchestration
+
+The sequence in `Run.py:run()`:
+
+1. Parse arguments via `parseArguments()` and set verbosity from `PrintLevel`.
+2. Resolve the output path and validate the toolchain via `validateToolchain()`, which
+   returns the C++ compiler and offload bundler.
+3. Split `Architecture` on `;` or `_`; expand `all` to `SUPPORTED_GFX`; pull predicate
+   filters out via `splitArchsFromPredicates()`.
+4. Map archs to ISAs with `gfxToIsa()`, build `isaInfoMap` via `makeIsaInfoMap()`, then
+   `assignGlobalParameters()`.
+5. Build `asmToolchain` via `makeAssemblyToolchain()` and `srcToolchain` via
+   `makeSourceToolchain()`.
+6. Glob `<LogicPath>/**/<LogicFilter>.<ext>` (extension is `.yaml` or `.json` per
+   `--logic-format`). Filter to files whose embedded gfx arch matches the request, and
+   drop any path containing an `experimental` segment unless `--experimental` is set.
+   Apply predicate filters via `filterLogicFilesByPredicates()`.
+7. Call `generateLogicDataAndSolutions()` to load the YAMLs in parallel, merge per-arch
+   `MasterSolutionLibrary` objects, re-index solution indices deterministically, fold any
+   `"fallback"` library into every per-arch master, then arch-suffix the fallback names
+   via `renameFallbacksPerArch()`.
+8. Call `generateKernelObjectsFromSolutions()` to collect the unique kernel objects.
+9. Call `generateKernelHelperObjects(kernels, ...)` to collect helper-kernel writers.
+10. Construct the `KernelWriterAssembly`.
+11. Call `copyStaticFiles()` to copy the static C++ headers into `OutputPath`.
+12. Call `writeSolutionsAndKernelsTCL()` to code-generate, write `.s` files, assemble to
+    `.o`, link/bundle to `.co`, and emit `Kernels.cpp` / `Kernels.h`.
+13. Call `passPostKernelInfoToLibrary()` to write per-kernel `CUOccupancy`,
+    `MathClocksUnrolledLoop`, `PrefetchGlobalRead`, non-temporal flags, wave-separate
+    flags, `UnrollLoopSwapGlobalReadOrder`, and `DirectToVgpr{A,B}` back into each
+    solution's `sizeMapping`.
+14. Build a `solDict` keyed by kernel name, then for each arch write a per-arch lazy-library
+    mapping file `TensileLiteLibrary_lazy_<arch>_Mapping` (msgpack) when the mapping has
+    entries.
+15. For each arch in `masterLibraries`, write the master manifest (`TensileLibrary_lazy_<arch>`
+    when `LazyLibraryLoading` is on, otherwise `TensileLibrary_<arch>`) via
+    `LibraryIO.write()` in the format chosen by `--library-format`. Then write each lazy
+    sub-library in parallel.
+16. Unless `--keep-build-tmp` is set, remove `<OutputPath>/build_tmp` and the sibling
+    `<OutputPath>/../library/build_tmp` if present.
 
 ## Key Functions in `Run.py`
 
-### `run()` — top-level orchestration
-
-The main sequence executed by the CLI:
-
-1. Parse arguments via `parseArguments()`.
-2. Validate toolchain (compilers, bundler, assembler) via `validateToolchain()`.
-3. Resolve target architectures and build `isaInfoMap` via `makeIsaInfoMap()`.
-4. Glob for logic YAML files matching the `LogicPath` / `Architecture` / `LogicFilter` args;
-   optionally filter out `Experimental` files.
-5. Call `generateLogicDataAndSolutions()` to load YAMLs and build `masterLibraries`.
-6. Call `generateKernelObjectsFromSolutions()` to deduplicate kernels.
-7. Call `generateKernelHelperObjects()` to build auxiliary kernel writers.
-8. Call `copyStaticFiles()` to copy static C++ headers.
-9. Call `writeSolutionsAndKernelsTCL()` to code-generate, assemble, and link.
-10. Call `passPostKernelInfoToLibrary()` to back-fill occupancy/PGR metadata into the library.
-11. Write per-arch master library manifests and lazy-library mapping files via `LibraryIO.write()`.
-12. Optionally clean up `build_tmp`.
-
 ### `generateLogicDataAndSolutions(logicFiles, args, assembler, isaInfoMap)`
 
-Loads all logic YAML files in parallel via `LibraryIO.parseLibraryLogicFile()` (using
-`ParallelMap2`). Merges per-architecture `MasterSolutionLibrary` objects. After all files are
-merged, re-indexes solution indices to be globally monotonic and deterministic (sorted by
-architecture name, then by source filename). Handles `"fallback"` architecture libraries:
-merges them into every per-arch master, then calls `renameFallbacksPerArch()` to arch-suffix
-their on-disk names to prevent overlay collisions.
+Loads logic YAMLs in parallel via `LibraryIO.parseLibraryLogicFile()` (using
+`ParallelMap2`). Merges into a per-arch `masterLibraries` dict. After merging, re-indexes
+solution indices to be globally monotonic (sorted by arch name, then by lazy-library name,
+with each lazy library's solutions sorted by source filename). When `--no-generate-solution-table`
+is not set, writes a `MatchTable` mapping each solution index to `[srcName, libraryLogicIndex]`.
+If a `"fallback"` arch is present, merges it into every other per-arch master, removes the
+`"fallback"` key, then calls `renameFallbacksPerArch()`. Returns
+`(solutions, masterLibraries, codeObjectFilesIndex)`.
 
-Returns: `(solutions, masterLibraries, codeObjectFilesIndex)`.
+### `writeSolutionsAndKernelsTCL(outputPath, asmToolchain, srcToolchain, solutions, kernels, kernelHelperObjs, kernelWriterAssembly, cmdlineArchs, disableAsmComments=False, compress=True, removeTemporaries=True)`
 
-### `writeSolutionsAndKernelsTCL(outputPath, asmToolchain, srcToolchain, solutions, kernels, ...)`
+The variant called by the CLI. `splitGSU` is hardcoded `False`. Steps:
 
-The streaming version of kernel compilation used by the CLI (a batch version
-`writeSolutionsAndKernels()` is used by `BenchmarkProblems`). Steps:
+1. Filter kernels to assembly-only (`KernelLanguage == "Assembly"`).
+2. Mark duplicates by `getKernelFileBase()`; keep only unique kernels for code generation.
+3. For each unique kernel, run `processKernelSource()` → `writeAssembly()` → assemble
+   (`asmToolchain.assembler`) as one composed function under `ParallelMap2`. When
+   `removeTemporaries` is true, the `.s` file is unlinked after assembly.
+4. Link and bundle all `.o` files into `.co` via `buildAssemblyCodeObjectFiles()`.
+5. Write `Kernels.cpp` / `Kernels.h` via `writeHelpers()`.
+6. Compile and bundle `Kernels.cpp` via `buildSourceCodeObjectFiles()`.
 
-1. Detect duplicate kernels by `getKernelFileBase()`; mark duplicates so they are only
-   compiled once.
-2. Code-generate each unique kernel with `processKernelSource()` in parallel
-   (`ParallelMap2`).
-3. Write each generated `.s` file to `assemblyTmpPath` with `writeAssembly()`.
-4. Assemble each `.s` to a `.o` file using `asmToolchain.assembler`.
-5. Link and bundle `.o` files into `.co` (HIP code object) files via
-   `buildAssemblyCodeObjectFiles()`.
-6. Write `Kernels.cpp` / `Kernels.h` helper kernels via `writeHelpers()`.
-7. Compile and bundle `Kernels.cpp` with `buildSourceCodeObjectFiles()`.
+Returns `(numUniqueKernels, uniqueKernels, results)`.
 
-Returns: `(numUniqueKernels, uniqueKernels, results)`.
+`writeSolutionsAndKernels()` is a separate variant used by `BenchmarkProblems`; it has
+the same shape but takes `splitGSU` as a parameter, supports `errorTolerant` and
+`generateSourcesAndExit`, and runs validation/post-info passes against the solution list
+during compilation.
 
-### `processKernelSource(kernelWriterAssembly, data, outOptions, splitGSU, kernel) -> KernelCodeGenResult`
+### `processKernelSource(kernelWriterAssembly, data, outOptions, splitGSU, kernel, compress=False) -> KernelCodeGenResult`
 
-Drives one kernel through code generation:
-1. Calls `kernelWriter.setRocIsa(data, outOptions)` to configure the `rocisa` backend.
-2. Calls `kernelWriter.getSourceFileString(kernel)` to emit the assembly text.
-3. Calls `kernelWriter.getHeaderFileString(kernel)` to emit the header.
-4. Returns a `KernelCodeGenResult` named tuple.
+Generates the source for one kernel: calls `kernelWriter.setRocIsa(data, outOptions)`,
+then `getSourceFileString(kernel)`, then `getHeaderFileString(kernel)`. Returns a
+`KernelCodeGenResult`. When `compress=True`, the source string is `zlib`-compressed via
+`memCompress()`.
 
 ### `KernelCodeGenResult` (NamedTuple)
 
-Fields: `err`, `src`, `header`, `name`, `targetObjFilename`, `isa`, `wavefrontSize`,
-`cuoccupancy`, `pgr`, `mathclk`.
+Fields: `err: int`, `src: Union[str, bytes]`, `header: Optional[str]`, `name: str`,
+`targetObjFilename: str`, `isa: IsaVersion`, `wavefrontSize: int`, `cuoccupancy: int`,
+`pgr: int`, `mathclk: int`.
 
 ### `generateKernelHelperObjects(solutions, cxxCompiler, isaInfoMap)`
 
-Collects the minimal set of auxiliary kernel writers needed across all solutions (beta-only,
-reduction, conversion, activation enum headers). Ensures activation enum header writers appear
-first in the returned list (so `Kernels.h` has the enum before the activation function kernels
-that reference it).
+Collects the unique helper-kernel writers needed across all solutions (beta-only,
+reduction, conversion, activation, activation enum headers). Returns the list sorted so
+that helpers whose name contains `"Enum"` come first, ensuring the activation enum is
+emitted in `Kernels.h` before any kernel that references it. Note: `run()` passes the
+deduplicated `kernels` list as the first argument.
 
 ### `renameFallbacksPerArch(masterLibraries)`
 
-Deep-copies each per-arch `MasterSolutionLibrary` that absorbed a fallback and arch-suffixes
-both the `lazyLibraries` dict keys and the `PlaceholderLibrary.filenamePrefix` strings inside
-the library tree. This prevents on-disk filename collisions between per-arch fallback shards in
-overlay-style installs.
+After fallback libraries have been merged into every per-arch master, deep-copies each
+arch's master and arch-suffixes both the `lazyLibraries` dict keys and every
+`PlaceholderLibrary.filenamePrefix` whose prefix contains `"_fallback"`. This breaks the
+shared-alias problem so on-disk fallback shard filenames (`*_fallback_<arch>.dat`) do not
+collide between archs in overlay-style installs, and so the per-arch Mapping filter on
+`endswith("_<arch>")` matches fallback entries.
+
+### `passPostKernelInfoToLibrary(results, kernels, masterLibraries, splitGSU)`
+
+Builds a name → `KernelCodeGenResult` dict keyed by `getKernelFileBase()`, then walks each
+master library (and its lazy sub-libraries) and writes occupancy, math-clock, prefetch,
+non-temporal, wave-separate, swap-order, and DirectToVgpr fields onto each solution's
+`sizeMapping`. Raises `KeyError` with diagnostic context if a kernel name is missing from
+the result dict.
 
 ### `libraryDir(outputPath, archs) -> Path`
 
-Returns the output directory for compiled library files:
 - Single arch → `<outputPath>/library/<arch>/`
-- Multiple or zero archs → `<outputPath>/library/`
+- Zero or multiple archs → `<outputPath>/library/`
 
 ### `copyStaticFiles(outputPath)`
 
-Copies the six static C++ headers that all generated kernels depend on:
-`TensileTypes.h`, `tensile_bfloat16.h`, `tensile_float8_bfloat8.h`, `KernelHeader.h`,
-`ReductionTemplate.h`, `memory_gfx.h`.
+Copies six static headers from `Tensile/Source/`: `TensileTypes.h`, `tensile_bfloat16.h`,
+`tensile_float8_bfloat8.h`, `KernelHeader.h`, `ReductionTemplate.h`, `memory_gfx.h`.
 
----
-
-## Key CLI Arguments (`ParseArguments.py`)
+## CLI Arguments (`ParseArguments.py`)
 
 Positional:
-- `LogicPath` — directory containing library logic YAML files.
-- `OutputPath` — where compiled libraries are written.
-- `RuntimeLanguage` — `HIP`, `OCL`, or `HSA`.
+- `LogicPath` — directory containing library-logic YAML (or JSON) files.
+- `OutputPath` — directory to write libraries into.
+- `RuntimeLanguage` — one of `OCL`, `HIP`, `HSA`.
 
-Notable optional flags:
-- `--architecture` — target GPU architectures (e.g., `gfx942_gfx1100`); default `all`.
-- `--code-object-version` — `4` or `5`.
-- `--library-format` — `msgpack` (default) or `yaml`.
-- `--logic-format` — `yaml` (default) or `json`.
-- `--no-compress` — skip zlib compression of code objects.
-- `--experimental` — include logic files under `Experimental/` directories.
-- `--lazy-library-loading` — emit per-lazy-library manifest files.
-- `--gen-sol-table` — write a `MatchTable` mapping solution index to source YAML.
-- `--keep-build-tmp` — preserve intermediate `.s` / `.o` files.
+Optional (long form, dest, default):
 
----
+| Flag | Dest | Default | Notes |
+|---|---|---|---|
+| `--cxx-compiler` | `CxxCompiler` | `ToolchainDefaults.CXX_COMPILER` | |
+| `--c-compiler` | `CCompiler` | `ToolchainDefaults.C_COMPILER` | |
+| `--cmake-cxx-compiler` | `CmakeCxxCompiler` | none | exported into `CMAKE_CXX_COMPILER` env var |
+| `--offload-bundler` | `OffloadBundler` | `ToolchainDefaults.OFFLOAD_BUNDLER` | |
+| `--assembler` | `Assembler` | `ToolchainDefaults.ASSEMBLER` | |
+| `--code-object-version` | `CodeObjectVersion` | `4` | choices `4`, `5`, `V4`, `V5`, `default`; mapped via `coVersionMap` |
+| `--architecture` | `Architecture` | `all` | `_` or `;` separated, e.g. `gfx942_gfx1100` |
+| `--no-compress` | `NoCompress` | false | inverted into `UseCompression` |
+| `--experimental` | `Experimental` | false | include logic files under `Experimental/` |
+| `--no-enumerate` | — | false | parsed but not consumed by `run()` |
+| `--version` | — | none | parsed but not consumed by `run()` |
+| `--logic-format` | `LogicFormat` | `yaml` | `yaml` or `json` |
+| `--library-format` | `LibraryFormat` | `msgpack` | `msgpack` or `yaml` |
+| `--jobs` / `-j` | `CpuThreads` | `-1` | |
+| `--verbose` / `-v` | `PrintLevel` | `1` | |
+| `--no-lazy-library-loading` | `LazyLibraryLoading` | true | flag turns lazy loading off |
+| `--enable-marker` | `EnableMarker` | false | |
+| `--no-generate-solution-table` | `GenSolTable` | true | flag turns the MatchTable off |
+| `--asm-debug` | `AsmDebug` | false | |
+| `--build-id` | `BuildIdKind` | `sha1` | |
+| `--address-sanitizer` | `AsanBuild` | false | |
+| `--keep-build-tmp` | `KeepBuildTmp` | false | preserves `.s` and `.o` |
+| `--logic-filter` | `LogicFilter` | `*` | glob pattern joined into `<LogicPath>/**/<filter><ext>` |
+| `--disable-asm-comments` | `DisableAsmComments` | false | |
 
 ## Output Directory Layout
 
 ```
 <OutputPath>/
   library/
-    <arch>/                      # when single arch
-      TensileLibrary_<arch>      # master library manifest (.yaml or .msgpack)
-      TensileLibrary_lazy_<arch> # lazy-loading master manifest
-      TensileLiteLibrary_lazy_<arch>_Mapping  # lazy-loading index mapping
-      <kernel_name>.co           # compiled HIP code objects
-  Kernels.cpp                    # auxiliary HIP kernel source
-  Kernels.h                      # auxiliary HIP kernel header
-  TensileTypes.h                 # (and other static headers)
-  build_tmp/                     # temporary assembly/object files (removed by default)
+    <arch>/                                  # when archs == 1
+      TensileLibrary_<arch>                  # master manifest (.yaml or .msgpack)
+      TensileLibrary_lazy_<arch>             # written instead when lazy loading is on
+      TensileLiteLibrary_lazy_<arch>_Mapping # per-arch lazy mapping, msgpack
+      <lazy_library_name>                    # individual lazy sub-libraries
+      <kernel_name>.co                       # compiled HIP code objects
+  Kernels.cpp                                # helper-kernel source
+  Kernels.h                                  # helper-kernel header
+  TensileTypes.h                             # plus the other five static headers
+  build_tmp/<OUTPATHSTEM>/assembly/          # generated .s and .o (removed by default)
+  build_tmp/<OUTPATHSTEM>/code_object_tmp/   # intermediate .hsaco
 ```
 
----
+When two or more archs are requested, the `library/<arch>/` level is flattened to
+`library/`.
 
 ## Interaction with the Rest of Tensile
 
-- `BenchmarkProblems.py` calls `writeSolutionsAndKernels()` (the non-TCL variant) during
-  benchmarking to compile candidate kernels on the fly.
-- `LibraryIO.parseLibraryLogicFile()` is the primary reader of logic YAML files.
+- `BenchmarkProblems` calls the non-TCL `writeSolutionsAndKernels()` to compile candidate
+  kernels during benchmarking.
+- `LibraryIO.parseLibraryLogicFile()` reads the logic YAML/JSON files.
 - `SolutionLibrary.MasterSolutionLibrary.merge()` combines per-arch libraries.
-- `Toolchain.Assembly` and `Toolchain.Source` provide the assembler, linker, and bundler.
+- `Toolchain.Assembly.makeAssemblyToolchain()` and `Toolchain.Source.makeSourceToolchain()`
+  produce the assembler, linker, bundler, and source compiler.

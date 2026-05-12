@@ -1,107 +1,165 @@
 # Tensile Module Overview
 
-## Purpose and Responsibility
+The `Tensile` package generates and tunes AMD GPU kernels for GEMM and related
+contraction operations. It covers the full tuning lifecycle: enumerate candidate
+kernels, benchmark them on hardware, analyze the results, and emit a deployable
+library that maps each problem size to its best kernel.
 
-The `Tensile` package is the core Python layer of the TensileLite framework for generating
-and tuning AMD GPU kernels that perform GEMM (General Matrix-Matrix Multiply) and related
-contraction operations. Its responsibilities span the full lifecycle of a tuned kernel:
-benchmark execution, performance data analysis, assembly kernel generation, and library
-packaging.
+`Tensile.py::executeStepsInConfig()` runs the workflow in three stages, driven
+by keys in the user's YAML config:
 
-The high-level workflow is orchestrated by `Tensile.py` through three sequential stages:
+1. `BenchmarkProblems` — `BenchmarkProblems.main()` enumerates fork permutations,
+   compiles them, and benchmarks them on the GPU. Output goes to
+   `1_BenchmarkProblems` and `2_BenchmarkData`.
+2. `LibraryLogic` — `LibraryLogic.main()` reads the benchmark CSVs and writes
+   logic YAML files to `3_LibraryLogic` mapping problem sizes to winning solutions.
+3. `LibraryClient` — `ClientWriter.main()` writes the client config and the
+   build/run scripts that drive the compiled benchmark client; output goes to
+   `4_LibraryClient`.
 
-1. **BenchmarkProblems** — enumerate candidate solutions, compile them, and benchmark on hardware.
-2. **LibraryLogic** — analyze benchmark results to select the best kernel per problem size.
-3. **ClientWriter / TensileCreateLibrary** — package the winning kernels into a deployable library.
+The CLI entry point `bin/Tensile` calls `Tensile.main()`, which parses arguments
+and dispatches to `executeStepsInConfig()`.
 
-Entry point: `executeStepsInConfig()` in `Tensile.py`, called by the CLI in `bin/Tensile`.
+`TensileCreateLibrary` is a separate sub-package (not part of the three-stage
+flow above). It compiles tuned solutions into the static library shipped with
+hipBLASLt and is invoked by its own CLI entry point.
 
 ---
 
-## Key Abstractions and How They Relate
+## Key Abstractions
 
-### Problem description layer
-- `Contractions.py` — `ProblemType`, `FreeIndex`, `BatchIndex`, `BoundIndex`: describe a
-  contraction mathematically (which indices are free, which are batch, which are summation).
-- `Properties.py` — `Property`, `Predicate`, `Solution` predicates: describe conditions under
-  which a library entry applies (e.g., hardware predicates, size ranges).
-- `Hardware.py` — maps GFX device names and PCI chip IDs to ISA versions; handles fallback
-  chains and GPU predicate objects used in solution dispatch.
+### Problem and hardware description
+- `Contractions.py` — `ProblemType`, `FreeIndex`, `BatchIndex`, `BoundIndex`
+  describe a contraction by its index roles (free, batch, summation).
+  `Solution`, `SizeMapping`, `ProblemPredicate`, and `TaskPredicate` live here too.
+- `Properties.py` — base `Property` and `Predicate` classes used to express
+  conditions in the solution-selection tree.
+- `Hardware.py` — `HardwarePredicate`, plus helpers like `parseDeviceNameToHex`
+  and the chip-id fallback graph that resolves GFX device names to ISAs.
 
-### Solution selection layer
-- `SolutionLibrary.py` — `SingleSolutionLibrary`, `IndexSolutionLibrary`, `PlaceholderLibrary`,
-  and the composite tree structures built from `Properties.Predicate`. A library is a tree of
-  predicate nodes that maps (hardware, problem size) to a specific solution index.
-- `SolutionSelectionLibrary.py` — higher-level wrappers around `SolutionLibrary` that handle
-  tile-aware selection and decision-tree dispatch.
-- `LibraryLogic.py` — `analyzeProblemType()`: reads raw benchmark CSVs, runs regression or
-  direct-lookup analysis, and writes the YAML logic files that become a deployed library.
+### Solution selection
+- `SolutionLibrary.py` — the library tree node types: `SingleSolutionLibrary`,
+  `IndexSolutionLibrary`, `PlaceholderLibrary`, `MatchingLibrary`,
+  `FreeSizeLibrary`, `PredictionLibrary`, `MLPClassificationLibrary`,
+  `ProblemMapLibrary`, `PredicateLibrary`, and the top-level `MasterSolutionLibrary`.
+  A library is a tree of predicate nodes that maps a (hardware, problem) pair
+  to a solution index.
+- `SolutionSelectionLibrary.py` — `analyzeSolutionSelection()` and supporting
+  helpers that build the tile-aware selection structures from raw benchmark data.
+- `LibraryLogic.py` — `analyzeProblemType()` and the `LogicAnalyzer` class read
+  benchmark CSVs and emit the logic YAML; `generateLogic()` and `main()` drive
+  the analysis from a config dict.
 
-### Benchmarking layer
-- `BenchmarkStructs.py` — `BenchmarkProcess`, `constructForkPermutations()`: parse the YAML
-  benchmark config into a list of parameter sweeps (fork permutations) and problem sizes.
-- `BenchmarkProblems.py` — `main()`: drives the full benchmarking loop. Compiles kernels using
-  the assembly and source toolchains, writes and runs the benchmark client, collects results.
-- `BenchmarkSplitter.py` — splits large benchmark runs into parallel jobs.
-- `ParallelExecution.py` — `detectAvailableGpus()`, `runClientParallel()`: discovers GPUs and
-  distributes benchmark jobs across them.
+### Benchmarking pipeline
+- `BenchmarkStructs.py` — `BenchmarkProcess` parses the YAML config into a
+  benchmark plan. `constructForkPermutations` expands fork parameters into
+  the cross product of solution candidates. `BenchmarkStep` represents one
+  step of the plan.
+- `BenchmarkProblems.py` — `main()` drives the benchmarking loop: it generates
+  forked solutions (`_generateForkedSolutions`), writes the build files
+  (`writeBenchmarkFiles`), compiles the kernels via the assembly and source
+  toolchains, runs the client, and caches results between runs.
+- `BenchmarkSplitter.py` — `BenchmarkSplitter` loads a benchmark YAML and
+  splits it into smaller files keyed by problem and grouping, so large configs
+  can be run as separate jobs.
+- `ParallelExecution.py` — `detectAvailableGpus()` discovers visible devices;
+  `runClientParallel()` shards a benchmark config across them and merges the
+  per-GPU CSVs with `mergeResultsCsv()`.
 
-### Kernel code-generation layer
-- `KernelWriterBase.py` — `KernelWriterBase` (abstract): defines the interface `getKernelName()`,
-  `getHeaderFileString()`, `getSourceFileString()` that all kernel writers must implement.
-- `KernelWriter.py` — `KernelWriter` (concrete main writer): owns the register allocation state
-  (`StateValues`, `MatrixInfo`, `ABMatrixInfo`) and high-level assembly logic. Works with
-  `Component` objects for pluggable sub-routines.
-- `KernelWriterAssembly.py` — `KernelWriterAssembly` (extends `KernelWriter`): produces `.s`
-  assembly source for AMD GCN/CDNA architectures using `rocisa` IR.
-- `KernelWriterBetaOnly.py`, `KernelWriterReduction.py`, `KernelWriterConversion.py` — specialist
-  writers for auxiliary kernels (beta-scaling, GSU reduction, data-type conversion).
-- `KernelWriterActivationFunction.py`, `KernelWriterActivationEnumHeader.py` — generate the
-  activation function kernels and C++ enum headers.
-- `KernelWriterModules.py` — shared module utilities used by all kernel writers.
-- `KernelHelperNaming.py` — `KernelHelperEnum`, `initHelperKernelObjects()`: enumeration of
-  helper kernel types (beta-only, reduction, conversion) and their construction.
+### Kernel code generation
+- `KernelWriterBase.py` — abstract `KernelWriterBase` defines the three
+  abstract methods every writer implements: `getKernelName`,
+  `getHeaderFileString`, and `getSourceFileString`.
+- `KernelWriter.py` — `KernelWriter` (abstract, extends `KernelWriterBase`)
+  holds the high-level codegen state. The dataclasses `MatrixInfo`,
+  `ABMatrixInfo`, `StateValues`, `StateVgprs`, `CodeModules`, `ConstValues`,
+  and `ExternClasses` (all defined at module scope) hold the per-kernel state
+  it threads through code generation. It dispatches to `Component` instances
+  for pluggable sub-routines.
+- `KernelWriterAssembly.py` — `KernelWriterAssembly` extends `KernelWriter` and
+  emits `.s` assembly for AMD GPUs by building `rocisa` IR modules. Helper
+  dataclasses `TailOptParams`, `GprInfo`, and `GlobalReadGprRecord` live here.
+- `KernelWriterBetaOnly.py`, `KernelWriterReduction.py`,
+  `KernelWriterConversion.py`, `KernelWriterActivationFunction.py`,
+  `KernelWriterActivationEnumHeader.py` — concrete `KernelWriterBase`
+  subclasses for the auxiliary kernels (beta scaling, GSU reduction, datatype
+  conversion, activation function bodies, and activation enum headers).
+- `KernelWriterModules.py` — free functions used by `KernelWriterAssembly`
+  for things like wait-count emission (`wait`, `tdmWait`, `syncThreads`) and
+  acc-to-arch register mapping (`mapAcctoArchRegs`).
+- `KernelHelperNaming.py` — `KernelHelperEnum` enumerates the helper kernel
+  types; `initHelperKernelObjects()` and the per-type `init*KernelObjects`
+  constructors build the writer instances for each helper kernel a solution
+  needs.
 
 ### Component system
-- `Component.py` — `Component` (metaclass-based registry), `ComponentMeta`, `PartialMatch()`:
-  allow pluggable kernel sub-routines selected at runtime by hardware capabilities and kernel
-  parameters. See `ComponentSystem.md` for details.
+- `Component.py` — `Component` is a registry base class with metaclass
+  `ComponentMeta`. Subclasses (`MAC`, `Signature`, `LocalRead`, `SumUnroll`,
+  `ShiftVectorComponents`, `ComputeStoreVgprs`, `NotLocalFullTileElements`,
+  `LraTileAssignment`, `PackData`, `SIA`, `GlobalWriteComponents`,
+  `TensorDataMover`) define hook points; their concrete implementations
+  register themselves and are dispatched at codegen time by
+  `Component.<Subtype>.find(writer)`. `PartialMatch()` is the matcher that
+  selects an implementation against the writer's state. See
+  `ComponentSystem.md` for details.
 
 ### Assembly helpers
-- `AsmAddressCalculation.py` — `AddrCalculation`: computes element addresses for C/D/E/bias
-  matrices during store epilogue.
-- `AsmStoreState.py` — `StoreState`, `VectorDataTypes`, `VectorUnit`: tracks VGPR allocation
-  state across batches of global writes (epilogue store state machine).
-- `AsmMemoryInstruction.py`, `AsmMemoryHelpers.py` — wrappers and helpers for DS (LDS) and
-  global memory instructions.
+- `AsmAddressCalculation.py` — `AddrCalculation` computes element addresses
+  for C/D/E/bias matrices during the store epilogue.
+- `AsmStoreState.py` — `StoreState`, `VectorDataTypes`, and `VectorUnit`
+  track VGPR allocation across batches of global writes.
+- `AsmMemoryInstruction.py` — `MemoryInstruction` describes a load/store
+  variant (width, modifiers, latency hints).
+- `AsmMemoryHelpers.py` — small helpers like `dsLoad` and `dsStore` for
+  emitting LDS access instructions.
 
-### Activation layer
-- `Activation.py` — `ActivationType` enum, `Activation` class, `ActivationModule`: generates
-  inline and out-of-line activation function assembly (ReLU, GELU, sigmoid, etc.).
+### Activation
+- `Activation.py` — `ActivationType` enum and `ActivationTypeRegister` table
+  declare the supported activations (relu, gelu, sigmoid, tanh, silu, etc.).
+  `ActivationModule` emits the inline assembly for a chosen activation.
+  Module-level functions `CombineInstructions`, `FuseInstruction`,
+  `ConvertCoeffToHex`, etc. post-process the emitted modules.
 
-### IO and library packaging layer
-- `LibraryIO.py` — read/write YAML and msgpack logic files; version compatibility checks.
-- `ClientWriter.py` — `runClient()`, `writeClientConfig()`: write benchmark client configuration,
-  invoke the compiled client executable.
-- `ClientExecutable.py`, `TensileClientConfig.py` — locate and configure the benchmark client binary.
-- `EmbeddedData.py` — embed compiled kernel data into generated C++ headers.
-- `CustomYamlLoader.py` — `load_yaml_stream()`: YAML loading with custom constructor support.
+### IO and library packaging
+- `LibraryIO.py` — read/write YAML, JSON, and msgpack for solution and logic
+  files. `parseLibraryLogicFile`, `parseSolutionsFile`, `writeSolutions`,
+  and `createLibraryLogic` are the main entry points; `MinimumRequiredVersion`
+  is checked via `versionIsCompatible`.
+- `CustomYamlLoader.py` — `load_yaml_stream()` and the per-key/per-index
+  loaders parse logic YAMLs lazily.
+- `ClientWriter.py` — `main()`, `writeClientConfig()`, and
+  `writeClientConfigIni()` emit the client `.ini`; `runClient()` and
+  `runNewClient()` invoke the compiled client. `getBuildClientLibraryScript()`
+  and `writeRunScript()` produce the build/run shell scripts.
+- `ClientExecutable.py` — `getClientExecutable()` builds (or locates) the
+  benchmark client binary using a `CMakeEnvironment`.
+- `TensileClientConfig.py` — top-level `TensileClientConfig()` script that
+  parses a benchmark YAML and writes out a client `.ini`.
+- `EmbeddedData.py` — `EmbeddedDataFile`, `Namespace`, and `Indent` write
+  C++ headers that embed binary data inline.
 
-### Utility / tooling scripts
-- `Tensile.py` — top-level orchestration.
-- `TensileCreateLibrary/` — sub-package: compiles solutions, links static libraries.
-- `TensileMergeLibrary.py` — merges multiple library logic YAML files.
-- `TensileUpdateLibrary.py`, `TensileRetuneLibrary.py` — update/retune an existing library with new data.
-- `TensileLibLogicToYaml.py` — converts binary library logic back to YAML.
-- `TensileBenchmarkCluster.py`, `TensileBenchmarkClusterScripts.py`, `TensileBenchmarkLibraryClient.py` — cluster benchmarking support.
-- `GenerateSummations.py` — generates summation (convolution) problem configs.
-- `CustomKernels.py` — `getCustomKernelConfig()`, `isCustomKernelConfig()`: support for
-  hand-written assembly kernels that bypass code generation.
-- `Configuration.py` — configuration validation and defaults.
+### Tooling and utilities
+- `Tensile.py` — orchestration; `Tensile()` is the script entry point.
+- `TensileCreateLibrary/` — sub-package that compiles solutions and produces
+  the static library.
+- `TensileMergeLibrary.py` — merges multiple library logic YAMLs.
+- `TensileUpdateLibrary.py`, `TensileRetuneLibrary.py` — update or retune an
+  existing library with new benchmark data.
+- `TensileLibLogicToYaml.py` — converts a binary library logic file back to YAML.
+- `TensileBenchmarkCluster.py`, `TensileBenchmarkClusterScripts.py`,
+  `TensileBenchmarkLibraryClient.py` — cluster benchmarking support.
+- `GenerateSummations.py` — `GenerateSummations()` generates summation
+  problem configs.
+- `CustomKernels.py` — `getCustomKernelConfig()` and `isCustomKernelConfig()`
+  load hand-written assembly kernels from `CustomKernels/` so they can be
+  benchmarked alongside generated ones.
+- `Configuration.py` — `Parameter`, `CallableParameter`, `ProjectConfig`,
+  and `ExpressionEvaluator` underpin parameter validation and expression
+  evaluation in benchmark configs.
 
 ---
 
-## Source File to Concept Map
+## Source file to concept map
 
 | Source file(s) | Concept |
 |---|---|
@@ -109,25 +167,29 @@ Entry point: `executeStepsInConfig()` in `Tensile.py`, called by the CLI in `bin
 | `BenchmarkProblems.py`, `BenchmarkStructs.py`, `BenchmarkSplitter.py` | Benchmarking pipeline |
 | `LibraryLogic.py`, `SolutionLibrary.py`, `SolutionSelectionLibrary.py` | Solution selection and library logic |
 | `Contractions.py`, `Properties.py`, `Hardware.py` | Problem and hardware description |
-| `KernelWriter.py`, `KernelWriterBase.py`, `KernelWriterAssembly.py` | Assembly kernel generation |
-| `KernelWriterBetaOnly.py`, `KernelWriterReduction.py`, `KernelWriterConversion.py` | Auxiliary kernel generation |
+| `KernelWriter.py`, `KernelWriterBase.py`, `KernelWriterAssembly.py`, `KernelWriterModules.py` | Main kernel code generation |
+| `KernelWriterBetaOnly.py`, `KernelWriterReduction.py`, `KernelWriterConversion.py`, `KernelHelperNaming.py` | Auxiliary kernel generation |
 | `KernelWriterActivationFunction.py`, `KernelWriterActivationEnumHeader.py`, `Activation.py` | Activation functions |
-| `Component.py` | Pluggable component system |
+| `Component.py` | Pluggable component registry |
 | `AsmAddressCalculation.py`, `AsmStoreState.py`, `AsmMemoryInstruction.py`, `AsmMemoryHelpers.py` | Assembly store/address helpers |
 | `LibraryIO.py`, `CustomYamlLoader.py`, `EmbeddedData.py` | IO and serialization |
 | `ClientWriter.py`, `ClientExecutable.py`, `TensileClientConfig.py` | Benchmark client |
-| `ParallelExecution.py` | GPU parallel execution |
-| `CustomKernels.py` | Custom hand-written kernels |
-| `TensileMergeLibrary.py`, `TensileUpdateLibrary.py`, `TensileRetuneLibrary.py` | Library management utilities |
+| `ParallelExecution.py` | Multi-GPU benchmark execution |
+| `CustomKernels.py` | Hand-written kernels |
+| `TensileMergeLibrary.py`, `TensileUpdateLibrary.py`, `TensileRetuneLibrary.py`, `TensileLibLogicToYaml.py` | Library management utilities |
 
 ---
 
-## Entry Points
+## Entry points
 
-- **Benchmarking a new problem**: `Tensile.py::executeStepsInConfig()` → `BenchmarkProblems.main()`
-- **Library analysis**: `Tensile.py::executeStepsInConfig()` → `LibraryLogic.main()`
-- **Kernel writing**: `KernelWriterAssembly` constructed from a `Solution` dict, then
-  `getSourceFileString()` called to emit assembly text.
-- **Component selection**: `Component.<SubType>.find(writer)` called from within a kernel writer.
-- **Custom kernel lookup**: `CustomKernels.getCustomKernelConfig()` invoked during benchmarking
-  when a solution is flagged as a custom kernel.
+- CLI: `bin/Tensile` -> `Tensile.main()` -> `Tensile.Tensile()` ->
+  `executeStepsInConfig()`.
+- Benchmark stage: `BenchmarkProblems.main()`.
+- Analysis stage: `LibraryLogic.main()`, which calls
+  `LibraryLogic.analyzeProblemType()` per problem type.
+- Client stage: `ClientWriter.main()`.
+- Kernel writing: instantiate `KernelWriterAssembly` from a `Solution`, then
+  call `getSourceFileString()` (and `getHeaderFileString()`) to emit assembly.
+- Component dispatch: `Component.<Subtype>.find(writer)` from inside a writer.
+- Custom kernels: `CustomKernels.getCustomKernelConfig()` during benchmark
+  solution generation.
