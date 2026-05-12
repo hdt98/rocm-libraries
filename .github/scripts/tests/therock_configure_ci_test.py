@@ -299,7 +299,7 @@ class ConfigureCITest(unittest.TestCase):
     def test_retrieve_projects_with_multiple_test_labels(self, mock_get_modified):
         mock_get_modified.return_value = []
 
-        pr_labels_json = '{"labels": [{"name": "test:rocblas"}, {"name": "test:miopen"}, {"name": "test_type:smoke"}]}'
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}, {"name": "test:miopen"}, {"name": "test_type:invalid_type"}]}'
         projects, test_type = therock_configure_ci.retrieve_projects(
             {"is_pull_request": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
         )
@@ -309,7 +309,8 @@ class ConfigureCITest(unittest.TestCase):
         projects_str = str(projects)
         self.assertIn("BLAS", projects_str)
         self.assertIn("MIOPEN", projects_str)
-        self.assertEqual(test_type, "")
+        # Invalid test_type labels are ignored, so test_type falls back to standard
+        self.assertEqual(test_type, "standard")
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_label_overrides_skippable_paths(self, mock_get_modified):
@@ -349,7 +350,7 @@ class ConfigureCITest(unittest.TestCase):
         mock_get_modified.return_value = []
 
         pr_labels_json = (
-            '{"labels": [{"name": "test:rocblas"}, {"name": "test_type:smoke"}]}'
+            '{"labels": [{"name": "test:rocblas"}, {"name": "test_type:comprehensive"}]}'
         )
         projects, test_type = therock_configure_ci.retrieve_projects(
             {"is_nightly": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
