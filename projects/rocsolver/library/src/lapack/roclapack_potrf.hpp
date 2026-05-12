@@ -160,10 +160,17 @@ static inline bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[may
     return is_use_recursion;
 };
 
+template <typename T>
+static inline int potrf_get_NB()
+{
+    int const nb = POTF2_MAX_SMALL_SIZE(T);
+    return (nb);
+}
+
 template <typename T, typename I>
 static inline I split_n(I const n)
 {
-    I const nb = POTF2_MAX_SMALL_SIZE(T) - 1;
+    I const nb = potrf_get_NB<T>();
 
     // ------------------------------------
     // split at maximum of 1024 * nb may be sufficient
@@ -206,13 +213,6 @@ static inline I potrf_get_block_size(I const n)
 {
     I const nb = std::max(I(POTF2_MAX_SMALL_SIZE(T)), I(POTRF_POTF2_SWITCHSIZE(T)));
     return std::min(n, nb);
-}
-
-template <typename T>
-static inline int potrf_get_NB()
-{
-    int const nb = POTF2_MAX_SMALL_SIZE(T);
-    return (nb);
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO = I>
