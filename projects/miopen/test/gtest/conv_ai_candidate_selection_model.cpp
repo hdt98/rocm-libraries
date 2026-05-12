@@ -365,7 +365,7 @@ TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitKFunctionality_Te
 
 // === CACHE TESTS ===
 
-// B-RAM: calling ModelSelectBestCandidate twice with the same arguments must
+// Calling ModelSelectBestCandidate twice with the same arguments must
 // return identical results. The second call should hit the RAM cache and must
 // not be slower on average (soft check — logged, not fatal).
 TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCache_Test)
@@ -410,10 +410,10 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCache_Test)
               << " ms\n";
 }
 
-// C1: calling ModelSelectBestCandidate with the same kernel params but a
+// Calling ModelSelectBestCandidate with the same kernel params but a
 // different problem (different shape) must return a non-empty result for both
-// calls, confirming that Tower 2 embedding reuse does not corrupt results.
-TEST_P(CPU_CandidateSelection_NONE, Tower2EmbeddingCache_Test)
+// calls, confirming that kernel-config embedding reuse does not corrupt results.
+TEST_P(CPU_CandidateSelection_NONE, KernelEmbeddingCache_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -445,7 +445,7 @@ TEST_P(CPU_CandidateSelection_NONE, Tower2EmbeddingCache_Test)
 
     ASSERT_FALSE(result_a.IsEmpty()) << "Shape A returned empty result";
     ASSERT_FALSE(result_b.IsEmpty())
-        << "Shape B returned empty result (Tower 2 cache may be corrupt)";
+        << "Shape B returned empty result (kernel-config embedding cache may be corrupt)";
 }
 
 // Cache key isolation: use_split_k=false and use_split_k=true must produce

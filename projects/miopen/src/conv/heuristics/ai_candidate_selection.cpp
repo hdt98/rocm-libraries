@@ -604,7 +604,7 @@ EncodeKernelParams(const std::vector<std::vector<std::string>>& valid_kernel_par
     return encoded_candidates;
 }
 
-// ---- B-RAM: per-process RAM cache for CandidateSelectionResult --------------
+// ---- Per-process RAM cache for CandidateSelectionResult --------------
 //
 // Mirrors the TunaNet RAM cache (GetCachedPrediction / StorePredictionCache in
 // ai_heuristics.cpp). A cache hit at this level bypasses all fdeep inference.
@@ -665,11 +665,11 @@ void StoreCandidateSelectionCache(const std::string& arch,
     cache.map.emplace(MakeCandidateSelectionKey(solver, problem, use_split_k), result);
 }
 
-// ---- C1: Tower 2 kernel-config embedding cache ------------------------------
+// ---- Kernel-config embedding cache ------------------------------------------
 //
-// The config encoder (Tower 2) depends only on the encoded kernel parameter
-// matrix, not on the input problem shape. Cache the embedding vectors so they
-// are computed at most once per unique (arch, solver, kernel-set).
+// The config encoder depends only on the encoded kernel parameter matrix, not
+// on the input problem shape. Cache the embedding vectors so they are computed
+// at most once per unique (arch, solver, kernel-set).
 struct KernelEmbeddingCache
 {
     std::unordered_map<std::string, std::vector<std::vector<float>>> map;
@@ -731,7 +731,7 @@ ModelSelectBestCandidate(const std::string& arch,
                          const bool use_split_k,
                          ValidationFunc&& is_valid)
 {
-    // B-RAM cache: bypass all model inference on repeated calls for the same problem
+    // RAM cache: bypass all model inference on repeated calls for the same problem
     {
         auto cached = GetCachedCandidateSelection(arch, solver, problem, use_split_k);
         if(cached)
@@ -787,7 +787,7 @@ ModelSelectBestCandidate(const std::string& arch,
         }
 
         const auto& encoded_features = model.EncodeInputFeatures(features);
-        // C1: reuse Tower 2 embeddings if the kernel set hasn't changed
+        // Reuse kernel-config embeddings if the kernel set hasn't changed
         const auto encoded_configs =
             GetOrComputeKernelEmbeddings(arch, solver, encoded_candidates, model);
 
