@@ -279,6 +279,7 @@ def runAsanDockerBuild() {
                 env.ASAN_CANDIDATE_IMAGE = candidateTag
             }
         } finally {
+            sh "docker rmi ${env.ASAN_CANDIDATE_IMAGE} || true"
             cleanWs()
         }
     }
@@ -316,6 +317,8 @@ def runAsanDockerPromote() {
                 promoteAsanDockerImage()
             }
         } finally {
+            sh "docker rmi ${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan_candidate || true"
+            sh "docker rmi ${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan || true"
             cleanWs()
         }
     }
@@ -864,6 +867,7 @@ pipeline {
                     post {
                         always {
                             archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
+                            sh "docker rmi ${env.ASAN_CANDIDATE_IMAGE ?: \"${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan\"} || true"
                             cleanWs()
                         }
                     }
