@@ -12,7 +12,7 @@ The `CTest resource allocation feature <https://cmake.org/cmake/help/latest/manu
 
    CMake 3.18 or later is required.
 
-When rocPRIM is built with :doc:`cmake -DBUILD_TEST=ON <../install/rocPRIM-build-install-linux>`, a ``generate_resource_spec`` file will be created. 
+When rocPRIM is built with :doc:`cmake -DBUILD_TEST=ON <../install/rocPRIM-build-install-linux>`, the ``generate_resource_spec`` binary file is created. 
 
 Use ``generate_resource_spec`` to create a resource specification file. The resource specification file is a JSON file that describes the GPU resources available on your system. For example:
 
