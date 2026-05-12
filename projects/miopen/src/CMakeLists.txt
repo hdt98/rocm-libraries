@@ -900,15 +900,15 @@ target_include_directories(MIOpen PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>
 )
 
+set(LEGACYCOMPOSABLEKERNEL_INCLUDE "${PROJECT_SOURCE_DIR}/src/legacy_composable_kernel")
+target_include_directories(MIOpen PRIVATE ${LEGACYCOMPOSABLEKERNEL_INCLUDE})
+
 if(MIOPEN_USE_COMPOSABLEKERNEL)
     if(MIOPEN_BUILD_CK)
         if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
             add_definitions(-DCK_EXPERIMENTAL_BUILDER)
         endif()
     endif()
-
-    set(LEGACYCOMPOSABLEKERNEL_INCLUDE "${PROJECT_SOURCE_DIR}/src/legacy_composable_kernel")
-    target_include_directories(MIOpen PRIVATE ${LEGACYCOMPOSABLEKERNEL_INCLUDE})
 
     # Build per-GPU-target CK grouped conv shared libraries
     add_subdirectory(ck_impl)
