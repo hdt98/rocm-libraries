@@ -157,3 +157,30 @@ jobs:
       platform: "linux"
       test_type: ${{ inputs.test_type }}
     secrets: inherit
+
+  pts-trigger:
+    name: Performance Test Suite
+    runs-on: ubuntu-latest
+    if: ${{ inputs.amdgpu_families == 'gfx90a-dcgpu' }}
+    steps:
+      - name: "Checking out repository for rocm-libraries"
+        uses: actions/checkout@v4
+
+      - name: Trigger Remote PTS Workflow
+        env:
+          GH_TOKEN: ${{ secrets.PTS_REPO_PAT }}
+        run: |
+          if [ ${{ github.event_name }} == "pull" ]; then
+            ref_hash=$(git merge-base --fork-point origin/develop)
+          elif [ ${{ github.event_name }} == "push" ]; then
+            ref_hash=$(git rev-parse HEAD~1)
+          fi
+          gh workflow run remote-workflow-filename.yml \
+            --repo ROCm/rocPTS \
+            --ref users/madkasul/githubMigration \
+            -f artifact_run_id=${{ github.run_id }} \
+            -f amdgpu_family=${{ inputs.amdgpu_family }} \
+            -f branch=${{ github.ref_name }} \
+            -f hash=${{ github.sha }} \
+            -f ref_hash=${{ ref_hash }} \
+            -f components=${{ inputs.projects_to_test }}
