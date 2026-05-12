@@ -26,7 +26,8 @@ set(HIPDNN_FRONTEND_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../frontend/include
 # Find HIP (if needed)
 find_package(hip REQUIRED)
 
-# Only find_package for hipDNN targets when built standalone
+# When built as a subdirectory of hipdnn, these targets already exist.
+# When built standalone (pip wheel / pip install), find the installed libraries.
 if(NOT TARGET hipdnn_frontend)
     find_package(hipdnn_frontend CONFIG REQUIRED)
 endif()
