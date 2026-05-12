@@ -222,6 +222,21 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
             return areDescriptorsSmallerThan2GB(M);
         }
 
+        // Gemm specific size check. Adding it to the grid changes convolution behaviour.
+        template <typename Argument>
+        __host__ static bool isDescriptorValidForGemm(const Argument& arg)
+        {
+            return static_cast<long_index_t>(arg.M) * static_cast<long_index_t>(arg.K) *
+                           sizeof(ADataType) <=
+                       TwoGB &&
+                   static_cast<long_index_t>(arg.N) * static_cast<long_index_t>(arg.K) *
+                           sizeof(BDataType) <=
+                       TwoGB &&
+                   static_cast<long_index_t>(arg.M) * static_cast<long_index_t>(arg.N) *
+                           sizeof(CDataType) <=
+                       TwoGB;
+        }
+
         __host__ auto splitProblem(index_t m,
                                    const ADataType* p_a_grid_left,
                                    DsGridPointer& p_ds_grid_left,
@@ -890,7 +905,8 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                 auto sub_arguments = partitioner.partitionGemmProblem(arg);
                 return std::all_of(
                     sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
-                        return GridwiseGemm64::CheckValidity(sub_arg);
+                        return GridwiseGemm64::CheckValidity(sub_arg) &&
+                               Partitioner::isDescriptorValidForGemm(sub_arg);
                     });
             }
         }
@@ -908,7 +924,8 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                         arg);
                 return std::all_of(
                     sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
-                        return GridwiseGemm32::CheckValidity(sub_arg);
+                        return GridwiseGemm32::CheckValidity(sub_arg) &&
+                               Partitioner::isDescriptorValidForGemm(sub_arg);
                     });
             }
         }

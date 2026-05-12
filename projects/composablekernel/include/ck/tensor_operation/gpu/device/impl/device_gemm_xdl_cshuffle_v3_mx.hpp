@@ -349,6 +349,21 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
             return areDescriptorsSmallerThan2GB(M);
         }
 
+        // Gemm specific size check. Adding it to the grid changes convolution behaviour.
+        template <typename Argument>
+        __host__ static bool isDescriptorValidForGemm(const Argument& arg)
+        {
+            return static_cast<long_index_t>(arg.M) * static_cast<long_index_t>(arg.K) *
+                           sizeof(ADataType) <=
+                       TwoGB &&
+                   static_cast<long_index_t>(arg.N) * static_cast<long_index_t>(arg.K) *
+                           sizeof(BDataType) <=
+                       TwoGB &&
+                   static_cast<long_index_t>(arg.M) * static_cast<long_index_t>(arg.N) *
+                           sizeof(CDataType) <=
+                       TwoGB;
+        }
+
         __host__ auto splitProblem(index_t m,
                                    const ADataType* p_a_grid_left,
                                    const AScaleDataType* p_a_scale_grid_left,
@@ -710,13 +725,15 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
                                                            typename GridwiseGemm32::Argument>(arg);
                     return std::all_of(
                         sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
-                            return GridwiseGemm32::CheckValidity(sub_arg);
+                            return GridwiseGemm32::CheckValidity(sub_arg) &&
+                                   Partitioner::isDescriptorValidForGemm(sub_arg);
                         });
                 }
                 else
                 {
                     return GridwiseGemm32::CheckValidity(
-                        reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
+                               reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg)) &&
+                           Partitioner::isDescriptorValidForGemm(arg);
                 }
             }
         }
