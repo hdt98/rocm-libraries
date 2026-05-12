@@ -761,12 +761,13 @@ std::vector<uint64_t> PredictSolver(const conv::ProblemDescription& problem,
         {
             MIOPEN_LOG_I2("Evaluating ND TunaNet for " << device);
             std::vector<float> predictions = model->Forward(problem);
-            auto result = ProcessAndCachePredictions(
+            auto result                    = ProcessAndCachePredictions(
                 problem, device, true, predictions, model->GetSolverMap());
             if(logging)
             {
                 const auto end = std::chrono::high_resolution_clock::now();
-                MIOPEN_LOG_I2("Heuristic solver selection inference time: " << (end - start).count() * .000001f << " ms");
+                MIOPEN_LOG_I2("Heuristic solver selection inference time: "
+                              << (end - start).count() * .000001f << " ms");
             }
             return result;
         }
