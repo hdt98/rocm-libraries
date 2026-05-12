@@ -26,7 +26,9 @@
 #include <gtest/gtest.h>
 #include <miopen/conv/heuristics/ai_candidate_selection.hpp>
 #include <miopen/conv/heuristics/ai_conv_nd_kernel_tuning_utils.hpp>
+#include <miopen/db_path.hpp>
 #include <miopen/filesystem.hpp>
+#include <miopen/handle.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/convolution.hpp>
 #include <miopen/tensor.hpp>
@@ -57,7 +59,35 @@ void PrintTo(const CandidateSelectionParams& p, std::ostream* os)
 // Default validation function: accepts all kernel/split_k combinations
 inline constexpr auto accept_all_combinations = [](int, int) { return true; };
 
-// Build a minimal 2D forward conv ProblemDescription for use as a cache key in tests.
+auto GetCandidateSelectionModelFiles(const CandidateSelectionParams& params)
+{
+    const auto db_path = miopen::GetSystemDbPath();
+    return std::vector<miopen::fs::path>{
+        db_path / (params.arch + "_" + params.solver + "_input_encoder.tn.model"),
+        db_path / (params.arch + "_" + params.solver + "_kernel_config_encoder.tn.model"),
+        db_path / (params.arch + "_" + params.solver + "_metadata.tn.model")};
+}
+
+auto GetMissingModelFiles(const CandidateSelectionParams& params)
+{
+    std::vector<miopen::fs::path> missing_files;
+    for(const auto& file : GetCandidateSelectionModelFiles(params))
+    {
+        if(!miopen::fs::exists(file))
+            missing_files.push_back(file);
+    }
+    return missing_files;
+}
+
+std::string FormatMissingFiles(const std::vector<miopen::fs::path>& missing_files)
+{
+    std::ostringstream os;
+    for(const auto& file : missing_files)
+        os << "\n  " << file.string();
+    return os.str();
+}
+
+// Build a minimal 2D conv ProblemDescription for use as a cache key in tests.
 miopen::conv::ProblemDescription
 MakeTestProblem(int n = 1, int c = 4, int h = 8, int w = 8, int k = 8, int y = 3, int x = 3)
 {
@@ -97,12 +127,31 @@ std::vector<std::vector<std::string>> GenerateValidKernelParams(
     return valid_kernel_params;
 }
 
-class CPU_CandidateSelection_NONE : public ::testing::TestWithParam<CandidateSelectionParams>
+class GPU_CandidateSelection_FP32 : public ::testing::TestWithParam<CandidateSelectionParams>
 {
 protected:
+    miopen::Handle handle;
+
     void SetUp() override
     {
-        // Place for prng::reset_seed() or early skip logic if needed
+        const auto& params      = GetParam();
+        const auto current_arch = handle.GetDeviceName();
+        const auto missing      = GetMissingModelFiles(params);
+
+        if(missing.empty())
+            return;
+
+        const auto message = "Missing AI candidate selection model files for arch " + params.arch +
+                             ", solver " + params.solver + ":" + FormatMissingFiles(missing);
+
+        if(params.arch != current_arch)
+        {
+            GTEST_SKIP() << message << "\nCurrent device arch is " << current_arch
+                         << "; skipping foreign-arch model validation.";
+        }
+
+        FAIL() << message << "\nCurrent device arch is " << current_arch
+               << "; native-arch model files are required.";
     }
 };
 
@@ -110,20 +159,14 @@ protected:
 
 // === TESTS ===
 
-TEST_P(CPU_CandidateSelection_NONE, FilesExist_Test)
+TEST_P(GPU_CandidateSelection_FP32, FilesExist_Test)
 {
-    const auto& params = GetParam();
-    auto db_path       = miopen::GetSystemDbPath();
-    auto input_encoder = db_path / (params.arch + "_" + params.solver + "_input_encoder.tn.model");
-    auto kernel_config_encoder =
-        db_path / (params.arch + "_" + params.solver + "_kernel_config_encoder.tn.model");
-    auto metadata = db_path / (params.arch + "_" + params.solver + "_metadata.tn.model");
-    ASSERT_TRUE(miopen::fs::exists(input_encoder)) << "Input encoder file missing!";
-    ASSERT_TRUE(miopen::fs::exists(kernel_config_encoder)) << "Kernel config encoder file missing!";
-    ASSERT_TRUE(miopen::fs::exists(metadata)) << "Metadata file missing!";
+    const auto missing = GetMissingModelFiles(GetParam());
+    ASSERT_TRUE(missing.empty()) << "Missing AI candidate selection model files:"
+                                 << FormatMissingFiles(missing);
 }
 
-TEST_P(CPU_CandidateSelection_NONE, MetadataAndModelInit_Test)
+TEST_P(GPU_CandidateSelection_FP32, MetadataAndModelInit_Test)
 {
     const auto& params = GetParam();
     ASSERT_NO_THROW({
@@ -132,7 +175,7 @@ TEST_P(CPU_CandidateSelection_NONE, MetadataAndModelInit_Test)
     });
 }
 
-TEST_P(CPU_CandidateSelection_NONE, ModelCaching_Test)
+TEST_P(GPU_CandidateSelection_FP32, ModelCaching_Test)
 {
     const auto& params = GetParam();
     auto& model1       = GetCandidateSelectionModel(params.arch, params.solver);
@@ -141,7 +184,7 @@ TEST_P(CPU_CandidateSelection_NONE, ModelCaching_Test)
         << "GetCandidateSelectionModel did not return the same cached object!";
 }
 
-TEST_P(CPU_CandidateSelection_NONE, EncodeInputFeatures_Test)
+TEST_P(GPU_CandidateSelection_FP32, EncodeInputFeatures_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionModel model(params.arch, params.solver);
@@ -153,7 +196,7 @@ TEST_P(CPU_CandidateSelection_NONE, EncodeInputFeatures_Test)
     ASSERT_FALSE(encoded.empty()) << "EncodeInputFeatures returned empty vector!";
 }
 
-TEST_P(CPU_CandidateSelection_NONE, EncodeKernelConfigs_Test)
+TEST_P(GPU_CandidateSelection_FP32, EncodeKernelConfigs_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionModel model(params.arch, params.solver);
@@ -166,7 +209,7 @@ TEST_P(CPU_CandidateSelection_NONE, EncodeKernelConfigs_Test)
         ASSERT_FALSE(vec.empty()) << "EncodeKernelConfigs returned a candidate with empty vector!";
 }
 
-TEST_P(CPU_CandidateSelection_NONE, EncodeInputFeaturesEdgeCases_Test)
+TEST_P(GPU_CandidateSelection_FP32, EncodeInputFeaturesEdgeCases_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionModel model(params.arch, params.solver);
@@ -196,7 +239,7 @@ TEST_P(CPU_CandidateSelection_NONE, EncodeInputFeaturesEdgeCases_Test)
     }
 }
 
-TEST_P(CPU_CandidateSelection_NONE, EncodeKernelConfigsEdgeCases_Test)
+TEST_P(GPU_CandidateSelection_FP32, EncodeKernelConfigsEdgeCases_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionModel model(params.arch, params.solver);
@@ -210,14 +253,14 @@ TEST_P(CPU_CandidateSelection_NONE, EncodeKernelConfigsEdgeCases_Test)
     EXPECT_THROW(model.EncodeKernelConfigs(candidates_long), std::exception);
 }
 
-TEST_P(CPU_CandidateSelection_NONE, KernelStrMappingUnknownKernelThrows_Test)
+TEST_P(GPU_CandidateSelection_FP32, KernelStrMappingUnknownKernelThrows_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
     EXPECT_THROW(meta.GetKernelStrMapping("unknown_kernel_name"), std::exception);
 }
 
-TEST_P(CPU_CandidateSelection_NONE, OutputConstantRetrieval_Test)
+TEST_P(GPU_CandidateSelection_FP32, OutputConstantRetrieval_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -230,7 +273,7 @@ TEST_P(CPU_CandidateSelection_NONE, OutputConstantRetrieval_Test)
     EXPECT_EQ(unknown, std::nullopt);
 }
 
-TEST_P(CPU_CandidateSelection_NONE, InputOutputParamIndexThrows_Test)
+TEST_P(GPU_CandidateSelection_FP32, InputOutputParamIndexThrows_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -238,7 +281,7 @@ TEST_P(CPU_CandidateSelection_NONE, InputOutputParamIndexThrows_Test)
     EXPECT_THROW(meta.GetOutputParamIndex("nonexistent_param"), std::exception);
 }
 
-TEST_P(CPU_CandidateSelection_NONE, EncodeKernelParamsBadValueThrows_Test)
+TEST_P(GPU_CandidateSelection_FP32, EncodeKernelParamsBadValueThrows_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -254,7 +297,7 @@ TEST_P(CPU_CandidateSelection_NONE, EncodeKernelParamsBadValueThrows_Test)
         << "Expected empty result when all candidates have invalid mappings";
 }
 
-TEST_P(CPU_CandidateSelection_NONE, SelectBestCandidateValid_Test)
+TEST_P(GPU_CandidateSelection_FP32, SelectBestCandidateValid_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionModel model(params.arch, params.solver);
@@ -279,7 +322,7 @@ TEST_P(CPU_CandidateSelection_NONE, SelectBestCandidateValid_Test)
     }
 }
 
-TEST_P(CPU_CandidateSelection_NONE, SelectBestCandidateEmptyInput_Test)
+TEST_P(GPU_CandidateSelection_FP32, SelectBestCandidateEmptyInput_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionModel model(params.arch, params.solver);
@@ -289,7 +332,7 @@ TEST_P(CPU_CandidateSelection_NONE, SelectBestCandidateEmptyInput_Test)
                  std::exception);
 }
 
-TEST_P(CPU_CandidateSelection_NONE, ModelSelectBestCandidate_Test)
+TEST_P(GPU_CandidateSelection_FP32, ModelSelectBestCandidate_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -314,7 +357,7 @@ TEST_P(CPU_CandidateSelection_NONE, ModelSelectBestCandidate_Test)
     }
 }
 
-TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitK_Test)
+TEST_P(GPU_CandidateSelection_FP32, ExpandKernelParamsWithSplitK_Test)
 {
     const auto& params                            = GetParam();
     std::vector<std::vector<std::string>> kernels = {{"typeA", "p1"}, {"typeB", "p2"}};
@@ -343,7 +386,7 @@ TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitK_Test)
     }
 }
 
-TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitKFunctionality_Test)
+TEST_P(GPU_CandidateSelection_FP32, ExpandKernelParamsWithSplitKFunctionality_Test)
 {
     const auto& params                            = GetParam();
     std::vector<std::vector<std::string>> kernels = {
@@ -365,10 +408,9 @@ TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitKFunctionality_Te
 
 // === CACHE TESTS ===
 
-// Calling ModelSelectBestCandidate twice with the same arguments must
-// return identical results. The second call should hit the RAM cache and must
-// not be slower on average (soft check — logged, not fatal).
-TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCache_Test)
+// Calling ModelSelectBestCandidate twice with the same arguments must return
+// identical results. The second call hits the in-process RAM cache.
+TEST_P(GPU_CandidateSelection_FP32, CandidateSelectionRamCache_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -404,16 +446,13 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCache_Test)
 
     const auto first_ms  = std::chrono::duration<double, std::milli>(t1 - t0).count();
     const auto second_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
-    // Soft check: log the speedup; a cache hit should be substantially faster.
-    // We do not assert a hard ratio to avoid flakiness on loaded systems.
     std::cout << "[CandidateSelectionRamCache] first=" << first_ms << " ms, second=" << second_ms
               << " ms\n";
 }
 
-// Calling ModelSelectBestCandidate with the same kernel params but a
-// different problem (different shape) must return a non-empty result for both
-// calls, confirming that kernel-config embedding reuse does not corrupt results.
-TEST_P(CPU_CandidateSelection_NONE, KernelEmbeddingCache_Test)
+// Calling with the same kernel params but different input shapes must return a
+// non-empty result for both, confirming kernel-config embedding reuse is correct.
+TEST_P(GPU_CandidateSelection_FP32, KernelEmbeddingCache_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -422,11 +461,11 @@ TEST_P(CPU_CandidateSelection_NONE, KernelEmbeddingCache_Test)
     for(const auto& name : meta.input_params())
     {
         features_a[name] = 1.0f;
-        features_b[name] = 2.0f; // different shape
+        features_b[name] = 2.0f;
     }
     auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
     auto problem_a           = MakeTestProblem(1, 4, 8, 8, 8, 3, 3);
-    auto problem_b           = MakeTestProblem(2, 8, 16, 16, 16, 3, 3); // different shape
+    auto problem_b           = MakeTestProblem(2, 8, 16, 16, 16, 3, 3);
 
     auto result_a = ModelSelectBestCandidate(params.arch,
                                              params.solver,
@@ -448,10 +487,8 @@ TEST_P(CPU_CandidateSelection_NONE, KernelEmbeddingCache_Test)
         << "Shape B returned empty result (kernel-config embedding cache may be corrupt)";
 }
 
-// Cache key isolation: use_split_k=false and use_split_k=true must produce
-// independent cache entries. Populate both, then verify a second call for each
-// returns its own result uncontaminated by the other.
-TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
+// use_split_k=false and use_split_k=true must produce independent cache entries.
+TEST_P(GPU_CandidateSelection_FP32, CandidateSelectionRamCacheIsolation_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
@@ -461,7 +498,6 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
     auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
     auto problem             = MakeTestProblem();
 
-    // First populate both cache entries
     auto result_no_splitk = ModelSelectBestCandidate(params.arch,
                                                      params.solver,
                                                      problem,
@@ -477,11 +513,9 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
                                                   /*use_split_k=*/true,
                                                   accept_all_combinations);
 
-    // Both must be non-empty
     ASSERT_FALSE(result_no_splitk.IsEmpty()) << "use_split_k=false returned empty";
     ASSERT_FALSE(result_splitk.IsEmpty()) << "use_split_k=true returned empty";
 
-    // Re-fetch from cache — each must return its own entry unchanged
     auto result_no_splitk_cached = ModelSelectBestCandidate(params.arch,
                                                             params.solver,
                                                             problem,
@@ -502,7 +536,6 @@ TEST_P(CPU_CandidateSelection_NONE, CandidateSelectionRamCacheIsolation_Test)
     ASSERT_EQ(result_splitk.kernel_indices, result_splitk_cached.kernel_indices)
         << "Cache isolation failed: use_split_k=true entry was overwritten";
 
-    // The two entries must differ from each other (split_k expands the candidate list)
     EXPECT_NE(result_no_splitk.split_k_values, result_splitk.split_k_values)
         << "Expected use_split_k=false and use_split_k=true to produce different split_k_values";
 }
@@ -529,7 +562,7 @@ std::vector<CandidateSelectionParams> GenerateCandidateSelectionParams()
 }
 
 INSTANTIATE_TEST_SUITE_P(Full,
-                         CPU_CandidateSelection_NONE,
+                         GPU_CandidateSelection_FP32,
                          ::testing::ValuesIn(GenerateCandidateSelectionParams()),
                          [](const ::testing::TestParamInfo<CandidateSelectionParams>& testInfo) {
                              std::ostringstream os;
