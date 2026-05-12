@@ -172,7 +172,7 @@ def runHipClangStage(Map conf=[:]) {
 def runAsanTests(String gpuLabel, String gfxFamily) {
     withWorkingDir {
         def variant = env.STAGE_NAME
-        def asanImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
+        def asanImage = env.ASAN_CANDIDATE_IMAGE?.trim() ? env.ASAN_CANDIDATE_IMAGE : "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
         def video_id = sh(returnStdout: true, script: 'getent group video | cut -d: -f3').trim()
         def render_id = sh(returnStdout: true, script: 'getent group render | cut -d: -f3').trim()
         def dockerOpts = "--user root " +
@@ -275,7 +275,45 @@ def runAsanDockerBuild() {
     node(rocmnode("docker")) {
         try {
             withWorkingDir {
-                buildAsanDockerImage(amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
+                def candidateTag = buildAsanDockerImage(amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
+                env.ASAN_CANDIDATE_IMAGE = candidateTag
+            }
+        } finally {
+            cleanWs()
+        }
+    }
+}
+
+def promoteAsanDockerImage() {
+    def variant = env.STAGE_NAME
+    def candidateTag = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan_candidate"
+    def finalTag = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
+    utils.setGithubStatus(variant, 'pending', 'In progress')
+    try {
+        withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
+            sh """
+                docker pull ${candidateTag}
+                docker tag ${candidateTag} ${finalTag}
+                docker push ${finalTag}
+            """.stripIndent()
+        }
+        utils.setGithubStatus(variant, 'success', 'Completed successfully')
+    }
+    catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+        utils.setGithubStatus(variant, 'error', 'Job cancelled or aborted')
+        throw e
+    }
+    catch (Exception ex) {
+        utils.setGithubStatus(variant, 'failure', 'Stage failed')
+        throw ex
+    }
+}
+
+def runAsanDockerPromote() {
+    node(rocmnode("docker")) {
+        try {
+            withWorkingDir {
+                promoteAsanDockerImage()
             }
         } finally {
             cleanWs()
@@ -329,7 +367,7 @@ def resolveAsanRunId() {
 def buildAsanDockerImage(Map conf=[:]) {
     def variant = env.STAGE_NAME
     env.DOCKER_BUILDKIT = 1
-    def asanTag = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
+    def asanTag = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan_candidate"
     def cacheRef = "${env.MIOPEN_DOCKER_IMAGE_URL}-ci-docker:asan_cache"
     def asanRunId = conf.get("asanRunId", null) ?: resolveAsanRunId()
     def amdgpuFamilies = conf.get("amdgpuFamilies", "gfx94X-dcgpu")
@@ -713,14 +751,28 @@ pipeline {
                 }
             }
         }
+        stage('Build ASAN Docker for gfx942') {
+            when {
+                expression { params.BUILD_ASAN_DOCKER }
+            }
+            steps {
+                script {
+                    runAsanDockerBuild()
+                }
+            }
+        }
         stage("Full Tests") {
             when {
                 expression {
-                    params.BUILD_FULL_TESTS || params.BUILD_THEROCK_DOCKER
+                    params.BUILD_FULL_TESTS || params.BUILD_THEROCK_DOCKER || params.BUILD_ASAN_DOCKER
                 }
             }
             parallel{
                 stage('Hip Tidy') {
+                    when {
+                        beforeAgent true
+                        expression { !params.BUILD_ASAN_DOCKER }
+                    }
                     agent{ label rocmnode("nogpu") }
                     environment{
                         setup_cmd = "CXX='/opt/rocm/llvm/bin/clang++' cmake -DCMAKE_PREFIX_PATH=/opt/rocm -DMIOPEN_BACKEND=HIP -DBUILD_DEV=On .. "
@@ -739,7 +791,7 @@ pipeline {
                 stage('Dbsync gfx90a') {
                     when {
                         beforeAgent true
-                        expression { params.DBSYNC_TEST && params.TARGET_GFX90A }
+                        expression { params.DBSYNC_TEST && params.TARGET_GFX90A && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
@@ -754,7 +806,7 @@ pipeline {
                 stage('Bf16 Hip Install All gfx90a') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX90A && params.DATATYPE_BF16 }
+                        expression { params.TARGET_GFX90A && params.DATATYPE_BF16 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
@@ -769,7 +821,7 @@ pipeline {
                 stage('Fp16 Hip Install All gfx90a') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX90A && params.DATATYPE_FP16 }
+                        expression { params.TARGET_GFX90A && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
@@ -784,7 +836,7 @@ pipeline {
                 stage('Fp32 Hip Install All gfx90a') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX90A && params.DATATYPE_FP32 }
+                        expression { params.TARGET_GFX90A && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
@@ -801,7 +853,7 @@ pipeline {
                 stage('ASAN Hip Install All gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX942 }
+                        expression { params.TARGET_GFX942 || params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx942") }
                     steps {
@@ -819,7 +871,7 @@ pipeline {
                 stage('Dbsync gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.DBSYNC_TEST && (params.TARGET_GFX942 || params.WORKAROUND__TARGET_GFX942_MINIMUM_TEST_ENABLE) }
+                        expression { params.DBSYNC_TEST && (params.TARGET_GFX942 || params.WORKAROUND__TARGET_GFX942_MINIMUM_TEST_ENABLE) && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
@@ -834,7 +886,7 @@ pipeline {
                 stage('Bf16 Hip Install All gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX942 && params.DATATYPE_BF16 }
+                        expression { params.TARGET_GFX942 && params.DATATYPE_BF16 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
@@ -844,7 +896,7 @@ pipeline {
                 stage('Fp16 Hip Install All gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX942 && params.DATATYPE_FP16 }
+                        expression { params.TARGET_GFX942 && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
@@ -859,7 +911,7 @@ pipeline {
                 stage('Fp32 Hip Install All gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX942 && params.DATATYPE_FP32 }
+                        expression { params.TARGET_GFX942 && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
@@ -874,7 +926,7 @@ pipeline {
                 stage('TF32 Hip Install All gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX942 && params.DATATYPE_TF32 }
+                        expression { params.TARGET_GFX942 && params.DATATYPE_TF32 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
@@ -890,7 +942,7 @@ pipeline {
                 stage('Fp16 Hip Install All gfx1101') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_NAVI32 && params.DATATYPE_FP16 }
+                        expression { params.TARGET_NAVI32 && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("navi32") }
                     steps{
@@ -900,7 +952,7 @@ pipeline {
                 stage('Fp32 Hip Install All gfx1101') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_NAVI32 && params.DATATYPE_FP32 }
+                        expression { params.TARGET_NAVI32 && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER }
                     }
                     agent{ label rocmnode("navi32") }
                     steps{
@@ -913,7 +965,7 @@ pipeline {
         stage('Build TheRock Docker: Promote') {
             when {
                 expression {
-                    params.BUILD_THEROCK_DOCKER && env.THEROCK_SKIP_UPDATE != 'true'
+                    params.BUILD_THEROCK_DOCKER && env.THEROCK_SKIP_UPDATE != 'true' && !params.BUILD_ASAN_DOCKER
                 }
             }
             steps {
@@ -922,20 +974,21 @@ pipeline {
                 }
             }
         }
-        stage('Build ASAN Docker for gfx942') {
+        // Promotes ci_asan_candidate to ci_asan only after the ASAN test in Full Tests passes.
+        stage('Promote ASAN Docker') {
             when {
                 expression { params.BUILD_ASAN_DOCKER }
             }
             steps {
                 script {
-                    runAsanDockerBuild()
+                    runAsanDockerPromote()
                 }
             }
         }
         // Publishes rocm/miopen-dev:multiarch_dev_<date> and :latest after CI passes.
         stage('Publish Dev Image') {
             when {
-                expression { params.BUILD_THEROCK_DOCKER }
+                expression { params.BUILD_THEROCK_DOCKER && !params.BUILD_ASAN_DOCKER }
             }
             steps {
                 script {
