@@ -64,62 +64,64 @@ def cleanupAsanImage() {
 }
 
 def runPackageAndStaticChecksParallel() {
-    parallel(
-        'HIP Package': {
-            node(rocmnode("nogpu")) {
-                try {
-                    runHipClangStage(package_build: true, needs_gpu: false, gpu_family: "ci")
-                } finally { cleanWs() }
-            }
-        },
-        'Clang Format': {
-            node(rocmnode("nogpu")) {
-                try {
-                    runHipClangStage(make_targets: "check_format", needs_gpu: false, gpu_family: "ci")
-                } finally { cleanWs() }
-            }
-        },
-        'Check GTest Format': {
-            node(rocmnode("nogpu")) {
-                try {
-                    withWorkingDir {
-                        sh 'cd ./test/utils && python3 gtest_formating_checks.py'
-                    }
-                } finally { cleanWs() }
-            }
-        },
-        'HipNoGPU Debug Build Test': {
-            if (params.TARGET_NOGPU) {
-                node(rocmnode("nogpu")) {
-                    try {
-                        runHipClangStage(build_type: 'debug',
-                            setup_flags: "-DMIOPEN_BACKEND=HIPNOGPU -DMIOPEN_INSTALL_CXX_HEADERS=On",
-                            build_cmd: "make -j\$(nproc)",
-                            needs_gpu: false, gpu_family: "ci")
-                    } finally { cleanWs() }
+    def branches = [:]
+
+    branches['HIP Package'] = {
+        node(rocmnode("nogpu")) {
+            try {
+                runHipClangStage(package_build: true, needs_gpu: false, gpu_family: "ci")
+            } finally { cleanWs() }
+        }
+    }
+    branches['Clang Format'] = {
+        node(rocmnode("nogpu")) {
+            try {
+                runHipClangStage(make_targets: "check_format", needs_gpu: false, gpu_family: "ci")
+            } finally { cleanWs() }
+        }
+    }
+    branches['Check GTest Format'] = {
+        node(rocmnode("nogpu")) {
+            try {
+                withWorkingDir {
+                    sh 'cd ./test/utils && python3 gtest_formating_checks.py'
                 }
-            }
-        },
-        'Tuna Fin Build Test': {
-            node(rocmnode("nogpu")) {
-                try {
-                    runHipClangStage(setup_flags: "-DMIOPEN_BACKEND=HIPNOGPU",
-                        make_targets: "all", build_fin: "ON",
-                        needs_gpu: false, build_install: true, gpu_family: "ci")
-                } finally { cleanWs() }
-            }
-        },
-        'Fp32 Hip Debug NOCK Build-Only': {
+            } finally { cleanWs() }
+        }
+    }
+    if (params.TARGET_NOGPU) {
+        branches['HipNoGPU Debug Build Test'] = {
             node(rocmnode("nogpu")) {
                 try {
                     runHipClangStage(build_type: 'debug',
-                        setup_flags: "-DMIOPEN_USE_COMPOSABLEKERNEL=Off",
-                        make_targets: "", build_install: true,
+                        setup_flags: "-DMIOPEN_BACKEND=HIPNOGPU -DMIOPEN_INSTALL_CXX_HEADERS=On",
+                        build_cmd: "make -j\$(nproc)",
                         needs_gpu: false, gpu_family: "ci")
                 } finally { cleanWs() }
             }
         }
-    )
+    }
+    branches['Tuna Fin Build Test'] = {
+        node(rocmnode("nogpu")) {
+            try {
+                runHipClangStage(setup_flags: "-DMIOPEN_BACKEND=HIPNOGPU",
+                    make_targets: "all", build_fin: "ON",
+                    needs_gpu: false, build_install: true, gpu_family: "ci")
+            } finally { cleanWs() }
+        }
+    }
+    branches['Fp32 Hip Debug NOCK Build-Only'] = {
+        node(rocmnode("nogpu")) {
+            try {
+                runHipClangStage(build_type: 'debug',
+                    setup_flags: "-DMIOPEN_USE_COMPOSABLEKERNEL=Off",
+                    make_targets: "", build_install: true,
+                    needs_gpu: false, gpu_family: "ci")
+            } finally { cleanWs() }
+        }
+    }
+
+    parallel(branches)
 }
 
 def runFullTestsParallel() {
