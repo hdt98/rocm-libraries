@@ -29,7 +29,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-FOLDER_PATH = "../../test/gtest"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+FOLDER_PATH = os.path.join(_SCRIPT_DIR, "..", "..", "gtest")
 
 # Ignore list: Add test names or file paths you want to exclude
 #              (keep the list sorted to min. git conflicts)
