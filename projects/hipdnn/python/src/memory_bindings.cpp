@@ -16,8 +16,8 @@ namespace nb = nanobind;
 class DeviceBuffer
 {
 private:
-    void* _devicePtr;
-    size_t _sizeBytes;
+    void* _devicePtr = nullptr;
+    size_t _sizeBytes = 0;
 
 public:
     DeviceBuffer(size_t sizeBytes)
@@ -37,17 +37,15 @@ public:
 
     ~DeviceBuffer()
     {
-        if(_devicePtr)
+        if(_devicePtr != nullptr)
         {
-            (void)hipFree(_devicePtr); // Explicitly ignore return value
+            (void)hipFree(_devicePtr);
         }
     }
 
-    // Disable copy
     DeviceBuffer(const DeviceBuffer&) = delete;
     DeviceBuffer& operator=(const DeviceBuffer&) = delete;
 
-    // Enable move
     DeviceBuffer(DeviceBuffer&& other) noexcept
         : _devicePtr(other._devicePtr)
         , _sizeBytes(other._sizeBytes)
@@ -60,9 +58,9 @@ public:
     {
         if(this != &other)
         {
-            if(_devicePtr)
+            if(_devicePtr != nullptr)
             {
-                (void)hipFree(_devicePtr); // Explicitly ignore return value
+                (void)hipFree(_devicePtr);
             }
             _devicePtr = other._devicePtr;
             _sizeBytes = other._sizeBytes;
@@ -74,7 +72,7 @@ public:
 
     void copyFromHost(const void* hostPtr)
     {
-        if(!_devicePtr || !hostPtr)
+        if(_devicePtr == nullptr || hostPtr == nullptr)
         {
             throw std::runtime_error("Invalid pointers for copy operation");
         }
@@ -88,7 +86,7 @@ public:
 
     void copyToHost(void* hostPtr)
     {
-        if(!_devicePtr || !hostPtr)
+        if(_devicePtr == nullptr || hostPtr == nullptr)
         {
             throw std::runtime_error("Invalid pointers for copy operation");
         }
@@ -112,7 +110,7 @@ public:
     // Fill with zeros
     void zeros()
     {
-        if(_devicePtr)
+        if(_devicePtr != nullptr)
         {
             const auto status = hipMemset(_devicePtr, 0, _sizeBytes);
             if(status != hipSuccess)
@@ -171,30 +169,27 @@ void memoryBindings(nb::module_& m)
             {
                 return sizeof(float);
             }
-            else if(dtypeStr == "<f2" || dtypeStr == "float16")
+            if(dtypeStr == "<f2" || dtypeStr == "float16")
             {
                 return sizeof(uint16_t);
             }
-            else if(dtypeStr == "<f8" || dtypeStr == "float64")
+            if(dtypeStr == "<f8" || dtypeStr == "float64")
             {
                 return sizeof(double);
             }
-            else if(dtypeStr == "<i4" || dtypeStr == "int32")
+            if(dtypeStr == "<i4" || dtypeStr == "int32")
             {
                 return sizeof(int32_t);
             }
-            else if(dtypeStr == "<u1" || dtypeStr == "uint8")
+            if(dtypeStr == "<u1" || dtypeStr == "uint8")
             {
                 return sizeof(uint8_t);
             }
-            else if(dtypeStr == "<i1" || dtypeStr == "int8")
+            if(dtypeStr == "<i1" || dtypeStr == "int8")
             {
                 return sizeof(int8_t);
             }
-            else
-            {
-                throw std::runtime_error("Unsupported dtype: " + dtypeStr);
-            }
+            throw std::runtime_error("Unsupported dtype: " + dtypeStr);
         },
         nb::arg("dtype"),
         "Get the size in bytes of a numpy dtype");
