@@ -532,10 +532,9 @@ void MultiPlanItem::WaitCommRequests()
         throw std::runtime_error("MPI_Waitall failed: " + std::to_string(rcmpi));
     comm_requests.clear();
 
-    // MPI_Waitall completes the GPU-side receive but does not order
-    // it against the user-supplied HIP stream the next plan item runs
-    // on. Barrier here so the receive is visible to it.
-    // TODO: replace with a per-op event + hipStreamWaitEvent chain.
+    // MPI_Waitall completes the receive on the host but does not
+    // stream-order it against the next plan item.
+    // TODO: replace with per-op event + hipStreamWaitEvent.
     if(hipDeviceSynchronize() != hipSuccess)
         throw std::runtime_error("post-MPI hipDeviceSynchronize failed");
 #endif
@@ -558,10 +557,8 @@ void CommPointToPoint::ExecuteAsync(const rocfft_plan                     plan,
                                     size_t                                multiPlanIdx,
                                     const std::map<int, device_callback_t>&)
 {
-    // Set the current HIP device to the device that owns the buffer
-    // touched on this rank: destLocation when we are the cross-rank
-    // receiver, srcLocation otherwise. GPU-aware MPI keys IPC and
-    // peer-access state off the current device.
+    // GPU-aware MPI keys IPC/peer-access off the current device.
+    // Use destLocation on the cross-rank receiver, srcLocation otherwise.
     const int scope_device
         = (local_comm_rank == destLocation.comm_rank && local_comm_rank != srcLocation.comm_rank)
               ? destLocation.device
@@ -680,10 +677,8 @@ void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
                                size_t                                multiPlanIdx,
                                const std::map<int, device_callback_t>&)
 {
-    // Default scope is the source device, which is the correct device
-    // for the sender side of cross-rank ops and for any same-rank
-    // memcpy. The cross-rank receive branch in the loop below switches
-    // to its own destination device before posting MPI_Irecv.
+    // Default to source device (sender / same-rank memcpy). The
+    // cross-rank receive branch below re-scopes to its destination.
     rocfft_scoped_device dev(srcLocation.device);
 
     if(LOG_PLAN_ENABLED())
@@ -748,9 +743,8 @@ void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
             }
             else if(local_comm_rank == op.destLocation.comm_rank)
             {
-                // Switch to the destination device for MPI_Irecv so
-                // any IPC / peer-access state set up by GPU-aware MPI
-                // is created on the device that owns the recv buffer.
+                // MPI_Irecv on the destination device so GPU-aware MPI
+                // sets up IPC/peer-access on the recv buffer's device.
                 rocfft_scoped_device recv_dev(op.destLocation.device);
                 MPI_Request          request;
                 const auto           mpiret = MPI_Irecv(destWithOffset,
@@ -887,9 +881,8 @@ void CommGather::ExecuteAsync(const rocfft_plan                     plan,
             }
             else if(local_comm_rank == destLocation.comm_rank)
             {
-                // Switch to the destination device for MPI_Irecv so
-                // any IPC / peer-access state set up by GPU-aware MPI
-                // is created on the device that owns the recv buffer.
+                // MPI_Irecv on the destination device so GPU-aware MPI
+                // sets up IPC/peer-access on the recv buffer's device.
                 rocfft_scoped_device recv_dev(destLocation.device);
                 MPI_Request          request;
                 auto                 rcmpi = MPI_Irecv(destWithOffset,

@@ -364,15 +364,27 @@ void rocfft_plan_t::Execute(void*                                 in_buffer[],
 
     auto callbacks = DeviceCallbackMap(info, desc, local_comm_rank);
 
-    // The first Comm* item in a multi-device plan reads from user
-    // buffers on rocFFT's own per-op streams, not the user-supplied
-    // stream. Drain the device here so writes the caller queued on
-    // its stream are visible before our internal streams begin.
-    // TODO: replace with per-(buffer, device) hipStreamWaitEvent edges
-    // recorded from the user stream onto each per-op stream that reads
-    // a user buffer.
-    if(hipDeviceSynchronize() != hipSuccess)
-        throw std::runtime_error("plan entry hipDeviceSynchronize failed");
+    // Multi-device plans read user input on per-op streams and via
+    // MPI_Isend (MPI-spec needs the buffer committed before the call).
+    // Drain the user stream(s); single-device plans run on the user
+    // stream and need no bridge.
+    // TODO: replace HIP-side reads with hipStreamWaitEvent from the
+    // user stream; MPI_Isend still needs a CPU drain.
+    if(sortedIdx.size() > 1)
+    {
+        int device_count = 0;
+        if(hipGetDeviceCount(&device_count) != hipSuccess)
+            throw std::runtime_error("hipGetDeviceCount failed");
+        for(int dev = 0; dev < device_count; ++dev)
+        {
+            hipStream_t user_stream = info.get_user_stream(dev);
+            if(!user_stream)
+                continue;
+            rocfft_scoped_device guard(dev);
+            if(hipStreamSynchronize(user_stream) != hipSuccess)
+                throw std::runtime_error("plan entry hipStreamSynchronize failed");
+        }
+    }
 
     for(auto i = sortedIdx.begin(); i != sortedIdx.end(); ++i)
     {
