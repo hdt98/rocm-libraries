@@ -4,24 +4,21 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher_unification.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm.hpp"
 #include "ck_tile/ops/gemm/warp/warp_wmma_gemm.hpp"
 #include "ck_tile/core/arch/arch.hpp"
 
-#define USE_NEW_UNIFIED_FRAMEWORK 1
-
 namespace ck_tile {
 
+#if !USE_NEW_UNIFIED_FRAMEWORK
 namespace impl {
 namespace warp_gemm_dispatcher {
 
-using namespace ck_tile::core::arch;
-using namespace mma;
-
 // C++20 using enum
-static inline constexpr auto ESingle = WGAttrNumAccessEnum::Single;
-static inline constexpr auto EDouble = WGAttrNumAccessEnum::Double;
-static inline constexpr auto EQuad   = WGAttrNumAccessEnum::Quad;
+static constexpr auto ESingle = WGAttrNumAccessEnum::Single;
+static constexpr auto EDouble = WGAttrNumAccessEnum::Double;
+static constexpr auto EQuad   = WGAttrNumAccessEnum::Quad;
 
 template <typename AType,
           typename BType,
@@ -36,56 +33,7 @@ template <typename AType,
           WGAttrNumAccessEnum AttrNumAccessB = AttrNumAccessA>
 struct Dispatcher
 {
-    // static_assert(0);
-
-#if USE_NEW_UNIFIED_FRAMEWORK
-
-    // TODO: The dispatcher currently determines whether microscaling intrinsics are requested based
-    // on the WaveTile sizes and types. This is potentially dangerous and we should add a dedicated
-    // parameter instead.
-    static constexpr bool IsMxSized = (MPerWave == 16 && NPerWave == 16 && KPerWave == 128) ||
-                                      (MPerWave == 32 && NPerWave == 32 && KPerWave == 64);
-    static constexpr bool IsMx =
-        (IsMxSized && std::is_same_v<AccType, float> && UseStructuredSparsity == false);
-
-    // General checks.
-    static_assert(SwizzleA == false);
-    static_assert(UseStructuredSparsity == false);
-
-    // Scale checks.
-    // TODO: Add the tiny types after those are merged.
-    static_assert(!IsMx || (std::is_same_v<AType, fp8_t> || std::is_same_v<AType, bf8_t>));
-    static_assert(!IsMx || (std::is_same_v<BType, fp8_t> || std::is_same_v<BType, bf8_t>));
-
-    // Non scale checks;
-    static_assert(IsMx || AttrNumAccessA == ESingle);
-    static_assert(IsMx || AttrNumAccessB == ESingle);
-
-    using Type = std::conditional_t<
-        IsMx,
-        ScaleMmaPipeline<AType,                     // ADataType
-                         BType,                     // BDataType
-                         AccType,                   // CDataType
-                         MPerWave,                  // M
-                         NPerWave,                  // N
-                         KPerWave,                  // K
-                         MmaAccumPolicy::ROW_MAJOR, // Irrelevant for now because we
-                                                    // don't allow MN composition
-                         TransposeC>,               // CTranspose
-        WaveWiseMmaPipeline<AType,                  // ADataType
-                            BType,                  // BDataType
-                            AccType,                // CDataType
-                            MPerWave,               // M
-                            NPerWave,               // N
-                            KPerWave,               // K
-                            MmaOpFamily::DENSE,
-                            MmaAccumPolicy::ROW_MAJOR, // Irrelevant for now because we
-                                                       // don't allow MN composition
-                            TransposeC>>;              // CTranspose
-#endif
 };
-
-#if !USE_NEW_UNIFIED_FRAMEWORK // Dispatcher specializations
 
 // clang-format off
 // fp32
@@ -117,7 +65,7 @@ template<> struct Dispatcher<tf32_t, tf32_t, float, 16, 16, 32, false, false, fa
 // ADataType, BDataType, AccDataType, MPerWave, NPerWave, KPerWave, TransposeC, SwizzleA, UseStructuredSparsity
 template<> struct Dispatcher<half_t, half_t, float, 32, 32,  8, false> { using Type = WarpGemmMfmaF16F16F32M32N32K8; };
 template<> struct Dispatcher<half_t, half_t, float, 32, 32,  8,  true>  { using Type = WarpGemmMfmaF16F16F32M32N32K8TransposedCDistribution; };
-// template<> struct Dispatcher<half_t, half_t, float, 32, 32, 16, false> { using Type = WarpGemmMfmaF16F16F32M32N32K16<>; }; // This one
+template<> struct Dispatcher<half_t, half_t, float, 32, 32, 16, false> { using Type = WarpGemmMfmaF16F16F32M32N32K16<>; };
 template<> struct Dispatcher<half_t, half_t, float, 32, 32, 16,  true>  { using Type = WarpGemmMfmaF16F16F32M32N32K16TransposedCDistribution<>; };
 template<> struct Dispatcher<half_t, half_t, float, 32, 32, 16, false, false, false, EDouble> { using Type = WarpGemmMfmaF16F16F32M32N32K16<EDouble>; };
 template<> struct Dispatcher<half_t, half_t, float, 32, 32, 16,  true, false, false, EDouble> { using Type = WarpGemmMfmaF16F16F32M32N32K16TransposedCDistribution<EDouble>; };
@@ -256,11 +204,10 @@ template<> struct Dispatcher<int8_t, int8_t, int32_t, 16, 16, 32,  true> { using
 // WMMA cases
 template<bool TransposeC> struct Dispatcher<int8_t, int8_t, int32_t, 16, 16, 16, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x16_i8_i8<TransposeC>;};
 
-#endif
-
 // clang-format on
 } // namespace warp_gemm_dispatcher
 } // namespace impl
+#endif // if !USE_NEW_UNIFIED_FRAMEWORK
 
 template <typename AType,
           typename BType,
@@ -273,7 +220,11 @@ template <typename AType,
           bool UseStructuredSparsity         = false,
           WGAttrNumAccessEnum AttrNumAccessA = WGAttrNumAccessEnum::Single,
           WGAttrNumAccessEnum AttrNumAccessB = AttrNumAccessA>
+#if USE_NEW_UNIFIED_FRAMEWORK
+using WarpGemmDispatcher = typename impl::warp_gemm_dispatcher::UnificationDispatcher< //
+#else
 using WarpGemmDispatcher = typename impl::warp_gemm_dispatcher::Dispatcher< //
+#endif
     AType,
     BType,
     AccType,
