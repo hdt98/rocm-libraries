@@ -3044,8 +3044,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
           else:
             self.codes.globalReadB = StructuredModule() # empty
           if kernel["ProblemType"]["Sparse"] and kernel["DirectToVgprSparseMetadata"]:
-            self.codes.globalReadMetadata = self.globalReadDo(kernel, 1, tPM, unrollLoopIdx=0, g2lBufIdx=0)
-          else:
+            pass # non-TDM path does not have globalReadMetadata
+          elif kernel["enableTDMMetadata"]:
             self.codes.globalReadMetadata = StructuredModule() # empty
 
         else:
