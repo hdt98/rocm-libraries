@@ -60,7 +60,7 @@ utils = null
 // Falls back to ci_asan for normal CI runs where no candidate was built.
 def cleanupAsanImage() {
     def imageToRemove = env.ASAN_CANDIDATE_IMAGE ?: "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
-    sh "docker rmi ${imageToRemove} || true"
+    sh label: 'Remove ASAN Docker image', script: "docker rmi ${imageToRemove} || true"
 }
 
 def runPackageAndStaticChecksParallel() {
@@ -389,7 +389,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
             }
             withDockerContainer(image: asanImage, args: dockerOpts) {
                 timeout(time: 420, unit: 'MINUTES') {
-                    sh """
+                    sh label: 'Build MIOpen with ASAN', script: """
                         set -e
                         echo "Running as: \$(whoami)"
                         cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
@@ -420,7 +420,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
 
                         ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
                     """.stripIndent()
-                    sh """#!/bin/bash
+                    def shardExit = sh label: 'Run ASAN shard tests', returnStatus: true, script: """#!/bin/bash
                         export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
                         export ASAN_OPTIONS="\${ASAN_OPTIONS}:print_stats=1"
                         . /opt/venv/bin/activate
@@ -453,9 +453,12 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                         done
                         exit \$overall_exit
                     """.stripIndent()
-                    // Make workspace files writable by the Jenkins agent user before the container exits,
-                    // so cleanWs() can delete root-owned files written during the build.
-                    sh "chmod -R a+w ${env.WORKSPACE} || true"
+                    // Always fix permissions so cleanWs() can delete root-owned files,
+                    // even when shards failed
+                    sh label: 'Fix workspace permissions', script: "chmod -R a+w ${env.WORKSPACE} || true"
+                    if (shardExit != 0) {
+                        error("ASAN shard tests failed")
+                    }
                 }
             }
             utils.setGithubStatus(variant, 'success', 'Completed successfully')
@@ -589,12 +592,12 @@ def buildAsanDockerImage(Map conf=[:]) {
     utils.setGithubStatus(variant, 'pending', 'In progress')
     try {
         withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
-            sh """
+            sh label: 'Set up Docker Buildx', script: """
                 docker buildx rm ci-builder || true
                 docker buildx create --name ci-builder --driver docker-container --use
                 docker buildx inspect --bootstrap
             """.stripIndent()
-            sh """
+            sh label: 'Build and push ASAN Docker image', script: """
                 DOCKER_BUILDKIT=1 docker buildx build \
                   --push \
                   --tag ${asanTag} \
