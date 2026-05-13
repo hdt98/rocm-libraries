@@ -82,6 +82,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "tqdm",
+    "hip-python",
 ]
 
 [project.scripts]
