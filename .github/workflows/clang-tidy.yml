@@ -9,6 +9,9 @@ on:
       - 'projects/hipdnn/**/*.[ch]p?p?'
       - 'projects/hipdnn/cmake/ClangTidy.cmake'
       - 'projects/hipdnn/.clang-tidy'
+      - 'projects/miopen/**/*.[ch]p?p?'
+      - 'projects/miopen/cmake/ClangTidy.cmake'
+      - 'projects/miopen/.clang-tidy'
       # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
       # - 'dnn-providers/miopen-provider/**/*.[ch]p?p?'
       # - 'dnn-providers/miopen-provider/cmake/ClangTidy.cmake'
@@ -19,6 +22,9 @@ on:
       - 'projects/hipdnn/**/*.[ch]p?p?'
       - 'projects/hipdnn/cmake/ClangTidy.cmake'
       - 'projects/hipdnn/.clang-tidy'
+      - 'projects/miopen/**/*.[ch]p?p?'
+      - 'projects/miopen/cmake/ClangTidy.cmake'
+      - 'projects/miopen/.clang-tidy'
       # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
       # - 'dnn-providers/miopen-provider/**/*.[ch]p?p?'
       # - 'dnn-providers/miopen-provider/cmake/ClangTidy.cmake'
@@ -48,6 +54,8 @@ jobs:
           filters: |
             hipdnn:
               - 'projects/hipdnn/**'
+            miopen:
+              - 'projects/miopen/**'
             # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
             # miopen-provider:
             #   - 'dnn-providers/miopen-provider/**'
@@ -100,6 +108,19 @@ jobs:
             -DENABLE_CLANG_FORMAT=OFF \
             -DHIP_PLATFORM=amd
           ninja -C build-hipdnn tidy
+
+      - name: Run clang-tidy (miopen)
+        if: steps.changes.outputs.miopen == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          . .venv/bin/activate
+          export PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
+          export CXX=/opt/rocm/llvm/bin/clang++
+          cmake -S projects/miopen -B build-miopen -G Ninja \
+            -DMIOPEN_BACKEND=HIP \
+            -DBUILD_DEV=On \
+            -DCMAKE_PREFIX_PATH=/opt/rocm \
+            -DROCM_PATH=/opt/rocm
+          ninja -C build-miopen analyze
 
       # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
       # - name: Run clang-tidy (miopen-provider)
