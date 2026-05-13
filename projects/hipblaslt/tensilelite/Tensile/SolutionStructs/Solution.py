@@ -2084,9 +2084,6 @@ class Solution(collections.abc.Mapping):
       if state["PrefetchGlobalRead"] < 1:
         reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires PGR >= 1")
         return
-      if state["PrefetchGlobalRead"] != 1:
-        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires PGR == 1")
-        return
       if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) \
           and (state["ProblemType"]["TransposeA"], state["ProblemType"]["TransposeB"]) != (True, False):
         reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent with MX supports TN only")

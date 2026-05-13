@@ -2490,6 +2490,44 @@ class KernelWriter(metaclass=abc.ABCMeta):
         waitCode.comment += " for iteration == 0"
       waitCode.dscnt = dscnt
 
+    # TDM + PGR>=2 + NoLdsWriteCode + SIA in {2,3} case: the SIA2/SIA3 schedulers
+    # route PGR>=2 global reads through itemsGRToSchedLater and pair them with
+    # local writes inside schedLocalWrite. TDM has no local writes
+    # (NoLdsWriteCode=True) so schedLocalWrite never iterates and the GR items
+    # are silently dropped. Placing them earlier in iterCode (e.g. via
+    # perIterGlobalRead[swapIter]) would also land them BEFORE pointerLWCode (the
+    # LDS swap) and BEFORE the barrier in syncCode, causing the new
+    # tensor_load_to_lds to write to the bank still being consumed by ds_loads.
+    # Append the deferred TDM tensor_load_to_lds at the very end of the swap
+    # iter's iterCode so the load uses the post-swap descriptor and targets the
+    # bank whose data was just fully consumed; the next outer cycle's syncPlr
+    # wait/barrier waits on it before its ds_loads.
+    # TODO: This is intentionally narrow rather than a canonical scheduler
+    # phase. A cleaner long-term model would add an explicit post-swap global
+    # read lane shared by SIA0/SIA2/SIA3, but doing that first would touch the
+    # broader GR/LW scheduling contract. Keep this local until the post-swap GR
+    # phase can be introduced and validated across DTL/DTV/sparse scheduling.
+    if scheduleIterAlg in (2, 3) \
+        and kernel["enableTDMA"] and kernel["enableTDMB"] \
+        and kernel["NoLdsWriteCode"] and kernel["PrefetchGlobalRead"] >= 2:
+      if scheduleIterAlg == 3:
+        swapIter = self.states.lwEndMfmaIndex // self.states.numMfmaPerIter
+      else:
+        swapIter = kernel["LoopIters"] - self.states.numItersPLR - 1
+      if iteration == swapIter:
+        tdmInj = Module("tdmInjectGRForPGR2")
+        tdmInj.addComment1("tdm: inject GR for PGR>=2 (scheduler drops these when no LWs to pair with)")
+        for item in self.codes.globalReadA.middle.items():
+          tdmInj.add(deepcopy(item))
+        for item in self.codes.globalReadMXSA.middle.items():
+          tdmInj.add(deepcopy(item))
+        for item in self.codes.globalReadMXSB.middle.items():
+          tdmInj.add(deepcopy(item))
+        for item in self.codes.globalReadB.middle.items():
+          tdmInj.add(deepcopy(item))
+        if tdmInj.itemsSize() > 1:
+          iterCode.add(tdmInj)
+
     return iterCode
 
   ##############################################################################
