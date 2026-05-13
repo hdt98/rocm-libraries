@@ -74,10 +74,7 @@ jobs:
             python3-venv \
             lsb-release wget \
             software-properties-common \
-            gnupg \
-            libsqlite3-dev \
-            libbz2-dev \
-            nlohmann-json3-dev
+            gnupg
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 20
@@ -118,16 +115,12 @@ jobs:
           . .venv/bin/activate
           export PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
           export CXX=/opt/rocm/llvm/bin/clang++
-          # TODO: remove these OFF flags once the CI runner has the deps available:
-          #   MIOPEN_USE_MLIR: needs rocMLIR
-          #   MIOPEN_ENABLE_AI_KERNEL_TUNING / MIOPEN_ENABLE_AI_IMMED_MODE_FALLBACK: need frugally-deep + Eigen3
+          # TODO: remove -DMIOPEN_USE_MLIR=OFF once rocMLIR is removed from MIOpen
           cmake -S projects/miopen -B build-miopen -G Ninja \
             -DMIOPEN_BACKEND=HIP \
             -DBUILD_DEV=On \
             -DMIOPEN_USE_MLIR=OFF \
-            -DMIOPEN_ENABLE_AI_KERNEL_TUNING=OFF \
-            -DMIOPEN_ENABLE_AI_IMMED_MODE_FALLBACK=OFF \
-            -DCMAKE_PREFIX_PATH=/opt/rocm \
+            -DCMAKE_PREFIX_PATH="/opt/rocm;/usr/local" \
             -DROCM_PATH=/opt/rocm
           ninja -C build-miopen analyze
 
