@@ -72,6 +72,7 @@ include(CheckCXXCompilerFlag)
 include(ROCMHeaderWrapper)
 
 include(cmake/ClangCheck.cmake)
+include(cmake/CheckPreCommit.cmake)
 
 # Build library with Beta APIs
 add_definitions("-DMIOPEN_BETA_API=1")
