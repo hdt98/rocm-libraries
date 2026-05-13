@@ -2542,7 +2542,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.addComment2("Begin setupNewTile")
 
     # work-group assignments
-    module.addComment1("global read addresses: work-group")
+    module.addComment1("global read addresses: work-group") # is this comment needed?
     if not forceNoTileCode:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
 
@@ -2565,7 +2565,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tdmB: bool = kernel["enableTDMB"]
     tdmInited: bool = False
 
-    # Always release GR-related SGPRs from the pool for full setupNewTile.
+    # TODO: This can probably be moved later, after setupnewtile
+    # Always release GR-related SGPRs from the pool. regardless of whether
+    # it is a TDM or non-TDM kernel.
     module.add(self.removeGRSrdVariableSgprsFromPool(kernel))
 
     # tile assignments
@@ -2744,8 +2746,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             self.vgprPool.checkIn(tP["gpr"]["subIterReg"])
           tP["gpr"]["subIterReg"] = None
 
-      # SRD setup via graAddresses.
-      if not kernel["UseSubtileImpl"] and not forceNoTileCode:
+      # addresses
+      if not forceNoTileCode:
         # Addresses A(MXSA)
         if not tdmA:
           module.addComment1("global read addresses: addresses a")
@@ -2765,53 +2767,51 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.addComment1("global read addresses: addresses b")
           module.add(self.graAddresses(kernel, tensorParametersB))
 
-      if not kernel["UseSubtileImpl"]:
-        # workgroup SGPRs no longer needed
-        if not tdmA or prod(kernel["MIWaveGroup"]) < 2:
-          module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
+      # workgroup SGPRs no longer needed
+      if not tdmA or prod(kernel["MIWaveGroup"]) < 2:
+        module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
 
-        # Final offsets A(MXSA)
-        if not tdmA:
-          module.addComment1("global read addresses: final offsets a")
-          module.add(self.graFinalOffsets(kernel, tensorParametersA))
-          # releaseTensorTmpGprs(tensorParametersA)
-        if not tdmA and kernel["ProblemType"]["MXBlockA"]:
-          module.addComment1("global read addresses: final offsets mxsa")
-          module.add(self.graFinalOffsets(kernel, tensorParametersA["MX"]))
-        if kernel["ProblemType"]["Sparse"]:
-          module.addComment1("global read addresses: final offsets metadata")
-          if kernel["DirectToVgprSparseMetadata"]:
-            module.add(self.graMetadataFinalOffsets(kernel, tPMRef))
-          else:
-            module.add(self.graFinalOffsets(kernel, tPM))
-        # Final offsets B(MXSB)
-        if not tdmB and kernel["ProblemType"]["MXBlockB"]:
-          module.addComment1("global read addresses: final offsets mxsb")
-          module.add(self.graFinalOffsets(kernel, tensorParametersB["MX"]))
-        if not tdmB:
-          module.addComment1("global read addresses: final offsets b")
-          module.add(self.graFinalOffsets(kernel, tensorParametersB))
-          # releaseTensorTmpGprs(tensorParametersB)
+      # Final offsets A(MXSA)
+      if not tdmA:
+        module.addComment1("global read addresses: final offsets a")
+        module.add(self.graFinalOffsets(kernel, tensorParametersA))
+        # releaseTensorTmpGprs(tensorParametersA)
+      if not tdmA and kernel["ProblemType"]["MXBlockA"]:
+        module.addComment1("global read addresses: final offsets mxsa")
+        module.add(self.graFinalOffsets(kernel, tensorParametersA["MX"]))
+      if kernel["ProblemType"]["Sparse"]:
+        module.addComment1("global read addresses: final offsets metadata")
+        if kernel["DirectToVgprSparseMetadata"]:
+          module.add(self.graMetadataFinalOffsets(kernel, tPMRef))
+        else:
+          module.add(self.graFinalOffsets(kernel, tPM))
+      # Final offsets B(MXSB)
+      if not tdmB and kernel["ProblemType"]["MXBlockB"]:
+        module.addComment1("global read addresses: final offsets mxsb")
+        module.add(self.graFinalOffsets(kernel, tensorParametersB["MX"]))
+      if not tdmB:
+        module.addComment1("global read addresses: final offsets b")
+        module.add(self.graFinalOffsets(kernel, tensorParametersB))
+        # releaseTensorTmpGprs(tensorParametersB)
 
       self.dontAppendCode = False
       self.dontAppendCode = self.dontAppendCode or forceNoTileCode
 
-      if not kernel["UseSubtileImpl"]:
-        # Add increment code
-        gsuComponent = Component.GSU.find(self)
-        module.add(gsuComponent.setupNewTile(self, kernel, tensorParametersA, tensorParametersB, tPM))
+      # Add increment code
+      gsuComponent = Component.GSU.find(self)
+      module.add(gsuComponent.setupNewTile(self, kernel, tensorParametersA, tensorParametersB, tPM))
 
-        #TODO: TDM wave separated
-        if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
-          module.add(self.tdmSetupIncrementWaveSeparated(kernel, tensorParametersA, tensorParametersB))
+      #TODO: TDM wave separated
+      if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
+        module.add(self.tdmSetupIncrementWaveSeparated(kernel, tensorParametersA, tensorParametersB))
 
+        if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
+          module.add(self.tdmSetupIncrementWaveSeparated(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
+
+        if kernel["StreamK"] > 0:
+          module.add(self.tdmApplyStreamKOffsetWaveSeparated(kernel, tensorParametersA, tensorParametersB))
           if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
-            module.add(self.tdmSetupIncrementWaveSeparated(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
-
-          if kernel["StreamK"] > 0:
-            module.add(self.tdmApplyStreamKOffsetWaveSeparated(kernel, tensorParametersA, tensorParametersB))
-            if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
-              module.add(self.tdmApplyStreamKOffsetWaveSeparated(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
+            module.add(self.tdmApplyStreamKOffsetWaveSeparated(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
 
       ###########################################################################
       # summations loops: open
