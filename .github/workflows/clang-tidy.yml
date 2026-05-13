@@ -118,9 +118,11 @@ jobs:
           . .venv/bin/activate
           export PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
           export CXX=/opt/rocm/llvm/bin/clang++
+          # TODO: remove -DMIOPEN_USE_MLIR=OFF once rocMLIR is available on the CI runner
           cmake -S projects/miopen -B build-miopen -G Ninja \
             -DMIOPEN_BACKEND=HIP \
             -DBUILD_DEV=On \
+            -DMIOPEN_USE_MLIR=OFF \
             -DCMAKE_PREFIX_PATH=/opt/rocm \
             -DROCM_PATH=/opt/rocm
           ninja -C build-miopen analyze
