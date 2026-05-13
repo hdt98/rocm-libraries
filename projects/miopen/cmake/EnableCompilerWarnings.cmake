@@ -27,6 +27,7 @@
 set(__default_cxx_compile_options
     -Wall
     -Wextra
+    -Werror
     -Wcomment
     -Wendif-labels
     -Wformat
