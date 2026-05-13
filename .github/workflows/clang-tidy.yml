@@ -74,7 +74,10 @@ jobs:
             python3-venv \
             lsb-release wget \
             software-properties-common \
-            gnupg
+            gnupg \
+            libsqlite3-dev \
+            libbz2-dev \
+            nlohmann-json3-dev
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 20
