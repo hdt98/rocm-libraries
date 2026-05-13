@@ -92,6 +92,8 @@ RUN pip3 install --break-system-packages -r /doc-requirements.txt && \
 # Install cget && rbuild
     pip3 install --break-system-packages https://github.com/pfultz2/cget/archive/b5dd36cafa2804e6146c5021eb2469c4b2d3ad42.tar.gz && \
     pip3 install --break-system-packages https://github.com/RadeonOpenCompute/rbuild/archive/c33b1a7e74ae7f72379364b523f73d30fd4d765c.tar.gz && \
+# Install pre-commit
+    pip3 install --break-system-packages pre-commit && \
 # groupadd render && video
     groupadd -f render && \
     groupadd -f video && \
