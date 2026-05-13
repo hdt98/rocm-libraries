@@ -1,7 +1,7 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-if(GPU_TARGETS MATCHES "gfx9")
+if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx11|gfx12")
     set(LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS)
     if(CK_USE_OCP_FP8)
         list(APPEND LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS -DCK_TILE_USE_OCP_FP8)
