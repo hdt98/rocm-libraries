@@ -16,7 +16,7 @@
 namespace nb = nanobind;
 using namespace hipdnn_frontend;
 
-void attributes_bindings(nb::module_& m)
+void attributesBindings(nb::module_& m)
 {
     // BatchnormAttributes
     nb::class_<graph::BatchnormAttributes>(m, "BatchnormAttributes")

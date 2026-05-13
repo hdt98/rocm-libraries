@@ -14,7 +14,7 @@ namespace nb = nanobind;
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
 
-void tensor_bindings(nb::module_& m)
+void tensorBindings(nb::module_& m)
 {
     nb::class_<TensorAttributes>(m, "Tensor")
         .def(nb::init<>())

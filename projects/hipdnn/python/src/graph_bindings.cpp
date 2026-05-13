@@ -19,7 +19,7 @@
 namespace nb = nanobind;
 using namespace hipdnn_frontend;
 
-void graph_bindings(nb::module_& m)
+void graphBindings(nb::module_& m)
 {
     nb::class_<graph::Graph>(m, "Graph")
         .def(nb::init<>())

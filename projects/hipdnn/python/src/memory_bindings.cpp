@@ -122,7 +122,7 @@ public:
     }
 };
 
-void memory_bindings(nb::module_& m)
+void memoryBindings(nb::module_& m)
 {
     nb::class_<DeviceBuffer>(m, "DeviceBuffer")
         .def(nb::init<size_t>(),
@@ -163,22 +163,36 @@ void memory_bindings(nb::module_& m)
     m.def(
         "get_dtype_size",
         [](nb::object dtype) -> size_t {
-            std::string dtype_str = nb::str(dtype).c_str();
+            std::string dtypeStr = nb::str(dtype).c_str();
 
-            if(dtype_str == "<f4" || dtype_str == "float32")
+            if(dtypeStr == "<f4" || dtypeStr == "float32")
+            {
                 return sizeof(float);
-            else if(dtype_str == "<f2" || dtype_str == "float16")
+            }
+            else if(dtypeStr == "<f2" || dtypeStr == "float16")
+            {
                 return sizeof(uint16_t);
-            else if(dtype_str == "<f8" || dtype_str == "float64")
+            }
+            else if(dtypeStr == "<f8" || dtypeStr == "float64")
+            {
                 return sizeof(double);
-            else if(dtype_str == "<i4" || dtype_str == "int32")
+            }
+            else if(dtypeStr == "<i4" || dtypeStr == "int32")
+            {
                 return sizeof(int32_t);
-            else if(dtype_str == "<u1" || dtype_str == "uint8")
+            }
+            else if(dtypeStr == "<u1" || dtypeStr == "uint8")
+            {
                 return sizeof(uint8_t);
-            else if(dtype_str == "<i1" || dtype_str == "int8")
+            }
+            else if(dtypeStr == "<i1" || dtypeStr == "int8")
+            {
                 return sizeof(int8_t);
+            }
             else
-                throw std::runtime_error("Unsupported dtype: " + dtype_str);
+            {
+                throw std::runtime_error("Unsupported dtype: " + dtypeStr);
+            }
         },
         nb::arg("dtype"),
         "Get the size in bytes of a numpy dtype");

@@ -84,7 +84,7 @@ public:
     }
 };
 
-void handle_bindings(nb::module_& m)
+void handleBindings(nb::module_& m)
 {
     nb::class_<HandleWrapper>(m, "Handle")
         .def(nb::init<>(), "Create a new hipdnn handle")
