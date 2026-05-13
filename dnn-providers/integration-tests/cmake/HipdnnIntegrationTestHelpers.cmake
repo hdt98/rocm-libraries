@@ -71,9 +71,20 @@ function(add_external_integration_test_target)
 
     add_custom_target(${ARG_TARGET_NAME}
         COMMAND ${_CMD}
-        DEPENDS ${ARG_PLUGIN_TARGET}
+        DEPENDS ${ARG_PLUGIN_TARGET} hipdnn_integration_tests
         COMMENT "Running integration tests for ${ARG_ENGINE_NAME}"
         USES_TERMINAL
         VERBATIM
+    )
+
+    # Register with ctest so the cross-provider integration suite is picked up
+    # by the calling project's `<project>-integration-check` target (which runs
+    # `ctest -L integration_test`) and by direct `ctest` invocations from the
+    # project's build subdir. Labels mirror add_integration_test_target so the
+    # test is selected the same way as the provider's own integration tests,
+    # plus an `external_integration_test` label and the engine name for filtering.
+    add_test(NAME ${ARG_TARGET_NAME} COMMAND ${_CMD})
+    set_tests_properties(${ARG_TARGET_NAME} PROPERTIES
+        LABELS "integration_test;slow;external_integration_test;${ARG_ENGINE_NAME}"
     )
 endfunction()

@@ -15,19 +15,7 @@ endif()
 add_executable(
     miopen_plugin_integration_tests
     main.cpp
-    IntegrationGpuBatchnormBackward.cpp
-    IntegrationGpuBatchnormBackwardActivation.cpp
-    IntegrationGpuBatchnormForwardInference.cpp
-    IntegrationGpuBatchnormForwardInferenceWithVariance.cpp
-    IntegrationGpuBatchnormForwardInferenceWithVarianceAndActivation.cpp
-    IntegrationGpuBatchnormFwdPlusActive.cpp
-    IntegrationGpuBatchnormForwardTraining.cpp
-    IntegrationGpuBatchnormFwdTrainingActiv.cpp
     IntegrationGpuBatchnormUnsupportedDataTypes.cpp
-    IntegrationGpuConvForward.cpp
-    IntegrationGpuConvFwdBiasActiv.cpp
-    IntegrationGpuConvBackwardData.cpp
-    IntegrationGpuConvBackwardWeights.cpp
     IntegrationGpuBenchmarkingKnob.cpp
     IntegrationGpuDeterministic.cpp
 )
