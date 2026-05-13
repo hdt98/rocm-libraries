@@ -45,7 +45,6 @@ enum struct GemmPipelineType
     Mem,
     CompV3,
     CompV4,
-    CompV4Async,
     CompV6,
     CompAsync,
     CompAsyncEightWaves
@@ -79,15 +78,6 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompV4, Problem>
     using pipeline      = ck_tile::GemmPipelineAgBgCrCompV4<Problem>;
 
     static constexpr auto GetName() { return "GemmPipelineAgBgCrCompV4"; }
-};
-
-template <typename Problem>
-struct GemmPipelineTypeSelector<GemmPipelineType::CompV4Async, Problem>
-{
-    using base_pipeline = ck_tile::BaseGemmPipelineAgBgCrCompV4Async<Problem>;
-    using pipeline      = ck_tile::GemmPipelineAgBgCrCompV4Async<Problem>;
-
-    static constexpr auto GetName() { return "GemmPipelineAgBgCrCompV4Async"; }
 };
 
 template <typename Problem>
@@ -164,7 +154,6 @@ class TestCkTileGemmPipeline : public ::testing::Test
         constexpr bool preshuffle = Preshuffle;
 
         constexpr bool DoubleSmemBuffer          = (PipelineType == GemmPipelineType::CompV4 ||
-                                           PipelineType == GemmPipelineType::CompV4Async ||
                                            PipelineType == GemmPipelineType::CompAsync);
         constexpr bool TransposeC                = false;
         static constexpr bool StructuredSparsity = false;
@@ -275,7 +264,6 @@ class TestCkTileGemmPipeline : public ::testing::Test
             GTEST_SKIP() << "Unsupported data type combination for gemm pipeline test.";
         }
         if constexpr(PipelineType == GemmPipelineType::CompV4 ||
-                     PipelineType == GemmPipelineType::CompV4Async ||
                      PipelineType == GemmPipelineType::CompAsync ||
                      PipelineType == GemmPipelineType::CompAsyncEightWaves ||
                      std::is_same_v<BDataType, ck_tile::pk_int4_t>)
