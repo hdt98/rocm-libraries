@@ -1407,8 +1407,8 @@ class Solution(collections.abc.Mapping):
           reject(state, printRejectionReason, "PrefetchAcrossPersistent is currently supported only with StreamK=3")
         if not state["BufferLoad"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent requires BufferLoad")
-        # if state["PrefetchGlobalRead"] < 2:
-        #   reject(state, printRejectionReason, "PrefetchAcrossPersistent requires PrefetchGlobalRead >= 2")
+        if state["PrefetchGlobalRead"] < 1:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent requires PGR >= 1")
         if state["1LDSBuffer"] == 1:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent requires 1LDSBuffer != 1 (double LDS buffer)")
         if state["DirectToVgprA"] or state["DirectToVgprB"]:
@@ -2080,9 +2080,6 @@ class Solution(collections.abc.Mapping):
         return
       if state["StreamK"] != 3:
         reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires StreamK == 3")
-        return
-      if state["PrefetchGlobalRead"] < 1:
-        reject(state, printRejectionReason, "TDM + PrefetchAcrossPersistent requires PGR >= 1")
         return
       if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) \
           and (state["ProblemType"]["TransposeA"], state["ProblemType"]["TransposeB"]) != (True, False):

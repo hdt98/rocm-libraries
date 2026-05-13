@@ -12853,6 +12853,8 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("shiftSrd")
     if self.states.version[:2] == (12, 5):
       with self.allocTmpSgpr(1) as stmpRes:
+        # gfx125x encodes low record-count bits in Srd+1, so this must run
+        # after the final Srd+2 limit value is known.
         module.addComment("Shift num records for gfx125x")
         module.add(SAndB32(sgpr(stmpRes.idx), sgpr("Srd%s+2"%tc), 0x7F))
         module.add(SLShiftLeftB32(sgpr(stmpRes.idx), 25, sgpr(stmpRes.idx)))
