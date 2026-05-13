@@ -121,7 +121,7 @@ class TestProviderEngineResultFullShape:
         # Always-on collection never populates this; the schema must
         # still round-trip an arbitrary dict so opt-in profiling
         # payloads land cleanly.
-        payload = {"trace": {"format": "pftrace", "path": "/tmp/x.pftrace"}}
+        payload = {"pmc": {"GRBM_GUI_ACTIVE": 12345}}
         pe = ProviderEngineResult(
             provider="miopen",
             engine_id=1,
