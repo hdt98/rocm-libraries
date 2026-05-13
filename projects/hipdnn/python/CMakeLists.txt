@@ -13,12 +13,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find Python and nanobind
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
-find_package(nanobind CONFIG QUIET)
-if(NOT nanobind_FOUND)
-    include(FetchContent)
-    fetchcontent_declare(nanobind GIT_REPOSITORY https://github.com/wjakob/nanobind GIT_TAG v2.4.0)
-    fetchcontent_makeavailable(nanobind)
-endif()
+hipdnn_add_dependency(tsl-robin-map VERSION ${HIPDNN_TSL_ROBIN_MAP_VERSION})
+hipdnn_add_dependency(nanobind VERSION ${HIPDNN_NANOBIND_VERSION})
 
 # Find hipDNN frontend headers
 set(HIPDNN_FRONTEND_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../frontend/include"
