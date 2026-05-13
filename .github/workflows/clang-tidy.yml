@@ -84,7 +84,7 @@ jobs:
             clang-tools-20
           python3 -m venv .venv
           . .venv/bin/activate
-          pip install boto3 'cmake<4'
+          pip install boto3 cmake
           pip install -r TheRock/requirements.txt
 
       - name: Install ROCm
@@ -99,7 +99,9 @@ jobs:
         if: steps.changes.outputs.miopen == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           . .venv/bin/activate
-          pip install \
+          # cmake 4.x removed compat with cmake_minimum_required(VERSION <3.5);
+          # several MIOpen deps (e.g. bzip2@1.0.8) still declare old minimums.
+          pip install 'cmake<4' \
             https://github.com/pfultz2/cget/archive/b5dd36cafa2804e6146c5021eb2469c4b2d3ad42.tar.gz \
             https://github.com/RadeonOpenCompute/rbuild/archive/c33b1a7e74ae7f72379364b523f73d30fd4d765c.tar.gz
           cp projects/miopen/requirements.txt     /tmp/requirements.txt
