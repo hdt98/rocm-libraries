@@ -1,0 +1,47 @@
+# RUN: %stinkytofu-opt --arch gfx1250 %s --StinkyBuildImplicitDependencyPass --StinkyDAGSchedulerPass --print-output
+#
+# DS-first scheduling policy (CDNA5):
+#   1) When both ds_load and an independent VALU are ready, prefer ds_load.
+#   2) After 4 consecutive ds_loads (kMaxConsecutiveDs), the burst limiter
+#      forces the scheduler to break and issue something else before another
+#      ds_load can fire.
+#
+# Input order (lowest DAG id first):
+#   id=0  v_add_f32          (independent VALU, no register conflicts)
+#   id=1  ds_load_b128 v[8:11]
+#   id=2  ds_load_b128 v[12:15]
+#   id=3  ds_load_b128 v[16:19]
+#   id=4  ds_load_b128 v[20:23]
+#   id=5  ds_load_b128 v[24:27]   (5th — would exceed burst limit if issued back-to-back)
+#   id=6  v_wmma_f32_16x16x16_bf16 (depends on v[8:15] and v[16:23])
+#
+# Expected schedule with the DS-first + 4-burst policy:
+#   4 ds_loads (ids 1..4) issue first (DS > VALU; burst counter at 4),
+#   then the burst limiter forces the VALU (id 0) to break the streak,
+#   then the 5th ds_load (id 5) fires (counter reset by VALU),
+#   then the WMMA.
+#
+# With the OLD policy (no DS-over-VALU priority, no burst cap) the schedule
+# would instead start with v_add_f32 (smallest DAG id) followed by all five
+# ds_loads in a row, which is exactly what the CHECK-NEXT directives below
+# forbid (the v_add_f32 would land at the top, not between ds_load #4 and #5).
+#
+# CHECK-LABEL: @ds_first_burst_cap
+# CHECK:      v[8:11]{{.*}}ds_load_b128
+# CHECK-NEXT: v[12:15]{{.*}}ds_load_b128
+# CHECK-NEXT: v[16:19]{{.*}}ds_load_b128
+# CHECK-NEXT: v[20:23]{{.*}}ds_load_b128
+# CHECK-NEXT: v_add_f32
+# CHECK-NEXT: v[24:27]{{.*}}ds_load_b128
+# CHECK-NEXT: v_wmma_f32_16x16x16_bf16
+
+st.func @ds_first_burst_cap() {
+^entry:
+  v0 = "st.v_add_f32"(v50, 1.0) { issueCycles = 1, latencyCycles = 5 }
+  v[8:11]  = "st.ds_load_b128"(v100) { issueCycles = 1, latencyCycles = 56, mod.ds = { na = 1, offset = 0,   gds = false }, mod.memtoken = { tokens = [0] } }
+  v[12:15] = "st.ds_load_b128"(v100) { issueCycles = 1, latencyCycles = 56, mod.ds = { na = 1, offset = 32,  gds = false }, mod.memtoken = { tokens = [0] } }
+  v[16:19] = "st.ds_load_b128"(v100) { issueCycles = 1, latencyCycles = 56, mod.ds = { na = 1, offset = 64,  gds = false }, mod.memtoken = { tokens = [0] } }
+  v[20:23] = "st.ds_load_b128"(v100) { issueCycles = 1, latencyCycles = 56, mod.ds = { na = 1, offset = 96,  gds = false }, mod.memtoken = { tokens = [0] } }
+  v[24:27] = "st.ds_load_b128"(v100) { issueCycles = 1, latencyCycles = 56, mod.ds = { na = 1, offset = 128, gds = false }, mod.memtoken = { tokens = [0] } }
+  v[40:47] = "st.v_wmma_f32_16x16x16_bf16"(v[8:15], v[16:23], v[40:47]) { mod.mfma = { reuseA = false, reuseB = false } }
+}
