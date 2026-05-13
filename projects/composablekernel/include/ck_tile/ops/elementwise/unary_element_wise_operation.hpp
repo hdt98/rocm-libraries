@@ -503,9 +503,42 @@ CK_TILE_HOST_DEVICE fp16x8_t fp8x8_to_fp16x8_scale(const fp8x8_t& src, const flo
 CK_TILE_HOST_DEVICE fp8x8_t fp16x8_to_fp8x8_scale(const fp16x8_t& src, const float& scale)
 {
     fp8x8_t y;
+#if defined(__gfx950__)
+    constexpr int16x2_t INIT_DST = {0, 0};
+
+    auto convert_pair = [&](const fp16_t& src0, const fp16_t& src1, index_t dst_offset) {
+        union
+        {
+            fp16x2_t vec;
+            fp16_t elements[2];
+        } input;
+
+        union
+        {
+            int16x2_t packed;
+            fp8_t elements[4];
+        } output;
+
+        input.elements[0] = src0;
+        input.elements[1] = src1;
+
+        output.packed     = __builtin_amdgcn_cvt_scalef32_pk_fp8_f16(INIT_DST, input.vec, scale, 0);
+        y[dst_offset]     = output.elements[0];
+        y[dst_offset + 1] = output.elements[1];
+    };
+
+    auto convert_quartet = [&](index_t src_offset, index_t dst_offset) {
+        convert_pair(src[src_offset], src[src_offset + 1], dst_offset);
+        convert_pair(src[src_offset + 2], src[src_offset + 3], dst_offset + 2);
+    };
+
+    convert_quartet(0, 0);
+    convert_quartet(4, 4);
+#else
     static_for<0, 8, 1>{}([&](auto i) {
         y[i.value] = type_convert<fp8_t>(type_convert<float>(src[i.value]) * scale);
     });
+#endif
     return y;
 }
 
