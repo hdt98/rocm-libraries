@@ -68,14 +68,7 @@ BenchmarkProblems:
           - Exact: [4096, 8192, 1, 4096]
           - Exact: [4096, 4096, 1, 8192]
 
-  - # SGEMM NT - PrefetchAcrossPersistent enabled (PAP=1)
-    - # ProblemType
-      OperationType: GEMM
-      DataType: s
-      TransposeA: False
-      TransposeB: True
-      UseBeta: True
-      Batched: True
+    # SGEMM NT - PrefetchAcrossPersistent enabled (PAP=1)
 
     - # SGEMM NT - StreamK with PrefetchAcrossPersistent
       InitialSolutionParameters:

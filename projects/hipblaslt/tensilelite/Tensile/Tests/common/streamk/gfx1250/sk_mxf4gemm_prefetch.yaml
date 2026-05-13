@@ -96,25 +96,9 @@ BenchmarkProblems:
         - ActivationArgs:
           - [Enum: none]
 
-  #######################################
-  # TN - focused StreamK PAP coverage
-  #######################################
-  -
-    - # ProblemType, TN
-      OperationType: GEMM
-      DataType: F4
-      DestDataType: s
-      ComputeDataType: s
-      HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
-      UseBeta: True
-      Batched: True
-      Activation: False
-      SupportUserArgs: True
-      UseBias: 0
-      MXBlockA: 32
-      MXBlockB: 32
+    #######################################
+    # TN - focused StreamK PAP coverage
+    #######################################
 
     - # Default fixup, K-tail, small tile
       InitialSolutionParameters:
