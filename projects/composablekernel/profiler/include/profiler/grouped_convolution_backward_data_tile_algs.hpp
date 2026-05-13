@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "../../experimental/builder/test/utils/conv_algorithm_type_utils.hpp"
+#include "common.hpp"
 #include "grouped_convolution_signatures.hpp"
 #include "ck_tile/ref/naive_grouped_conv_bwd_data_gpu.hpp"
 
@@ -51,7 +52,10 @@ void run_cpu_validation(const ckt::Args<SIGNATURE>& args,
         hipMemcpy(&ref.data()[0], reference.input, input_bytes_num, hipMemcpyDeviceToHost));
     HIP_CHECK_ERROR(
         hipMemcpy(&in.data()[0], outputs.input, input_bytes_num, hipMemcpyDeviceToHost));
-    ck_tile::check_err(in, ref, "\tError: Incorrect results!");
+        
+    constexpr double rtol = ck::profiler::get_rtol<DataType>();
+    constexpr double atol = ck::profiler::get_atol<DataType>();
+    ck_tile::check_err(in, ref, "\tError: Incorrect results!", rtol, atol);
 }
 
 /// @brief `run_grouped_conv_backward_data_tile_algs()` run all grouped conv fwd instances.
