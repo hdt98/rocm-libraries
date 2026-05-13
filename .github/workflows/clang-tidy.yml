@@ -84,7 +84,7 @@ jobs:
             clang-tools-20
           python3 -m venv .venv
           . .venv/bin/activate
-          pip install boto3 cmake
+          pip install boto3 'cmake<4'
           pip install -r TheRock/requirements.txt
 
       - name: Install ROCm
