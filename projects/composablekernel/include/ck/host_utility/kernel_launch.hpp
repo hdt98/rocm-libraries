@@ -255,6 +255,10 @@ float launch_and_time_kernel_with_preprocess(const StreamConfig& stream_config,
 
             float cur_time = 0;
             hip_check_error(hipEventElapsedTime(&cur_time, start, stop));
+            // hipEventElapsedTime can return a small negative value on Windows for a
+            // very fast kernel. Clamp to zero, as negative elapsed time is never physical.
+            if(cur_time < 0)
+                cur_time = 0;
             times.push_back(cur_time);
             total_time += cur_time;
             if(total_time >= maxtime && i + 1 >= minrep)
@@ -272,6 +276,9 @@ float launch_and_time_kernel_with_preprocess(const StreamConfig& stream_config,
         printf("times {");
         for (float t: times) printf(" %.7f", t);
         printf("}\n");
+
+        hip_check_error(hipEventDestroy(start));
+        hip_check_error(hipEventDestroy(stop));
 
         return total_time / times.size();
     }
