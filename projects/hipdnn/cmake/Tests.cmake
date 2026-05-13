@@ -330,8 +330,15 @@ function(install_hipdnn_ctest_files)
     # per-directory apply_hipdnn_test_categories() calls above only
     # cover the build tree; the install-tree CTestTestfile is
     # hand-rolled here, so we need a single parser invocation that
-    # appends the same set_property(TEST ...) snippet to it.
-    if(COMMAND apply_ctest_category_labels)
+    # appends the same labels snippet to it.
+    #
+    # Passing INSTALLED_CTEST_FILE as the 2nd argument signals to the
+    # parser that the snippet will be evaluated by ctest's own
+    # interpreter (which does not implement
+    # get_property(DIRECTORY ... PROPERTY TESTS)), so it emits explicit
+    # per-test set_property() lines after auto-discovering the test
+    # names from the add_test() lines we just wrote above.
+    if(COMMAND apply_ctest_category_labels AND all_tests)
         apply_ctest_category_labels(
             "${_HIPDNN_TEST_CATEGORIES_YAML}"
             "${INSTALLED_CTEST_FILE}"
