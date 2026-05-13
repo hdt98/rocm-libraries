@@ -64,7 +64,7 @@ def cleanupAsanImage() {
 }
 
 def runPackageAndStaticChecksParallel() {
-    def branches = [:]
+    def branches = [failFast: true]
 
     branches['HIP Package'] = {
         node(rocmnode("nogpu")) {
@@ -125,7 +125,7 @@ def runPackageAndStaticChecksParallel() {
 }
 
 def runFullTestsParallel() {
-    def branches = [:]
+    def branches = [failFast: true]
 
     if (!params.BUILD_ASAN_DOCKER) {
         branches['Hip Tidy'] = {
