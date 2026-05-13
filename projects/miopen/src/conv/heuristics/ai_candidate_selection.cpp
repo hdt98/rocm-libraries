@@ -667,12 +667,13 @@ void StoreCandidateSelectionCache(const std::string& arch,
 
 // ---- Kernel-config embedding cache ------------------------------------------
 //
-// The config encoder depends only on the encoded kernel parameter matrix, not
-// on the input problem shape. Cache the embedding vectors so they are computed
-// at most once per unique (arch, solver, kernel-set).
+// The config encoder processes each kernel independently, so its output for
+// kernel K is the same regardless of what other kernels are in the batch.
+// Cache at individual kernel-row granularity so embeddings are reused across
+// different shapes that share a subset of valid kernels.
 struct KernelEmbeddingCache
 {
-    std::unordered_map<std::string, std::vector<std::vector<float>>> map;
+    std::unordered_map<std::string, std::vector<float>> map; // one entry per kernel row
     std::mutex mtx;
 
     static KernelEmbeddingCache& Get()
@@ -682,21 +683,13 @@ struct KernelEmbeddingCache
     }
 };
 
-std::string HashEncodedCandidates(const std::vector<std::vector<float>>& enc)
+std::string
+HashKernelRow(const std::string& arch, const std::string& solver, const std::vector<float>& row)
 {
-    // FNV-1a inspired combination over the flat matrix
-    std::size_t h = enc.size();
-    for(const auto& row : enc)
-        for(float v : row)
-            h ^= std::hash<float>{}(v) + 0x9e3779b9u + (h << 6) + (h >> 2);
-    return std::to_string(h);
-}
-
-std::string MakeEmbeddingKey(const std::string& arch,
-                             const std::string& solver,
-                             const std::vector<std::vector<float>>& encoded_candidates)
-{
-    return arch + "|" + solver + "|" + HashEncodedCandidates(encoded_candidates);
+    std::size_t h = row.size();
+    for(float v : row)
+        h ^= std::hash<float>{}(v) + 0x9e3779b9u + (h << 6) + (h >> 2);
+    return arch + "|" + solver + "|" + std::to_string(h);
 }
 
 std::vector<std::vector<float>>
@@ -705,18 +698,62 @@ GetOrComputeKernelEmbeddings(const std::string& arch,
                              const std::vector<std::vector<float>>& encoded_candidates,
                              const CandidateSelectionModel& model)
 {
-    auto& cache  = KernelEmbeddingCache::Get();
-    auto emb_key = MakeEmbeddingKey(arch, solver, encoded_candidates);
-    std::lock_guard<std::mutex> lk(cache.mtx);
-    const auto it = cache.map.find(emb_key);
-    if(it != cache.map.end())
+    auto& cache = KernelEmbeddingCache::Get();
+
+    std::vector<std::vector<float>> result(encoded_candidates.size());
+    std::vector<size_t> miss_indices;
+    std::vector<std::string> miss_keys;
+
+    // Phase 1: look up each kernel row individually.
     {
-        MIOPEN_LOG_I2("Tower 2 embedding cache hit for solver: " << solver);
-        return it->second;
+        std::lock_guard<std::mutex> lk(cache.mtx);
+        for(size_t i = 0; i < encoded_candidates.size(); ++i)
+        {
+            auto key = HashKernelRow(arch, solver, encoded_candidates[i]);
+            auto it  = cache.map.find(key);
+            if(it != cache.map.end())
+            {
+                result[i] = it->second;
+            }
+            else
+            {
+                miss_indices.push_back(i);
+                miss_keys.push_back(std::move(key));
+            }
+        }
     }
-    auto embeddings = model.EncodeKernelConfigs(encoded_candidates);
-    cache.map.emplace(emb_key, embeddings);
-    return embeddings;
+
+    if(miss_indices.empty())
+    {
+        MIOPEN_LOG_I2("Kernel-config embedding cache: all "
+                      << encoded_candidates.size() << " kernels hit for solver: " << solver);
+        return result;
+    }
+
+    MIOPEN_LOG_I2("Kernel-config embedding cache: "
+                  << (encoded_candidates.size() - miss_indices.size()) << "/"
+                  << encoded_candidates.size() << " kernels hit, encoding " << miss_indices.size()
+                  << " new kernels for solver: " << solver);
+
+    // Phase 2: batch-encode only the cache misses.
+    std::vector<std::vector<float>> miss_candidates;
+    miss_candidates.reserve(miss_indices.size());
+    for(size_t idx : miss_indices)
+        miss_candidates.push_back(encoded_candidates[idx]);
+
+    auto miss_embeddings = model.EncodeKernelConfigs(miss_candidates);
+
+    // Phase 3: store new embeddings and assemble the full result.
+    {
+        std::lock_guard<std::mutex> lk(cache.mtx);
+        for(size_t i = 0; i < miss_indices.size(); ++i)
+        {
+            result[miss_indices[i]] = miss_embeddings[i];
+            cache.map.emplace(miss_keys[i], miss_embeddings[i]);
+        }
+    }
+
+    return result;
 }
 
 } // anonymous namespace

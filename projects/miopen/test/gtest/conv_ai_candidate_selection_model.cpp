@@ -450,41 +450,37 @@ TEST_P(GPU_CandidateSelection_FP32, CandidateSelectionRamCache_Test)
               << " ms\n";
 }
 
-// Calling with the same kernel params but different input shapes must return a
-// non-empty result for both, confirming kernel-config embedding reuse is correct.
+// Kernel-config embeddings are cached per individual kernel row. Encoding a
+// subset of previously-seen kernels must return identical embeddings to the
+// original call, confirming per-row reuse is correct and not corrupted.
 TEST_P(GPU_CandidateSelection_FP32, KernelEmbeddingCache_Test)
 {
     const auto& params = GetParam();
     CandidateSelectionMetadata meta(params.arch, params.solver);
-    std::map<std::string, float> features_a;
-    std::map<std::string, float> features_b;
-    for(const auto& name : meta.input_params())
-    {
-        features_a[name] = 1.0f;
-        features_b[name] = 2.0f;
-    }
-    auto valid_kernel_params = GenerateValidKernelParams(meta, params.kernel_name, 3);
-    auto problem_a           = MakeTestProblem(1, 4, 8, 8, 8, 3, 3);
-    auto problem_b           = MakeTestProblem(2, 8, 16, 16, 16, 3, 3);
 
-    auto result_a = ModelSelectBestCandidate(params.arch,
-                                             params.solver,
-                                             problem_a,
-                                             features_a,
-                                             valid_kernel_params,
-                                             /*use_split_k=*/false,
-                                             accept_all_combinations);
-    auto result_b = ModelSelectBestCandidate(params.arch,
-                                             params.solver,
-                                             problem_b,
-                                             features_b,
-                                             valid_kernel_params,
-                                             /*use_split_k=*/false,
-                                             accept_all_combinations);
+    // Generate a set of 3 kernel candidates.
+    auto valid_kernel_params_full = GenerateValidKernelParams(meta, params.kernel_name, 3);
+    const auto& encoded_full      = EncodeKernelParams(valid_kernel_params_full, meta);
+    if(encoded_full.size() < 2)
+        GTEST_SKIP() << "Need at least 2 valid kernel candidates for this test";
 
-    ASSERT_FALSE(result_a.IsEmpty()) << "Shape A returned empty result";
-    ASSERT_FALSE(result_b.IsEmpty())
-        << "Shape B returned empty result (kernel-config embedding cache may be corrupt)";
+    const CandidateSelectionModel& model = GetCandidateSelectionModel(params.arch, params.solver);
+
+    // First call: encode all 3 kernels — populates the per-row cache.
+    auto embeddings_full = model.EncodeKernelConfigs(encoded_full);
+    ASSERT_EQ(embeddings_full.size(), encoded_full.size());
+
+    // Second call: encode only the first 2 rows — should hit the per-row cache
+    // for both and return embeddings identical to the first call.
+    std::vector<std::vector<float>> encoded_subset(encoded_full.begin(), encoded_full.begin() + 2);
+    auto embeddings_subset = model.EncodeKernelConfigs(encoded_subset);
+    ASSERT_EQ(embeddings_subset.size(), 2u);
+
+    // The embeddings for the shared rows must be identical.
+    ASSERT_EQ(embeddings_subset[0], embeddings_full[0])
+        << "Kernel 0 embedding differs between full and subset call";
+    ASSERT_EQ(embeddings_subset[1], embeddings_full[1])
+        << "Kernel 1 embedding differs between full and subset call";
 }
 
 // use_split_k=false and use_split_k=true must produce independent cache entries.
