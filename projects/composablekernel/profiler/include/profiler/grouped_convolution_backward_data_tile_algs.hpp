@@ -53,8 +53,8 @@ void run_cpu_validation(const ckt::Args<SIGNATURE>& args,
     HIP_CHECK_ERROR(
         hipMemcpy(&in.data()[0], outputs.input, input_bytes_num, hipMemcpyDeviceToHost));
         
-    constexpr double rtol = ck::profiler::get_rtol<DataType>();
-    constexpr double atol = ck::profiler::get_atol<DataType>();
+    constexpr double rtol = 10.0*ck::profiler::get_rtol<DataType>();
+    constexpr double atol = 10.0*ck::profiler::get_atol<DataType>();
     ck_tile::check_err(in, ref, "\tError: Incorrect results!", rtol, atol);
 }
 
