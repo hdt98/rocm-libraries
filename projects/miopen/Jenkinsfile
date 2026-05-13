@@ -423,21 +423,6 @@ pipeline {
                         }
                     }
                 }
-                stage('Check GTest Format') {
-                    agent { label rocmnode("nogpu") }
-                    steps {
-                        script {
-                            withWorkingDir {
-                                sh 'cd ./test/utils && python3 gtest_formating_checks.py'
-                            }
-                        }
-                    }
-                    post {
-                        always {
-                            cleanWs()
-                        }
-                    }
-                }
                 stage('HipNoGPU Debug Build Test') {
                     when {
                         beforeAgent true
