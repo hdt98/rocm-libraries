@@ -1,6 +1,8 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#include "bindings.hpp"
+
 #include <cstring>
 #include <hip/hip_runtime.h>
 #include <memory>
@@ -24,7 +26,7 @@ public:
     {
         if(_sizeBytes > 0)
         {
-            auto status = hipMalloc(&_devicePtr, _sizeBytes);
+            const auto status = hipMalloc(&_devicePtr, _sizeBytes);
             if(status != hipSuccess)
             {
                 throw std::runtime_error("Failed to allocate device memory: "
@@ -76,7 +78,7 @@ public:
         {
             throw std::runtime_error("Invalid pointers for copy operation");
         }
-        auto status = hipMemcpy(_devicePtr, hostPtr, _sizeBytes, hipMemcpyHostToDevice);
+        const auto status = hipMemcpy(_devicePtr, hostPtr, _sizeBytes, hipMemcpyHostToDevice);
         if(status != hipSuccess)
         {
             throw std::runtime_error("Failed to copy from host: "
@@ -90,7 +92,7 @@ public:
         {
             throw std::runtime_error("Invalid pointers for copy operation");
         }
-        auto status = hipMemcpy(hostPtr, _devicePtr, _sizeBytes, hipMemcpyDeviceToHost);
+        const auto status = hipMemcpy(hostPtr, _devicePtr, _sizeBytes, hipMemcpyDeviceToHost);
         if(status != hipSuccess)
         {
             throw std::runtime_error("Failed to copy to host: "
@@ -112,7 +114,7 @@ public:
     {
         if(_devicePtr)
         {
-            auto status = hipMemset(_devicePtr, 0, _sizeBytes);
+            const auto status = hipMemset(_devicePtr, 0, _sizeBytes);
             if(status != hipSuccess)
             {
                 throw std::runtime_error("Failed to zero memory: "
@@ -130,7 +132,7 @@ void memoryBindings(nb::module_& m)
              "Create a device buffer with the given size in bytes")
         .def(
             "copy_from_host",
-            [](DeviceBuffer& self, nb::bytes data) {
+            [](DeviceBuffer& self, const nb::bytes& data) {
                 if(data.size() != self.size())
                 {
                     throw std::runtime_error("Data size (" + std::to_string(data.size())
@@ -162,8 +164,8 @@ void memoryBindings(nb::module_& m)
     // Utility function to get element size for different data types
     m.def(
         "get_dtype_size",
-        [](nb::object dtype) -> size_t {
-            std::string dtypeStr = nb::str(dtype).c_str();
+        [](const nb::object& dtype) -> size_t {
+            const std::string dtypeStr = nb::str(dtype).c_str();
 
             if(dtypeStr == "<f4" || dtypeStr == "float32")
             {

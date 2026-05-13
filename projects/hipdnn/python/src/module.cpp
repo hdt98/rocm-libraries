@@ -1,22 +1,15 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#include "bindings.hpp"
+
 #include <HipdnnBackendPluginLoadingMode.h>
 #include <hipdnn_backend.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
-#include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
-
-// Forward declarations for binding functions
-void graphBindings(nb::module_& m);
-void tensorBindings(nb::module_& m);
-void attributesBindings(nb::module_& m);
-void typesBindings(nb::module_& m);
-void handleBindings(nb::module_& m);
-void memoryBindings(nb::module_& m);
 
 NB_MODULE(hipdnn_frontend_python, m)
 {
@@ -43,7 +36,7 @@ NB_MODULE(hipdnn_frontend_python, m)
                 cPaths.push_back(path.c_str());
             }
 
-            hipdnnStatus_t status
+            const auto status
                 = hipdnnSetEnginePluginPaths_ext(cPaths.size(), cPaths.data(), mode);
 
             if(status != HIPDNN_STATUS_SUCCESS)
