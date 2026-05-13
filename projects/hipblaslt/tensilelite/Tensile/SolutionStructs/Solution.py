@@ -2384,7 +2384,6 @@ class Solution(collections.abc.Mapping):
       state["_staggerStrideShift"] = (int)(math.ceil(math.log(state["StaggerUStride"] / (state["DepthU"] * bpeAB), 2)))
 
       def calcLdsPad(isaInfoMap: Dict[str, IsaInfo]) -> int:
-        isMX = state["ProblemType"].get("MXBlockA", 0) != 0 or state["ProblemType"].get("MXBlockB", 0) != 0
         numBytesA = state["ProblemType"]["MacDataTypeA"].numBytes()
         numBytesB = state["ProblemType"]["MacDataTypeB"].numBytes()
         lrvwA = state["LocalReadVectorWidthA"]
@@ -2420,111 +2419,74 @@ class Solution(collections.abc.Mapping):
               if readRegsA in (1, 4): optPadA *= 2
               if readRegsB in (1, 4): optPadB *= 2
 
-        if ldsPadA == -1:
-          if isMX and (state["ProblemType"]["DataTypeA"].is6bitFloat() or state["ProblemType"]["DataTypeA"].isFloat4()) and isa[:2] != (12, 5):
-            ldsPadA = 0
-          else:
-            if not state["UnrollMajorLDSA"]:
-              if state["EnableMatrixInstruction"]:
-                ldsPadA = 0
-                if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-                  ldsPadA = int(((16 * state["VectorWidthA"] * numBytesA + state["MacroTile0"] * numBytesA * lrvwA) % 128) // numBytesA)
-                if state["GlobalReadVectorWidthA"] * numBytesA == 32 and ldsPadA == 0:
-                  ldsPadA = int(16 // numBytesA)
-                if isa[:2] == (12, 5):
-                  if state["ProblemType"]["MacDataTypeA"].numBytes() == 0.5 and state.get("enableLDSTrA", False):
-                    ldsPadA = get_fp4_mt_config(state["MacroTile0"], "pad",
-                                state["MIWaveTile"][0], state["MIWaveGroup"][0])
-                  elif state["ProblemType"]["MacDataTypeA"].is8bitFloat() and state.get("enableLDSTrA", False):
-                    ldsPadA = get_fp8_mt_config(state["MacroTile0"], "pad",
-                                state["MIWaveTile"][0], state["MIWaveGroup"][0])
-                  elif state["ProblemType"]["MacDataTypeA"].numBytes() == 2 and state.get("enableLDSTrA", False):
-                    ldsPadA = get_fp16_mt_config(state["MacroTile0"], "pad", state["MIWaveGroup"][0],
-                                miInputPerThUnroll=state["MIInputPerThread"],
-                                lrvw=state["LocalReadVectorWidthA"],
-                                miWaveTile=state["MIWaveTile"][0],
-                                vw=state["VectorWidthA"])
-                  elif state["ProblemType"]["MacDataTypeA"].numBytes() == 4:
-                    ldsPadA = get_fp32_mt_config(state["MacroTile0"], "pad",
-                                state["VectorWidthA"], state["LocalReadVectorWidthA"],
-                                state["MIWaveGroup"][0],
-                                miInputPerThread=state["MIInputPerThread"],
-                                miWaveTile=state["MIWaveTile"][0],
-                                xf32EmuPack=state.get("UseF32XEmulation", False))
-                if state["DirectToLdsA"]:
-                  # TODO: Check if there are cases which benefit from padding, currently set to zero by default
-                  ldsPadA = state["MatrixInstM"] if state["enableLDSTrA"] else 0
-              else: # mac instruction
-                if state["ProblemType"]["TLUA"]:
-                  ldsPadA = 0
-                else:
-                  ldsPadA = state["VectorWidthA"]
-            else:
-              if state["DirectToLdsA"]:
-                if not state["ProblemType"]["TLUA"]:
-                  bpeA = state["ProblemType"]["DataTypeA"].numBytes()
-                  LdsStride = state["VectorWidthA"] * bpeA * state["DepthU"]
-                  MinLdsBlockSizePerPadA = (state[f"GlobalReadVectorWidthA"] * bpeA) * state["WavefrontSize"]
-                  isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadA
-                  ldsPadA = state["MatrixInstK"] if bpeA == 2 and not isM0PadEnough else 2 * lrvwA
-                else:
-                  ldsPadA = 0
-              else:
-                ldsPadA = max(state["GlobalReadVectorWidthA"],optPadA)
-          assert(ldsPadA >= 0)
+        def calcLdsPadPerOperand(tc: str, idx: int, numBytes: float, lrvw: int, optPad: int) -> int:
+          """Auto-resolve LdsPad{tc} (tc in {A, B}) when the user left it on -1.
 
-        if ldsPadB == -1:
-          if isMX and (state["ProblemType"]["DataTypeB"].is6bitFloat() or state["ProblemType"]["DataTypeB"].isFloat4()) and isa[:2] != (12, 5):
-            ldsPadB = 0
+          Order of overrides is intentional: later writes can clobber earlier
+          ones (e.g. the gfx1250 solver path can replace the MatrixInstM=16
+          formula, and the DirectToLds branch overrides everything that came
+          before).
+          """
+          mt   = state[f"MacroTile{idx}"]
+          vw   = state[f"VectorWidth{tc}"]
+          grvw = state[f"GlobalReadVectorWidth{tc}"]
+          ldstr     = state.get(f"enableLDSTr{tc}", False)
+          macDtype  = state["ProblemType"][f"MacDataType{tc}"]
+          tlu       = state["ProblemType"][f"TLU{tc}"]
+
+          ldsPad = 0
+          if not state[f"UnrollMajorLDS{tc}"]:
+            if state["EnableMatrixInstruction"]:
+              if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
+                ldsPad = int(((16 * vw * numBytes + mt * numBytes * lrvw) % 128) // numBytes)
+              if grvw * numBytes == 32 and ldsPad == 0:
+                ldsPad = int(16 // numBytes)
+              if isa[:2] == (12, 5):
+                # MIWaveTile / MIWaveGroup are only populated for MFMA/WMMA
+                # kernels; reading them outside this guard breaks non-MI dtypes
+                # (e.g. FP64) where the keys are absent.
+                miwt = state["MIWaveTile"][idx]
+                miwg = state["MIWaveGroup"][idx]
+                if macDtype.numBytes() == 0.5 and ldstr:
+                  ldsPad = get_fp4_mt_config(mt, "pad", miwt, miwg)
+                elif macDtype.is8bitFloat() and ldstr:
+                  ldsPad = get_fp8_mt_config(mt, "pad", miwt, miwg)
+                elif macDtype.numBytes() == 2 and ldstr:
+                  ldsPad = get_fp16_mt_config(mt, "pad", miwg,
+                              miInputPerThUnroll=state["MIInputPerThread"],
+                              lrvw=state[f"LocalReadVectorWidth{tc}"],
+                              miWaveTile=miwt,
+                              vw=vw)
+                elif macDtype.numBytes() == 4:
+                  ldsPad = get_fp32_mt_config(mt, "pad",
+                              vw, state[f"LocalReadVectorWidth{tc}"], miwg,
+                              miInputPerThread=state["MIInputPerThread"],
+                              miWaveTile=miwt,
+                              xf32EmuPack=state.get("UseF32XEmulation", False))
+              if state[f"DirectToLds{tc}"]:
+                # TODO: Check if there are cases which benefit from padding, currently set to zero by default
+                ldsPad = state["MatrixInstM"] if ldstr else 0
+            else: # mac instruction
+              ldsPad = 0 if tlu else vw
           else:
-            if not state["UnrollMajorLDSB"]:
-              if state["EnableMatrixInstruction"]:
-                ldsPadB = 0
-                if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-                  ldsPadB = int(((16 * state["VectorWidthB"] * numBytesB + state["MacroTile1"] * numBytesB * lrvwB) % 128) // numBytesB)
-                if state["GlobalReadVectorWidthB"] * numBytesB == 32 and ldsPadB == 0:
-                  ldsPadB = int(16 // numBytesB)
-                if isa[:2] == (12, 5):
-                  if state["ProblemType"]["MacDataTypeB"].numBytes() == 0.5 and state.get("enableLDSTrB", False):
-                    ldsPadB = get_fp4_mt_config(state["MacroTile1"], "pad",
-                                state["MIWaveTile"][1], state["MIWaveGroup"][1])
-                  elif state["ProblemType"]["MacDataTypeB"].is8bitFloat() and state.get("enableLDSTrB", False):
-                    ldsPadB = get_fp8_mt_config(state["MacroTile1"], "pad",
-                                state["MIWaveTile"][1], state["MIWaveGroup"][1])
-                  elif state["ProblemType"]["MacDataTypeB"].numBytes() == 2 and state.get("enableLDSTrB", False):
-                    ldsPadB = get_fp16_mt_config(state["MacroTile1"], "pad", state["MIWaveGroup"][1],
-                                miInputPerThUnroll=state["MIInputPerThread"],
-                                lrvw=state["LocalReadVectorWidthB"],
-                                miWaveTile=state["MIWaveTile"][1],
-                                vw=state["VectorWidthB"])
-                  elif state["ProblemType"]["MacDataTypeB"].numBytes() == 4:
-                    ldsPadB = get_fp32_mt_config(state["MacroTile1"], "pad",
-                                state["VectorWidthB"], state["LocalReadVectorWidthB"],
-                                state["MIWaveGroup"][1],
-                                miInputPerThread=state["MIInputPerThread"],
-                                miWaveTile=state["MIWaveTile"][1],
-                                xf32EmuPack=state.get("UseF32XEmulation", False))
-                if state["DirectToLdsB"]:
-                  # TODO: Check if there are cases which benefit from padding, currently set to zero by default
-                  ldsPadB = state["MatrixInstM"] if state["enableLDSTrB"] else 0
-              else: # mac instruction
-                if state["ProblemType"]["TLUB"]:
-                  ldsPadB = 0
-                else:
-                  ldsPadB = state["VectorWidthB"]
-            else:
-              if state["DirectToLdsB"]:
-                if not state["ProblemType"]["TLUB"]:
-                  bpeB = state["ProblemType"]["DataTypeB"].numBytes()
-                  LdsStride = state["VectorWidthB"] * bpeB * state["DepthU"]
-                  MinLdsBlockSizePerPadB = (state[f"GlobalReadVectorWidthB"] * bpeB) * state["WavefrontSize"]
-                  isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadB
-                  ldsPadB = state["MatrixInstK"] if bpeB == 2 and not isM0PadEnough else 2 * lrvwB
-                else:
-                  ldsPadB = 0
+            if state[f"DirectToLds{tc}"]:
+              if not tlu:
+                bpe = state["ProblemType"][f"DataType{tc}"].numBytes()
+                LdsStride            = vw   * bpe * state["DepthU"]
+                MinLdsBlockSizePerPad = grvw * bpe * state["WavefrontSize"]
+                isM0PadEnough = LdsStride >= MinLdsBlockSizePerPad
+                ldsPad = state["MatrixInstK"] if bpe == 2 and not isM0PadEnough else 2 * lrvw
               else:
-                ldsPadB = max(state["GlobalReadVectorWidthB"],optPadB)
-          assert(ldsPadB >= 0)
+                ldsPad = 0
+            else:
+              ldsPad = max(grvw, optPad)
+          assert ldsPad >= 0
+          return ldsPad
+
+        if ldsPadA == -1:
+          ldsPadA = calcLdsPadPerOperand("A", 0, numBytesA, lrvwA, optPadA)
+        if ldsPadB == -1:
+          ldsPadB = calcLdsPadPerOperand("B", 1, numBytesB, lrvwB, optPadB)
 
         if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
           optPadM = (optPadB if state["ProblemType"]["Sparse"] == 2 else optPadA) // 4
@@ -2564,24 +2526,20 @@ class Solution(collections.abc.Mapping):
         if state["DirectToVgprB"]:
           ldsPadB = 0
 
-        if isa[:2] == (12, 5):
-          if state["LdsPadMXSA"] == -1:
-            ldsPadMXSA = get_mxs_mt_config(state["MatrixInstK"],
-                                          state["ProblemType"]["MXBlockA"],
-                                          state["VectorWidthA"], "pad") \
-                        if state["ProblemType"]["MXBlockA"] else 0
-          else:
-            ldsPadMXSA = state["LdsPadMXSA"]
-          if state["LdsPadMXSB"] == -1:
-            ldsPadMXSB = get_mxs_mt_config(state["MatrixInstK"],
-                                          state["ProblemType"]["MXBlockB"],
-                                          state["VectorWidthB"], "pad") \
-                        if state["ProblemType"]["MXBlockB"] else 0
-          else:
-            ldsPadMXSB = state["LdsPadMXSB"]
-        else:
-          ldsPadMXSA = 4 * 2 if (state["LdsPadMXSA"] == -1) else state["LdsPadMXSA"]
-          ldsPadMXSB = 4 * 2 if (state["LdsPadMXSB"] == -1) else state["LdsPadMXSB"]
+        def calcLdsPadPerMxOperand(tc: str) -> int:
+          """Auto-resolve LdsPad{tc} (tc in {MXSA, MXSB}) when user left it on -1."""
+          if state[f"LdsPad{tc}"] != -1:
+            return state[f"LdsPad{tc}"]
+          sub = tc[-1]   # "A" or "B"
+          if isa[:2] == (12, 5):
+            return get_mxs_mt_config(state["MatrixInstK"],
+                                      state["ProblemType"][f"MXBlock{sub}"],
+                                      state[f"VectorWidth{sub}"], "pad") \
+                   if state["ProblemType"][f"MXBlock{sub}"] else 0
+          return 4 * 2
+
+        ldsPadMXSA = calcLdsPadPerMxOperand("MXSA")
+        ldsPadMXSB = calcLdsPadPerMxOperand("MXSB")
 
         if state["TDMInst"]:
           pads = {"A": ldsPadA * state["ProblemType"]["MacDataTypeA"].numBytes(), "B": ldsPadB * state["ProblemType"]["MacDataTypeB"].numBytes(), "MXSA": ldsPadMXSA, "MXSB": ldsPadMXSB}
