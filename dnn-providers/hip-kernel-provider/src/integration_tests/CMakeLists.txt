@@ -29,6 +29,10 @@ add_executable(
 
 target_compile_options(hip_kernel_provider_integration_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
 
+# Tests exercise the header-only experimental SDPA frontend API by default while
+# the installed consumer API remains gated by the hipdnn_frontend target.
+target_compile_definitions(hip_kernel_provider_integration_tests PRIVATE HIPDNN_ENABLE_SDPA)
+
 # To use the build tree plugin, we use the path relative to the test binary instead of the installed
 # libhipdnn_backend.so HIPDNN_PLUGIN_ENGINE_SUBDIR is provided by the sdk
 target_compile_definitions(
@@ -49,26 +53,20 @@ target_link_libraries(
 add_dependencies(hip_kernel_provider_integration_tests hip_kernel_provider)
 
 if(ENABLE_ASM_SDPA_ENGINE)
-    if(NOT HIPDNN_ENABLE_SDPA)
-        message(WARNING
-                "ENABLE_ASM_SDPA_ENGINE is ON but hipDNN was built with HIPDNN_ENABLE_SDPA=OFF. "
-                "Skipping SDPA integration tests. Rebuild hipDNN with -DHIPDNN_ENABLE_SDPA=ON to enable them.")
-    else()
-        target_sources(hip_kernel_provider_integration_tests PRIVATE
-            asm_sdpa_engine/AsmSdpaConfigHelpers.cpp
-            asm_sdpa_engine/IntegrationGpuSdpaForward.cpp
-            asm_sdpa_engine/IntegrationGpuSdpaBackward.cpp
-        )
-        # Add include path for codegen-generated headers (e.g., asm_fmha_v3_fwd_configs.hpp)
-        target_include_directories(hip_kernel_provider_integration_tests PRIVATE
-            ${CMAKE_CURRENT_BINARY_DIR}/../engines/asm_sdpa_engine/generated
-        )
-        # Ensure codegen runs before compiling the integration tests
-        add_dependencies(hip_kernel_provider_integration_tests asm_kernel_codegen)
-        target_compile_definitions(hip_kernel_provider_integration_tests PRIVATE
-            AITER_ASM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../engines/asm_sdpa_engine/asm/asm_kernels"
-        )
-    endif()
+    target_sources(hip_kernel_provider_integration_tests PRIVATE
+        asm_sdpa_engine/AsmSdpaConfigHelpers.cpp
+        asm_sdpa_engine/IntegrationGpuSdpaForward.cpp
+        asm_sdpa_engine/IntegrationGpuSdpaBackward.cpp
+    )
+    # Add include path for codegen-generated headers (e.g., asm_fmha_v3_fwd_configs.hpp)
+    target_include_directories(hip_kernel_provider_integration_tests PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/../engines/asm_sdpa_engine/generated
+    )
+    # Ensure codegen runs before compiling the integration tests
+    add_dependencies(hip_kernel_provider_integration_tests asm_kernel_codegen)
+    target_compile_definitions(hip_kernel_provider_integration_tests PRIVATE
+        AITER_ASM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../engines/asm_sdpa_engine/asm/asm_kernels"
+    )
 endif()
 
 clang_tidy_check(hip_kernel_provider_integration_tests)
@@ -77,20 +75,14 @@ add_integration_test_target(hip_kernel_provider_integration_tests ${CMAKE_CURREN
     LABELS slow)
 
 if(ENABLE_ASM_SDPA_ENGINE)
-    if(NOT HIPDNN_ENABLE_SDPA)
-        message(WARNING
-                "ENABLE_ASM_SDPA_ENGINE is ON but hipDNN was built with HIPDNN_ENABLE_SDPA=OFF. "
-                "Skipping SDPA integration test environment setup.")
+    set(ASM_KERNEL_ENV "HIPDNN_AITER_ASM_DIR=${CMAKE_BINARY_DIR}/hip_kernel_provider/asm_kernels")
+    if(COVERAGE_ENVIRONMENT)
+        set_tests_properties(hip_kernel_provider_integration_tests PROPERTIES
+            ENVIRONMENT "${COVERAGE_ENVIRONMENT};${ASM_KERNEL_ENV}"
+        )
     else()
-        set(ASM_KERNEL_ENV "HIPDNN_AITER_ASM_DIR=${CMAKE_BINARY_DIR}/hip_kernel_provider/asm_kernels")
-        if(COVERAGE_ENVIRONMENT)
-            set_tests_properties(hip_kernel_provider_integration_tests PROPERTIES
-                ENVIRONMENT "${COVERAGE_ENVIRONMENT};${ASM_KERNEL_ENV}"
-            )
-        else()
-            set_tests_properties(hip_kernel_provider_integration_tests PROPERTIES
-                ENVIRONMENT "${ASM_KERNEL_ENV}"
-            )
-        endif()
+        set_tests_properties(hip_kernel_provider_integration_tests PROPERTIES
+            ENVIRONMENT "${ASM_KERNEL_ENV}"
+        )
     endif()
 endif()

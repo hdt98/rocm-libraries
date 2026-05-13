@@ -60,10 +60,10 @@ add_executable(
     IntegrationRMSNormBackwardDescriptorLowering.cpp
     IntegrationRMSNormBackwardDescriptorLifting.cpp
     IntegrationSetPluginPathsExt.cpp
-    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdDescriptorLowering.cpp>
-    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdLifting.cpp>
-    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLifting.cpp>
-    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLowering.cpp>
+    IntegrationSdpaBwdDescriptorLowering.cpp
+    IntegrationSdpaBwdLifting.cpp
+    IntegrationSdpaFwdDescriptorLifting.cpp
+    IntegrationSdpaFwdDescriptorLowering.cpp
 )
 
 target_compile_options(hipdnn_public_frontend_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
@@ -82,7 +82,8 @@ target_include_directories(hipdnn_public_frontend_tests PRIVATE ${HIPDNN_TEST_IN
 
 target_compile_definitions(
     hipdnn_public_frontend_tests
-    PRIVATE TEST_GOOD_PLUGIN_NAME="${TEST_GOOD_PLUGIN_NAME}"
+    PRIVATE HIPDNN_ENABLE_SDPA
+            TEST_GOOD_PLUGIN_NAME="${TEST_GOOD_PLUGIN_NAME}"
             TEST_EXECUTE_FAILS_PLUGIN_NAME="${TEST_EXECUTE_FAILS_PLUGIN_NAME}"
             TEST_NO_APPLICABLE_ENGINES_A_PLUGIN_NAME="${TEST_NO_APPLICABLE_ENGINES_A_PLUGIN_NAME}"
             TEST_NO_APPLICABLE_ENGINES_B_PLUGIN_NAME="${TEST_NO_APPLICABLE_ENGINES_B_PLUGIN_NAME}"

@@ -47,6 +47,10 @@ add_executable(
 
 target_compile_options(hip_kernel_provider_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
 
+# Tests exercise the header-only experimental SDPA frontend API by default while
+# the installed consumer API remains gated by the hipdnn_frontend target.
+target_compile_definitions(hip_kernel_provider_tests PRIVATE HIPDNN_ENABLE_SDPA)
+
 target_link_libraries(
     hip_kernel_provider_tests PUBLIC GTest::gtest GTest::gmock hip::host
                                    hip_kernel_provider_private hipdnn_test_sdk hipdnn_plugin_sdk Threads::Threads
@@ -56,13 +60,7 @@ target_link_libraries(
 target_include_directories(hip_kernel_provider_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_LIST_DIR}/../../include)
 
 if(ENABLE_ASM_SDPA_ENGINE)
-    if(NOT HIPDNN_ENABLE_SDPA)
-        message(WARNING
-                "ENABLE_ASM_SDPA_ENGINE is ON but hipDNN was built with HIPDNN_ENABLE_SDPA=OFF. "
-                "Skipping SDPA unit tests. Rebuild hipDNN with -DHIPDNN_ENABLE_SDPA=ON to enable them.")
-    else()
-        add_subdirectory(engines/asm_sdpa_engine)
-    endif()
+    add_subdirectory(engines/asm_sdpa_engine)
 endif()
 
 clang_tidy_check(hip_kernel_provider_tests)

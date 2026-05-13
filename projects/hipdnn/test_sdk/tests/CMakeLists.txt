@@ -79,12 +79,16 @@ add_executable(
     utilities/cpu_graph_executor/TestReductionSignatureKey.cpp
     utilities/cpu_graph_executor/TestRMSNormFwdPlan.cpp
     utilities/cpu_graph_executor/TestRMSNormFwdSignatureKey.cpp
-    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:utilities/cpu_graph_executor/TestSdpaFwdPlan.cpp>
-    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:utilities/cpu_graph_executor/TestSdpaFwdSignatureKey.cpp>
+    utilities/cpu_graph_executor/TestSdpaFwdPlan.cpp
+    utilities/cpu_graph_executor/TestSdpaFwdSignatureKey.cpp
     TestVersion.cpp
 )
 
 target_compile_options(hipdnn_test_sdk_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
+
+# Tests exercise the header-only experimental SDPA frontend API by default while
+# the installed consumer API remains gated by the hipdnn_frontend target.
+target_compile_definitions(hipdnn_test_sdk_tests PRIVATE HIPDNN_ENABLE_SDPA)
 
 target_link_libraries(
     hipdnn_test_sdk_tests GTest::gtest GTest::gmock Threads::Threads hipdnn_test_sdk hipdnn_plugin_sdk

@@ -80,6 +80,10 @@ add_executable(
 
 target_compile_options(hipdnn_frontend_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
 
+# Tests exercise the header-only experimental SDPA frontend API by default while
+# the installed consumer API remains gated by the hipdnn_frontend target.
+target_compile_definitions(hipdnn_frontend_tests PRIVATE HIPDNN_ENABLE_SDPA)
+
 target_link_libraries(
     hipdnn_frontend_tests GTest::gtest GTest::gmock hip::host Threads::Threads hipdnn_test_sdk
 )

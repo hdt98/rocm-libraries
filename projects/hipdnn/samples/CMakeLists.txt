@@ -69,10 +69,11 @@ add_hipdnn_sample(hipdnn_sample_fused_conv_fprop_activ convolution/FusedConvFpro
 add_hipdnn_sample(hipdnn_sample_fused_conv_fprop_bias_activ convolution/FusedConvFpropBiasActiv.cpp)
 add_hipdnn_sample(hipdnn_sample_conv_wgrad convolution/ConvWgrad.cpp)
 add_hipdnn_sample(hipdnn_sample_conv_fprop_deterministic convolution/ConvFpropDeterministic.cpp)
+add_hipdnn_sample(hipdnn_sample_sdpa_fprop sdpa/SdpaFprop.cpp)
 
-if(HIPDNN_ENABLE_SDPA)
-    add_hipdnn_sample(hipdnn_sample_sdpa_fprop sdpa/SdpaFprop.cpp)
-endif()
+# Samples validate the header-only experimental SDPA frontend API by default while
+# the installed consumer API remains gated by the hipdnn_frontend target.
+target_compile_definitions(hipdnn_sample_sdpa_fprop PRIVATE HIPDNN_ENABLE_SDPA)
 
 add_hipdnn_sample(hipdnn_sample_serialization_roundtrip serialization/SerializationRoundTrip.cpp)
 
