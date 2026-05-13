@@ -1511,7 +1511,7 @@ void RNNDescriptor::RNNForwardInferencePacked(const Handle& handle,
     for(int li = 0; li < nLayers; li++)
     {
         size_t hid_shift           = static_cast<size_t>(li) * batch_n * hy_stride;
-        int hx_shift               = li * hy_n * bi_stride;
+        size_t hx_shift            = static_cast<size_t>(li) * hy_n * bi_stride;
         size_t wei_shift_bias_temp = wei_shift_bias + static_cast<size_t>(li) * 2 * wei_stride;
 
         // from input
@@ -2947,7 +2947,7 @@ void RNNDescriptor::RNNForwardTrainingPackedTensors(
     for(int li = 0; li < nLayers; li++)
     {
         size_t hid_shift           = static_cast<size_t>(li) * batch_n * hy_stride;
-        int hx_shift               = li * hy_n * bi_stride;
+        size_t hx_shift            = static_cast<size_t>(li) * hy_n * bi_stride;
         size_t wei_shift_bias_temp = wei_shift_bias + static_cast<size_t>(li) * 2 * wei_stride;
 
         // from input
@@ -4467,7 +4467,7 @@ void RNNDescriptor::RNNBackwardDataPackedTensors(
         size_t wei_shift =
             (in_h + hy_h) * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
         size_t hid_shift = static_cast<size_t>(li) * batch_n * hy_stride;
-        int hx_shift     = li * hy_n * bi_stride;
+        size_t hx_shift  = static_cast<size_t>(li) * hy_n * bi_stride;
         size_t weitime_shift =
             in_h * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
 
@@ -6372,7 +6372,8 @@ void RNNDescriptor::RNNBackwardWeightsPackedTensors(
         }
 
         size_t pretime_shift = 0;
-        int hx_shift, cur_time;
+        size_t hx_shift;
+        int cur_time;
         bool comb_check = true;
         if(seqLen > 2)
         {
@@ -6384,7 +6385,7 @@ void RNNDescriptor::RNNBackwardWeightsPackedTensors(
 
         if(comb_check)
         {
-            hx_shift = li * hy_n * bi_stride;
+            hx_shift = static_cast<size_t>(li) * hy_n * bi_stride;
             wei_shift =
                 in_h * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
 
@@ -6530,7 +6531,7 @@ void RNNDescriptor::RNNBackwardWeightsPackedTensors(
             {
                 baccbi -= in_n.at(seqLen - 1 - ti);
 
-                hx_shift = li * hy_n * bi_stride;
+                hx_shift = static_cast<size_t>(li) * hy_n * bi_stride;
                 wei_shift =
                     in_h * wei_stride + static_cast<size_t>(li) * (bi * hy_h + hy_h) * wei_stride;
 
