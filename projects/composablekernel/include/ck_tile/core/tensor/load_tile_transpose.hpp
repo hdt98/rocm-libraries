@@ -531,6 +531,27 @@ load_tile_transpose(const tile_window_with_static_distribution<BottomTensorView_
 }
 
 /**
+ * Helper class for pattern-matching supported unary op sizes for mixed-precision transpose
+ * conversion. This is used to select the appropriate PassThroughPack (e.g., PassThroughPack8,
+ * PassThroughPack2) based on the vector length of the transpose load. Unsupported sizes will result
+ * in a compile-time error.
+ */
+template <index_t UnaryOpSize_>
+struct PassThroughPackSelector;
+
+template <>
+struct PassThroughPackSelector<8>
+{
+    using type = element_wise::PassThroughPack8;
+};
+
+template <>
+struct PassThroughPackSelector<2>
+{
+    using type = element_wise::PassThroughPack2;
+};
+
+/**
  * @brief Mixed-precision transpose load: converts input data type to output data type while
  * transposing.
  *
@@ -605,11 +626,12 @@ CK_TILE_DEVICE void load_tile_transpose_convert_with_offset(
     constexpr index_t num_of_access = total_elems_in / number<UnaryOpSize_>{};
 
     // Read as input type, convert to output type
-    using SrcDataVec = ext_vector_t<SrcDataType, number<UnaryOpSize_>{}>;
-    using DstDataVec = ext_vector_t<DstDataType, number<UnaryOpSize_>{}>;
+    using SrcDataVec      = ext_vector_t<SrcDataType, number<UnaryOpSize_>{}>;
+    using DstDataVec      = ext_vector_t<DstDataType, number<UnaryOpSize_>{}>;
+    using PassThroughPack = typename PassThroughPackSelector<UnaryOpSize_>::type;
+
     static_for<0, num_of_access, 1>{}([&](auto i) {
-        static_assert(number<UnaryOpSize_>{} == 8, "Only PassThroughPack8 is supported for now.");
-        const element_wise::PassThroughPack8 elementwise_op{};
+        const PassThroughPack elementwise_op{};
 
         elementwise_op(out_tensor.get_thread_buffer().template get_as<DstDataVec>()(i),
                        trans_tensor.get_thread_buffer().template get_as<SrcDataVec>()[i]);
