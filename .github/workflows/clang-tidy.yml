@@ -95,6 +95,20 @@ jobs:
             --output-dir /opt/rocm \
             --base-only
 
+      - name: Install MIOpen dependencies
+        if: steps.changes.outputs.miopen == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          . .venv/bin/activate
+          pip install \
+            https://github.com/pfultz2/cget/archive/b5dd36cafa2804e6146c5021eb2469c4b2d3ad42.tar.gz \
+            https://github.com/RadeonOpenCompute/rbuild/archive/c33b1a7e74ae7f72379364b523f73d30fd4d765c.tar.gz
+          cp projects/miopen/requirements.txt     /tmp/requirements.txt
+          cp projects/miopen/rbuild.ini           /tmp/rbuild.ini
+          cp projects/miopen/dev-requirements.txt /tmp/dev-requirements.txt
+          # Strip deps not available/needed on CI runner
+          sed -i '/composablekernel/d; /half/d; /nlohmann/d; /rocMLIR/d' /tmp/requirements.txt
+          cd /tmp && rbuild prepare -s develop -d /usr/local
+
       - name: Run clang-tidy (hipDNN)
         if: steps.changes.outputs.hipdnn == 'true' || github.event_name == 'workflow_dispatch'
         run: |
