@@ -123,131 +123,136 @@ def runPackageAndStaticChecksParallel() {
 }
 
 def runFullTestsParallel() {
-    parallel(
-        'Hip Tidy': {
-            if (!params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("nogpu")) {
-                    try {
-                        runHipClangStage(
-                            setup_cmd: "CXX='/opt/rocm/llvm/bin/clang++' cmake -DCMAKE_PREFIX_PATH=/opt/rocm -DMIOPEN_BACKEND=HIP -DBUILD_DEV=On .. ",
-                            build_cmd: "make -j\$(nproc) -k analyze",
-                            needs_gpu: false, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
+    def branches = [:]
+
+    if (!params.BUILD_ASAN_DOCKER) {
+        branches['Hip Tidy'] = {
+            node(rocmnode("nogpu")) {
+                try {
+                    runHipClangStage(
+                        setup_cmd: "CXX='/opt/rocm/llvm/bin/clang++' cmake -DCMAKE_PREFIX_PATH=/opt/rocm -DMIOPEN_BACKEND=HIP -DBUILD_DEV=On .. ",
+                        build_cmd: "make -j\$(nproc) -k analyze",
+                        needs_gpu: false, gpu_family: "ci")
+                } finally { cleanWs() }
             }
-        },
-        // GFX90A Tests
-        'Dbsync gfx90a': {
-            if (params.DBSYNC_TEST && params.TARGET_GFX90A && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx90a")) {
-                    try { runDbSyncJob(gfx90a_flags, "ci") } finally { cleanWs() }
-                }
+        }
+    }
+
+    // GFX90A Tests
+    if (params.DBSYNC_TEST && params.TARGET_GFX90A && !params.BUILD_ASAN_DOCKER) {
+        branches['Dbsync gfx90a'] = {
+            node(rocmnode("gfx90a")) {
+                try { runDbSyncJob(gfx90a_flags, "ci") } finally { cleanWs() }
             }
-        },
-        'Bf16 Hip Install All gfx90a': {
-            if (params.TARGET_GFX90A && params.DATATYPE_BF16 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx90a")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + Bf16_flags + gfx90a_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
+        }
+    }
+    if (params.TARGET_GFX90A && params.DATATYPE_BF16 && !params.BUILD_ASAN_DOCKER) {
+        branches['Bf16 Hip Install All gfx90a'] = {
+            node(rocmnode("gfx90a")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + Bf16_flags + gfx90a_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
             }
-        },
-        'Fp16 Hip Install All gfx90a': {
-            if (params.TARGET_GFX90A && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx90a")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + Fp16_flags + gfx90a_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
+        }
+    }
+    if (params.TARGET_GFX90A && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER) {
+        branches['Fp16 Hip Install All gfx90a'] = {
+            node(rocmnode("gfx90a")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + Fp16_flags + gfx90a_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
             }
-        },
-        'Fp32 Hip Install All gfx90a': {
-            if (params.TARGET_GFX90A && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx90a")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + gfx90a_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
+        }
+    }
+    if (params.TARGET_GFX90A && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER) {
+        branches['Fp32 Hip Install All gfx90a'] = {
+            node(rocmnode("gfx90a")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + gfx90a_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
             }
-        },
-        // GFX942 Tests — ASAN declared first so it enters the gfx942 queue sooner
-        'ASAN Hip Install All gfx942': {
-            if (params.TARGET_GFX942 || params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx942")) {
-                    try {
-                        runAsanTests("gfx942", "gfx942")
-                    } finally {
-                        archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
-                        cleanupAsanImage()
-                        cleanWs()
-                    }
-                }
-            }
-        },
-        'Dbsync gfx942': {
-            if (params.DBSYNC_TEST && (params.TARGET_GFX942 || params.WORKAROUND__TARGET_GFX942_MINIMUM_TEST_ENABLE) && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx942")) {
-                    try { runDbSyncJob(gfx942_flags, "ci") } finally { cleanWs() }
-                }
-            }
-        },
-        'Bf16 Hip Install All gfx942': {
-            if (params.TARGET_GFX942 && params.DATATYPE_BF16 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx942")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + Bf16_flags + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
-            }
-        },
-        'Fp16 Hip Install All gfx942': {
-            if (params.TARGET_GFX942 && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx942")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + Fp16_flags + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
-            }
-        },
-        'Fp32 Hip Install All gfx942': {
-            if (params.TARGET_GFX942 && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx942")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
-            }
-        },
-        'TF32 Hip Install All gfx942': {
-            if (params.TARGET_GFX942 && params.DATATYPE_TF32 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("gfx942")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + Tf32_flags + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
-            }
-        },
-        // GFX1101 Tests
-        'Fp16 Hip Install All gfx1101': {
-            if (params.TARGET_NAVI32 && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("navi32")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + Fp16_flags + gfx1101_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
-                }
-            }
-        },
-        'Fp32 Hip Install All gfx1101': {
-            if (params.TARGET_NAVI32 && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER) {
-                node(rocmnode("navi32")) {
-                    try {
-                        runBuildAndSingleGtestJob(flags: Full_test + gfx1101_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
-                    } finally { cleanWs() }
+        }
+    }
+
+    // GFX942 Tests — ASAN declared first so it enters the gfx942 queue sooner
+    if (params.TARGET_GFX942 || params.BUILD_ASAN_DOCKER) {
+        branches['ASAN Hip Install All gfx942'] = {
+            node(rocmnode("gfx942")) {
+                try {
+                    runAsanTests("gfx942", "gfx942")
+                } finally {
+                    archiveArtifacts artifacts: 'shard_logs/asan_shard_*.log', allowEmptyArchive: true
+                    cleanupAsanImage()
+                    cleanWs()
                 }
             }
         }
-    )
+    }
+    if (params.DBSYNC_TEST && (params.TARGET_GFX942 || params.WORKAROUND__TARGET_GFX942_MINIMUM_TEST_ENABLE) && !params.BUILD_ASAN_DOCKER) {
+        branches['Dbsync gfx942'] = {
+            node(rocmnode("gfx942")) {
+                try { runDbSyncJob(gfx942_flags, "ci") } finally { cleanWs() }
+            }
+        }
+    }
+    if (params.TARGET_GFX942 && params.DATATYPE_BF16 && !params.BUILD_ASAN_DOCKER) {
+        branches['Bf16 Hip Install All gfx942'] = {
+            node(rocmnode("gfx942")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + Bf16_flags + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
+            }
+        }
+    }
+    if (params.TARGET_GFX942 && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER) {
+        branches['Fp16 Hip Install All gfx942'] = {
+            node(rocmnode("gfx942")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + Fp16_flags + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
+            }
+        }
+    }
+    if (params.TARGET_GFX942 && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER) {
+        branches['Fp32 Hip Install All gfx942'] = {
+            node(rocmnode("gfx942")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
+            }
+        }
+    }
+    if (params.TARGET_GFX942 && params.DATATYPE_TF32 && !params.BUILD_ASAN_DOCKER) {
+        branches['TF32 Hip Install All gfx942'] = {
+            node(rocmnode("gfx942")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + Tf32_flags + gfx942_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
+            }
+        }
+    }
+
+    // GFX1101 Tests
+    if (params.TARGET_NAVI32 && params.DATATYPE_FP16 && !params.BUILD_ASAN_DOCKER) {
+        branches['Fp16 Hip Install All gfx1101'] = {
+            node(rocmnode("navi32")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + Fp16_flags + gfx1101_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
+            }
+        }
+    }
+    if (params.TARGET_NAVI32 && params.DATATYPE_FP32 && !params.BUILD_ASAN_DOCKER) {
+        branches['Fp32 Hip Install All gfx1101'] = {
+            node(rocmnode("navi32")) {
+                try {
+                    runBuildAndSingleGtestJob(flags: Full_test + gfx1101_flags, build_timeout_minutes: Build_timeout_minutes, gpu_family: "ci")
+                } finally { cleanWs() }
+            }
+        }
+    }
+
+    parallel(branches)
 }
 
 def show_node_info() {
