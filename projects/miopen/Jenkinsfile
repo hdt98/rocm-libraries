@@ -478,6 +478,7 @@ def runAsanDockerBuild() {
                 env.ASAN_CANDIDATE_IMAGE = candidateTag
             }
         } finally {
+            sh "docker buildx rm ci-builder || true"
             sh "docker rmi ${env.ASAN_CANDIDATE_IMAGE} || true"
             cleanWs()
         }
