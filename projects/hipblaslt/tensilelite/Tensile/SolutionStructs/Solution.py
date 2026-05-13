@@ -1801,7 +1801,7 @@ class Solution(collections.abc.Mapping):
       and ((numBytesB == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
         or (numBytesB == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
       )
-	  
+
     if state["enableLDSTrA"] or state["enableGLTrA"]:
       state["VectorWidthA"] = 1
 
@@ -2272,6 +2272,7 @@ class Solution(collections.abc.Mapping):
 
     state["ExpertSchedulingMode"] = evaluateExpertSchedulingMode()
 
+    state["ESMRuntimeGate"] = tuple(state["ISA"])[:2] == (12, 0)
     # Some restrictions for float4 and 6bitFloat:
     # TODO: remove this if edge and tail are supported for fp4/fp6/bf6
     isFloat4 = state["ProblemType"]["DataTypeA"].isFloat4() or state["ProblemType"]["DataTypeB"].isFloat4()
@@ -2817,7 +2818,7 @@ class Solution(collections.abc.Mapping):
         # If the LRVW is set by the user, validate the configuration and rejects if,
         #   - state["LocalReadVectorWidth{tc}"] * state["ProblemType"]["MacDataType{tc}"].numRegisters() < 1 if not sparse
         #   - state["LocalReadVectorWidth{tc}"] // 2 * state["ProblemType"]["MacDataType{tc}"].numRegisters() < 1 is sparse
-        #   - state["LocalReadVectorWidth{tc}"] > state["MIInputPerThread"] and LDS is not transposed 
+        #   - state["LocalReadVectorWidth{tc}"] > state["MIInputPerThread"] and LDS is not transposed
         def isAutoLRVW(tc) -> bool:
           autoLRVW = False
           if state[f"LocalReadVectorWidth{tc}"] != -1:
@@ -2859,7 +2860,7 @@ class Solution(collections.abc.Mapping):
                 = calcLdsNumBytes(padA, ldsBlockSizePerPadA, padB, ldsBlockSizePerPadB)
               ldsNumBytes = ldsNumBytesAlignedA + ldsNumBytesAlignedB + \
                             ldsNumBytesAlignedMXSA + ldsNumBytesAlignedMXSB + \
-                            ldsNumBytesAlignedMetadata 
+                            ldsNumBytesAlignedMetadata
               if ldsNumBytes > state["MaxLDS"]:
                 if wlrA > 1:
                   state["LocalReadVectorWidthA"] //= 2
@@ -2921,7 +2922,7 @@ class Solution(collections.abc.Mapping):
             if state["ProblemType"]["SwizzleTensorA"]:
               state["GlobalReadVectorWidthA"] = state["MIInputPerThreadA"] * calSwizzlePackK(state, "A")
             elif state["ProblemType"]["DataTypeA"].is6bitFloat():
-              state["GlobalReadVectorWidthA"] = 32	  
+              state["GlobalReadVectorWidthA"] = 32
             elif state["enableGLTrA"]:
               state["GlobalReadVectorWidthA"] = 8
             else:
