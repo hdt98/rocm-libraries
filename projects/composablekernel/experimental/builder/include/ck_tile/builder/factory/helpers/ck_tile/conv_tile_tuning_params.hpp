@@ -119,6 +119,15 @@ struct TilePipelineType<ck_tile::GemmPipeline::BASIC_ASYNC_V1>
     using GemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegAsyncV1<PipelineProblem>;
 };
 
+template <>
+struct TilePipelineType<ck_tile::GemmPipeline::LEAN>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline =
+        ck_tile::GemmPipelineAgBgCrLean<PipelineProblem,
+                                        GroupedConvUniversalPipelineAgBgCrPolicy>;
+};
+
 template <ConvAlgorithmDescriptor auto ALGORITHM>
 consteval ck_tile::GemmPipeline SetTileBlockGemmPipelineVersion()
 {
@@ -134,6 +143,7 @@ consteval ck_tile::GemmPipeline SetTileBlockGemmPipelineVersion()
     case PipelineVersion::V6: return ck_tile_pipeline::COMPUTE_V6;
     case PipelineVersion::ASYNC_V1: return ck_tile_pipeline::BASIC_ASYNC_V1;
     case PipelineVersion::ASYNC_V4: return ck_tile_pipeline::COMPUTE_ASYNC;
+    case PipelineVersion::LEAN: return ck_tile_pipeline::LEAN;
     case PipelineVersion::WEIGHT_ONLY:
         throw "PipelineVersion::WEIGHT_ONLY is not supported for block GEMM pipeline version.";
     default: throw "Unknown block GEMM PipelineVersion";

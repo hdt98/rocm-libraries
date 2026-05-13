@@ -16,7 +16,8 @@ enum struct GemmPipeline
     BASIC_V1,
     BASIC_V2,
     PRESHUFFLE_V2,
-    BASIC_ASYNC_V1
+    BASIC_ASYNC_V1,
+    LEAN
 };
 
 } // namespace ck_tile
