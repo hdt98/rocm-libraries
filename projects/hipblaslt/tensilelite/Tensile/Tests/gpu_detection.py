@@ -49,9 +49,7 @@ def get_available_archs() -> list[str]:
     if not os.path.exists(enumerator):
         return []
     try:
-        output = subprocess.check_output(
-            [enumerator, "-t", "GPU"], stderr=subprocess.DEVNULL
-        )
+        output = subprocess.check_output([enumerator, "-t", "GPU"])
         return list(dict.fromkeys(
             line.strip()
             for line in output.decode().splitlines()
