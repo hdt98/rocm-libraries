@@ -187,7 +187,7 @@ set( MIOPEN_BACKEND ${MIOPEN_DEFAULT_BACKEND} CACHE STRING
     "Which of MIOpens's backends to use?" )
 set_property( CACHE MIOPEN_BACKEND PROPERTY STRINGS
     OpenCL HIP HIPOC HIPNOGPU)
-    
+
 set_var_to_condition(MIOPEN_BUILD_DRIVER_DEFAULT (NOT MIOPEN_EMBED_BUILD) AND (NOT (MIOPEN_BACKEND STREQUAL "HIPNOGPU")))
 option(MIOPEN_BUILD_DRIVER "Build MIOpenDriver (and use it in tests)" ${MIOPEN_BUILD_DRIVER_DEFAULT})
 message(STATUS "MIOPEN_BUILD_DRIVER: ${MIOPEN_BUILD_DRIVER}" )
@@ -711,7 +711,7 @@ function(install_gpu_databases gfx_target)
     if("${gfx_target}" IN_LIST _targets)
         message(FATAL_ERROR "AMDGPU target ${gfx_target} already defined")
     endif()
-    
+
     set(KDB_FILENAME "${gfx_target}.kdb.bz2")
     if(${KDB_FILENAME} IN_LIST KDB_BZ2_FILES)
         set(KDB_COMPONENT_NAME "${gfx_target}kdb")
