@@ -11,6 +11,7 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx11|gfx12")
     add_gtest_executable(test_load_and_convert_tile_no_transpose test_load_and_convert_tile_no_transpose.cpp)
     target_compile_options(test_load_and_convert_tile_no_transpose PRIVATE ${LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS})
 
+    # Transposed load is only supported on gfx950, so only add the test for that target.
     if(GPU_TARGETS MATCHES "gfx950")
         add_gtest_executable(test_load_and_convert_tile_transposed test_load_and_convert_tile_transposed.cpp)
         target_compile_options(test_load_and_convert_tile_transposed PRIVATE ${LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS})
