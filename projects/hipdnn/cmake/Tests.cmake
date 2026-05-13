@@ -324,6 +324,20 @@ function(install_hipdnn_ctest_files)
         file(APPEND "${INSTALLED_CTEST_FILE}" "add_test(${test_target} \"../${test_target}\")\n")
     endforeach()
 
+    # Bake the YAML-driven category labels into the installed
+    # CTestTestfile.cmake so `ctest --test-dir $THEROCK_BIN_DIR/hipdnn -L
+    # <tier>` works the same way as the build-tree ctest. The
+    # per-directory apply_hipdnn_test_categories() calls above only
+    # cover the build tree; the install-tree CTestTestfile is
+    # hand-rolled here, so we need a single parser invocation that
+    # appends the same set_property(TEST ...) snippet to it.
+    if(COMMAND apply_ctest_category_labels)
+        apply_ctest_category_labels(
+            "${_HIPDNN_TEST_CATEGORIES_YAML}"
+            "${INSTALLED_CTEST_FILE}"
+        )
+    endif()
+
     # Install the generated CTestTestfile.cmake to HIPDNN_CTEST_FILE_INSTALL_PATH
     install(FILES "${INSTALLED_CTEST_FILE}" DESTINATION ${HIPDNN_CTEST_FILE_INSTALL_PATH}
             RENAME CTestTestfile.cmake
