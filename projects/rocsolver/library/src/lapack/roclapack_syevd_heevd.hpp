@@ -48,7 +48,7 @@ void rocsolver_syevd_heevd_getMemorySize(rocblas_handle handle,
                                          const rocblas_evect evect,
                                          const rocblas_fill uplo,
                                          const I n,
-                                         const rocblas_int batch_count,
+                                         const I batch_count,
                                          size_t* size_scalars,
                                          size_t* size_work1,
                                          size_t* size_work2,
@@ -342,7 +342,7 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
     {
         // only in hybrid mode, compute eigenvalues using sterf
         rocsolver_sterf_template<S>(handle, n, D, 0, strideD, E, 0, strideE, info, batch_count,
-                                    (rocblas_int*)work1);
+                                    (I*)work1);
     }
     else
     {
@@ -364,7 +364,7 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
                 (T*)work1, (T*)work3, workArr);
 
             // copy matrix product into A
-            const rocblas_int copyblocks = (n - 1) / BS2 + 1;
+            const I copyblocks = (n - 1) / BS2 + 1;
             ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocks, copyblocks, batch_count),
                                     dim3(BS2, BS2), 0, stream, n, n, tmptau_W, 0, ldw, strideW, A,
                                     shiftA, lda, strideA);
@@ -499,7 +499,7 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
                 splits, work4, (T*)work1, (T*)work3, workArr, optim_mem);
 
             // copy matrix product into A
-            const rocblas_int copyblocks = (n - 1) / BS2 + 1;
+            const I copyblocks = (n - 1) / BS2 + 1;
             ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocks, copyblocks, batch_count),
                                     dim3(BS2, BS2), 0, stream, n, n, tmptau_W, 0, ldw, strideW, A,
                                     shiftA, lda, strideA);

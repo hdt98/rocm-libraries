@@ -702,10 +702,10 @@ ROCSOLVER_KERNEL void steqr_kernel(const I n,
     run_steqr(tid, tid_inc, n, D, E, C, ldc, info, work, max_iters, eps, ssfmin, ssfmax);
 }
 
-template <typename T, typename S>
+template <typename T, typename S, typename I>
 void rocsolver_steqr_getMemorySize(const rocblas_evect evect,
-                                   const rocblas_int n,
-                                   const rocblas_int batch_count,
+                                   const I n,
+                                   const I batch_count,
                                    size_t* size_work_stack)
 {
     // if quick return no workspace needed
@@ -722,15 +722,15 @@ void rocsolver_steqr_getMemorySize(const rocblas_evect evect,
         *size_work_stack = sizeof(S) * (2 * n) * batch_count;
 }
 
-template <typename T, typename S>
+template <typename T, typename S, typename I>
 rocblas_status rocsolver_steqr_argCheck(rocblas_handle handle,
                                         const rocblas_evect evect,
-                                        const rocblas_int n,
+                                        const I n,
                                         S D,
                                         S E,
                                         T C,
-                                        const rocblas_int ldc,
-                                        rocblas_int* info)
+                                        const I ldc,
+                                        I* info)
 {
     // order is important for unit tests:
 

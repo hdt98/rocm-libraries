@@ -324,9 +324,9 @@ ROCSOLVER_KERNEL void sterf_kernel(const I n,
     run_sterf<T>(n, D, E, info, stack, max_iters, eps, ssfmin, ssfmax);
 }
 
-template <typename T>
-void rocsolver_sterf_getMemorySize(const rocblas_int n,
-                                   const rocblas_int batch_count,
+template <typename T, typename I>
+void rocsolver_sterf_getMemorySize(const I n,
+                                   const I batch_count,
                                    size_t* size_stack)
 {
     // if quick return no workspace needed
@@ -340,9 +340,9 @@ void rocsolver_sterf_getMemorySize(const rocblas_int n,
     *size_stack = sizeof(rocblas_int) * (2 * 32) * batch_count;
 }
 
-template <typename T>
+template <typename T, typename I>
 rocblas_status
-    rocsolver_sterf_argCheck(rocblas_handle handle, const rocblas_int n, T D, T E, rocblas_int* info)
+    rocsolver_sterf_argCheck(rocblas_handle handle, const I n, T D, T E, I* info)
 {
     // order is important for unit tests:
 
