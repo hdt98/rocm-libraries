@@ -3856,12 +3856,10 @@ class Solution(collections.abc.Mapping):
                  f"gfx1250: LdsPad{tc}=-1 with LdsBlockSizePerPad{tc}=0 is not supported")
           return False
 
-    auto_LdsBlockSizePerPadA_for_mix = 0
-    if state["LdsBlockSizePerPadA"] == -1:
-      auto_LdsBlockSizePerPadA_for_mix = 1
-    auto_LdsBlockSizePerPadB_for_mix = 0
-    if state["LdsBlockSizePerPadB"] == -1:
-      auto_LdsBlockSizePerPadB_for_mix = 1
+    auto_LdsPadA = (state["LdsPadA"] == -1)
+    auto_LdsPadB = (state["LdsPadB"] == -1)
+    auto_LdsBlockSizePerPadA = (state["LdsBlockSizePerPadA"] == -1)
+    auto_LdsBlockSizePerPadB = (state["LdsBlockSizePerPadB"] == -1)
     state["LdsBlockSizePerPadA"] = calcLdsBlockSizePerPad("A", state["LocalReadVectorWidthA"])
     state["LdsBlockSizePerPadB"] = calcLdsBlockSizePerPad("B", state["LocalReadVectorWidthB"])
     state["LdsBlockSizePerPadMXSA"] = calcLdsBlockSizePerPad("MXSA", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockA"] else 0
@@ -4034,10 +4032,10 @@ class Solution(collections.abc.Mapping):
 
       if state["LdsBlockSizePerPad%s"%tc] != 0 and state["LdsPad%s"%tc] != 0:
         idx = 0 if tc == "A" else 1
-        auto_LdsBlockSizePerPad_for_mix = auto_LdsBlockSizePerPadA_for_mix if tc == "A" else auto_LdsBlockSizePerPadB_for_mix
+        auto_LdsBlockSizePerPad = auto_LdsBlockSizePerPadA if tc == "A" else auto_LdsBlockSizePerPadB
 
         if not subCheckLdsBlockSizePerPad(tc, idx) and not state["UseGeneralizedNLCOne%s"%tc]:
-          if auto_LdsBlockSizePerPad_for_mix:
+          if auto_LdsBlockSizePerPad:
             printWarning("Padded address is inconisstent, set LdsBlockSizePerPad%s=0."%tc)
             state["LdsBlockSizePerPad%s"%tc] = 0
           else:
@@ -4121,12 +4119,12 @@ class Solution(collections.abc.Mapping):
     state["LdsPadA"], state["LdsPadB"], state["LdsPadMetadata"], state["LdsPadMXSA"], state["LdsPadMXSB"] = calcLdsPad(isaInfoMap)
 
     if state["GlobalReadVectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes() == 32 and state["LdsPadA"] == 16 // state["ProblemType"]["MacDataTypeA"].numBytes():
-      if auto_LdsBlockSizePerPadA_for_mix:
+      if auto_LdsBlockSizePerPadA:
         state["LdsBlockSizePerPadA"] = 128
     assert(state["LdsPadA"] >= 0)
 
     if state["GlobalReadVectorWidthB"] * state["ProblemType"]["MacDataTypeB"].numBytes() == 32 and state["LdsPadB"] == 16 // state["ProblemType"]["MacDataTypeB"].numBytes():
-      if auto_LdsBlockSizePerPadB_for_mix:
+      if auto_LdsBlockSizePerPadB:
         state["LdsBlockSizePerPadB"] = 128
     assert(state["LdsPadB"] >= 0)
 
@@ -4220,7 +4218,8 @@ class Solution(collections.abc.Mapping):
 
     # Half-wave configs need a +4-byte LDS base shift (see LdsPadding).
     halfBankShiftA = 0
-    if isa[:2] == (12, 5) and state.get("enableLDSTrA", False):
+    if isa[:2] == (12, 5) and state.get("enableLDSTrA", False) \
+       and auto_LdsPadA and auto_LdsBlockSizePerPadA:
       if state["ProblemType"]["MacDataTypeA"].numBytes() == 0.5:
         halfBankShiftA = get_fp4_mt_config(state["MacroTile0"], "shift",
                           state["MIWaveTile"][0], state["MIWaveGroup"][0])
@@ -4229,7 +4228,8 @@ class Solution(collections.abc.Mapping):
                           state["MIWaveTile"][0], state["MIWaveGroup"][0])
 
     halfBankShiftB = 0
-    if isa[:2] == (12, 5) and state.get("enableLDSTrB", False):
+    if isa[:2] == (12, 5) and state.get("enableLDSTrB", False) \
+       and auto_LdsPadB and auto_LdsBlockSizePerPadB:
       if state["ProblemType"]["MacDataTypeB"].numBytes() == 0.5:
         halfBankShiftB = get_fp4_mt_config(state["MacroTile1"], "shift",
                           state["MIWaveTile"][1], state["MIWaveGroup"][1])
