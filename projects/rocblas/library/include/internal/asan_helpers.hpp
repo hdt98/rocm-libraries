@@ -4,11 +4,7 @@
 #ifndef ROCBLAS_ASAN_HELPERS_HPP
 #define ROCBLAS_ASAN_HELPERS_HPP
 
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-inline constexpr bool rocblas_enable_asan = true;
-#else
 inline constexpr bool rocblas_enable_asan = false;
-#endif
 
 namespace rocblas
 {
