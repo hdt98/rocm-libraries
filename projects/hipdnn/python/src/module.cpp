@@ -36,8 +36,7 @@ NB_MODULE(hipdnn_frontend_python, m)
                 cPaths.push_back(path.c_str());
             }
 
-            const auto status
-                = hipdnnSetEnginePluginPaths_ext(cPaths.size(), cPaths.data(), mode);
+            const auto status = hipdnnSetEnginePluginPaths_ext(cPaths.size(), cPaths.data(), mode);
 
             if(status != HIPDNN_STATUS_SUCCESS)
             {

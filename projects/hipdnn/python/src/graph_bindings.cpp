@@ -33,8 +33,7 @@ void graphBindings(nb::module_& m)
             [](graph::Graph& g, const nb::object& handle) {
                 auto handlePtr = handle.attr("get")();
                 // NOLINTNEXTLINE(performance-no-int-to-ptr)
-                auto rawHandle
-                    = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
+                auto rawHandle = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
                 return g.build_operation_graph(rawHandle);
             },
             nb::arg("handle"),
@@ -81,8 +80,7 @@ void graphBindings(nb::module_& m)
                uintptr_t workspace) {
                 auto handlePtr = handle.attr("get")();
                 // NOLINTNEXTLINE(performance-no-int-to-ptr)
-                auto rawHandle
-                    = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
+                auto rawHandle = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
 
                 std::unordered_map<int64_t, void*> cppVariantPack;
                 for(const auto& [key, value] : variantPack)
@@ -166,8 +164,7 @@ void graphBindings(nb::module_& m)
             [](graph::Graph& g, const nb::object& handle, const std::string& jsonStr) {
                 auto handlePtr = handle.attr("get")();
                 // NOLINTNEXTLINE(performance-no-int-to-ptr)
-                auto rawHandle
-                    = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
+                auto rawHandle = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
                 return g.deserialize(rawHandle, jsonStr);
             },
             nb::arg("handle"),
@@ -197,8 +194,7 @@ void graphBindings(nb::module_& m)
             [](graph::Graph& g, const nb::object& handle, const nb::bytes& data) {
                 auto handlePtr = handle.attr("get")();
                 // NOLINTNEXTLINE(performance-no-int-to-ptr)
-                auto rawHandle
-                    = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
+                auto rawHandle = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
                 const auto* ptr = reinterpret_cast<const uint8_t*>(data.c_str());
                 const std::vector<uint8_t> vec(ptr, ptr + data.size());
                 return g.deserialize(rawHandle, vec);
