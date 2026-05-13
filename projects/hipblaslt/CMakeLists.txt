@@ -15,6 +15,12 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# ROCm libraries root (for shared/ctest and other shared resources)
+# Only set default when not already defined (e.g. by superproject / rocm-libraries).
+if(NOT DEFINED ROCM_LIBRARIES_ROOT)
+  set(ROCM_LIBRARIES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+endif()
+
 include(hipblaslt_shim)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -559,6 +565,17 @@ if(HIPBLASLT_ENABLE_CLIENT AND (HIPBLASLT_BUILD_TESTING OR BUILD_TESTING))
         DESTINATION "${CMAKE_INSTALL_BINDIR}"
         COMPONENT tests
     )
+
+    # Install CTestTestfile.cmake to bin/hipblaslt/ for TheRock (relocatable tests; run ctest from that dir)
+    if(HIPBLASLT_CTEST_INSTALL_FILE)
+        install(
+            FILES "${HIPBLASLT_CTEST_INSTALL_FILE}"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}/hipblaslt"
+            COMPONENT tests
+            RENAME "CTestTestfile.cmake"
+        )
+    endif()
+
     rocm_package_setup_client_component(tests
         DEPENDS
         COMPONENT clients-common
