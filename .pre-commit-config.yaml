@@ -26,7 +26,6 @@ exclude: |
     projects/hipsparse/.*|
     projects/hipsparselt/.*|
     projects/hiptensor/.*|
-    projects/miopen/.*|
     projects/rocblas/.*|
     projects/rocfft/.*|
     projects/rocprim/.*|
@@ -63,6 +62,7 @@ repos:
         exclude: |
           (?x)
           ^projects/hipdnn/\.clang-format$|
+          ^projects/miopen/\.clang-format$|
           ^dnn-providers/miopen-provider/\.clang-format$|
           ^dnn-providers/hipblaslt-provider/\.clang-format$|
           ^dnn-providers/hip-kernel-provider/\.clang-format$|
