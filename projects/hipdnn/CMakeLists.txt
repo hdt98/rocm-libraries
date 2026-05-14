@@ -8,8 +8,8 @@ set(HIPDNN_SPDLOG_VERSION "1.15.3" CACHE STRING "Version of spdlog to use")
 set(HIPDNN_FLATBUFFERS_VERSION "25.9.23" CACHE STRING "Version of flatbuffers to use")
 set(HIPDNN_NLOHMANN_JSON_VERSION "3.12.0" CACHE STRING "Version of nlohmann_json to use")
 set(HIPDNN_GTEST_VERSION "1.16.0" CACHE STRING "Version of googletest to use")
-set(HIPDNN_NANOBIND_VERSION "2.4.0" CACHE STRING "Version of nanobind to use")
-set(HIPDNN_TSL_ROBIN_MAP_VERSION "1.3.0" CACHE STRING "Version of tsl-robin-map to use")
+set(HIPDNN_NANOBIND_VERSION "2.12.0" CACHE STRING "Version of nanobind to use")
+set(HIPDNN_TSL_ROBIN_MAP_VERSION "1.4.1" CACHE STRING "Version of tsl-robin-map to use")
 
 option(HIPDNN_SKIP_JSON_LIB "Defines whether SDK public headers should not include nlohmann/json.hpp." OFF)
 
