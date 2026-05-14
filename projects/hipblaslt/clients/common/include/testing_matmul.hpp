@@ -2678,11 +2678,13 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            // Scale-format takes precedence (it can pin kGFX950); otherwise on
-            // gfx1250 use the dimk swizzle.
-            MXScaleLayout scaleLayoutA = mxScaleLayoutForFormat(arg.scaleA);
-            if(scaleLayoutA == MXScaleLayout::kNone && isGfx1250Arch)
-                scaleLayoutA = MXScaleLayout::kGFX1250;
+            // Block_32_UE8M0_32_8_EXT pins the gfx950 swizzle; otherwise on
+            // gfx1250 use the dimk swizzle; everything else stays canonical.
+            MXScaleLayout const scaleLayoutA
+                = (arg.scaleA == hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT)
+                      ? MXScaleLayout::kGFX950
+                  : isGfx1250Arch ? MXScaleLayout::kGFX1250
+                                  : MXScaleLayout::kNone;
             size_t dataBatchBytesA  = (num_batches[i] > 1) ? elementsToBytes(stride_a[i], TiA) : 0;
             size_t scaleBatchBytesA = (num_batches[i] > 1) ? size_scaleAVec[i] : 0;
             std::vector<float> refAAll;
@@ -2782,9 +2784,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            MXScaleLayout scaleLayoutB = mxScaleLayoutForFormat(arg.scaleB);
-            if(scaleLayoutB == MXScaleLayout::kNone && isGfx1250Arch)
-                scaleLayoutB = MXScaleLayout::kGFX1250;
+            MXScaleLayout const scaleLayoutB
+                = (arg.scaleB == hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT)
+                      ? MXScaleLayout::kGFX950
+                  : isGfx1250Arch ? MXScaleLayout::kGFX1250
+                                  : MXScaleLayout::kNone;
             size_t             dataBatchBytesB    = (num_batches[i] > 1)
                                                         ? elementsToBytes(stride_b[i], TiB)
                                                         : 0;

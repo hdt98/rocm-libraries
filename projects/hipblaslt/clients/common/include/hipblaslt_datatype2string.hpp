@@ -130,27 +130,6 @@ inline int blockSize(hipblaslt_scaling_format s)
     }
 }
 
-#if HIPBLASLT_ENABLE_MXDATAGENERATOR
-#include "mxDataGen.hpp"
-
-// Map a hipblaslt scale format to the architecture-flavoured scale memory
-// layout `generateMXInput` should produce. The format itself only pins
-// `kGFX950` (UE8M0_32_8_EXT); for formats that don't fix a layout, callers
-// may upgrade `kNone` to `kGFX1250` based on the live device's gcnArchName,
-// since the kernel for a given problem only supports one layout per
-// architecture.
-inline MXScaleLayout mxScaleLayoutForFormat(hipblaslt_scaling_format s)
-{
-    switch(s)
-    {
-    case hipblaslt_scaling_format::Block_32_UE8M0_32_8_EXT:
-        return MXScaleLayout::kGFX950;
-    default:
-        return MXScaleLayout::kNone;
-    }
-}
-#endif
-
 // Compute scale buffer size with padding for block-scaled MX formats.
 // dataRow, dataCol are the raw data matrix dimensions (A_row/A_col or B_row/B_col).
 // Scale dimensions are padded to ensure kernels that process data in 32-element (M/N)
