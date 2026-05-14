@@ -32,11 +32,11 @@ The skill is **near-autonomous**: it derives what it can, prompts you only when 
 
 ## Three Decisions Before You Run the Agent
 
-1. **cuDNN equivalent** — does this op have one? If yes, record the cuDNN backend descriptor identifier (e.g., `CUDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR`) and the cuDNN attribute names. Find them in the open-source [`cudnn-frontend`](https://github.com/NVIDIA/cudnn-frontend) under `include/cudnn_frontend/node/<op>.h` and the attributes class it references. The agent uses these to decide where to apply the `_EXT` suffix; if you're unsure, the agent will look them up itself and ask you to confirm. See [cuDNN Parity Rules](#cudnn-parity-rules) for the full rule.
-2. **Mode enum members** — if the op has discrete modes (e.g., reduction op type, pointwise kind), enumerate them. The agent emits them automatically.
-3. **Semantic deviations from cuDNN** — extra inputs, different output-shape rules, hipDNN-only behavior. These become comments in code; non-trivial divergences warrant an RFC under [`docs/rfcs/`](./rfcs/).
+1. **FBS schema** — decide whether to write the schema yourself or let the agent construct it. If you have a schema or a written description of one, point the agent at it. Otherwise, leave it to the agent: it derives the schema from the cudnn-frontend source and asks you to confirm before continuing.
+2. **Mode enum members** — if the op has discrete modes (e.g., reduction op type, pointwise kind), list the members you want. The agent uses them to populate the `enum_def` block in the YAML config.
+3. **Semantic deviations from cuDNN** — extra inputs, different output-shape rules, hipDNN-only behavior. These become comments in the generated code.
 
-You do **not** need to author the FBS schema yourself — the agent constructs it from these decisions and asks you to confirm before continuing.
+The agent handles cuDNN naming parity (`_EXT` decisions) automatically and will prompt you if it cannot determine the cuDNN equivalent. See [cuDNN Parity Rules](#cudnn-parity-rules) for details.
 
 ## Run `/hipdnn-codegen`
 
@@ -100,7 +100,6 @@ Copy-paste this into your PR description.
 - [ ] ASAN build (`cmake -DBUILD_ADDRESS_SANITIZER=ON ..` + `ninja check`) clean
 - [ ] No clang-tidy errors, no compiler warnings
 - [ ] Test coverage ≥80% (no regression)
-- [ ] If the op is large or controversial, RFC filed in `docs/rfcs/`
 ```
 
 ---
@@ -162,8 +161,7 @@ operation_type_enum: "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT"      # hipD
 
 ### Recording Deviations
 
-- A `_EXT` suffix is itself the marker for "not in cuDNN". A short comment is sufficient for trivial deviations.
-- For non-trivial divergences (semantic differences, extra inputs, output-shape differences), file an RFC under [`docs/rfcs/`](./rfcs/) before merging.
+A `_EXT` suffix is itself the marker for "not in cuDNN". Add a short comment in the descriptor or schema for any non-obvious semantic difference.
 
 ---
 
