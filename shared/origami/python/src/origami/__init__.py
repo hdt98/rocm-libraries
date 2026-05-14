@@ -147,3 +147,9 @@ except ImportError:
     # work without the dedicated Python selector
     pass
 
+try:
+    from .origami import ml_recommender
+    __all__.append("ml_recommender")
+except ImportError:
+    pass
+

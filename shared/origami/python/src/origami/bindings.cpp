@@ -10,6 +10,7 @@
 #include <nanobind/stl/vector.h>
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
+#include "origami/ml_recommender.hpp"
 #include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
@@ -84,6 +85,7 @@ NB_MODULE(origami, m) {
   nanobind::enum_<origami::prediction_modes_t>(m, "prediction_modes_t")
       .value("estimation", origami::prediction_modes_t::estimation)
       .value("simulation", origami::prediction_modes_t::simulation)
+      .value("ml_recommender", origami::prediction_modes_t::ml_recommender)
       .export_values();
 
   // Add new struct bindings
@@ -424,4 +426,32 @@ NB_MODULE(origami, m) {
         return origami::compute_timestep_latency(problem, hardware, config, context);
       },
       "Compute latency per K-complete MT wave (auto-creates context)");
+
+  m.def("compute_number_of_output_tiles",
+        &origami::streamk::compute_number_of_output_tiles,
+        "Compute number of output tiles");
+
+  auto ml = m.def_submodule("ml_recommender",
+                            "Per-cluster two-tower ML GEMM tile prediction");
+
+  ml.def("load_weights",
+         &origami::ml_recommender::load_weights,
+         nanobind::arg("bin_path"));
+
+  ml.def("weights_loaded",
+         &origami::ml_recommender::weights_loaded);
+
+  ml.def("rank_configs",
+         &origami::ml_recommender::rank_configs,
+         nanobind::arg("problem"),
+         nanobind::arg("hardware"),
+         nanobind::arg("configs"));
+
+  ml.def("route_cluster_for_problem",
+         &origami::ml_recommender::route_cluster_for_problem,
+         nanobind::arg("problem"));
+
+  ml.def("cluster_uses_ml",
+         &origami::ml_recommender::cluster_uses_ml,
+         nanobind::arg("cluster_id"));
 }
