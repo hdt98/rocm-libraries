@@ -472,7 +472,7 @@ There are two classes of question the agent is expected to ask the user. Everyth
   - e.g., "stride and dilation must be > 0"
   - Default: leave with just the standard null/dim checks
 
-Do NOT ask the user about any other fields or decisions.
+Do NOT ask the user about any other fields or decisions — derive everything else from the schema, existing code, and conventions.
 
 ### 12. Verify Generated Integration Tests
 
@@ -538,7 +538,7 @@ Summarize what was generated and placed:
 - Confirm build passed and tests passed
 - **List the hand-authored pieces still required** (out of scope for this skill):
   - JSON serialization helper at `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/<Op>Attributes.hpp` (template: `ConvolutionFwdAttributes.hpp`)
-  - Python bindings (only if the op is on the curated Python surface — see [`AddingNewOperations.md`](../../../../../docs/AddingNewOperations.md#python-bindings-optional))
+  - Python bindings (only if the op is on the curated Python surface — see [`AddingNewOperations.md`](../../../../../docs/AddingNewOperations.md#json-utilities-and-python-bindings))
   - End-user sample under `samples/<op>/`
 - If anything failed and could not be fixed, explain what and why
 
