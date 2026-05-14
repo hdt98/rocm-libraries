@@ -25,18 +25,22 @@ from .population import Individual, Population, IndividualSet, ExceedsCapacity
 from typing import Callable, Union
 
 import os
-import sys
 import math
 import numpy as np
 import joblib
 import contextlib
 import tqdm
 
-# Use threading backend during pytest to avoid nested multiprocessing conflicts
-# with pytest-xdist parallel execution. Multiprocessing/loky can cause semaphore
-# file errors when temp directories are cleaned up during test runs.
-# In production (non-test), multiprocessing provides better performance.
-JOBLIB_BACKEND = "threading" if "pytest" in sys.modules else "multiprocessing"
+# xdist workers are already parallel processes. Keep inner GA sampling serial to
+# avoid nested parallel execution issues (state/process inheritance failures).
+IS_XDIST_WORKER = bool(os.environ.get("PYTEST_XDIST_WORKER"))
+
+if IS_XDIST_WORKER:
+    JOBLIB_BACKEND = "threading"
+    JOBLIB_N_JOBS_OVERRIDE = 1
+else:
+    JOBLIB_BACKEND = "multiprocessing"
+    JOBLIB_N_JOBS_OVERRIDE = None
 
 
 class MaxIterationsReached(Exception):
@@ -114,7 +118,10 @@ class SearchSpace:
 
         p = p if p else {}
         it, max_iters = 0, self.max_iters * size * iter_mul
-        n_jobs = os.cpu_count() // 12
+
+        n_jobs = max((os.cpu_count() or 1) // 12, 1)
+        if JOBLIB_N_JOBS_OVERRIDE is not None:
+            n_jobs = JOBLIB_N_JOBS_OVERRIDE
         
         if reuse and self.cache:
             pop = IndividualSet(self.cache, capacity=max(size, len(self.cache)))
