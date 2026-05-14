@@ -237,6 +237,7 @@ if(NOT BZIP2_FOUND)
         "${bzip2_BINARY_DIR}-wrapper"
         SYSTEM
     )
+    target_compile_options(miopen_bz2 PRIVATE -w)
 endif()
 
 # -----------------------------------------------------------------------------
@@ -261,6 +262,7 @@ if(NOT SQLite3_FOUND)
         "${sqlite3_BINARY_DIR}-wrapper"
         SYSTEM
     )
+    target_compile_options(miopen_sqlite3 PRIVATE -w)
 endif()
 
 # -----------------------------------------------------------------------------
@@ -286,6 +288,12 @@ if(NOT GTest_FOUND)
     _miopen_restore_rocm_toolchain_checks()
     set(BUILD_SHARED_LIBS ${_miopen_saved_BUILD_SHARED_LIBS})
     unset(_miopen_saved_BUILD_SHARED_LIBS)
+
+    foreach(_tgt gtest gtest_main gmock gmock_main)
+        if(TARGET ${_tgt})
+            target_compile_options(${_tgt} PRIVATE -w)
+        endif()
+    endforeach()
 
     # Some of MIOpen's existing find_package consumers expect GTest::gtest /
     # GTest::gtest_main aliases (the names FindGTest creates). googletest's own
