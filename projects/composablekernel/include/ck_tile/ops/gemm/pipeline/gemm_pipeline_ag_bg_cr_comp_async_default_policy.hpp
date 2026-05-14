@@ -53,45 +53,83 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
         !is_a_load_tr<Problem> && !is_b_load_tr<Problem> &&
         IsSupportedXorSwizzleDataType<Problem> && IsSupportedXorSwizzleAsyncWidth<Problem>;
 
-    // Get number of LDS read accesses by warp GEMM
-    template <typename Problem>
-    CK_TILE_HOST_DEVICE static constexpr auto GetWGAttrNumAccess()
+    // Compute the number of LDS read accesses for A or B
+    // IsLoadTr=true if ds_read_tr is used
+    template <bool IsLoadTr, typename DataType, index_t ThreadElements>
+    CK_TILE_HOST_DEVICE static constexpr auto CalculateWGAttrNumAccess()
     {
-        using WarpTile = typename Problem::BlockGemmShape::WarpTile;
-
-        constexpr index_t vector_size =
-            DS_READ_TR_SIZE() / sizeof(typename Problem::ComputeDataType);
-        constexpr index_t thread_elements = WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
-
-        if constexpr(!(is_a_load_tr<Problem> || is_b_load_tr<Problem>))
+        if constexpr(IsLoadTr)
         {
-            // Non-transpose load path uses regular ds_read,
-            // which always maps to a single warp-GEMM attribute access
-            return WGAttrNumAccessEnum::Single;
-        }
-        else if constexpr(vector_size == thread_elements)
-        {
-            // 1 ds_read_tr instruction needed
-            return WGAttrNumAccessEnum::Single;
-        }
-        else if constexpr(vector_size * 2 == thread_elements)
-        {
-            // 2 ds_read_tr instructions needed
-            return WGAttrNumAccessEnum::Double;
-        }
-        else if constexpr(vector_size * 4 == thread_elements)
-        {
-            // 4 ds_read_tr instructions needed
-            return WGAttrNumAccessEnum::Quad;
+            // Transpose-load path: ds_read_tr reads DS_READ_TR_SIZE bytes per instruction.
+            constexpr index_t vector_size =
+                DS_READ_TR_SIZE() / sizeof(DataType) * numeric_traits<DataType>::PackedSize;
+            if constexpr(vector_size == ThreadElements)
+                return WGAttrNumAccessEnum::Single;
+            else if constexpr(vector_size * 2 == ThreadElements)
+                return WGAttrNumAccessEnum::Double;
+            else if constexpr(vector_size * 4 == ThreadElements)
+                return WGAttrNumAccessEnum::Quad;
+            else
+                return WGAttrNumAccessEnum::Invalid;
         }
         else
         {
-            // Unsupported ds_read_tr access pattern
-            return WGAttrNumAccessEnum::Invalid;
+            // Non-transpose path: ds_read_b128 reads 16 bytes per instruction
+            constexpr index_t bytes_per_lane =
+                sizeof(DataType) * ThreadElements / numeric_traits<DataType>::PackedSize;
+            constexpr index_t ds_read_b128_width = 16;
+            if constexpr(bytes_per_lane <= ds_read_b128_width)
+                return WGAttrNumAccessEnum::Single;
+            else if constexpr(bytes_per_lane <= ds_read_b128_width * 2)
+                return WGAttrNumAccessEnum::Double;
+            else if constexpr(bytes_per_lane <= ds_read_b128_width * 4)
+                return WGAttrNumAccessEnum::Quad;
+            else
+                return WGAttrNumAccessEnum::Invalid;
         }
     }
 
-    template <typename Problem, index_t MNPerBlock, index_t WarpTileMN, index_t K2>
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetAWGAttrNumAccess()
+    {
+        using WarpTile                    = typename Problem::BlockGemmShape::WarpTile;
+        constexpr index_t thread_elements = WarpTile::at(I0) * WarpTile::at(I2) / get_warp_size();
+        return CalculateWGAttrNumAccess<is_a_load_tr<Problem>,
+                                        typename Problem::ADataType,
+                                        thread_elements>();
+    }
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetBWGAttrNumAccess()
+    {
+        using WarpTile                    = typename Problem::BlockGemmShape::WarpTile;
+        constexpr index_t thread_elements = WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
+        return CalculateWGAttrNumAccess<is_b_load_tr<Problem>,
+                                        typename Problem::BDataType,
+                                        thread_elements>();
+    }
+
+    // Get number of accesses
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetWGAttrNumAccess()
+    {
+        constexpr auto num_access_a = GetAWGAttrNumAccess<Problem>();
+        constexpr auto num_access_b = GetBWGAttrNumAccess<Problem>();
+
+        if constexpr(num_access_a == WGAttrNumAccessEnum::Invalid ||
+                     num_access_b == WGAttrNumAccessEnum::Invalid)
+            return WGAttrNumAccessEnum::Invalid;
+        else if constexpr(static_cast<index_t>(num_access_a) >= static_cast<index_t>(num_access_b))
+            return num_access_a;
+        else
+            return num_access_b;
+    }
+
+    template <typename Problem,
+              index_t MNPerBlock,
+              index_t WarpTileMN,
+              index_t K2,
+              WGAttrNumAccessEnum WGAttrNumAccess>
     CK_TILE_HOST_DEVICE static constexpr auto MakeXorSwizzledABLdsBlockDescriptor()
     {
         using BlockGemmShape = typename Problem::BlockGemmShape;
@@ -106,13 +144,12 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
 
         constexpr index_t warp_size            = get_warp_size();
         constexpr index_t warp_num             = BlockSize / warp_size;
-        constexpr auto wg_attr_num_access      = GetWGAttrNumAccess<Problem>();
-        constexpr index_t wg_attr_num_access_v = static_cast<index_t>(wg_attr_num_access);
+        constexpr index_t wg_attr_num_access_v = static_cast<index_t>(WGAttrNumAccess);
 
         static_assert(warp_num * warp_size == BlockSize, "Wrong!");
         static_assert(KWarps * K0 * K1 * K2 == KPerBlock, "Wrong!");
-        static_assert(wg_attr_num_access == WGAttrNumAccessEnum::Single,
-                      "XOR swizzle currently supports only the normal non-ds_read_tr path");
+        static_assert(WGAttrNumAccess != WGAttrNumAccessEnum::Invalid,
+                      "XOR swizzle: unsupported LDS read access count for this configuration");
 
         constexpr index_t M4 = warp_size / wg_attr_num_access_v / K1;
         constexpr index_t M3 = wg_attr_num_access_v;
@@ -122,19 +159,21 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
 
         static_assert(M1 * M0 * M2 * M3 * M4 == MNPerBlock, "Wrong!");
 
-        constexpr auto desc_0 =
-            make_naive_tensor_descriptor(number_tuple<M2, KWarps, M1, M0, K0, M3, M4, K1, K2>{},
-                                         number_tuple<KWarps * M1 * M0 * K0 * M3 * M4 * K1 * K2,
-                                                      M1 * M0 * K0 * M3 * M4 * K1 * K2,
-                                                      M0 * K0 * M3 * M4 * K1 * K2,
-                                                      K0 * M3 * M4 * K1 * K2,
-                                                      M3 * M4 * K1 * K2,
-                                                      M4 * K1 * K2,
-                                                      K1 * K2,
-                                                      K2,
-                                                      1>{},
-                                         number<K2>{},
-                                         number<1>{});
+        constexpr index_t PadSize = 16;
+
+        constexpr auto desc_0 = make_naive_tensor_descriptor(
+            number_tuple<M2, KWarps, M1, M0, K0, M3, M4, K1, K2>{},
+            number_tuple<KWarps * M1 * M0 * K0 * M3 * M4 * K1 * K2 + PadSize,
+                         M1 * M0 * K0 * M3 * M4 * K1 * K2,
+                         M0 * K0 * M3 * M4 * K1 * K2,
+                         K0 * M3 * M4 * K1 * K2,
+                         M3 * M4 * K1 * K2,
+                         M4 * K1 * K2,
+                         K1 * K2,
+                         K2,
+                         1>{},
+            number<K2>{},
+            number<1>{});
 
         constexpr auto desc_1 = transform_tensor_descriptor(
             desc_0,
@@ -199,12 +238,14 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
             {
                 using WarpTile          = typename Problem::BlockGemmShape::WarpTile;
                 constexpr index_t KPack = GetSmemPackA<Problem>();
-                constexpr auto desc     = MakeXorSwizzledABLdsBlockDescriptor<Problem,
-                                                                              MPerBlock,
-                                                                              WarpTile::at(I0),
-                                                                              KPack>();
-                static_assert(desc.get_element_space_size() == MPerBlock * KPerBlock,
-                              "XOR swizzle must not change A LDS allocation size");
+                constexpr auto desc =
+                    MakeXorSwizzledABLdsBlockDescriptor<Problem,
+                                                        MPerBlock,
+                                                        WarpTile::at(I0),
+                                                        KPack,
+                                                        GetWGAttrNumAccess<Problem>()>();
+                static_assert(desc.get_element_space_size() >= MPerBlock * KPerBlock,
+                              "XOR swizzle LDS allocation must cover the A tile");
                 return desc;
             }
             else
@@ -255,12 +296,14 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
             {
                 using WarpTile          = typename Problem::BlockGemmShape::WarpTile;
                 constexpr index_t KPack = GetSmemPackB<Problem>();
-                constexpr auto desc     = MakeXorSwizzledABLdsBlockDescriptor<Problem,
-                                                                              NPerBlock,
-                                                                              WarpTile::at(I1),
-                                                                              KPack>();
-                static_assert(desc.get_element_space_size() == NPerBlock * KPerBlock,
-                              "XOR swizzle must not change B LDS allocation size");
+                constexpr auto desc =
+                    MakeXorSwizzledABLdsBlockDescriptor<Problem,
+                                                        NPerBlock,
+                                                        WarpTile::at(I1),
+                                                        KPack,
+                                                        GetWGAttrNumAccess<Problem>()>();
+                static_assert(desc.get_element_space_size() >= NPerBlock * KPerBlock,
+                              "XOR swizzle LDS allocation must cover the B tile");
                 return desc;
             }
             else
@@ -285,7 +328,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
 #endif
     }
 
-    template <typename Problem, index_t K2, typename Window>
+    template <typename Problem, index_t K2, WGAttrNumAccessEnum WGAttrNumAccess, typename Window>
     CK_TILE_DEVICE static constexpr auto MakeAsyncLoadABDramWindow(const Window& window)
     {
         using BlockGemmShape = typename Problem::BlockGemmShape;
@@ -301,11 +344,12 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
 
         static_assert(K1 * K2 == WarpTile::at(I2), "Wrong!");
         static_assert(KPerBlock % (KWarps * K1 * K2) == 0, "Wrong!");
-        static_assert(GetWGAttrNumAccess<Problem>() == WGAttrNumAccessEnum::Single,
-                      "XOR swizzle currently supports only the normal non-ds_read_tr path");
 
-        constexpr index_t M4 = get_warp_size() / K1;
-        static_assert(M4 * K1 == get_warp_size(), "Wrong!");
+        constexpr index_t wg_attr_num_access_v = static_cast<index_t>(WGAttrNumAccess);
+
+        constexpr index_t M4 = get_warp_size() / wg_attr_num_access_v / K1;
+        static_assert(get_warp_size() % (wg_attr_num_access_v * K1) == 0,
+                      "warp_size must be divisible by (wg_attr_num_access_v * K1)");
 
         auto&& tensor_view      = window.get_bottom_tensor_view();
         const auto [rows, cols] = tensor_view.get_tensor_descriptor().get_lengths();
@@ -353,7 +397,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
         if constexpr(UseXorSwizzle<Problem>)
         {
             constexpr index_t KPack = GetSmemPackA<Problem>();
-            return MakeAsyncLoadABDramWindow<Problem, KPack>(window);
+            return MakeAsyncLoadABDramWindow<Problem, KPack, GetWGAttrNumAccess<Problem>()>(window);
         }
         else
         {
@@ -369,7 +413,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
         if constexpr(UseXorSwizzle<Problem>)
         {
             constexpr index_t KPack = GetSmemPackB<Problem>();
-            return MakeAsyncLoadABDramWindow<Problem, KPack>(window);
+            return MakeAsyncLoadABDramWindow<Problem, KPack, GetWGAttrNumAccess<Problem>()>(window);
         }
         else
         {
