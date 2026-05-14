@@ -286,4 +286,13 @@ typedef enum
      */
     HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR = 31,
 
+    /**
+     * @brief Profiling control descriptor (extension)
+     *
+     * Manages GPU timing via HIP events for autotuning workloads.
+     * Allows recording start/stop events on a stream extracted from
+     * a handle, synchronizing, and reading elapsed time.
+     */
+    HIPDNN_BACKEND_PROFILING_CONTROL_EXT = 32,
+
 } hipdnnBackendDescriptorType_t;
