@@ -83,7 +83,6 @@ struct GemmPipelineAgBgCrImplBase
         move_tile_window(dram_tile_window, dram_tile_window_step);
     }
 
-<<<<<<< HEAD
     template <typename TDMConfig_,
               typename DstBlockWindow,
               typename SrcTileWindow,
@@ -106,7 +105,6 @@ struct GemmPipelineAgBgCrImplBase
         load_tile_tdm(tdm_config, dst_block_window, dram_tile_window);
     }
 
-=======
     // Store a tile to LDS. Applies an optional element-wise function first.
     //
     // PERFORMANCE NOTE: When `lds_tile_window` is a tile_window_with_static_lengths (bare
@@ -118,7 +116,6 @@ struct GemmPipelineAgBgCrImplBase
     //
     // When `lds_tile_window` is already a tile_window_with_static_distribution, the fast
     // path is used automatically (no reconstruction).
->>>>>>> 651bf871f8 ([CK_TILE] Pre-compute LDS store window coordinates in CompV3 pipeline)
     template <typename DstTileWindow, typename SrcBlockTile, typename ElementFunction>
     CK_TILE_DEVICE void LocalPrefill(DstTileWindow& lds_tile_window,
                                      const SrcBlockTile& src_block_tile,
