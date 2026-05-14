@@ -163,15 +163,15 @@ rocblas_status rocsolver_gesv_outofplace_template(rocblas_handle handle,
     rocsolver_workspace_helper* getrs_work = work_helper->get_nested("getrs");
 
     // constants in host memory
-    const rocblas_int copyblocksx = (n - 1) / 32 + 1;
-    const rocblas_int copyblocksy = (nrhs - 1) / 32 + 1;
+    const rocblas_int copyblocksx = (n - 1) / BS2 + 1;
+    const rocblas_int copyblocksy = (nrhs - 1) / BS2 + 1;
 
     // compute LU factorization of A
     rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0,
                                                   strideP, info, batch_count, getrf_work, true);
 
     // copy B to X
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(BS2, BS2),
                             0, stream, n, nrhs, B, shiftB, ldb, strideB, X, shiftX, ldx, strideX);
 
     // solve AX = B

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -14,6 +14,10 @@
 #include "ck_tile/core/utility/env.hpp"
 #include "ck_tile/ops/gemm/kernel/universal_gemm_kernel.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck_tile {
 
@@ -168,3 +172,5 @@ struct GemmKernel
     }
 };
 } // namespace ck_tile
+
+#pragma clang diagnostic pop

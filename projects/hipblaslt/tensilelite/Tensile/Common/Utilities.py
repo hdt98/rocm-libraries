@@ -34,6 +34,7 @@ from copy import deepcopy
 from enum import Enum
 from math import log
 from pathlib import Path
+from typing import Sequence, Tuple, Optional
 
 from Tensile import __version__
 
@@ -369,3 +370,46 @@ def ceilDivide(numerator, denominator):
 
 def roundUpToNearestMultiple(numerator, denominator):
     return ceilDivide(numerator,denominator)*int(denominator)
+
+# Given a divisor, this routine computes the corresponding multiplicative constant
+# and required post shifts.
+#
+# Algorithm based on: https://dl.acm.org/doi/pdf/10.1145/178243.178249
+#
+# Inputs:
+#   d: divisor
+#   N: Number of bits integers are represented in
+#   p: precision in bits (usually N = P)
+#
+# Output:
+#   mhigh: multiplicative constant
+#   shPost: amount to right shift after multiplication
+def choose_multiplier(d, N, p):
+    l = int(math.ceil(math.log(d, 2)))
+    shPost = l
+    mlow = 2**(N+l) // d
+    mhigh = (2**(N+l) + 2 ** (N + l - p )) // d
+    while ((mlow // 2) < (mhigh // 2)) and shPost > 0:
+        mlow //= 2
+        mhigh //= 2
+        shPost -=1
+    return mhigh, shPost, l
+
+def wmmaV3InputVgprLayout(wmma: Sequence[int], dtypeBitWidth: Optional[int] = None) -> Tuple[int]:
+    # wmmaV3InputVgprLayout: (numReadsUnroll, numVecTile, numVecUnroll, NumElementPerRead)
+    wmma = tuple(wmma)
+    if wmma == (16, 16, 4, 1):
+        return (1, 16, 2, 2)
+    elif wmma == (16, 16, 32, 1):
+        return (2, 16, 2, 8)
+    elif wmma == (16, 16, 64, 1):
+        return (2, 16, 2, 16)
+    elif wmma == (16, 16, 128, 1) or wmma == (32, 16, 128, 1):
+        assert dtypeBitWidth
+        if dtypeBitWidth == 8:
+            return (4, 16, 2, 16)
+        if dtypeBitWidth == 4 or dtypeBitWidth == 6:
+            return (2, 16, 2, 32)
+        assert False, f"Unsupported datatype bitwidth: {dtypeBitWidth}"
+    else:
+        assert False, f"Unhandled WMMA: {wmma}"

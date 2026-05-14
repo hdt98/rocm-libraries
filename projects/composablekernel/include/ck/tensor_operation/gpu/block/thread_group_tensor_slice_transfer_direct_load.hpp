@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -140,19 +140,9 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
                       "Direct load transfer does not support datatypes conversion. Source and "
                       "destination data types must be the same.");
 
-        static_assert(
-            DstVectorDim == nDim - 1,
-            "Direct load transfer requires the destination vector dimension to be the last one.");
-
         static_assert(ScalarPerVector == 1 || SrcVectorDim == DstVectorDim,
                       "When loading more than one element per thread at once, the contiguous "
                       "dimension must be the same between source and destination.");
-
-        // constexpr auto dword_bytes           = 4;
-        // constexpr auto bytes_per_thread_load = ScalarPerVector * sizeof(SrcData);
-        // static_assert(bytes_per_thread_load == dword_bytes,
-        //               "Direct load transfer requires each thread to load exactly a single "
-        //               "DWORD of data.");
 
         static_assert(nDim == remove_cvref_t<SrcDesc>::GetNumOfDimension() &&
                           nDim == remove_cvref_t<DstDesc>::GetNumOfDimension() &&

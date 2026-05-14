@@ -32,6 +32,10 @@
 #include <Tensile/ContractionProblemPredicates.hpp>
 #include <Tensile/Predicates.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace TensileLite
 {
     namespace Serialization
@@ -58,6 +62,8 @@ namespace TensileLite
                 SubclassMap rv(
                     {Base::template Pair<Predicates::Contraction::Free0SizeMultiple>(),
                      Base::template Pair<Predicates::Contraction::Free1SizeMultiple>(),
+                     Base::template Pair<Predicates::Contraction::Free1SizeDivByValueLowbitGT1>(),
+                     Base::template Pair<Predicates::Contraction::KRingShiftTailWrapOnly>(),
                      Base::template Pair<Predicates::Contraction::BatchSizeMultiple>(),
                      Base::template Pair<Predicates::Contraction::BatchSizeEqual>(),
                      Base::template Pair<Predicates::Contraction::SynchronizerSizeCheck>(),
@@ -105,6 +111,8 @@ namespace TensileLite
                      Base::template Pair<Predicates::Contraction::EqualityMatching>(),
                      Base::template Pair<Predicates::Contraction::RangeMatching>(),
                      Base::template Pair<Predicates::Contraction::FreeSizeMatching>(),
+                     Base::template Pair<Predicates::Contraction::PredictionMatching>(),
+                     Base::template Pair<Predicates::Contraction::GridBasedMatching>(),
                      Base::template Pair<Predicates::Contraction::UseGradientEqual>(),
                      Base::template Pair<Predicates::Contraction::ActivationCheck>(),
                      Base::template Pair<Predicates::Contraction::ActivationComputeTypeEqual>(),
@@ -124,7 +132,11 @@ namespace TensileLite
                      Base::template Pair<Predicates::Contraction::SupportDeviceUserArguments>(),
                      Base::template Pair<Predicates::Contraction::WorkgroupMappingXCCCheck>(),
                      Base::template Pair<Predicates::Contraction::SwizzleTensorA>(),
-                     Base::template Pair<Predicates::Contraction::SwizzleTensorB>()});
+                     Base::template Pair<Predicates::Contraction::SwizzleTensorB>(),
+                     Base::template Pair<Predicates::Contraction::MXBlockA>(),
+                     Base::template Pair<Predicates::Contraction::MXBlockB>(),
+                     Base::template Pair<Predicates::Contraction::DataTypeMXSA>(),
+                     Base::template Pair<Predicates::Contraction::DataTypeMXSB>()});
 
                 auto gmap = Generic::GetSubclasses();
                 rv.insert(gmap.begin(), gmap.end());
@@ -151,6 +163,18 @@ namespace TensileLite
         template <typename IO>
         struct MappingTraits<Predicates::Contraction::Free1SizeMultiple, IO>
             : public AutoMappingTraits<Predicates::Contraction::Free1SizeMultiple, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::Free1SizeDivByValueLowbitGT1, IO>
+            : public AutoMappingTraits<Predicates::Contraction::Free1SizeDivByValueLowbitGT1, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::KRingShiftTailWrapOnly, IO>
+            : public AutoMappingTraits<Predicates::Contraction::KRingShiftTailWrapOnly, IO>
         {
         };
 
@@ -419,6 +443,18 @@ namespace TensileLite
         };
 
         template <typename IO>
+        struct MappingTraits<Predicates::Contraction::PredictionMatching, IO>
+            : public AutoMappingTraits<Predicates::Contraction::PredictionMatching, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::GridBasedMatching, IO>
+            : public AutoMappingTraits<Predicates::Contraction::GridBasedMatching, IO>
+        {
+        };
+
+        template <typename IO>
         struct MappingTraits<Predicates::Contraction::UseGradientEqual, IO>
             : public AutoMappingTraits<Predicates::Contraction::UseGradientEqual, IO>
         {
@@ -550,5 +586,27 @@ namespace TensileLite
             : public AutoMappingTraits<Predicates::Contraction::WorkgroupMappingXCCCheck, IO>
         {
         };
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::MXBlockA, IO>
+            : public AutoMappingTraits<Predicates::Contraction::MXBlockA, IO>
+        {
+        };
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::MXBlockB, IO>
+            : public AutoMappingTraits<Predicates::Contraction::MXBlockB, IO>
+        {
+        };
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::DataTypeMXSA, IO>
+            : public AutoMappingTraits<Predicates::Contraction::DataTypeMXSA, IO>
+        {
+        };
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::DataTypeMXSB, IO>
+            : public AutoMappingTraits<Predicates::Contraction::DataTypeMXSB, IO>
+        {
+        };
     } // namespace Serialization
 } // namespace TensileLite
+
+TENSILE_HIDDEN_END

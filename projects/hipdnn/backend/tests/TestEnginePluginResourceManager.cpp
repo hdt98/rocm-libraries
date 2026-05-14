@@ -1,6 +1,7 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#include <array>
 #include <atomic>
 #include <filesystem>
 #include <memory>
@@ -8,6 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "HipdnnException.hpp"
 #include "descriptors/BackendDescriptor.hpp"
 #include "descriptors/DescriptorFactory.hpp"
 #include "descriptors/DescriptorTestUtils.hpp"
@@ -24,14 +26,15 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::plugin;
+using namespace hipdnn_backend::test_utilities;
 using namespace ::testing;
 
 TEST(TestEnginePluginResourceManager, PluginLoading)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
 
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*mockPlugin, createHandle())
@@ -45,16 +48,16 @@ TEST(TestEnginePluginResourceManager, PluginLoading)
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
     }
 }
 
 TEST(TestEnginePluginResourceManager, SetStream)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
 
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -71,7 +74,7 @@ TEST(TestEnginePluginResourceManager, SetStream)
     EXPECT_CALL(*mockPlugin, destroyHandle(hipdnnEnginePluginHandle_t(0xdeadbeef)));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         resourceManager.setStream(hipStream_t(0x12345678));
     }
@@ -84,7 +87,7 @@ TEST(TestEnginePluginResourceManager, StaticPluginPathManagementSetAndGetSingleP
     EnginePluginResourceManager::setPluginPaths(pluginPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     auto retrievedPaths = EnginePluginResourceManager::getPluginPaths();
 
-    std::set<std::filesystem::path> expectedPaths(pluginPaths.begin(), pluginPaths.end());
+    const std::set<std::filesystem::path> expectedPaths(pluginPaths.begin(), pluginPaths.end());
     EXPECT_EQ(retrievedPaths, expectedPaths);
 }
 
@@ -96,27 +99,28 @@ TEST(TestEnginePluginResourceManager, StaticPluginPathManagementSetAndGetMultipl
     EnginePluginResourceManager::setPluginPaths(pluginPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     auto retrievedPaths = EnginePluginResourceManager::getPluginPaths();
 
-    std::set<std::filesystem::path> expectedPaths(pluginPaths.begin(), pluginPaths.end());
+    const std::set<std::filesystem::path> expectedPaths(pluginPaths.begin(), pluginPaths.end());
     EXPECT_EQ(retrievedPaths, expectedPaths);
 }
 
 TEST(TestEnginePluginResourceManager, StaticPluginPathManagementAdditiveLoadingMode)
 {
-    std::vector<std::filesystem::path> initialPaths = {"/test/path1"};
+    const std::vector<std::filesystem::path> initialPaths = {"/test/path1"};
     EnginePluginResourceManager::setPluginPaths(initialPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    std::vector<std::filesystem::path> additionalPaths = {"/test/path2", "/test/path3"};
+    const std::vector<std::filesystem::path> additionalPaths = {"/test/path2", "/test/path3"};
     EnginePluginResourceManager::setPluginPaths(additionalPaths, HIPDNN_PLUGIN_LOADING_ADDITIVE);
 
     auto retrievedPaths = EnginePluginResourceManager::getPluginPaths();
 
-    std::set<std::filesystem::path> expectedPaths = {"/test/path1", "/test/path2", "/test/path3"};
+    const std::set<std::filesystem::path> expectedPaths
+        = {"/test/path1", "/test/path2", "/test/path3"};
     EXPECT_EQ(retrievedPaths, expectedPaths);
 }
 
 TEST(TestEnginePluginResourceManager, StaticPluginPathManagementAbsoluteLoadingModeReplacesExisting)
 {
-    std::vector<std::filesystem::path> initialPaths = {"/test/path1", "/test/path2"};
+    const std::vector<std::filesystem::path> initialPaths = {"/test/path1", "/test/path2"};
     EnginePluginResourceManager::setPluginPaths(initialPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     std::vector<std::filesystem::path> newPaths = {"/test/path3", "/test/path4"};
@@ -124,16 +128,16 @@ TEST(TestEnginePluginResourceManager, StaticPluginPathManagementAbsoluteLoadingM
 
     auto retrievedPaths = EnginePluginResourceManager::getPluginPaths();
 
-    std::set<std::filesystem::path> expectedPaths(newPaths.begin(), newPaths.end());
+    const std::set<std::filesystem::path> expectedPaths(newPaths.begin(), newPaths.end());
     EXPECT_EQ(retrievedPaths, expectedPaths);
 }
 
 TEST(TestEnginePluginResourceManager, StaticPluginPathManagementEmptyPathsClearing)
 {
-    std::vector<std::filesystem::path> pluginPaths = {"/test/path1", "/test/path2"};
+    const std::vector<std::filesystem::path> pluginPaths = {"/test/path1", "/test/path2"};
     EnginePluginResourceManager::setPluginPaths(pluginPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    std::vector<std::filesystem::path> emptyPaths;
+    const std::vector<std::filesystem::path> emptyPaths;
     EnginePluginResourceManager::setPluginPaths(emptyPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     auto retrievedPaths = EnginePluginResourceManager::getPluginPaths();
@@ -142,9 +146,9 @@ TEST(TestEnginePluginResourceManager, StaticPluginPathManagementEmptyPathsCleari
 
 TEST(TestEnginePluginResourceManager, MoveConstructor)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -157,20 +161,20 @@ TEST(TestEnginePluginResourceManager, MoveConstructor)
 
     EnginePluginResourceManager rm1(pluginManager);
 
-    EnginePluginResourceManager rm2 = std::move(rm1);
+    const EnginePluginResourceManager rm2 = std::move(rm1);
 
     EXPECT_NO_THROW(rm2.setStream(nullptr));
 }
 
 TEST(TestEnginePluginResourceManager, MoveAssignment)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin1 = std::make_shared<MockEnginePlugin>();
-    std::shared_ptr<MockEnginePlugin> mockPlugin2 = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin1 = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin2 = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins1{mockPlugin1};
     std::vector<std::shared_ptr<EnginePlugin>> plugins2{mockPlugin2};
-    std::shared_ptr<MockEnginePluginManager> pluginManager1
+    const std::shared_ptr<MockEnginePluginManager> pluginManager1
         = std::make_shared<MockEnginePluginManager>();
-    std::shared_ptr<MockEnginePluginManager> pluginManager2
+    const std::shared_ptr<MockEnginePluginManager> pluginManager2
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager1, getPlugins()).WillOnce(::testing::ReturnRef(plugins1));
@@ -199,13 +203,13 @@ TEST(TestEnginePluginResourceManager, MoveAssignment)
 
 TEST(TestEnginePluginResourceManager, SelfMoveAssignment)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeSerializedData
+    const hipdnnPluginConstData_t fakeSerializedData
         = {reinterpret_cast<const void*>("fake_graph_data"), 15};
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -270,7 +274,7 @@ TEST(TestEnginePluginResourceManager, RapidCreationDestruction)
                     destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
         {
-            EnginePluginResourceManager rm(pluginManager);
+            const EnginePluginResourceManager rm(pluginManager);
         }
     }
 }
@@ -309,7 +313,7 @@ TEST(TestEnginePluginResourceManager, ConcurrentCreationAndPublicMethods)
             {
                 auto pluginManager = std::make_shared<MockEnginePluginManager>();
                 auto mockPlugin = std::make_shared<MockEnginePlugin>();
-                std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+                const std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
 
                 allPluginManagers[t].push_back(pluginManager);
                 allMockPlugins[t].push_back(mockPlugin);
@@ -348,9 +352,9 @@ TEST(TestEnginePluginResourceManager, ConcurrentCreationAndPublicMethods)
 
 TEST(TestEnginePluginResourceManager, GetApplicableEngineIdsNullGraphDescriptor)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -361,7 +365,7 @@ TEST(TestEnginePluginResourceManager, GetApplicableEngineIdsNullGraphDescriptor)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(resourceManager.getApplicableEngineIds(nullptr),
                                    HIPDNN_STATUS_INTERNAL_ERROR);
@@ -370,9 +374,9 @@ TEST(TestEnginePluginResourceManager, GetApplicableEngineIdsNullGraphDescriptor)
 
 TEST(TestEnginePluginResourceManager, SetNullStream)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -384,7 +388,7 @@ TEST(TestEnginePluginResourceManager, SetNullStream)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         EXPECT_NO_THROW(resourceManager.setStream(nullptr));
     }
@@ -392,13 +396,13 @@ TEST(TestEnginePluginResourceManager, SetNullStream)
 
 TEST(TestEnginePluginResourceManager, GetApplicableEngineIdsWithLoadedPlugin)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeSerializedData = {
+    const hipdnnPluginConstData_t fakeSerializedData = {
         reinterpret_cast<const void*>("fake_graph_data"),
         15 // length of "fake_graph_data"
     };
@@ -423,7 +427,7 @@ TEST(TestEnginePluginResourceManager, GetApplicableEngineIdsWithLoadedPlugin)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
 
@@ -436,17 +440,17 @@ TEST(TestEnginePluginResourceManager, GetApplicableEngineIdsWithLoadedPlugin)
 
 TEST(TestEnginePluginResourceManager, GetWorkspaceSize)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeEngineConfig = {
+    const hipdnnPluginConstData_t fakeEngineConfig = {
         reinterpret_cast<const void*>("fake_config"),
         11 // length of "fake_config"
     };
-    hipdnnPluginConstData_t fakeSerializedData = {
+    const hipdnnPluginConstData_t fakeSerializedData = {
         reinterpret_cast<const void*>("fake_graph_data"),
         15 // length of "fake_graph_data"
     };
@@ -474,7 +478,7 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSize)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         auto workspaceSize
             = resourceManager.getWorkspaceSize(100, &fakeEngineConfig, &mockGraphDesc);
@@ -485,9 +489,9 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSize)
 
 TEST(TestEnginePluginResourceManager, GetWorkspaceSizeFromExecutionContext)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -498,7 +502,7 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeFromExecutionContext)
     EXPECT_CALL(*mockPlugin, getWorkspaceSize(_, _)).WillOnce(::testing::Return(size_t(4096)));
     EXPECT_CALL(*mockPlugin, destroyHandle(_));
 
-    EnginePluginResourceManager resourceManager(pluginManager);
+    const EnginePluginResourceManager resourceManager(pluginManager);
 
     auto workspaceSize = resourceManager.getWorkspaceSize(
         100, reinterpret_cast<hipdnnEnginePluginExecutionContext_t>(0x12345678));
@@ -507,13 +511,13 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeFromExecutionContext)
 
 TEST(TestEnginePluginResourceManager, GetEngineDetails)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeSerializedData = {
+    const hipdnnPluginConstData_t fakeSerializedData = {
         reinterpret_cast<const void*>("fake_graph_data"),
         15 // length of "fake_graph_data"
     };
@@ -542,7 +546,7 @@ TEST(TestEnginePluginResourceManager, GetEngineDetails)
                                      const hipdnnPluginConstData_t*,
                                      hipdnnPluginConstData_t* output) {
             // Create valid flatbuffer engine details
-            static auto s_builder = hipdnn_sdk::test_utilities::createValidEngineDetails(engineId);
+            static auto s_builder = createValidEngineDetails(engineId);
             output->ptr = s_builder.GetBufferPointer();
             output->size = s_builder.GetSize();
         }));
@@ -570,17 +574,17 @@ TEST(TestEnginePluginResourceManager, GetEngineDetails)
 
 TEST(TestEnginePluginResourceManager, CreateExecutionContext)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeEngineConfig = {
+    const hipdnnPluginConstData_t fakeEngineConfig = {
         reinterpret_cast<const void*>("fake_config"),
         11 // length of "fake_config"
     };
-    hipdnnPluginConstData_t fakeSerializedData = {
+    const hipdnnPluginConstData_t fakeSerializedData = {
         reinterpret_cast<const void*>("fake_graph_data"),
         15 // length of "fake_graph_data"
     };
@@ -627,13 +631,13 @@ TEST(TestEnginePluginResourceManager, CreateExecutionContext)
 
 TEST(TestEnginePluginResourceManager, CreateExecutionContextWithInvalidEngineId)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeEngineConfig = {
+    const hipdnnPluginConstData_t fakeEngineConfig = {
         reinterpret_cast<const void*>("fake_config"),
         11 // length of "fake_config"
     };
@@ -662,9 +666,9 @@ TEST(TestEnginePluginResourceManager, CreateExecutionContextWithInvalidEngineId)
 
 TEST(TestEnginePluginResourceManager, ExecuteOpGraphWithNullParameters)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -675,33 +679,278 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphWithNullParameters)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(resourceManager.executeOpGraph(nullptr, nullptr),
                                    HIPDNN_STATUS_INTERNAL_ERROR);
     }
 }
 
-TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedPlan)
+TEST(TestEnginePluginResourceManager, SerializeExecutionContextFailsForUnsupportedPlugin)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
-    auto executionPlanWrapper
-        = hipdnn_sdk::test_utilities::createDescriptor<MockExecutionPlanDescriptor>();
-    auto variantWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockVariantDescriptor>();
+    std::vector<uint8_t> serializedContext;
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin,
+                serializeExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef),
+                                          hipdnnEnginePluginExecutionContext_t(0xcafebabe),
+                                          _))
+        .WillOnce(::testing::Throw(
+            HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
+                            "Engine plugin does not support execution context serialization")));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_THROW_HIPDNN_STATUS(
+            resourceManager.serializeExecutionContext(
+                100, hipdnnEnginePluginExecutionContext_t(0xcafebabe), serializedContext),
+            HIPDNN_STATUS_NOT_SUPPORTED);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, SerializeExecutionContextRejectsNullPluginPayload)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    std::vector<uint8_t> serializedContext;
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin,
+                serializeExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef),
+                                          hipdnnEnginePluginExecutionContext_t(0xcafebabe),
+                                          _))
+        .WillOnce([](hipdnnEnginePluginHandle_t,
+                     hipdnnEnginePluginExecutionContext_t,
+                     hipdnnPluginConstData_t* serializedContext) {
+            *serializedContext = hipdnnPluginConstData_t{nullptr, 4};
+        });
+    EXPECT_CALL(*mockPlugin,
+                destroySerializedExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef), _));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_THROW_HIPDNN_STATUS(
+            resourceManager.serializeExecutionContext(
+                100, hipdnnEnginePluginExecutionContext_t(0xcafebabe), serializedContext),
+            HIPDNN_STATUS_PLUGIN_ERROR);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, SerializeExecutionContextRejectsEmptyPluginPayload)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    const std::array<uint8_t, 1> payloadBytes{9};
+    std::vector<uint8_t> serializedContext;
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin,
+                serializeExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef),
+                                          hipdnnEnginePluginExecutionContext_t(0xcafebabe),
+                                          _))
+        .WillOnce([&payloadBytes](hipdnnEnginePluginHandle_t,
+                                  hipdnnEnginePluginExecutionContext_t,
+                                  hipdnnPluginConstData_t* serializedContext) {
+            *serializedContext = hipdnnPluginConstData_t{payloadBytes.data(), 0};
+        });
+    EXPECT_CALL(*mockPlugin,
+                destroySerializedExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef), _));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_THROW_HIPDNN_STATUS(
+            resourceManager.serializeExecutionContext(
+                100, hipdnnEnginePluginExecutionContext_t(0xcafebabe), serializedContext),
+            HIPDNN_STATUS_PLUGIN_ERROR);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, SerializeExecutionContextCopiesPluginPayload)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    const std::array<uint8_t, 4> payloadBytes{9, 8, 7, 6};
+    std::vector<uint8_t> serializedContext;
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin,
+                serializeExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef),
+                                          hipdnnEnginePluginExecutionContext_t(0xcafebabe),
+                                          _))
+        .WillOnce([&payloadBytes](hipdnnEnginePluginHandle_t,
+                                  hipdnnEnginePluginExecutionContext_t,
+                                  hipdnnPluginConstData_t* serializedContext) {
+            *serializedContext = hipdnnPluginConstData_t{payloadBytes.data(), payloadBytes.size()};
+        });
+    EXPECT_CALL(*mockPlugin,
+                destroySerializedExecutionContext(hipdnnEnginePluginHandle_t(0xdeadbeef), _));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_NO_THROW(resourceManager.serializeExecutionContext(
+            100, hipdnnEnginePluginExecutionContext_t(0xcafebabe), serializedContext));
+    }
+
+    ASSERT_EQ(serializedContext, std::vector<uint8_t>(payloadBytes.begin(), payloadBytes.end()));
+}
+
+TEST(TestEnginePluginResourceManager, SerializeExecutionContextRejectsInvalidInputs)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    std::vector<uint8_t> serializedContext;
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_THROW_HIPDNN_STATUS(
+            resourceManager.serializeExecutionContext(100, nullptr, serializedContext),
+            HIPDNN_STATUS_BAD_PARAM);
+        ASSERT_THROW_HIPDNN_STATUS(
+            resourceManager.serializeExecutionContext(
+                101, hipdnnEnginePluginExecutionContext_t(0xcafebabe), serializedContext),
+            HIPDNN_STATUS_INTERNAL_ERROR);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, CreateExecutionContextFromSerializedFailsForUnsupportedPlugin)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    const std::array<uint8_t, 3> serializedContextBytes{4, 5, 6};
+    const hipdnnPluginConstData_t serializedContext{serializedContextBytes.data(),
+                                                    serializedContextBytes.size()};
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin,
+                createExecutionContextFromSerialized(hipdnnEnginePluginHandle_t(0xdeadbeef),
+                                                     &serializedContext))
+        .WillOnce(::testing::Throw(
+            HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
+                            "Engine plugin does not support execution context serialization")));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_THROW_HIPDNN_STATUS(
+            EnginePluginResourceManager::createExecutionContextFromSerialized(
+                std::make_shared<EnginePluginResourceManager>(std::move(resourceManager)),
+                100,
+                &serializedContext),
+            HIPDNN_STATUS_NOT_SUPPORTED);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, CreateExecutionContextFromSerializedPropagatesPluginFailure)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    const std::array<uint8_t, 3> serializedContextBytes{4, 5, 6};
+    const hipdnnPluginConstData_t serializedContext{serializedContextBytes.data(),
+                                                    serializedContextBytes.size()};
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin,
+                createExecutionContextFromSerialized(hipdnnEnginePluginHandle_t(0xdeadbeef),
+                                                     &serializedContext))
+        .WillOnce(::testing::Throw(HipdnnException(
+            HIPDNN_STATUS_PLUGIN_ERROR, "Plugin rejected serialized execution context")));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        EnginePluginResourceManager resourceManager(pluginManager);
+
+        ASSERT_THROW_HIPDNN_STATUS(
+            EnginePluginResourceManager::createExecutionContextFromSerialized(
+                std::make_shared<EnginePluginResourceManager>(std::move(resourceManager)),
+                100,
+                &serializedContext),
+            HIPDNN_STATUS_PLUGIN_ERROR);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedPlan)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    auto executionPlanWrapper = createDescriptor<MockExecutionPlanDescriptor>();
+    auto variantWrapper = createDescriptor<MockVariantDescriptor>();
 
     auto mockExecutionPlan = MockDescriptorUtility::asDescriptorUnsafe<MockExecutionPlanDescriptor>(
         executionPlanWrapper.get());
     auto mockVariantPack
         = MockDescriptorUtility::asDescriptorUnsafe<MockVariantDescriptor>(variantWrapper.get());
 
-    std::vector<int64_t> tensorIds = {1, 2, 3};
-    std::vector<const void*> dataPtrs = {reinterpret_cast<void*>(0x1000),
-                                         reinterpret_cast<void*>(0x2000),
-                                         reinterpret_cast<void*>(0x3000)};
+    const std::vector<int64_t> tensorIds = {1, 2, 3};
+    const std::vector<const void*> dataPtrs = {reinterpret_cast<void*>(0x1000),
+                                               reinterpret_cast<void*>(0x2000),
+                                               reinterpret_cast<void*>(0x3000)};
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
     EXPECT_CALL(*mockPlugin, createHandle())
@@ -713,7 +962,7 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedPlan)
     EXPECT_CALL(*mockExecutionPlan, isFinalized()).WillOnce(::testing::Return(false));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(
             resourceManager.executeOpGraph(executionPlanWrapper.get(), variantWrapper.get()),
@@ -723,24 +972,23 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedPlan)
 
 TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedVariant)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
-    auto executionPlanWrapper
-        = hipdnn_sdk::test_utilities::createDescriptor<MockExecutionPlanDescriptor>();
-    auto variantWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockVariantDescriptor>();
+    auto executionPlanWrapper = createDescriptor<MockExecutionPlanDescriptor>();
+    auto variantWrapper = createDescriptor<MockVariantDescriptor>();
 
     auto mockExecutionPlan = MockDescriptorUtility::asDescriptorUnsafe<MockExecutionPlanDescriptor>(
         executionPlanWrapper.get());
     auto mockVariantPack
         = MockDescriptorUtility::asDescriptorUnsafe<MockVariantDescriptor>(variantWrapper.get());
 
-    std::vector<int64_t> tensorIds = {1, 2, 3};
-    std::vector<const void*> dataPtrs = {reinterpret_cast<void*>(0x1000),
-                                         reinterpret_cast<void*>(0x2000),
-                                         reinterpret_cast<void*>(0x3000)};
+    const std::vector<int64_t> tensorIds = {1, 2, 3};
+    const std::vector<const void*> dataPtrs = {reinterpret_cast<void*>(0x1000),
+                                               reinterpret_cast<void*>(0x2000),
+                                               reinterpret_cast<void*>(0x3000)};
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
     EXPECT_CALL(*mockPlugin, createHandle())
@@ -753,7 +1001,7 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedVariant)
     EXPECT_CALL(*mockVariantPack, isFinalized()).WillOnce(::testing::Return(false));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(
             resourceManager.executeOpGraph(executionPlanWrapper.get(), variantWrapper.get()),
@@ -763,22 +1011,14 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailNonFinalizedVariant)
 
 TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailTensorMismatch)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
-    auto engineConfigWrapper
-        = hipdnn_sdk::test_utilities::createDescriptor<MockEngineConfigDescriptor>();
-    auto engineWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockEngineDescriptor>();
-    auto executionPlanWrapper
-        = hipdnn_sdk::test_utilities::createDescriptor<MockExecutionPlanDescriptor>();
-    auto variantWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockVariantDescriptor>();
+    auto executionPlanWrapper = createDescriptor<MockExecutionPlanDescriptor>();
+    auto variantWrapper = createDescriptor<MockVariantDescriptor>();
 
-    auto mockEngineConfig = MockDescriptorUtility::asDescriptorUnsafe<MockEngineConfigDescriptor>(
-        engineConfigWrapper.get());
-    auto mockEngine
-        = MockDescriptorUtility::asDescriptorUnsafe<MockEngineDescriptor>(engineWrapper.get());
     auto mockExecutionPlan = MockDescriptorUtility::asDescriptorUnsafe<MockExecutionPlanDescriptor>(
         executionPlanWrapper.get());
     auto mockVariantPack
@@ -797,20 +1037,17 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailTensorMismatch)
         .WillOnce(::testing::Return(std::vector<int64_t>{100, 101, 102}));
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
-    EXPECT_CALL(*mockExecutionPlan, isFinalized()).WillOnce(::testing::Return(true));
+    EXPECT_CALL(*mockExecutionPlan, isFinalized()).WillRepeatedly(::testing::Return(true));
     EXPECT_CALL(*mockVariantPack, isFinalized()).WillOnce(::testing::Return(true));
 
-    EXPECT_CALL(*mockExecutionPlan, getEngineConfig())
-        .WillOnce(::testing::Return(mockEngineConfig));
-    EXPECT_CALL(*mockEngineConfig, getEngine()).WillOnce(::testing::Return(mockEngine));
-    EXPECT_CALL(*mockEngine, getEngineId()).WillOnce(::testing::Return(int64_t(100)));
+    EXPECT_CALL(*mockExecutionPlan, getEngineId()).WillOnce(::testing::Return(int64_t(100)));
     EXPECT_CALL(*mockVariantPack, getWorkspace())
         .WillOnce(::testing::Return(reinterpret_cast<void*>(0x4000)));
     EXPECT_CALL(*mockVariantPack, getTensorIds()).WillOnce(::testing::ReturnRef(tensorIds));
     EXPECT_CALL(*mockVariantPack, getDataPointers()).WillOnce(::testing::ReturnRef(dataPtrs));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(
             resourceManager.executeOpGraph(executionPlanWrapper.get(), variantWrapper.get()),
@@ -818,30 +1055,25 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphFailTensorMismatch)
     }
 }
 
+namespace
+{
 // NOLINTNEXTLINE(readability-identifier-naming)
 MATCHER_P2(MatchesMemory, data, size, "")
 {
     return memcmp(arg, data, size) == 0;
 }
+} // namespace
 
 TEST(TestEnginePluginResourceManager, ExecuteOpGraphSuccessWithValidDescriptors)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
-    auto engineConfigWrapper
-        = hipdnn_sdk::test_utilities::createDescriptor<MockEngineConfigDescriptor>();
-    auto engineWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockEngineDescriptor>();
-    auto executionPlanWrapper
-        = hipdnn_sdk::test_utilities::createDescriptor<MockExecutionPlanDescriptor>();
-    auto variantWrapper = hipdnn_sdk::test_utilities::createDescriptor<MockVariantDescriptor>();
+    auto executionPlanWrapper = createDescriptor<MockExecutionPlanDescriptor>();
+    auto variantWrapper = createDescriptor<MockVariantDescriptor>();
 
-    auto mockEngineConfig = MockDescriptorUtility::asDescriptorUnsafe<MockEngineConfigDescriptor>(
-        engineConfigWrapper.get());
-    auto mockEngine
-        = MockDescriptorUtility::asDescriptorUnsafe<MockEngineDescriptor>(engineWrapper.get());
     auto mockExecutionPlan = MockDescriptorUtility::asDescriptorUnsafe<MockExecutionPlanDescriptor>(
         executionPlanWrapper.get());
     auto mockVariantPack
@@ -859,13 +1091,10 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphSuccessWithValidDescriptors)
         .WillOnce(::testing::Return(std::vector<int64_t>{100, 101, 102}));
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
-    EXPECT_CALL(*mockExecutionPlan, isFinalized()).WillOnce(::testing::Return(true));
+    EXPECT_CALL(*mockExecutionPlan, isFinalized()).WillRepeatedly(::testing::Return(true));
     EXPECT_CALL(*mockVariantPack, isFinalized()).WillOnce(::testing::Return(true));
 
-    EXPECT_CALL(*mockExecutionPlan, getEngineConfig())
-        .WillOnce(::testing::Return(mockEngineConfig));
-    EXPECT_CALL(*mockEngineConfig, getEngine()).WillOnce(::testing::Return(mockEngine));
-    EXPECT_CALL(*mockEngine, getEngineId()).WillOnce(::testing::Return(int64_t(100)));
+    EXPECT_CALL(*mockExecutionPlan, getEngineId()).WillOnce(::testing::Return(int64_t(100)));
     EXPECT_CALL(*mockVariantPack, getWorkspace())
         .WillOnce(::testing::Return(reinterpret_cast<void*>(0x4000)));
     EXPECT_CALL(*mockVariantPack, getTensorIds()).WillOnce(::testing::ReturnRef(tensorIds));
@@ -893,7 +1122,7 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphSuccessWithValidDescriptors)
                                static_cast<uint32_t>(tensorIds.size())));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         resourceManager.executeOpGraph(executionPlanWrapper.get(), variantWrapper.get());
     }
@@ -901,9 +1130,9 @@ TEST(TestEnginePluginResourceManager, ExecuteOpGraphSuccessWithValidDescriptors)
 
 TEST(TestEnginePluginResourceManager, GetLoadedPluginFiles)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     std::set<std::filesystem::path> expectedPluginFiles
@@ -920,7 +1149,7 @@ TEST(TestEnginePluginResourceManager, GetLoadedPluginFiles)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         size_t numPlugins = 0;
         size_t maxStringLen = 0;
@@ -942,18 +1171,18 @@ TEST(TestEnginePluginResourceManager, GetLoadedPluginFiles)
             resourceManager.getLoadedPluginFiles(&numPlugins, pluginPaths.data(), &maxStringLen));
 
         // Note: std::set ordering may differ, so we check that both paths are present
-        std::set<std::string> returnedPaths
+        const std::set<std::string> returnedPaths
             = {std::string(pluginPaths[0]), std::string(pluginPaths[1])};
-        std::set<std::string> expectedPaths = {"/path/to/plugin1.so", "/path/to/plugin2.so"};
+        const std::set<std::string> expectedPaths = {"/path/to/plugin1.so", "/path/to/plugin2.so"};
         EXPECT_EQ(returnedPaths, expectedPaths);
     }
 }
 
 TEST(TestEnginePluginResourceManager, GetWorkspaceSizeNullEngineConfig)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
@@ -966,7 +1195,7 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeNullEngineConfig)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(resourceManager.getWorkspaceSize(100, nullptr, &mockGraphDesc),
                                    HIPDNN_STATUS_INTERNAL_ERROR);
@@ -975,13 +1204,13 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeNullEngineConfig)
 
 TEST(TestEnginePluginResourceManager, GetWorkspaceSizeThrowsExceptionForInvalidEngineId)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     MockGraphDescriptor mockGraphDesc;
-    hipdnnPluginConstData_t fakeEngineConfig = {
+    const hipdnnPluginConstData_t fakeEngineConfig = {
         reinterpret_cast<const void*>("fake_config"),
         11 // length of "fake_config"
     };
@@ -994,7 +1223,7 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeThrowsExceptionForInvalidE
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
 
         ASSERT_THROW_HIPDNN_STATUS(
             resourceManager.getWorkspaceSize(200, &fakeEngineConfig, &mockGraphDesc),
@@ -1004,9 +1233,9 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeThrowsExceptionForInvalidE
 
 TEST(TestEnginePluginResourceManager, GetWorkspaceSizeFromExecutionContextNullExecutionContext)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -1016,7 +1245,7 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeFromExecutionContextNullEx
         .WillOnce(::testing::Return(std::vector<int64_t>{100, 101, 102}));
     EXPECT_CALL(*mockPlugin, destroyHandle(_));
 
-    EnginePluginResourceManager resourceManager(pluginManager);
+    const EnginePluginResourceManager resourceManager(pluginManager);
 
     ASSERT_THROW_HIPDNN_STATUS(resourceManager.getWorkspaceSize(100, nullptr),
                                HIPDNN_STATUS_INTERNAL_ERROR);
@@ -1025,9 +1254,9 @@ TEST(TestEnginePluginResourceManager, GetWorkspaceSizeFromExecutionContextNullEx
 TEST(TestEnginePluginResourceManager,
      GetWorkspaceSizeFromExecutionContextThrowsExceptionForInvalidEngineId)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -1037,7 +1266,7 @@ TEST(TestEnginePluginResourceManager,
         .WillOnce(::testing::Return(std::vector<int64_t>{100, 101, 102}));
     EXPECT_CALL(*mockPlugin, destroyHandle(_));
 
-    EnginePluginResourceManager resourceManager(pluginManager);
+    const EnginePluginResourceManager resourceManager(pluginManager);
 
     ASSERT_THROW_HIPDNN_STATUS(
         resourceManager.getWorkspaceSize(
@@ -1047,9 +1276,9 @@ TEST(TestEnginePluginResourceManager,
 
 TEST(TestEnginePluginResourceManager, SetPluginPathsWithActiveResourceManager)
 {
-    std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
     std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
-    std::shared_ptr<MockEnginePluginManager> pluginManager
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
         = std::make_shared<MockEnginePluginManager>();
 
     EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
@@ -1060,18 +1289,392 @@ TEST(TestEnginePluginResourceManager, SetPluginPathsWithActiveResourceManager)
     EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
 
     {
-        EnginePluginResourceManager resourceManager(pluginManager);
+        const EnginePluginResourceManager resourceManager(pluginManager);
         std::vector<std::filesystem::path> pluginPaths = {"/test/path"};
 
         EXPECT_NO_THROW(EnginePluginResourceManager::setPluginPaths(
             pluginPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 
         auto retrievedPaths = EnginePluginResourceManager::getPluginPaths();
-        std::set<std::filesystem::path> expectedPaths(pluginPaths.begin(), pluginPaths.end());
+        const std::set<std::filesystem::path> expectedPaths(pluginPaths.begin(), pluginPaths.end());
         EXPECT_EQ(retrievedPaths, expectedPaths);
 
-        std::vector<std::filesystem::path> emptyPaths;
+        const std::vector<std::filesystem::path> emptyPaths;
         EXPECT_NO_THROW(EnginePluginResourceManager::setPluginPaths(
             emptyPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorSkipsPluginWhenCreateHandleThrowsHipdnnException)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    MockGraphDescriptor mockGraphDesc;
+    const hipdnnPluginConstData_t fakeSerializedData
+        = {reinterpret_cast<const void*>("fake_graph_data"), 15};
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, name()).WillRepeatedly(::testing::Return("BadPlugin"));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Throw(HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "Test error")));
+
+    // Plugin should never be queried since it failed to load
+    EXPECT_CALL(*mockPlugin, getApplicableEngineIds(testing::_, testing::_)).Times(0);
+
+    // No destroyHandle call expected since handle creation failed
+
+    {
+        // Constructor should not throw, but the plugin should be skipped
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        // Verify no engines were registered
+        EXPECT_CALL(mockGraphDesc, getSerializedGraph())
+            .WillOnce(::testing::Return(fakeSerializedData));
+        auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
+        EXPECT_TRUE(engineIds.empty());
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorSkipsPluginWhenCreateHandleThrowsStdException)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    MockGraphDescriptor mockGraphDesc;
+    const hipdnnPluginConstData_t fakeSerializedData
+        = {reinterpret_cast<const void*>("fake_graph_data"), 15};
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, name()).WillRepeatedly(::testing::Return("BadPlugin"));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Throw(std::runtime_error("Test std::exception")));
+
+    // Plugin should never be queried since it failed to load
+    EXPECT_CALL(*mockPlugin, getApplicableEngineIds(testing::_, testing::_)).Times(0);
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        // Verify no engines were registered
+        EXPECT_CALL(mockGraphDesc, getSerializedGraph())
+            .WillOnce(::testing::Return(fakeSerializedData));
+        auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
+        EXPECT_TRUE(engineIds.empty());
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorSkipsPluginWhenCreateHandleReturnsNull)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    MockGraphDescriptor mockGraphDesc;
+    const hipdnnPluginConstData_t fakeSerializedData
+        = {reinterpret_cast<const void*>("fake_graph_data"), 15};
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, name()).WillRepeatedly(::testing::Return("NullHandlePlugin"));
+    EXPECT_CALL(*mockPlugin, createHandle()).WillOnce(::testing::Return(nullptr));
+
+    // Plugin should never be queried since it returned null handle
+    EXPECT_CALL(*mockPlugin, getApplicableEngineIds(testing::_, testing::_)).Times(0);
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        // Verify no engines were registered
+        EXPECT_CALL(mockGraphDesc, getSerializedGraph())
+            .WillOnce(::testing::Return(fakeSerializedData));
+        auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
+        EXPECT_TRUE(engineIds.empty());
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorSkipsPluginOnHandleCollision)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin1 = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin2 = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin1, mockPlugin2};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    MockGraphDescriptor mockGraphDesc;
+    const hipdnnPluginConstData_t fakeSerializedData
+        = {reinterpret_cast<const void*>("fake_graph_data"), 15};
+
+    // Both plugins return the same handle (simulating a collision)
+    auto collisionHandle = reinterpret_cast<hipdnnEnginePluginHandle_t>(0x123);
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+
+    // First plugin succeeds
+    EXPECT_CALL(*mockPlugin1, createHandle()).WillOnce(::testing::Return(collisionHandle));
+    EXPECT_CALL(*mockPlugin1, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin1, destroyHandle(collisionHandle));
+
+    // Second plugin returns same handle - should be skipped
+    EXPECT_CALL(*mockPlugin2, name()).WillRepeatedly(::testing::Return("CollidingPlugin"));
+    EXPECT_CALL(*mockPlugin2, createHandle()).WillOnce(::testing::Return(collisionHandle));
+    EXPECT_CALL(*mockPlugin2, destroyHandle(collisionHandle));
+
+    // Second plugin should never be queried since it had handle collision
+    EXPECT_CALL(*mockPlugin2, getApplicableEngineIds(testing::_, testing::_)).Times(0);
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        // Verify first plugin loaded successfully, second was skipped
+        EXPECT_CALL(mockGraphDesc, getSerializedGraph())
+            .WillOnce(::testing::Return(fakeSerializedData));
+        EXPECT_CALL(*mockPlugin1, getApplicableEngineIds(collisionHandle, testing::_))
+            .WillOnce(::testing::Return(std::vector<int64_t>{100}));
+
+        auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
+        EXPECT_EQ(engineIds.size(), 1);
+        EXPECT_EQ(engineIds[0], 100);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorSkipsPluginWhenGetAllEngineIdsThrows)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    MockGraphDescriptor mockGraphDesc;
+    const hipdnnPluginConstData_t fakeSerializedData
+        = {reinterpret_cast<const void*>("fake_graph_data"), 15};
+
+    auto handle = reinterpret_cast<hipdnnEnginePluginHandle_t>(0xdeadbeef);
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, name()).WillRepeatedly(::testing::Return("EngineIdFailPlugin"));
+    EXPECT_CALL(*mockPlugin, createHandle()).WillOnce(::testing::Return(handle));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillOnce(::testing::Throw(
+            HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "Failed to get engine IDs")));
+    EXPECT_CALL(*mockPlugin, destroyHandle(handle));
+
+    // Plugin should never be queried since getAllEngineIds failed
+    EXPECT_CALL(*mockPlugin, getApplicableEngineIds(testing::_, testing::_)).Times(0);
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        // Verify plugin was skipped and handle was cleaned up
+        EXPECT_CALL(mockGraphDesc, getSerializedGraph())
+            .WillOnce(::testing::Return(fakeSerializedData));
+        auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
+        EXPECT_TRUE(engineIds.empty());
+    }
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorContinuesAfterBadPluginWithGoodPlugin)
+{
+    const std::shared_ptr<MockEnginePlugin> badPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> goodPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{badPlugin, goodPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    MockGraphDescriptor mockGraphDesc;
+    const hipdnnPluginConstData_t fakeSerializedData
+        = {reinterpret_cast<const void*>("fake_graph_data"), 15};
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+
+    // Bad plugin throws during createHandle
+    EXPECT_CALL(*badPlugin, name()).WillRepeatedly(::testing::Return("BadPlugin"));
+    EXPECT_CALL(*badPlugin, createHandle())
+        .WillOnce(::testing::Throw(HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "Test error")));
+
+    // Good plugin succeeds
+    auto goodHandle = reinterpret_cast<hipdnnEnginePluginHandle_t>(0xcafe);
+    EXPECT_CALL(*goodPlugin, createHandle()).WillOnce(::testing::Return(goodHandle));
+    EXPECT_CALL(*goodPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{200, 201}));
+    EXPECT_CALL(*goodPlugin, destroyHandle(goodHandle));
+
+    EXPECT_CALL(mockGraphDesc, getSerializedGraph())
+        .WillOnce(::testing::Return(fakeSerializedData));
+    EXPECT_CALL(*goodPlugin, getApplicableEngineIds(goodHandle, testing::_))
+        .WillOnce(::testing::Return(std::vector<int64_t>{200, 201}));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        // Verify good plugin's engines are available
+        auto engineIds = resourceManager.getApplicableEngineIds(&mockGraphDesc);
+        EXPECT_EQ(engineIds.size(), 2);
+        EXPECT_EQ(engineIds[0], 200);
+        EXPECT_EQ(engineIds[1], 201);
+    }
+}
+
+TEST(TestEnginePluginResourceManager, GetEngineInfosSinglePlugin)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillRepeatedly(::testing::ReturnRef(plugins));
+    EXPECT_CALL(*mockPlugin, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin, getAllEngineIds())
+        .WillRepeatedly(::testing::Return(std::vector<int64_t>{100, 101}));
+    EXPECT_CALL(*mockPlugin, name()).WillRepeatedly(::testing::Return("test-plugin"));
+    EXPECT_CALL(*mockPlugin, version()).WillRepeatedly(::testing::Return("1.0"));
+    EXPECT_CALL(*mockPlugin, type()).WillRepeatedly(::testing::Return(HIPDNN_PLUGIN_TYPE_ENGINE));
+    EXPECT_CALL(*mockPlugin, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        auto infos = resourceManager.getEngineInfos();
+
+        ASSERT_EQ(infos.size(), 2);
+
+        // Results are sorted by engineName. formatEngineIdHex(100) = "0x0000000000000064",
+        // formatEngineIdHex(101) = "0x0000000000000065"
+        EXPECT_EQ(infos[0].engineId, 100);
+        EXPECT_EQ(infos[0].engineName, "0x0000000000000064");
+        EXPECT_EQ(infos[0].pluginName, "test-plugin");
+        EXPECT_EQ(infos[0].version, "1.0");
+        EXPECT_EQ(infos[0].type, "HIPDNN_PLUGIN_TYPE_ENGINE");
+
+        EXPECT_EQ(infos[1].engineId, 101);
+        EXPECT_EQ(infos[1].engineName, "0x0000000000000065");
+        EXPECT_EQ(infos[1].pluginName, "test-plugin");
+        EXPECT_EQ(infos[1].version, "1.0");
+        EXPECT_EQ(infos[1].type, "HIPDNN_PLUGIN_TYPE_ENGINE");
+    }
+}
+
+TEST(TestEnginePluginResourceManager, GetEngineInfosMultiplePlugins)
+{
+    const std::shared_ptr<MockEnginePlugin> mockPlugin1 = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> mockPlugin2 = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{mockPlugin1, mockPlugin2};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillRepeatedly(::testing::ReturnRef(plugins));
+
+    EXPECT_CALL(*mockPlugin1, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xdeadbeef)));
+    EXPECT_CALL(*mockPlugin1, getAllEngineIds())
+        .WillRepeatedly(::testing::Return(std::vector<int64_t>{200}));
+    EXPECT_CALL(*mockPlugin1, name()).WillRepeatedly(::testing::Return("plugin-alpha"));
+    EXPECT_CALL(*mockPlugin1, version()).WillRepeatedly(::testing::Return("2.0"));
+    EXPECT_CALL(*mockPlugin1, type()).WillRepeatedly(::testing::Return(HIPDNN_PLUGIN_TYPE_ENGINE));
+    EXPECT_CALL(*mockPlugin1, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xdeadbeef))));
+
+    EXPECT_CALL(*mockPlugin2, createHandle())
+        .WillOnce(::testing::Return(hipdnnEnginePluginHandle_t(0xcafebabe)));
+    EXPECT_CALL(*mockPlugin2, getAllEngineIds())
+        .WillRepeatedly(::testing::Return(std::vector<int64_t>{100}));
+    EXPECT_CALL(*mockPlugin2, name()).WillRepeatedly(::testing::Return("plugin-beta"));
+    EXPECT_CALL(*mockPlugin2, version()).WillRepeatedly(::testing::Return("3.0"));
+    EXPECT_CALL(*mockPlugin2, type())
+        .WillRepeatedly(::testing::Return(HIPDNN_PLUGIN_TYPE_UNSPECIFIED));
+    EXPECT_CALL(*mockPlugin2, destroyHandle(testing::Eq(hipdnnEnginePluginHandle_t(0xcafebabe))));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        auto infos = resourceManager.getEngineInfos();
+
+        ASSERT_EQ(infos.size(), 2);
+
+        // Sorted by engineName: "0x0000000000000064" (100) < "0x00000000000000C8" (200)
+        EXPECT_EQ(infos[0].engineId, 100);
+        EXPECT_EQ(infos[0].engineName, "0x0000000000000064");
+        EXPECT_EQ(infos[0].pluginName, "plugin-beta");
+        EXPECT_EQ(infos[0].version, "3.0");
+        EXPECT_EQ(infos[0].type, "HIPDNN_PLUGIN_TYPE_UNSPECIFIED");
+
+        EXPECT_EQ(infos[1].engineId, 200);
+        EXPECT_EQ(infos[1].engineName, "0x00000000000000C8");
+        EXPECT_EQ(infos[1].pluginName, "plugin-alpha");
+        EXPECT_EQ(infos[1].version, "2.0");
+        EXPECT_EQ(infos[1].type, "HIPDNN_PLUGIN_TYPE_ENGINE");
+    }
+}
+
+TEST(TestEnginePluginResourceManager, GetEngineInfosNoPlugins)
+{
+    std::vector<std::shared_ptr<EnginePlugin>> plugins;
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillRepeatedly(::testing::ReturnRef(plugins));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+
+        auto infos = resourceManager.getEngineInfos();
+
+        EXPECT_TRUE(infos.empty());
+    }
+}
+
+// Test subclass to access the protected default constructor
+class TestableEnginePluginResourceManager : public EnginePluginResourceManager
+{
+public:
+    TestableEnginePluginResourceManager() = default;
+};
+
+TEST(TestEnginePluginResourceManager, GetEngineInfosNullPluginManager)
+{
+    const TestableEnginePluginResourceManager resourceManager;
+
+    auto infos = resourceManager.getEngineInfos();
+
+    EXPECT_TRUE(infos.empty());
+}
+
+TEST(TestEnginePluginResourceManager, ConstructorHandlesMultipleBadPlugins)
+{
+    const std::shared_ptr<MockEnginePlugin> nullPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> throwingPlugin = std::make_shared<MockEnginePlugin>();
+    const std::shared_ptr<MockEnginePlugin> goodPlugin = std::make_shared<MockEnginePlugin>();
+    std::vector<std::shared_ptr<EnginePlugin>> plugins{nullPlugin, throwingPlugin, goodPlugin};
+    const std::shared_ptr<MockEnginePluginManager> pluginManager
+        = std::make_shared<MockEnginePluginManager>();
+
+    EXPECT_CALL(*pluginManager, getPlugins()).WillOnce(::testing::ReturnRef(plugins));
+
+    // First plugin returns null
+    EXPECT_CALL(*nullPlugin, name()).WillRepeatedly(::testing::Return("NullPlugin"));
+    EXPECT_CALL(*nullPlugin, createHandle()).WillOnce(::testing::Return(nullptr));
+
+    // Second plugin throws
+    EXPECT_CALL(*throwingPlugin, name()).WillRepeatedly(::testing::Return("ThrowingPlugin"));
+    EXPECT_CALL(*throwingPlugin, createHandle())
+        .WillOnce(::testing::Throw(std::runtime_error("Plugin initialization failed")));
+
+    // Third plugin succeeds
+    auto goodHandle = reinterpret_cast<hipdnnEnginePluginHandle_t>(0xbeef);
+    EXPECT_CALL(*goodPlugin, createHandle()).WillOnce(::testing::Return(goodHandle));
+    EXPECT_CALL(*goodPlugin, getAllEngineIds())
+        .WillOnce(::testing::Return(std::vector<int64_t>{300}));
+    EXPECT_CALL(*goodPlugin, setStream(goodHandle, nullptr));
+    EXPECT_CALL(*goodPlugin, destroyHandle(goodHandle));
+
+    {
+        const EnginePluginResourceManager resourceManager(pluginManager);
+        // Verify good plugin was loaded by calling setStream
+        EXPECT_NO_THROW(resourceManager.setStream(nullptr));
     }
 }

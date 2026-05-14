@@ -159,6 +159,14 @@ Use the following commands for a sparse checkout:
    git sparse-checkout set projects/rocblas shared/tensile
    git checkout develop # or use the branch you want to work with
 
+The checkout above omits other top-level trees (for example ``shared/ctest``). If you build the test
+client (``BUILD_CLIENTS_TESTS=ON``) and want YAML-based CTest labels and the installed
+``CTestTestfile.cmake`` from the shared categorization helpers, add ``shared/ctest`` to the
+``git sparse-checkout set`` list (or use a full clone). Without ``shared/ctest`` present under
+``ROCM_LIBRARIES_ROOT``, ``ROCBLAS_ENABLE_CTEST`` defaults to OFF. If you turn
+``ROCBLAS_ENABLE_CTEST`` ON explicitly, configuration requires both ``clients/gtest/test_categories.yaml``
+and ``shared/ctest/TestCategories.cmake`` to exist.
+
 .. note::
 
    To build ROCm 6.4 and older, use the rocBLAS repository at `<https://github.com/ROCm/rocBLAS>`_.
@@ -203,18 +211,27 @@ Other dependencies are listed in the ``install.sh`` script.
 Pass the ``-d`` flag to ``install.sh`` to install these dependencies.
 
 
-However, for the host reference BLAS test and benchmark clients,
-it is recommended that you manually download and install the AMD `ILP64 version of
-AOCL-BLAS 4.2 <https://www.amd.com/en/developer/aocl.html>`_.
-If you download and install the full AOCL packages into their default locations
-or download the BLIS archive files and extract them into the build directory ``deps`` subfolder,
-then the client's ``CMakeLists.txt`` should find the reference BLAS.
+Client dependencies: BLAS library
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The rocBLAS test and benchmark clients require a host reference BLAS library. When building
+clients with ``-dc`` flags, ``install.sh`` automatically builds AOCL 5.2 (AMD Optimizing CPU Libraries)
+from source with ILP64 support. The build searches for BLAS libraries in this order:
+
+1. AOCL 5.x (built or pre-installed)
+2. AOCL 4.x BLIS
+3. Bundled BLIS
+4. System BLAS
+
+To skip the automatic AOCL build and use an alternative, add ``--skip-aocl`` to the install command.
+To clean and rebuild all dependencies, use ``--clean-deps``. You can also set ``AOCL_ROOT``
+to specify a custom AOCL location, or manually install AOCL from
+`AMD Developer Central <https://www.amd.com/en/developer/aocl.html>`_.
 
 .. note::
 
-   If you only use the ``install.sh -d`` script-based BLIS download and install,
-   you might experience ``rocblas-test`` stress test failures due to 32-bit integer overflow on the host.
-   If this occurs, exclude the stress tests using the command line argument ``--gtest_filter=-*stress*``.
+   If using a BLAS library without ILP64 support, some stress tests might fail.
+   To exclude these tests, use the ``--gtest_filter=-*stress*`` option.
 
 Building the library dependencies and library
 ---------------------------------------------
@@ -252,12 +269,14 @@ listed in this table.
 
 .. csv-table::
    :header: "Command","Description"
-   :widths: 33, 97
+   :widths: 40, 90
 
    "``./install.sh -h``", "Help information."
-   "``./install.sh -dc``", "Build the library dependencies, client dependencies, library, and client in your local directory. The ``-d`` flag only has to be used once. For subsequent invocations of ``install.sh``, it is not necessary to rebuild the dependencies."
+   "``./install.sh -dc``", "Build the library dependencies, client dependencies, library, and client in your local directory. Automatically builds AOCL 5.2. The ``-d`` flag only has to be used once. For subsequent invocations of ``install.sh``, it is not necessary to rebuild the dependencies."
+   "``./install.sh -dc --skip-aocl``", "Build clients without AOCL, using the next available BLAS library."
+   "``./install.sh -dc --clean-deps``", "Clean and rebuild all dependencies before building."
    "``./install.sh -c``", "Build the library and client in your local directory. It is assumed the dependencies have been built."
-   "``./install.sh -idc``", "Build the library  dependencies, client dependencies, library, and client, then build and install the rocBLAS package. You will be prompted for ``sudo`` access. To install rocBLAS for all users, use the ``-i`` flag. To restrict it to your local directory, do not use the ``-i`` flag."
+   "``./install.sh -idc``", "Build the library dependencies, client dependencies, library, and client, then build and install the rocBLAS package. You will be prompted for ``sudo`` access. To install rocBLAS for all users, use the ``-i`` flag. To restrict it to your local directory, do not use the ``-i`` flag."
    "``./install.sh -ic``", "Build and install the rocBLAS package and build the client. You will be prompted for ``sudo`` access. This installs it for all users. To restrict rocBLAS to your local directory, do not use the ``-i`` flag."
    "``./install.sh -t /path/to/Tensile``", "``tensile_tag.txt`` has been deprecated so use this option to build a folder that has a different Tensile commit than the rocBLAS commit."
 
@@ -280,3 +299,22 @@ one of these commands.
 
    "``./install.sh --clients-only``", "Build the rocBLAS clients and use the installed rocBLAS library at ``ROCM_PATH`` (defaults to ``/opt/rocm`` if not specified)."
    "``./install.sh --clients-only --library-path /path/to/rocBLAS``", "Build the rocBLAS clients and use the rocBLAS library at the specified location."
+
+Using the rocBLAS Docker images
+------------------------------------------
+
+The rocBLAS Docker images provide a reproducible, ready-to-use development environment to simplify
+the set-up process. The Dockerfiles install all system dependencies, such as Clang, LLVM,
+zstd, and the development libraries, schedule update alternatives, and configure the environment.
+Two Dockerfiles are available for Ubuntu 24.04:
+
+*  ``Dockerfile.ubuntu24.prebuilt``: Downloads a prebuilt ROCm nightly tarball from the `ROCm nightly builds <https://rocm.nightlies.amd.com>`_.
+   This solution is faster to build and suitable for most development work. It lets you configure the target ASIC,
+   nightly tag, tarball filename, and tarball source URL.
+*  ``Dockerfile.ubuntu24.fullbuild``: Clones `<https://github.com/ROCm/TheRock>`_ and builds ROCm from source.
+   It's the best choice for when a prebuilt tarball is unavailable or custom build options are required.
+   The configuration options include the target ASIC, specific commit hash, build type (release, debug, or preset), CMake presets,
+   and parallel job count.
+   
+For more information on how to download and use these images, see the
+`rocBLAS Docker documentation <https://github.com/ROCm/rocm-libraries/blob/develop/projects/rocblas/docker/README.md>`_.

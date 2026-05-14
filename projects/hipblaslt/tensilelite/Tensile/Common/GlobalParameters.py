@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -122,6 +122,8 @@ globalParameters["CpuThreads"] = (
     -1
 )  # How many CPU threads to use for kernel generation.  0=no threading, -1 == nproc, N=min(nproc,N).  TODO - 0 sometimes fails with a kernel name error?  0 does not check error codes correctly
 globalParameters["NumWarmups"] = 0
+globalParameters["TimingInstrumentation"] = False  # Enable detailed timing instrumentation output
+globalParameters["ParallelGpuExecution"] = 1  # Number of GPUs for parallel client execution (0=auto-detect, 1=serial, N=use N GPUs)
 
 globalParameters["PythonProfile"] = False  # Enable python profiling
 
@@ -135,6 +137,7 @@ globalParameters["CMakeBuildType"] = (
 )
 globalParameters["LogicFormat"] = "yaml"  # set library backend (yaml, or json)
 globalParameters["LibraryFormat"] = "yaml"  # set library backend (yaml, or msgpack)
+globalParameters["MXScaleFormat"] = 0  # MX scale data format (0=none, 1=pre-swizzle for GPU kernel layout). Only the gfx950 subtile MX kernels need the pre-swizzle; gfx1250 reads canonical scales. The two gfx950 yamls that need it set MXScaleFormat: 1 explicitly.
 
 # True/False: CSV will/won't export WinnerGFlops, WinnerTimeUS, WinnerIdx, WinnerName.
 # TODO - if no side-effect, we can set default to True. This can make analyzing "LibraryLogic" (AddFromCSV) faster
@@ -175,6 +178,8 @@ globalParameters["DataInitTypeScaleB"] = 2
 globalParameters["DataInitTypeScaleC"] = 2
 globalParameters["DataInitTypeScaleD"] = 2
 globalParameters["DataInitTypeScaleAlphaVec"] = 3
+globalParameters["DataInitTypeMXSA"] = 1
+globalParameters["DataInitTypeMXSB"] = 1
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
 globalParameters["CEqualD"] = (
     False  # Set to true if testing for the case where the pointer to C is the same as D.
@@ -261,6 +266,16 @@ globalParameters["MaxWorkspaceSize"] = 128 * 1024 * 1024  # max workspace for tr
 # control if a solution is run for a given problem
 globalParameters["GranularityThreshold"] = 0.0
 
+# control if a solution is run for a given performance prediction
+# if enabled, the solutions will be run in the order of the performance prediction, from fatest to slowest.
+#   PredictionThreshold > 1 : Regular tuning, no sorting with performance prediction.
+#   PredictionThreshold == 1: Regular tuning, but sorted with performance prediction.
+#   PredictionThreshold < 1 : Sort and use the `PredictionThreshold * NumSolutions`-th performance prediction value as the threshold,
+#                              and run the solutions with better prediction value than the threshold. Usually only run the
+#                              `PredictionThreshold`-percent of solutions.
+#   PredictionTHreshold == 0: Run the single solution with best prediction value.
+globalParameters["PredictionThreshold"] = 2.0
+
 globalParameters["PristineOnGPU"] = (
     True  # use Pristine memory on Tensile trainning verification or not
 )
@@ -289,6 +304,41 @@ globalParameters["AsmDebug"] = (
 )
 
 globalParameters["UseEffLike"] = True  # Set to False to use winnerGFlops as the performance metric
+
+globalParameters["DisableAsmComments"] = False  # Set to True to disable assembly comments in generated assembly code
+
+globalParameters["RocProfCounter"] = None # No rocprof counter
+
+# StinkyTofu debug level (applies per-PM: outer PM + each ScopeAdaptor inner PM)
+# 0: Silent (default)
+# 1: Pass names + AnalysisManager cache activity to stdout
+# 2: Initial IR + IR after each pass to per-PM files:
+#    kernel-OuterPM-{before,after}_passes.txt     (outer PM)
+#    <groupName>-{before,after}_passes.txt        (single-region adapter)
+#    <group1>+<group2>-{before,after}_passes.txt  (multi-region adapter)
+#    wholeKernel-{before,after}_passes.txt        (whole-kernel adapter)
+globalParameters["StinkyTofuDebugLevel"] = 0
+
+# StinkyTofu selective pass IR dump (applies per-PM, same file naming as DebugLevel 2)
+# Comma-separated pass names to print IR before/after (case-sensitive)
+# e.g. "CFG Builder" or "RedundantMovEliminationPass, StinkyDAGSchedulerPass"
+# Unmatched pass names are silently ignored
+globalParameters["StinkyTofuPrintBeforePass"] = ""
+globalParameters["StinkyTofuPrintAfterPass"] = ""
+
+# StinkyTofu internal pass debug logging & instruction-order snapshot (global — applies to all PMs)
+# Comma-separated pass names (case-sensitive) to:
+#   1. Enable PASS_DEBUG output for the listed passes
+#   2. Record before/after instruction order JSON when StinkyTofuPassOrderSnapshotJson is set
+# e.g. "StinkyDAGSchedulerPass"
+# Unmatched pass names are silently ignored
+globalParameters["StinkyTofuDebugPass"] = ""
+
+# Before/after instruction-order JSON for tools/stinkytofu-analysis (empty = disabled).
+# When set, PassManager records snapshots for passes listed in StinkyTofuDebugPass
+# (defaults to StinkyDAGSchedulerPass only when StinkyTofuDebugPass is empty).
+# Note: multiple kernels may overwrite the same file unless you use a unique path per build.
+globalParameters["StinkyTofuPassOrderSnapshotJson"] = ""
 
 # Save a copy - since pytest doesn't re-run this initialization code and YAML files can override global settings - odd things can happen
 # we should do this here...
@@ -325,12 +375,17 @@ defaultBenchmarkCommonParameters = [
     {"InnerUnroll": [1]},
     {"KernelLanguage": ["Assembly"]},
     {"LdsPadA": [-1]},
+    {"LdsPadMXSA": [ 0 ] },
     {"LdsPadB": [-1]},
+    {"LdsPadMXSB": [ 0 ] },
     {"LdsPadMetadata": [0]},
     {"LdsBlockSizePerPadA": [-1]},
+    {"LdsBlockSizePerPadMXSA": [ 0 ] },
     {"LdsBlockSizePerPadB": [-1]},
+    {"LdsBlockSizePerPadMXSB": [ 0 ] },
     {"LdsBlockSizePerPadMetadata": [0]},
     {"TransposeLDS": [-1]},
+    {"TransposeLDSMetadata": [-1]},
     {"MaxOccupancy": [40]},
     {"MaxLDS": [-1]},
     {"VectorWidthA": [-1]},
@@ -340,6 +395,8 @@ defaultBenchmarkCommonParameters = [
     {"GlobalReadVectorWidthA": [-1]},
     {"GlobalReadVectorWidthB": [-1]},
     {"LocalReadVectorWidth": [-1]},
+    {"LocalReadVectorWidthA": [-1]},
+    {"LocalReadVectorWidthB": [-1]},
     {"WaveSeparateGlobalReadA": [0]},
     {"WaveSeparateGlobalReadB": [0]},
     {"WaveSeparateGlobalReadMetadata": [0]},
@@ -360,13 +417,26 @@ defaultBenchmarkCommonParameters = [
     {"BufferStore": [True]},
     {"DirectToVgprA": [False]},
     {"DirectToVgprB": [False]},
+    {"DirectToVgprMXSA": [False]},
+    {"DirectToVgprMXSB": [False]},
     {"DirectToVgprSparseMetadata": [False]},
-    {"DirectToLds": [False]},
+    # Restricted address remap features (default off unless explicitly enabled in the solution config):
+    {"BAddrInterleave": [False]},
+    {"KRingShift": [False]},
+    {"DirectToLds": [0]},
+    {"UseSubtileImpl": [False]},
     {"UseSgprForGRO": [-1]},
     {"UseInstOffsetForGRO": [0]},
     {"AssertSummationElementMultiple": [1]},
     {"AssertFree0ElementMultiple": [1]},
     {"AssertFree1ElementMultiple": [1]},
+    # Address-interleave restriction (default disabled):
+    # When >0, the solution requires tiles1=(SizeJ/MT1) to have lowbit(tiles1)>1 (i.e. G>1),
+    {"AssertFree1DivByMT1LowbitGT1": [0]},
+    # KRingShift wrap restriction (default disabled):
+    # Encodes a runtime predicate that ensures (k + KRingShift) does not wrap in main loop
+    # (wrap is allowed only in tail loop where codegen applies the correction).
+    {"AssertKRingShiftTailWrapOnly": [0]},
     {"AssertAIGreaterThanEqual": [-1]},
     {"AssertAILessThanEqual": [-1]},
     {"StaggerU": [32]},  # recommend [0,32]
@@ -377,7 +447,8 @@ defaultBenchmarkCommonParameters = [
     {"GlobalSplitUAlgorithm": ["MultipleBuffer"]},
     {"GlobalSplitUCoalesced": [False]},
     {"GlobalSplitUWorkGroupMappingRoundRobin": [False]},
-    {"Use64bShadowLimit": [1]},
+    {"Use64bShadowLimit": [True]},
+    {"Use64bShadowLimitMX": [False]}, # Disable Use64bShadowLimit for MXSA/B by default
     {"NumLoadsCoalescedA": [1]},
     {"NumLoadsCoalescedB": [1]},
     {"WorkGroup": [[16, 16, 1]]},
@@ -385,7 +456,7 @@ defaultBenchmarkCommonParameters = [
     {"WorkGroupMappingXCC": [1]},
     {"WorkGroupMappingXCCGroup": [-1]},
     {"ThreadTile": [[4, 4]]},
-    {"WavefrontSize": [64]},
+    {"WavefrontSize": [-1]},
     {"MatrixInstruction": [[]]},
     {"1LDSBuffer": [0]},
     {"DepthU": [-1]},
@@ -393,7 +464,9 @@ defaultBenchmarkCommonParameters = [
     {"NonTemporalD": [0]},
     {"NonTemporalC": [0]},
     {"NonTemporalA": [0]},
+    {"NonTemporalMXSA": [ 0 ] },
     {"NonTemporalB": [0]},
+    {"NonTemporalMXSB": [ 0 ] },
     {"NonTemporalWS": [0]},
     {"NonTemporalMetadata": [0]},
     {"NonTemporal": [-1]},
@@ -420,10 +493,24 @@ defaultBenchmarkCommonParameters = [
     {"ForceDisableShadowInit": [False]},
     {"LDSTrInst": [False]},
     {"WaveSplitK": [ False ]},
-    {"MbskPrefetchMethod": [0]},
-    {"UseCustomMainLoopSchedule": [1]},
+    {"MbskPrefetchMethod": [-1]},
+    {"UseCustomMainLoopSchedule": [-1]},
     {"SpaceFillingAlgo": [[]]},
-    {"SFCWGM": [[[1,1],[1,1]]]}
+    {"SFCWGM": [[[1,1],[1,1]]]},
+    {"AdaptiveGemm": [0]},
+    {"AdaptiveGemmGSUA": [0]},
+    {"ExtraMiLatencyLeft": [-1]},
+    {"ExtraLatencyForLR": [0]},
+    {"TailloopInNll": [False]},
+    {"SwapGlobalReadOrder": [0]},
+    {"ScheduleGROverBarrier": [-1]},
+    {"DtlPlusLdsBuf": [-1]},
+    {"MinGRIncPerMfma": [-1]},
+    {"UsePLRPack": [0]},
+    {"TDMInst": [0]},
+    {"TDMSplit": [False]},
+    {"MXScaleFormat": ["Auto"]},
+    {"MXLoadInst": ["Auto"]}
 ]
 
 # dictionary of defaults comprised of default option for each parameter

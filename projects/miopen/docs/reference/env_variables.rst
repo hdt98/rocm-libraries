@@ -83,7 +83,6 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_MODE``
         | Sets find mode to accelerate find API calls.
-        | **Note**: For details on safe/unsafe combinations with ``MIOPEN_FIND_ENFORCE``, see :ref:`Find mode and enforcement combinations <find_mode_and_enforce_combinations>`.
       - | "NORMAL" or 1: Full find mode (benchmarks all solvers)
         | "FAST" or 2: Fast find (use FindDb or immediate fallback)
         | "HYBRID" or 3: Hybrid find (FindDb hit or full find)
@@ -94,12 +93,16 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_ENFORCE``
         | Controls auto-tune behavior and database updates.
-        | **Note**: For details on safe/unsafe combinations with ``MIOPEN_FIND_MODE``, see :ref:`Find mode and enforcement combinations <find_mode_and_enforce_combinations>`.
       - | "NONE" or 1: No change in default behavior
-        | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb (unsafe with Fast/Hybrid/Trust modes)
+        | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb
         | "SEARCH" or 3: Auto-tune even if not requested via API
-        | "SEARCH_DB_UPDATE" or 4: Combination of DB_UPDATE and SEARCH (unsafe with Fast/Hybrid/Trust modes)
-        | "DB_CLEAN" or 5: Remove optimized values from User PerfDb (unsafe with Fast/Hybrid/Trust modes)
+        | "SEARCH_DB_UPDATE" or 4: Combination of DB_UPDATE and SEARCH
+        | "DB_CLEAN" or 5: Remove optimized values from User PerfDb
+
+    * - | ``MIOPEN_SEARCH_CUTOFF``
+        | Allows speculative early termination of suboptimal searches.
+      - | 1: Enable
+        | 0 or unset: Disable
 
     * - | ``MIOPEN_DEBUG_DISABLE_FIND_DB``
         | Disables FindDb functionality.
@@ -260,8 +263,8 @@ For more information, see :doc:`Logging and debugging <../how-to/debug-log>`.
       - | 0: Disable
         | 1: Enable
 
-    * - | ``MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD11X11``
-        | Controls ConvOclDirectFwd11x11 direct solution.
+    * - | ``MIOPEN_DEBUG_CONV_DIRECT_HIP_FWD11X11``
+        | Controls ConvHipDirectFwd11x11 direct solution.
       - | 0: Disable
         | 1: Enable
 
@@ -280,18 +283,8 @@ For more information, see :doc:`Logging and debugging <../how-to/debug-log>`.
       - | 0: Disable
         | 1: Enable
 
-    * - | ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW2``
-        | Controls ConvOclBwdWrW2<n> (n={1,2,4,8,16}) and ConvOclBwdWrW2NonTunable solutions.
-      - | 0: Disable
-        | 1: Enable
-
     * - | ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53``
         | Controls ConvOclBwdWrW53 direct solution.
-      - | 0: Disable
-        | 1: Enable
-
-    * - | ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1``
-        | Controls ConvOclBwdWrW1x1 direct solution.
       - | 0: Disable
         | 1: Enable
 

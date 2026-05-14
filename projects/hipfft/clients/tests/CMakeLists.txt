@@ -1,5 +1,5 @@
 # #############################################################################
-# Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -38,6 +38,26 @@ find_package( ROCmCMakeBuildTools REQUIRED CONFIG PATHS /opt/rocm )
 include(ROCMInstallTargets)
 list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake )
 
+set( hipfft-test_source
+  gtest_main.cpp
+  hipfft_accuracy_test.cpp
+  simple_test.cpp
+  accuracy_test_1D.cpp
+  accuracy_test_2D.cpp
+  accuracy_test_3D.cpp
+  accuracy_test_callback.cpp
+  hipfftw_test.cpp
+  multi_device_test.cpp
+  multi_stream_test.cpp
+  ../../shared/array_validator.cpp
+  ../../shared/test_callbacks.cpp
+  ../../shared/data_gen_device.cpp
+  )
+
+add_executable( hipfft-test ${hipfft-test_source} ${hipfft-test_includes} )
+
+set( TEST_TARGETS hipfft-test )
+
 
 # This has to be initialized before the project() command appears
 # Set the default of CMAKE_BUILD_TYPE to be release, unless user
@@ -53,10 +73,6 @@ if( NOT HIPFFT_BUILD_SCOPE )
   find_package( hipfft REQUIRED CONFIG PATHS )
 endif()
 
-find_package( Boost REQUIRED)
-
-set( Boost_USE_STATIC_LIBS OFF )
-
 # searching FFTW with FindFFTW.cmake that is provided by project
 # because distro versions of FFTW does not include the cmake specific
 # helper files
@@ -70,12 +86,13 @@ else()
   find_package(FFTW3f CONFIG QUIET )
   if( FFTW3_FOUND AND FFTW3f_FOUND )
     message(STATUS "FFTW3 found by using the FFTW3Config.cmake")
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_UPPER)
     if ( NOT WIN32 )
-      get_target_property(fftw3_libs FFTW3::fftw3 IMPORTED_LOCATION_RELEASE)
-      get_target_property(fftw3f_libs FFTW3::fftw3f IMPORTED_LOCATION_RELEASE)
+      get_target_property(fftw3_libs FFTW3::fftw3 IMPORTED_LOCATION_${CMAKE_BUILD_TYPE_UPPER})
+      get_target_property(fftw3f_libs FFTW3::fftw3f IMPORTED_LOCATION_${CMAKE_BUILD_TYPE_UPPER})
     else()
-      get_target_property(fftw3_libs FFTW3::fftw3 IMPORTED_IMPLIB_RELEASE)
-      get_target_property(fftw3f_libs FFTW3::fftw3f IMPORTED_IMPLIB_RELEASE)
+      get_target_property(fftw3_libs FFTW3::fftw3 IMPORTED_IMPLIB_${CMAKE_BUILD_TYPE_UPPER})
+      get_target_property(fftw3f_libs FFTW3::fftw3f IMPORTED_IMPLIB_${CMAKE_BUILD_TYPE_UPPER})
     endif()
 
     # Look for omp (preferred) or thread libraries. These are not a
@@ -114,28 +131,10 @@ set( BUILD_WITH_LIB "ROCM" CACHE STRING "Build ${PROJECT_NAME} with ROCM or CUDA
 set( THREADS_PREFER_PTHREAD_FLAG ON )
 find_package( Threads REQUIRED )
 
-set( hipfft-test_source
-  gtest_main.cpp
-  hipfft_accuracy_test.cpp
-  simple_test.cpp
-  accuracy_test_1D.cpp
-  accuracy_test_2D.cpp
-  accuracy_test_3D.cpp
-  accuracy_test_callback.cpp
-  hipfftw_test.cpp
-  multi_device_test.cpp
-  multi_stream_test.cpp
-  ../../shared/array_validator.cpp
-  )
-
-add_executable( hipfft-test ${hipfft-test_source} ${hipfft-test_includes} )
-
-set( TEST_TARGETS hipfft-test )
-
 # MPI worker for MPI tests
 if( HIPFFT_MPI_ENABLE )
   # build MPI worker to support the tests
-  add_executable( hipfft_mpi_worker hipfft_mpi_worker.cpp )
+  add_executable( hipfft_mpi_worker hipfft_mpi_worker.cpp ../../shared/test_callbacks.cpp )
   list( APPEND TEST_TARGETS hipfft_mpi_worker )
   target_include_directories( hipfft_mpi_worker
     PRIVATE
@@ -148,7 +147,7 @@ if( NOT BUILD_WITH_LIB STREQUAL "CUDA" )
   if( WIN32 )
     find_package( HIP CONFIG REQUIRED )
   else()
-    find_package( hip REQUIRED CONFIG PATHS /opt/rocm/lib/cmake/hip/ )
+    find_package( HIP REQUIRED )
   endif()
 endif()
 
@@ -179,19 +178,37 @@ endif()
 
 foreach( target ${TEST_TARGETS} )
   set_target_properties( ${target} PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     )
 
-    if( BUILD_CLIENTS_TESTS_OPENMP )
-      set_target_properties( ${TEST_TARGETS} PROPERTIES
-         BUILD_RPATH "${BUILD_RPATH}"
-      )
-      set_target_properties( ${TEST_TARGETS} PROPERTIES
-        INSTALL_RPATH "${INSTALL_RPATH}"
-      )
-    endif()
+  if( BUILD_CLIENTS_TESTS_OPENMP )
+    set_target_properties( ${TEST_TARGETS} PROPERTIES
+       BUILD_RPATH "${BUILD_RPATH}"
+    )
+    set_target_properties( ${TEST_TARGETS} PROPERTIES
+      INSTALL_RPATH "${INSTALL_RPATH}"
+    )
+  endif()
 
+  if( USE_HIPRAND )
+    if( NOT hiprand_FOUND )
+      find_package( hiprand REQUIRED )
+    endif()
+    
+    if( BUILD_WITH_LIB STREQUAL "CUDA" )
+      # nvcc doesn't know what do with hiprand.so.1.1, but we can try linking it to hiprand.so,
+      # assuming that it's in the same directory.
+      get_target_property( HIPRAND_FILE_PATH hip::hiprand LOCATION )
+      string( REGEX REPLACE ".so(.[0-9]*)*" ".so" HIPRAND_FILE_PATH_NOVER "${HIPRAND_FILE_PATH}" )
+      message( "Renamed hiprand so filename: ${HIPRAND_FILE_PATH_NOVER}" )
+      
+      target_link_libraries( ${target} PRIVATE ${HIPRAND_FILE_PATH_NOVER} )
+    else()
+      target_link_libraries( ${target} PRIVATE hip::hiprand )
+    endif()
+  endif()
+  
   if( BUILD_WITH_LIB STREQUAL "ROCM" )
     target_compile_options( ${target} PRIVATE ${WARNING_FLAGS} )
     target_link_libraries( ${target}
@@ -203,12 +220,6 @@ foreach( target ${TEST_TARGETS} )
       target_compile_options( ${target} PRIVATE --offload-arch=${gpu_target} )
     endforeach()
 
-    if( NOT hiprand_FOUND )
-      find_package( hiprand REQUIRED )
-    endif()
-    if( USE_HIPRAND )
-      target_link_libraries( ${target} PRIVATE hip::hiprand )
-    endif()
   else()
     target_compile_definitions( ${target} PRIVATE __HIP_PLATFORM_NVIDIA__)
     target_include_directories( ${target} PRIVATE ${HIP_INCLUDE_DIRS})
@@ -227,10 +238,8 @@ foreach( target ${TEST_TARGETS} )
     target_compile_definitions( ${target} PUBLIC _CUFFT_BACKEND )
   endif()
 
-
   target_include_directories( ${target}
     PRIVATE
-    $<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${FFTW_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${hip_INCLUDE_DIRS}>
   )
@@ -288,12 +297,6 @@ endif()
 # tests have callback functions, which need to be built as relocatable device code
 if( BUILD_WITH_LIB STREQUAL "CUDA" )
   target_compile_options( hipfft-test PRIVATE -dc )
-else()
-  # -fgpu-rdc causes failure at link stage on Windows
-  if (NOT WIN32)
-    target_compile_options( hipfft-test PRIVATE -fgpu-rdc )
-    target_link_options( hipfft-test PRIVATE -fgpu-rdc )
-  endif()
 endif()
 
 if(FFTW_MULTITHREAD)

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -18,6 +18,10 @@
 #include "ck/tensor_operation/gpu/device/conv_tensor_rearrange_op.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_grouped_conv_utils.hpp"
 #include "ck/host_utility/io.hpp"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck {
 namespace tensor_operation {
@@ -406,3 +410,5 @@ struct DeviceImageToColumnImpl
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#pragma clang diagnostic pop

@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -18,6 +18,10 @@
 #include "ck/tensor_operation/operator_transform/transform_contraction_to_gemm.hpp"
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck {
 namespace tensor_operation {
@@ -43,7 +47,7 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_batched_gemm_softmax_gemm_xdl_cshuffle_v1(
         const FloatAB* __restrict__ p_a_grid,
@@ -223,9 +227,9 @@ struct DeviceBatchedGemmSoftmaxGemmPermute_Xdl_CShuffle
                                                  MaskingSpec>
 {
     static constexpr auto MXdlPerWave64 =
-        GetNXdlPerWave2<BlockSize, NPerBlock, MPerBlock, NPerXDL, MPerXDL, NXdlPerWave, true>();
+        GetXdlPerWave2<BlockSize, NPerBlock, MPerBlock, NPerXDL, MPerXDL, NXdlPerWave, true>();
     static constexpr auto MXdlPerWave32 =
-        GetNXdlPerWave2<BlockSize, NPerBlock, MPerBlock, NPerXDL, MPerXDL, NXdlPerWave, false>();
+        GetXdlPerWave2<BlockSize, NPerBlock, MPerBlock, NPerXDL, MPerXDL, NXdlPerWave, false>();
 
     static_assert(NumDimG > 0 && NumDimM > 0 && NumDimN > 0 && NumDimK > 0 && NumDimO > 0,
                   "Number of dimension must be greater than 0");
@@ -983,3 +987,5 @@ struct DeviceBatchedGemmSoftmaxGemmPermute_Xdl_CShuffle
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#pragma clang diagnostic pop

@@ -27,15 +27,22 @@
 #pragma once
 
 #include <cstdlib>
+#include <set>
 #include <string>
+#include <Tensile/Macros.hpp>
+
 #ifdef Tensile_ENABLE_MARKER
 #include <roctracer/roctx.h>
 #endif
 
 #include <Tensile/Singleton.hpp>
 
+TENSILE_HIDDEN_BEGIN
+
 namespace TensileLite
 {
+    using StringSet = std::set<std::string>;
+
     /**
      * @brief Common place for defining flags which enable debug behaviour.
      */
@@ -44,6 +51,7 @@ namespace TensileLite
     public:
         bool printPropertyEvaluation() const;
         bool printPredicateEvaluation() const;
+        bool printPredicateEvaluationVerbose() const;
         bool printDeviceSelection() const;
         bool printCodeObjectInfo() const;
         bool printKernelArguments() const;
@@ -83,6 +91,10 @@ namespace TensileLite
         bool gridBasedBatchExp() const;
 
         bool disableStaggerU() const;
+
+        StringSet excludedLibFromGetAll() const;
+
+        void setExcludedLibFromGetAll(StringSet& excludedSet);
 
         __attribute__((always_inline)) inline void markerStart(const char* name) const
         {
@@ -133,7 +145,10 @@ namespace TensileLite
         bool        m_gridbasedBatchExp   = false;
         bool        m_printMarker         = false;
         bool        m_disableStaggerU     = false;
+        StringSet   m_excludedFromGetAll;
 
         Debug();
     };
 } // namespace TensileLite
+
+TENSILE_HIDDEN_END

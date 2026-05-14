@@ -1,3 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
 /*
  * The MIT License (MIT)
  *
@@ -842,6 +845,7 @@ inline void run(int argc, const char* argv[])
 
 #ifdef __clang__
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
 #endif
 

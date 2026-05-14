@@ -2,6 +2,52 @@
 
 Full documentation for hipBLASLt is available at [rocm.docs.amd.com/projects/hipBLASLt](https://rocm.docs.amd.com/projects/hipBLASLt/en/latest/index.html).
 
+## hipBLASLt 1.4.0
+
+### Added
+
+* Complex datatype support for gfx942 and gfx950.
+
+## hipBLASLt 1.3.0
+
+### Added
+
+* General Batched GEMM support.
+
+### Changed
+
+* Replaced `install.sh` with an invoke-based task runner (`tasks.py`) to support cross-platform builds including Windows (ROCm 7.0+).
+* gtest and msgpack-cxx are now fetched automatically via CMake FetchContent if not found on the system.
+* Greatly improved MXFP4 GEMM performance when using HIPBLASLT_MATMUL_MATRIX_SCALE_BLK32_UE8M0_32_8_EXT
+
+## hipBLASLt 1.2.2 for ROCm 7.2.1
+
+### Added
+
+* Support for AMD SMI.
+
+### Changed
+
+* Migrate `HIPBLASLT_ENABLE_LLVM` to `HIPBLASLT_ENABLE_YAML` and synchronize with tensilelite's build library format.
+
+### Deprecation
+
+* ROCm SMI is deprecated and dependencies are removed.
+
+## hipBLASLt 1.2.1 for ROCm 7.2.1
+
+### Resolved issues
+
+* Fix issue where users might encounter a `HIPBLAS_STATUS_INTERNAL_ERROR` with various sizes in CPX mode.
+
+## hipBLASLt 1.2.0 for ROCm 7.2.0
+
+### Added
+
+* Support for 'BF16' input with 'FP32' output data type for gfx90a.
+* Support for hipBLASLtExt operation APIs on gfx11XX and gfx12XX.
+* Added ``HIPBLASLT_MATMUL_MATRIX_SCALE_BLK32_UE8M0_32_8_EXT`` to support pre-swizzled block scaling data.
+
 ## hipBLASLt 1.1.0 for ROCm 7.1.0
 
 ### Added

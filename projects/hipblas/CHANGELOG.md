@@ -3,6 +3,31 @@
 Documentation for hipBLAS is available at
 [https://rocm.docs.amd.com/projects/hipBLAS/en/latest/](https://rocm.docs.amd.com/projects/hipBLAS/en/latest/).
 
+## hipBLAS 3.4.0 
+ 
+### Added
+
+* gfx1250 and gfx90c support to clients.
+* Version and other properties to Windows `hipblas.dll`.
+* Support for `OpenBLAS` ILP64-based API usage in clients.
+
+### Resolved issue
+
+* Restored fallback of using the deprecated rocBLAS API `rocblas_set_device_memory_size` if allocations are failing.
+
+## hipBLAS 3.3.0
+
+### Added
+
+* Added the `hipblasHerkEx()` API.
+* Added the `hipblasSyrkEx()` API.
+
+## hipBLAS 3.2.0 for ROCm 7.2
+
+### Resolved issues
+* Corrected client memory use counts for the `HIPBLAS_CLIENT_RAM_GB_LIMIT` environment variable.
+* Fix to avoid false Clang static analysis warnings.
+
 ## hipBLAS 3.1.0 for ROCm 7.1
 
 ### Added

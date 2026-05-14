@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -11,6 +11,10 @@
 
 #include "device_base.hpp"
 #include "ck/utility/ignore.hpp"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck {
 namespace tensor_operation {
@@ -94,7 +98,8 @@ template <typename ALayout,
           typename EDataType,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
-          typename CElementwiseOperation>
+          typename CElementwiseOperation,
+          typename ComputeDataType = ADataType>
 struct DeviceGroupedGemm : public BaseOperator
 {
     static constexpr index_t NumDTensor = DsDataType::Size();
@@ -177,3 +182,5 @@ struct DeviceGroupedGemm : public BaseOperator
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#pragma clang diagnostic pop

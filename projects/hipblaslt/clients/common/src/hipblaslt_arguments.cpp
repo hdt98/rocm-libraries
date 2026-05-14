@@ -42,8 +42,10 @@ void Arguments::init()
     category[0]            = 0;
     known_bug_platforms[0] = 0;
 
-    alpha = 1.0;
-    beta  = 0.0;
+    alpha  = 1.0;
+    alphai = 0.0;
+    beta   = 0.0;
+    betai  = 0.0;
 
     memset(stride_a, 0, sizeof(int64_t) * MAX_SUPPORTED_NUM_PROBLEMS);
     memset(stride_b, 0, sizeof(int64_t) * MAX_SUPPORTED_NUM_PROBLEMS);
@@ -121,11 +123,6 @@ void Arguments::init()
     gradient          = false;
     norm_check_assert = true;
 
-    scaleABlockRowSize = 0;
-    scaleABlockColSize = 0;
-    scaleBBlockRowSize = 0;
-    scaleBBlockColSize = 0;
-
     use_ext                  = false;
     use_ext_setproblem       = false;
     algo_method              = 0;
@@ -146,9 +143,9 @@ void Arguments::init()
         wgm_vector[i] = -1;
     }
 
-    print_solution_found = false;
-    flush                = false;
-    tensile_solution_selection_method   = -1;
+    print_solution_found              = false;
+    flush                             = false;
+    tensile_solution_selection_method = -1;
 }
 
 // Function to print Arguments out to stream in YAML format

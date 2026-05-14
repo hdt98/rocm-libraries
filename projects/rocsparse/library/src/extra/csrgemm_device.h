@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -412,7 +412,7 @@ namespace rocsparse
             if(temp == key)
             {
                 // Element already present, add value to exsiting entry
-                rocsparse::atomic_add(&data[hash], val);
+                rocsparse::atomic_add(data, hash, HASHSIZE, val);
                 break;
             }
             else if(temp == empty)
@@ -421,7 +421,7 @@ namespace rocsparse
                 if(rocsparse::atomic_cas<I>(&table[hash], empty, key) == empty)
                 {
                     // Add value
-                    rocsparse::atomic_add(&data[hash], val);
+                    rocsparse::atomic_add(data, hash, HASHSIZE, val);
                     break;
                 }
             }
@@ -982,6 +982,7 @@ namespace rocsparse
 
         // Entry point of current row into C
         I row_begin_C = csr_row_ptr_C[row] - idx_base_C;
+        I row_end_C   = csr_row_ptr_C[row + 1] - idx_base_C;
 
         // Loop over hash table
         for(uint32_t i = lid; i < HASHSIZE; i += WFSIZE)
@@ -1018,8 +1019,11 @@ namespace rocsparse
             }
 
             // Write column and accumulated value to the obtained position in C
-            csr_col_ind_C[idx_C] = col_C + idx_base_C;
-            csr_val_C[idx_C]     = data[i];
+            if(idx_C >= row_begin_C && idx_C < row_end_C)
+            {
+                csr_col_ind_C[idx_C] = col_C + idx_base_C;
+                csr_val_C[idx_C]     = data[i];
+            }
         }
     }
 
@@ -1227,8 +1231,11 @@ namespace rocsparse
             }
 
             // Write column and accumulated value to the obtain position in C
-            csr_col_ind_C[idx_C] = col_C + idx_base_C;
-            csr_val_C[idx_C]     = val_C;
+            if(idx_C >= row_begin_C && idx_C < row_end_C)
+            {
+                csr_col_ind_C[idx_C] = col_C + idx_base_C;
+                csr_val_C[idx_C]     = val_C;
+            }
         }
     }
 
@@ -1295,6 +1302,7 @@ namespace rocsparse
 
         // Entry point into columns of C
         I row_begin_C = csr_row_ptr_C[row] - idx_base_C;
+        I row_end_C   = csr_row_ptr_C[row + 1] - idx_base_C;
 
         // Loop over the row chunks until the end of the row has been reached (which is
         // the number of total columns)
@@ -1352,7 +1360,8 @@ namespace rocsparse
                             table[col_B - chunk_begin] = 1;
 
                             // Atomically accumulate the intermediate products
-                            rocsparse::atomic_add(&data[col_B - chunk_begin], val_A * csr_val_B[k]);
+                            rocsparse::atomic_add(
+                                data, col_B - chunk_begin, CHUNKSIZE, val_A * csr_val_B[k]);
                         }
                         else if(col_B >= chunk_end)
                         {
@@ -1396,7 +1405,8 @@ namespace rocsparse
                         table[col_D - chunk_begin] = 1;
 
                         // Atomically accumulate the entry of D
-                        rocsparse::atomic_add(&data[col_D - chunk_begin], beta * csr_val_D[j]);
+                        rocsparse::atomic_add(
+                            data, col_D - chunk_begin, CHUNKSIZE, beta * csr_val_D[j]);
                     }
                     else if(col_D >= chunk_end)
                     {
@@ -1479,7 +1489,7 @@ namespace rocsparse
                 I idx = row_begin_C + offset - 1;
 
                 // Only threads with a non-zero value write to C
-                if(has_nnz)
+                if(has_nnz && idx < row_end_C)
                 {
                     csr_col_ind_C[idx] = i + chunk_begin + idx_base_C;
                     csr_val_C[idx]     = value;

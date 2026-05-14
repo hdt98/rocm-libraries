@@ -26,8 +26,8 @@
 #ifndef GUARD_TENSOR_HOLDER_HPP
 #define GUARD_TENSOR_HOLDER_HPP
 
-#include "ford.hpp"
 #include "network_data.hpp"
+#include <miopen/ford.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/functional.hpp>
 #include <miopen/type_name.hpp>
@@ -307,15 +307,15 @@ struct tensor
             }
         };
 
-        void operator()(any = {},
-                        any = {},
-                        any = {},
-                        any = {},
-                        any = {},
-                        any = {},
-                        any = {},
-                        any = {},
-                        any = {}) const
+        [[noreturn]] void operator()(any = {},
+                                     any = {},
+                                     any = {},
+                                     any = {},
+                                     any = {},
+                                     any = {},
+                                     any = {},
+                                     any = {},
+                                     any = {}) const
         {
             throw std::runtime_error(
                 "Arguments to for_each do not match tensor size or the function " +
@@ -338,7 +338,7 @@ struct tensor
     {
         visit_tensor_size(
             desc.GetLengths().size(),
-            std::bind(for_each_handler{}, this, ford, std::move(f), std::placeholders::_1));
+            std::bind(for_each_handler{}, this, miopen::ford, std::move(f), std::placeholders::_1));
     }
 
     template <class F>
@@ -346,7 +346,8 @@ struct tensor
     {
         visit_tensor_size(
             desc.GetLengths().size(),
-            std::bind(for_each_handler{}, this, par_ford, std::move(f), std::placeholders::_1));
+            std::bind(
+                for_each_handler{}, this, miopen::par_ford, std::move(f), std::placeholders::_1));
     }
 
     template <class... Ts>

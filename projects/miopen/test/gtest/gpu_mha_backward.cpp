@@ -54,7 +54,7 @@ struct TensorStruct
     {
     }
 
-    TensorStruct(const TensorStruct&) = delete;
+    TensorStruct(const TensorStruct&)            = delete;
     TensorStruct& operator=(const TensorStruct&) = delete;
 
     ~TensorStruct() = default;
@@ -317,7 +317,7 @@ protected:
             }
 
             solutions.resize(found);
-            return solutions;
+            return std::move(solutions);
         };
 
         std::vector<miopenSolution_t> solutions = FindSolutions(problem);
@@ -375,6 +375,11 @@ protected:
             checkOutput(miopenTensorMhaDQ, "tensor dQ", dQDesc_ref);
             checkOutput(miopenTensorMhaDK, "tensor dK", dKDesc_ref);
             checkOutput(miopenTensorMhaDV, "tensor dV", dVDesc_ref);
+        }
+
+        for(auto& solution : solutions)
+        {
+            ASSERT_EQ(miopenDestroySolution(solution), miopenStatusSuccess);
         }
     }
 

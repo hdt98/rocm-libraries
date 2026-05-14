@@ -26,7 +26,7 @@
 #include "rocfft_hip.h"
 
 // RAII wrapper around HIP objects
-template <typename T, auto TCreate, auto TDestroy>
+template <typename T, auto TCreate, auto TDestroy, auto TSuccess = hipSuccess>
 struct hip_object_wrapper_t
 {
     hip_object_wrapper_t()
@@ -34,10 +34,19 @@ struct hip_object_wrapper_t
     {
     }
 
-    void alloc()
+    template <typename... Args>
+    void alloc(Args&&... arg)
     {
-        if(obj == nullptr && TCreate(&obj) != hipSuccess)
-            throw std::runtime_error("hip create failure");
+        free();
+        if(TCreate(&obj, std::forward<Args>(arg)...) != TSuccess)
+            throw std::runtime_error("object allocation failure");
+    }
+
+    template <typename... Args>
+    auto alloc_with_err(Args&&... arg)
+    {
+        free();
+        return TCreate(&obj, std::forward<Args>(arg)...);
     }
 
     void free()
@@ -76,11 +85,18 @@ struct hip_object_wrapper_t
         other.obj = nullptr;
     }
 
+    hip_object_wrapper_t& operator=(hip_object_wrapper_t&& other)
+    {
+        std::swap(obj, other.obj);
+        return *this;
+    }
+
 private:
     T obj;
 };
 
-typedef hip_object_wrapper_t<hipStream_t, hipStreamCreate, hipStreamDestroy> hipStream_wrapper_t;
-typedef hip_object_wrapper_t<hipEvent_t, hipEventCreate, hipEventDestroy>    hipEvent_wrapper_t;
+typedef hip_object_wrapper_t<hipStream_t, hipStreamCreate, hipStreamDestroy>  hipStream_wrapper_t;
+typedef hip_object_wrapper_t<hipEvent_t, hipEventCreate, hipEventDestroy>     hipEvent_wrapper_t;
+typedef hip_object_wrapper_t<hipModule_t, hipModuleLoadData, hipModuleUnload> hipModule_wrapper_t;
 
 #endif // ROCFFT_HIP_OBJ_WRAPPER_H

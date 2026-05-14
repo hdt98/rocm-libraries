@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -24,6 +24,9 @@
 #include "ck/host_utility/io.hpp"
 #include "ck/library/utility/numeric.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 namespace ck {
 namespace tensor_operation {
 namespace device {
@@ -173,7 +176,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
         const auto rs_batch_offset = compute_ptr_offset_of_batch.GetRsPtrOffset(g_idx);
 
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
+        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
 
         DsPointer p_ds_grid_grp;
 
@@ -1141,3 +1144,4 @@ struct DeviceGroupedConvFwdMultipleDMultipleR_Xdl_CShuffle
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+#pragma clang diagnostic pop

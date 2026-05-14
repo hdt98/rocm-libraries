@@ -166,15 +166,15 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     T* copyB = (T*)(*phase2_work)["copyB"];
 
     // constants in host memory
-    const rocblas_int copyblocksx = (n - 1) / 32 + 1;
-    const rocblas_int copyblocksy = (nrhs - 1) / 32 + 1;
+    const rocblas_int copyblocksx = (n - 1) / BS2 + 1;
+    const rocblas_int copyblocksy = (nrhs - 1) / BS2 + 1;
 
     // compute LU factorization of A
     rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0,
                                                   strideP, info, batch_count, getrf_work, true);
 
     // save elements of B that will be overwritten by GETRS for cases where info is nonzero
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(BS2, BS2),
                             0, stream, copymat_to_buffer, n, nrhs, B, shiftB, ldb, strideB,
                             (T*)copyB, info_mask(info));
 
@@ -184,7 +184,7 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                                                   1, ldb, strideB, batch_count, getrs_work, true);
 
     // restore elements of B that were overwritten by GETRS in cases where info is nonzero
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(BS2, BS2),
                             0, stream, copymat_from_buffer, n, nrhs, B, shiftB, ldb, strideB,
                             (T*)copyB, info_mask(info));
 

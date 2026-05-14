@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -91,6 +91,7 @@ std::string SequenceStr(const std::vector<int>& v);
 std::string MakeTuple(const std::vector<std::string>& v);
 
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
 template <int... xs>
 const std::string S = SequenceStr({xs...});

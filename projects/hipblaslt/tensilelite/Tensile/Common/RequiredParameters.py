@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +35,7 @@ def getRequiredParametersMin() -> set:
     return frozenset({
         '1LDSBuffer',
         'ActivationFuncCall',
+        'AdaptiveGemm',
         'AssertFree0ElementMultiple',
         'AssertFree1ElementMultiple',
         'AssertSummationElementMultiple',
@@ -42,9 +43,14 @@ def getRequiredParametersMin() -> set:
         'ConvertAfterDS',
         'DirectToVgprA',
         'DirectToVgprB',
+        'DirectToVgprSparseMetadata',
         'DirectToLdsA',
         'DirectToLdsB',
+        'DirectToVgprMXSA',
+        'DirectToVgprMXSB',
         'ExpandPointerSwap',
+        'ExtraLatencyForLR',
+        'ExtraMiLatencyLeft',
         'ForceDisableShadowInit',
         'GlobalReadPerMfma',
         'GlobalReadVectorWidthA',
@@ -60,6 +66,7 @@ def getRequiredParametersMin() -> set:
         'LdsPadA',
         'LdsPadB',
         'LdsPadMetadata',
+        'LDSTrInst',
         'LocalReadVectorWidth',
         'LocalWritePerMfma',
         'MIArchVgpr',
@@ -78,6 +85,7 @@ def getRequiredParametersMin() -> set:
         'PrefetchLocalRead',
         'PreloadKernArgs',
         'ScheduleIterAlg',
+        'ScheduleGROverBarrier',
         'SourceSwap',
         'SpaceFillingAlgo',
         'StorePriorityOpt',
@@ -87,9 +95,17 @@ def getRequiredParametersMin() -> set:
         'StreamK',
         'StreamKXCCMapping',
         'StreamKFixupTreeReduction',
+        'SwapGlobalReadOrder',
+        'TailloopInNll',
         'TransposeLDS',
+        'TransposeLDSMetadata',
+        'TDMInst',
+        "TDMSplit",
+        "MXScaleFormat",
+        "MXLoadInst",
         'UnrollLoopSwapGlobalReadOrder',
         'Use64bShadowLimit',
+        'Use64bShadowLimitMX',
         'UseInstOffsetForGRO',
         'UseSgprForGRO',
         'VectorStore',
@@ -99,4 +115,8 @@ def getRequiredParametersMin() -> set:
         'WaveSeparateGlobalReadB',
         'WavefrontSize',
         'WorkGroup',
+        'DtlPlusLdsBuf',
+        'MinGRIncPerMfma',
+        'UsePLRPack',
+        'UseSubtileImpl'
     })

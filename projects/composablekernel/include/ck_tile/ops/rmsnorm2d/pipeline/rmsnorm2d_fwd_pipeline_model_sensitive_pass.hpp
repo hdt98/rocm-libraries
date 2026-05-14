@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -102,8 +102,8 @@ struct Rmsnorm2dFwdPipelineModelSensitiveT5Pass
         auto reduce_sum_func        = ReduceOp::Add{};
         auto block_reduce2d         = Policy::template GetBlockReduce2d<Problem>();
         auto block_reduce2d_sync    = Policy::template GetBlockReduce2dSync<Problem>();
-        auto block_reduce2d_tree_cross_warp_sync =
-            Policy::template GetBlockReduce2dTreeCrossWarpSync<Problem>();
+        auto block_reduce2d_cross_warp_sync =
+            Policy::template GetBlockReduce2dCrossWarpSync<Problem>();
 
         auto x      = load_tile(x_window);
         auto x_resi = load_tile(x_residual_window);
@@ -162,7 +162,7 @@ struct Rmsnorm2dFwdPipelineModelSensitiveT5Pass
                                         reduce_square_sum_func);
         }
         block_reduce2d_sync(square_sum, reduce_sum_func);
-        block_reduce2d_tree_cross_warp_sync(square_sum, smem, reduce_sum_func);
+        block_reduce2d_cross_warp_sync(square_sum, smem, reduce_sum_func);
 
         // compute inv-rms
         auto inv_rms = tile_elementwise_in(
@@ -181,12 +181,10 @@ struct Rmsnorm2dFwdPipelineModelSensitiveT5Pass
 
             if constexpr(std::is_same_v<XDataType, ck_tile::bf16_t>)
             {
-                const auto tmp0 =
-                    float_to_bf16<bf16_rounding_mode::standard>(acc[idx] * inv_rms_[i_idx]);
-                const auto tmp1 = float_to_bf16<bf16_rounding_mode::standard>(
-                    type_convert<ComputeDataType>(tmp0) * gamma_);
-                const auto rmsn_ = type_convert<ComputeDataType>(tmp1);
-                rmsn(idx)        = rmsn_;
+                const auto tmp      = acc[idx] * inv_rms_[i_idx];
+                const auto tmp_bf16 = float_to_bf16<bf16_rounding_mode::standard>(tmp);
+                const auto rmsn_    = type_convert<ComputeDataType>(tmp_bf16) * gamma_;
+                rmsn(idx)           = rmsn_;
             }
             else
             {

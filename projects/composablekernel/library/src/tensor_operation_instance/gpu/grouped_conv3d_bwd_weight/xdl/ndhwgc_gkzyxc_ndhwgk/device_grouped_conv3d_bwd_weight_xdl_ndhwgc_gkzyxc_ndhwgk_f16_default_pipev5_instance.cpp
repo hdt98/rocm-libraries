@@ -1,8 +1,9 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "ck/library/tensor_operation_instance/add_device_operation_instance.hpp"
 #include "ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight/device_grouped_conv_bwd_weight_v3_xdl_instance.hpp"
+#include "ck/host_utility/device_prop.hpp"
 
 namespace ck {
 namespace tensor_operation {
@@ -22,15 +23,30 @@ void add_device_grouped_conv3d_bwd_weight_xdl_ndhwgc_gkzyxc_ndhwgk_f16_default_p
                                                            PassThrough,
                                                            PassThrough>>>& instances)
 {
-    add_device_operation_instances(instances,
-                                   device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_f16_instances<
-                                       3,
-                                       NDHWGC,
-                                       GKZYXC,
-                                       NDHWGK,
-                                       ConvBwdWeightDefault,
-                                       BlockGemmPipelineScheduler::Intrawave,
-                                       BlockGemmPipelineVersion::v5>{});
+    add_device_operation_instances(
+        instances,
+        device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_f16_base_instances<
+            3,
+            NDHWGC,
+            GKZYXC,
+            NDHWGK,
+            ConvBwdWeightDefault,
+            BlockGemmPipelineScheduler::Intrawave,
+            BlockGemmPipelineVersion::v5>{});
+    if(!is_gfx90a())
+    {
+        add_device_operation_instances(
+            instances,
+            device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_high_reg_usage_instances<
+                3,
+                ck::half_t,
+                NDHWGC,
+                GKZYXC,
+                NDHWGK,
+                ConvBwdWeightDefault,
+                BlockGemmPipelineScheduler::Intrawave,
+                BlockGemmPipelineVersion::v5>{});
+    }
 }
 
 } // namespace instance
