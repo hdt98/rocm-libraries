@@ -65,7 +65,7 @@ If you've already written the FBS schema or have a written description of one, p
 
 The agent leaves these pieces for you to author:
 
-- **JSON serialization helper** — `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/<Op>Attributes.hpp`. Template: [`ConvolutionFwdAttributes.hpp`](../flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/ConvolutionFwdAttributes.hpp).
+- **JSON serialization helper** — `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/<Op>Attributes.hpp`. Template: [`MatmulAttributes.hpp`](../flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/MatmulAttributes.hpp).
 - **Python bindings (optional)** — only if your op is on the curated Python surface (current set: `batchnorm`, `batchnorm_backward`, `batchnorm_inference`, `pointwise`, `conv_fprop`, `matmul`). Add a `.def(...)` line in `python/src/graph_bindings.cpp` and register the attributes class in `python/src/attributes_bindings.cpp`.
 - **`infer_properties_node()` body** — fill in the stub the agent left in `<Op>Node.hpp`. Document the output-dimension formula in a comment for non-trivial shape rules.
 - **Operation-specific tests** beyond the auto-generated round-trips: multi-input variants, multi-op graph chains, edge cases (zero-sized dims, fused activations).
@@ -167,22 +167,18 @@ A `_EXT` suffix is itself the marker for "not in cuDNN". Add a short comment in 
 
 ## File Map (PR Diff Template)
 
-The complete surface area for a single op, using **ConvolutionFwd** (backend name) / **ConvolutionFprop** (frontend name) as the canonical example. Use as the diff template when reviewing your own PR.
-
-> [!NOTE]
-> Backend types use the `Fwd` / `Bwd` / `Wrw` suffixes; frontend types use the cuDNN-aligned `Fprop` / `Dgrad` / `Wgrad` suffixes. The split is historical and is preserved deliberately for cuDNN naming parity on the frontend.
+The complete surface area for a single op, using **Matmul** as the canonical example. Use as the diff template when reviewing your own PR.
 
 | Layer | File |
 |---|---|
-| FBS schema | `flatbuffers_sdk/schemas/convolution_fwd_attributes.fbs` |
-| FBS schema (shared) | `flatbuffers_sdk/schemas/convolution_common.fbs` |
+| FBS schema | `flatbuffers_sdk/schemas/matmul_attributes.fbs` |
 | FBS union entry | `flatbuffers_sdk/schemas/graph.fbs` (`NodeAttributes` union) |
 | FBS CMake list | `flatbuffers_sdk/CMakeLists.txt` (`SCHEMAS` variable) |
 | Backend descriptor type enum | `backend/include/HipdnnBackendDescriptorType.h` |
 | Backend attribute name enum | `backend/include/HipdnnBackendAttributeName.h` |
 | Backend attribute type enum | `backend/include/HipdnnBackendAttributeType.h` |
 | Backend operation type enum | `backend/include/HipdnnOperationType.h` |
-| Backend descriptor class | `backend/src/descriptors/ConvolutionFwdOperationDescriptor.{hpp,cpp}` |
+| Backend descriptor class | `backend/src/descriptors/MatmulOperationDescriptor.{hpp,cpp}` |
 | Backend descriptor factory | `backend/src/descriptors/DescriptorFactory.cpp` |
 | Backend node factory (lifting) | `backend/src/descriptors/NodeFactory.cpp` |
 | Backend enum string utils | `backend/src/BackendEnumStringUtils.hpp` (header-only) |
@@ -190,25 +186,24 @@ The complete surface area for a single op, using **ConvolutionFwd** (backend nam
 | Backend attribute set/get helpers | `backend/src/descriptors/DescriptorAttributeUtils.{hpp,cpp}` |
 | Backend CMake | `backend/src/CMakeLists.txt` |
 | Frontend Types (enum + converters) | `frontend/include/hipdnn_frontend/Types.hpp` |
-| Frontend attributes class | `frontend/include/hipdnn_frontend/attributes/ConvolutionFpropAttributes.hpp` |
-| Frontend packer (lowering) | `frontend/include/hipdnn_frontend/detail/ConvolutionFpropPacker.hpp` |
-| Frontend unpacker (lifting) | `frontend/include/hipdnn_frontend/detail/ConvolutionFpropUnpacker.hpp` |
+| Frontend attributes class | `frontend/include/hipdnn_frontend/attributes/MatmulAttributes.hpp` |
+| Frontend packer (lowering) | `frontend/include/hipdnn_frontend/detail/MatmulPacker.hpp` |
+| Frontend unpacker (lifting) | `frontend/include/hipdnn_frontend/detail/MatmulUnpacker.hpp` |
 | Frontend operation unpacker switch | `frontend/include/hipdnn_frontend/detail/OperationUnpacker.hpp` |
-| Frontend node class | `frontend/include/hipdnn_frontend/node/ConvolutionFpropNode.hpp` |
-| Frontend Graph API | `frontend/include/hipdnn_frontend/Graph.hpp` (`Graph::conv_fprop(...)`) |
-| JSON utility (hand-authored) | `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/ConvolutionFwdAttributes.hpp` |
+| Frontend node class | `frontend/include/hipdnn_frontend/node/MatmulNode.hpp` |
+| Frontend Graph API | `frontend/include/hipdnn_frontend/Graph.hpp` (`Graph::matmul(...)`) |
+| JSON utility (hand-authored) | `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/MatmulAttributes.hpp` |
 | Python bindings (optional) | `python/src/graph_bindings.cpp`, `python/src/attributes_bindings.cpp` |
-| Backend descriptor unit test | `backend/tests/descriptors/TestConvolutionFwdOperationDescriptor.cpp` |
-| Backend fromNode test | `backend/tests/descriptors/TestConvolutionBwdOperationFromNode.cpp` (Bwd shown — same shape applies to Fwd) |
-| Backend graph descriptor test | `backend/tests/descriptors/TestGraphDescriptorConvolutionBwd.cpp` (Bwd shown — same shape applies to Fwd) |
+| Backend descriptor unit test | `backend/tests/descriptors/TestMatmulOperationDescriptor.cpp` |
+| Backend fromNode test | `backend/tests/descriptors/TestMatmulOperationFromNode.cpp` |
+| Backend graph descriptor test | `backend/tests/descriptors/TestGraphDescriptorMatmul.cpp` |
 | Backend enum string test | `backend/tests/TestBackendEnumStringUtils.cpp` |
-| Frontend attributes test | `frontend/tests/TestConvolutionFwdAttributes.cpp` |
-| Frontend node test | `frontend/tests/TestConvolutionNode.cpp` (combined Conv test — generator emits a per-op file for new ops) |
-| Integration lowering test | `tests/frontend/IntegrationConvFpropDescriptorLowering.cpp` |
-| Integration lifting test | `tests/frontend/IntegrationConvFpropDescriptorLifting.cpp` |
-| Test SDK constants | `test_sdk/include/hipdnn_test_sdk/constants/ConvFpropConstants.hpp` |
-| Sample (optional) | `samples/convolution/ConvFprop.cpp` |
-| YAML config | `tools/DescriptorGenerator/configs/convolution_fwd.yaml` |
+| Frontend attributes test | `frontend/tests/TestMatmulAttributes.cpp` |
+| Frontend node test | `frontend/tests/TestMatmulNode.cpp` |
+| Integration lowering test | `tests/frontend/IntegrationMatmulDescriptorLowering.cpp` |
+| Integration lifting test | `tests/frontend/IntegrationMatmulDescriptorLifting.cpp` |
+| Test SDK constants | `test_sdk/include/hipdnn_test_sdk/constants/MatmulConstants.hpp` |
+| YAML config | `tools/DescriptorGenerator/configs/matmul.yaml` |
 
 ---
 
@@ -257,19 +252,19 @@ See [Polish the Stubs](#polish-the-stubs).
 
 Each layer has a required test. Every checkbox in the [PR Checklist](#pr-checklist) maps to a row here.
 
-| Layer | Required test | Source | ConvolutionFwd reference |
+| Layer | Required test | Source | Matmul reference |
 |---|---|---|---|
-| Backend descriptor unit | construction, finalize, get/setAttribute | generator | `backend/tests/descriptors/TestConvolutionFwdOperationDescriptor.cpp` |
-| `fromNode` | FlatBuffer → backend descriptor lifting | generator | `backend/tests/descriptors/TestConvolutionBwdOperationFromNode.cpp` (Bwd shown) |
-| Backend graph descriptor | full graph including the node, descriptor mode | generator | `backend/tests/descriptors/TestGraphDescriptorConvolutionBwd.cpp` (Bwd shown) |
-| Frontend attribute | getters/setters/validation | generator | `frontend/tests/TestConvolutionFwdAttributes.cpp` |
-| Frontend node | construction, `pre_validate_node` | generator | `frontend/tests/TestConvolutionNode.cpp` |
-| Frontend graph | end-to-end frontend graph | generator | `frontend/tests/TestGraph.cpp` |
-| Lowering integration | frontend node → backend descriptor round-trip | generator | `tests/frontend/IntegrationConvFpropDescriptorLowering.cpp` |
-| Lifting integration | backend descriptor → frontend node round-trip; tensor sharing; auto-assigned UIDs; per-scalar preservation | generator | `tests/frontend/IntegrationConvFpropDescriptorLifting.cpp` |
-| Constants header | shared per-op test constants | generator | `test_sdk/include/hipdnn_test_sdk/constants/ConvFpropConstants.hpp` |
+| Backend descriptor unit | construction, finalize, get/setAttribute | generator | `backend/tests/descriptors/TestMatmulOperationDescriptor.cpp` |
+| `fromNode` | FlatBuffer → backend descriptor lifting | generator | `backend/tests/descriptors/TestMatmulOperationFromNode.cpp` |
+| Backend graph descriptor | full graph including the node, descriptor mode | generator | `backend/tests/descriptors/TestGraphDescriptorMatmul.cpp` |
+| Frontend attribute | getters/setters/validation | generator | `frontend/tests/TestMatmulAttributes.cpp` |
+| Frontend node | construction, `pre_validate_node` | generator | `frontend/tests/TestMatmulNode.cpp` |
+| Frontend graph | end-to-end frontend graph | generator | `frontend/tests/TestGraph.cpp` (generator emits a per-op file for new ops) |
+| Lowering integration | frontend node → backend descriptor round-trip | generator | `tests/frontend/IntegrationMatmulDescriptorLowering.cpp` |
+| Lifting integration | backend descriptor → frontend node round-trip; tensor sharing; auto-assigned UIDs; per-scalar preservation | generator | `tests/frontend/IntegrationMatmulDescriptorLifting.cpp` |
+| Constants header | shared per-op test constants | generator | `test_sdk/include/hipdnn_test_sdk/constants/MatmulConstants.hpp` |
 | Backend enum string | one `EXPECT_STREQ` per new attribute and descriptor type | hand-add | `backend/tests/TestBackendEnumStringUtils.cpp` |
-| Sample (optional but expected) | end-user-style usage | hand-author | `samples/convolution/ConvFprop.cpp` |
+| Sample (optional but expected) | end-user-style usage | hand-author | `samples/<op>/` |
 
 > [!IMPORTANT]
 > Reuse the shared helpers from [`test_sdk/include/hipdnn_test_sdk/utilities/`](../test_sdk/include/hipdnn_test_sdk/utilities/): `IntegrationTestFixture`, `LoweringTestHelpers`, `LiftingTestHelpers`. Do not roll your own fixtures.
@@ -295,7 +290,7 @@ Each layer has a required test. Every checkbox in the [PR Checklist](#pr-checkli
 | Backend reports "unknown attribute name" | `_EXT` suffix mismatch between `HipdnnBackendAttributeName.h` and the YAML. Verify both sides use the same suffix. |
 | Compile error about a duplicate enum value | Enum value collision (someone landed on the same value while you were rebasing). Re-pick the next free value and re-run insertion. |
 | Generator output not built | The CMake fragment was not inserted. Confirm the snippet from `fragments/*_cmake_*.txt` was applied to the right `CMakeLists.txt`. |
-| Lifting test fails on tensor sharing | The unpacker is not using `getOrCreate` semantics for shared tensors. Check the unpacker against `ConvolutionFpropUnpacker.hpp`. |
+| Lifting test fails on tensor sharing | The unpacker is not using `getOrCreate` semantics for shared tensors. Check the unpacker against `MatmulUnpacker.hpp`. |
 | Unpacker references a converter that exists in backend headers but not in frontend `Types.hpp` | The mode-frontend-plumbing fragment was not fully applied. Insert the inverse converter from the fragment. |
 | Segfaults during graph execution plan build | Plugins require PIC/PIE. Set `set(CMAKE_POSITION_INDEPENDENT_CODE ON)` in your consumer CMake. See [HowTo.md troubleshooting](./HowTo.md#-troubleshooting). |
 
