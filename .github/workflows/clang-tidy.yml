@@ -108,7 +108,7 @@ jobs:
           cp projects/miopen/rbuild.ini           /tmp/rbuild.ini
           cp projects/miopen/dev-requirements.txt /tmp/dev-requirements.txt
           # Strip deps not available/needed on CI runner
-          sed -i '/composablekernel/d; /half/d; /nlohmann/d; /rocMLIR/d' /tmp/requirements.txt
+          sed -i '/composablekernel/d; /half/d; /rocMLIR/d' /tmp/requirements.txt
           cd /tmp && CMAKE_GENERATOR=Ninja rbuild prepare -s develop -d /tmp/miopen-deps
 
       - name: Run clang-tidy (hipDNN)
