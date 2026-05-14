@@ -249,7 +249,7 @@ endfunction()
 
 # Fetches tsl-robin-map
 function(_fetch_tsl-robin-map VERSION HASH)
-    _determine_git_tag(v v1.3.0)
+    _determine_git_tag(v v1.4.1)
 
     fetchcontent_declare(
         tsl-robin-map
@@ -267,7 +267,7 @@ endfunction()
 
 # Fetches nanobind
 function(_fetch_nanobind VERSION HASH)
-    _determine_git_tag(v v2.4.0)
+    _determine_git_tag(v v2.12.0)
 
     set(NB_USE_SUBMODULE_DEPS OFF)
 
