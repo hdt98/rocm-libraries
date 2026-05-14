@@ -101,4 +101,39 @@ inline void cpuGemm(const float* a,
         }
 }
 
+/// Print a 2D matrix to a file, reading elements with strides from Args.
+/// Pass "-" as path to write to stdout.
+inline void dumpMatrix(const float* host_data,
+                       const rocm_ck::Args& args,
+                       int tensor_slot,
+                       std::string_view path)
+{
+    int M      = args.tensors[tensor_slot].lengths[0];
+    int N      = args.tensors[tensor_slot].lengths[1];
+    int64_t s0 = args.tensors[tensor_slot].strides[0];
+    int64_t s1 = args.tensors[tensor_slot].strides[1];
+
+    FILE* f = (path == "-") ? stdout : std::fopen(path.data(), "w");
+    if(!f)
+    {
+        std::fprintf(stderr, "dumpMatrix: cannot open %s\n", path.data());
+        return;
+    }
+
+    std::fprintf(f, "# %d x %d  strides=(%ld, %ld)\n", M, N, s0, s1);
+    for(int m = 0; m < M; ++m)
+    {
+        for(int n = 0; n < N; ++n)
+        {
+            if(n > 0)
+                std::fputc(' ', f);
+            std::fprintf(f, "%g", static_cast<double>(host_data[m * s0 + n * s1]));
+        }
+        std::fputc('\n', f);
+    }
+
+    if(f != stdout)
+        std::fclose(f);
+}
+
 } // namespace rocm_ck::test
