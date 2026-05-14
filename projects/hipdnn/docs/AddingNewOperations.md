@@ -1,6 +1,6 @@
 # Adding a New Operation to hipDNN
 
-A contributor walkthrough for landing a new op across the hipDNN stack. The [`hipdnn-codegen`](../tools/DescriptorGenerator/.claude/skills/hipdnn-codegen/SKILL.md) agent skill handles the mechanical work; this guide tells you what to decide upfront and what to review afterward.
+A contributor walkthrough for landing a new op across the hipDNN stack. The code generator handles the bulk of the implementation — schema wiring, descriptor boilerplate, frontend plumbing, and tests — leaving only review and a few judgment-heavy pieces for you. Without agentic AI, the same steps apply but the final integration details and polishing will need to be completed by hand.
 
 ## Table of Contents
 
@@ -22,13 +22,16 @@ A contributor walkthrough for landing a new op across the hipDNN stack. The [`hi
 
 # Quick Start
 
-Adding a new op touches FlatBuffers schemas, backend descriptors, frontend nodes, JSON utilities, and tests at four levels. Most of it is mechanical and is automated by the agent skill.
+Adding a new op touches FlatBuffers schemas, backend descriptors, frontend nodes, JSON utilities, and tests at four levels. Most of it is mechanical.
+
+> [!IMPORTANT]
+> Use an agentic AI that can run the [`hipdnn-codegen`](../tools/DescriptorGenerator/.claude/skills/hipdnn-codegen/SKILL.md) skill. The skill drives the full workflow — schema construction, code generation, file placement, build, and tests — with only a handful of confirmation prompts from you.
 
 ```
 Decisions (you) → /hipdnn-codegen (agent) → Review implementation (you) → PR
 ```
 
-The skill is **near-autonomous**: it derives what it can, prompts you only when it must (cuDNN naming uncertainty, output-shape strategy, custom validation). For a clean cuDNN-aligned op, the only mandatory prompt is a one-time confirmation of the FBS schema it constructed.
+**Without agentic AI:** the [`hipdnn-codegen` skill file](../tools/DescriptorGenerator/.claude/skills/hipdnn-codegen/SKILL.md) doubles as a detailed step-by-step procedure. Follow it manually alongside the [Layer-by-Layer Reference](#layer-by-layer-reference) and [Testing Requirements](#testing-requirements) below.
 
 ## Two Decisions Before You Run the Agent
 
