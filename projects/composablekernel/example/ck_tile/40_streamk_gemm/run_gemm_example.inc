@@ -48,7 +48,7 @@ template <typename GemmConfiguration,
           typename CLayout,
           typename CDEElementWise = ck_tile::element_wise::PassThrough,
           ck_tile::StreamKReductionStrategy ReductionStrategy>
-std::tuple<float, ck_tile::index_t> gemm(const ck_tile::StreamKHostArgs& args,
+std::tuple<float, ck_tile::index_t> gemm(const ck_tile::UniversalGemmHostArgs<1, 1, 0>& args,
                                          const ck_tile::stream_config& stream_config);
 
 template <typename GemmConfiguration,
@@ -76,15 +76,18 @@ std::tuple<float, ck_tile::index_t> invokeGemm(ck_tile::DeviceMem& a_m_k_device_
                                                bool flush_cache,
                                                ck_tile::StreamKReductionStrategy reduction_strategy)
 {
-    ck_tile::StreamKHostArgs args{a_m_k_device_memory.GetDeviceBuffer(),
-                                  b_k_n_device_memory.GetDeviceBuffer(),
-                                  c_m_n_device_memory.GetDeviceBuffer(),
-                                  m_dim,
-                                  n_dim,
-                                  k_dim,
-                                  stride_a,
-                                  stride_b,
-                                  stride_c};
+    ck_tile::UniversalGemmHostArgs<1, 1, 0> args{{a_m_k_device_memory.GetDeviceBuffer()},
+                                                 {b_k_n_device_memory.GetDeviceBuffer()},
+                                                 {},
+                                                 c_m_n_device_memory.GetDeviceBuffer(),
+                                                 1,
+                                                 m_dim,
+                                                 n_dim,
+                                                 k_dim,
+                                                 {stride_a},
+                                                 {stride_b},
+                                                 {},
+                                                 stride_c};
 
     std::tuple<float, ck_tile::index_t> average_time_and_batch;
 

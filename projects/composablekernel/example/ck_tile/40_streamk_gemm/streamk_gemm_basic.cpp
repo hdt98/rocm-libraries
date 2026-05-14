@@ -16,7 +16,7 @@ template <typename GemmConfiguration,
           typename ELayout,
           typename CDEElementWise,
           ck_tile::StreamKReductionStrategy ReductionStrategy>
-std::tuple<float, ck_tile::index_t> gemm(const ck_tile::StreamKHostArgs& args,
+std::tuple<float, ck_tile::index_t> gemm(const ck_tile::UniversalGemmHostArgs<1, 1, 0>& args,
                                          const ck_tile::stream_config& stream_config)
 {
     using GemmShape = ck_tile::TileGemmShape<ck_tile::sequence<GemmConfiguration::M_TILE,
@@ -81,7 +81,7 @@ std::tuple<float, ck_tile::index_t> gemm(const ck_tile::StreamKHostArgs& args,
                                          UniversalGemmProblem::TransposeC,
                                          GemmConfiguration::NUM_WAVE_GROUPS>>;
 
-    using Kernel = ck_tile::StreamKKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
+    using Kernel = ck_tile::UniversalGemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
     auto kernel_args          = Kernel::MakeKernelArgs(args);
     const auto workspace_size = Kernel::GetWorkSpaceSize(kernel_args);
