@@ -54,10 +54,8 @@ from .Utilities import reject, roundupRatio, pvar
 def _deriveAndValidateMXScaleLayoutAndTransport(state, asmCaps, archCaps, printRejectionReason):
   """Resolve the ``MXLoadInst`` / ``MXScaleFormat`` / ``TDMInst`` triple.
 
-  This is the validation block introduced by PR #7386 ("Extend MX BufferLoad
-  + NoSwizzle to all transposes on gfx1250"), lifted out of
-  ``Solution.assignDerivedParameters`` so it can be exercised by unit tests
-  without standing up an entire solution-derivation pipeline.
+  Lifted out of ``Solution.assignDerivedParameters`` so it can be exercised
+  by unit tests without standing up an entire solution-derivation pipeline.
 
   The function:
     * Resolves the ``"Auto"`` sentinels on ``MXLoadInst`` / ``MXScaleFormat``

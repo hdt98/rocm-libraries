@@ -22,8 +22,8 @@
 #
 # SPDX-License-Identifier: MIT
 ################################################################################
-"""Unit tests for the MX-scale layout & transport derivation introduced by
-PR #7386 ("Extend MX BufferLoad + NoSwizzle to all transposes on gfx1250").
+"""Unit tests for the MX-scale layout & transport derivation in
+``Solution.assignDerivedParameters``.
 
 These tests drive :func:`_deriveAndValidateMXScaleLayoutAndTransport`
 directly, which lets us exercise every reject and defaulting branch
@@ -209,7 +209,7 @@ REJECT_CASES = [
         id="tdm_with_no_swizzle",
     ),
     # 9. gfx1250 + MX + TDMInst=0 + StreamK=0 is the unvalidated GSU
-    #    NoSwizzle path that PR #7386 explicitly excludes from tuning.
+    #    NoSwizzle path that the derivation explicitly excludes from tuning.
     pytest.param(
         dict(isa=ISA_GFX1250, mxLoadInst="BufferLoad",
              mxScaleFormat="NoSwizzle", tdmInst=0, streamK=0),
@@ -248,7 +248,7 @@ class TestRejectComplements:
 
     def test_gfx1250_mx_with_streamk_escape_passes(self):
         # Counterpoint to "gfx1250_mx_without_tdminst_or_streamk": the
-        # StreamK!=0 escape hatch is the path PR #7386 validated E2E.
+        # StreamK!=0 escape hatch is the path validated end-to-end.
         state = _make_state(isa=ISA_GFX1250, mxLoadInst="BufferLoad",
                             mxScaleFormat="NoSwizzle", tdmInst=0, streamK=3)
         assert _run(state) is True

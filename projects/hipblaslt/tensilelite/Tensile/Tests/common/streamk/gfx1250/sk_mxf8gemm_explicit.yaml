@@ -6,7 +6,7 @@
 # defaulting path (``MXLoadInst="Auto"`` + ``MXScaleFormat="Auto"`` plus a
 # choice of ``TDMInst``). This file pins both parameters *explicitly* in
 # ForkParameters, so it guards the YAML deserialization + ForkParameter
-# expansion path for the new string-valued parameters that PR #7386 added.
+# expansion path for the string-valued MXLoadInst / MXScaleFormat parameters.
 #
 # Transpose coverage mirrors the existing non-explicit yamls:
 #   * BufferLoad + NoSwizzle      -- NN, NT, TN, TT (sk_mxf8gemm_quick.yaml)
