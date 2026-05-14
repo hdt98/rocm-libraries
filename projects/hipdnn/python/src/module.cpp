@@ -11,7 +11,7 @@
 
 namespace nb = nanobind;
 
-NB_MODULE(hipdnn_frontend_python, m)
+NB_MODULE(hipdnn_frontend_python, m) // NOLINT(modernize-avoid-c-arrays)
 {
     m.doc() = "Python bindings for the hipDNN frontend library";
 

@@ -21,8 +21,7 @@ private:
 
 public:
     DeviceBuffer(size_t sizeBytes)
-        : _devicePtr(nullptr)
-        , _sizeBytes(sizeBytes)
+        : _sizeBytes(sizeBytes)
     {
         if(_sizeBytes > 0)
         {
