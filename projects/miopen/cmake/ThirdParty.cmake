@@ -13,11 +13,13 @@
 # find_package(<name> [REQUIRED]) calls in projects/MIOpen/CMakeLists.txt
 # resolve transparently against the populated content.
 #
-# Requires CMake 3.24 (OVERRIDE_FIND_PACKAGE). MIOpen's top-level
-# cmake_minimum_required stays at 3.15; this floor only applies in standalone
-# mode where we know we control the environment.
+# Requires CMake 3.25 (OVERRIDE_FIND_PACKAGE from 3.24, plus the SYSTEM keyword
+# on FetchContent_Declare / add_subdirectory from 3.25 so third-party headers
+# reach consumers via -isystem rather than -I, suppressing their warnings).
+# MIOpen's top-level cmake_minimum_required stays at 3.15; this floor only
+# applies in standalone mode where we know we control the environment.
 
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 include(FetchContent)
 
 message(STATUS "MIOpen: standalone build — preferring system third-party deps, fetching what's missing")
@@ -137,6 +139,7 @@ if(NOT Eigen3_FOUND)
     FetchContent_Declare(Eigen3
         URL      https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.bz2
         URL_HASH SHA256=b4c198460eba6f28d34894e3a5710998818515104d6e74e5cc331ce31e46e626
+        SYSTEM
         OVERRIDE_FIND_PACKAGE)
     # Eigen's CMakeLists writes to CMAKE_CXX_FLAGS while probing compiler support
     # for many warning flags; without the guard ROCMChecks emits one warning per
@@ -157,6 +160,7 @@ if(NOT nlohmann_json_FOUND)
     FetchContent_Declare(nlohmann_json
         URL      https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz
         URL_HASH SHA256=4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187
+        SYSTEM
         OVERRIDE_FIND_PACKAGE)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
@@ -175,6 +179,7 @@ if(NOT frugally-deep_FOUND)
         FetchContent_Declare(FunctionalPlus
             URL      https://github.com/Dobiasd/FunctionalPlus/archive/refs/tags/v0.2.25.tar.gz
             URL_HASH SHA256=9b5e24bbc92f43b977dc83efbc173bcf07dbe07f8718fc2670093655b56fcee3
+            SYSTEM
             OVERRIDE_FIND_PACKAGE)
         FetchContent_MakeAvailable(FunctionalPlus)
     endif()
@@ -186,6 +191,7 @@ if(NOT frugally-deep_FOUND)
     FetchContent_Declare(frugally-deep
         URL      https://github.com/Dobiasd/frugally-deep/archive/refs/tags/v0.15.31.tar.gz
         URL_HASH SHA256=49bf5e30ad2d33e464433afbc8b6fe8536fc959474004a1ce2ac03d7c54bc8ba
+        SYSTEM
         OVERRIDE_FIND_PACKAGE)
     FetchContent_GetProperties(frugally-deep)
     if(NOT frugally-deep_POPULATED)
@@ -193,7 +199,10 @@ if(NOT frugally-deep_FOUND)
     endif()
     file(WRITE "${frugally-deep_SOURCE_DIR}/cmake/pkgconfig.cmake"
          "# install rules disabled by MIOpen standalone wrapper (cmake/ThirdParty.cmake)\n")
-    add_subdirectory("${frugally-deep_SOURCE_DIR}" "${frugally-deep_BINARY_DIR}" EXCLUDE_FROM_ALL)
+    # SYSTEM here forces -isystem for fdeep's include dirs in consumers; the
+    # SYSTEM flag on FetchContent_Declare above does not propagate to a manual
+    # add_subdirectory(), only to MakeAvailable's implicit one.
+    add_subdirectory("${frugally-deep_SOURCE_DIR}" "${frugally-deep_BINARY_DIR}" SYSTEM EXCLUDE_FROM_ALL)
 
     # Mimic what FetchContent_MakeAvailable would have written for OVERRIDE_FIND_PACKAGE,
     # so the later find_package(frugally-deep CONFIG REQUIRED) call resolves to the
@@ -215,15 +224,18 @@ if(NOT BZIP2_FOUND)
     FetchContent_Declare(BZip2
         URL      https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
         URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
+        SYSTEM
         OVERRIDE_FIND_PACKAGE)
     FetchContent_MakeAvailable(BZip2)
     # Upstream tarball has no CMakeLists.txt; build from the vendored wrapper,
     # which creates the BZip2::BZip2 alias and installs miopen_bz2 in the
-    # miopen-targets export set.
+    # miopen-targets export set. SYSTEM marks the wrapper's targets so their
+    # PUBLIC include dirs (the bzip2 headers) reach consumers via -isystem.
     set(BZIP2_UPSTREAM_SOURCE_DIR "${bzip2_SOURCE_DIR}")
     add_subdirectory(
         "${CMAKE_CURRENT_LIST_DIR}/thirdparty/bzip2"
         "${bzip2_BINARY_DIR}-wrapper"
+        SYSTEM
     )
 endif()
 
@@ -236,15 +248,18 @@ if(NOT SQLite3_FOUND)
     FetchContent_Declare(SQLite3
         URL      https://sqlite.org/2026/sqlite-amalgamation-3510300.zip
         URL_HASH SHA256=acb1e6f5d832484bf6d32b681e858c38add8b2acdfd42ac5df24b8afb46552b4
+        SYSTEM
         OVERRIDE_FIND_PACKAGE)
     FetchContent_MakeAvailable(SQLite3)
     # Upstream tarball has no CMakeLists.txt; build from the vendored wrapper,
     # which creates the SQLite::SQLite3 alias and installs miopen_sqlite3 in the
-    # miopen-targets export set.
+    # miopen-targets export set. SYSTEM marks the wrapper's targets so their
+    # PUBLIC include dirs (the sqlite3 amalgamation) reach consumers via -isystem.
     set(SQLITE3_UPSTREAM_SOURCE_DIR "${sqlite3_SOURCE_DIR}")
     add_subdirectory(
         "${CMAKE_CURRENT_LIST_DIR}/thirdparty/sqlite3"
         "${sqlite3_BINARY_DIR}-wrapper"
+        SYSTEM
     )
 endif()
 
@@ -262,6 +277,7 @@ if(NOT GTest_FOUND)
     FetchContent_Declare(GTest
         URL      https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
         URL_HASH SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c
+        SYSTEM
         OVERRIDE_FIND_PACKAGE)
     set(_miopen_saved_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS OFF)
