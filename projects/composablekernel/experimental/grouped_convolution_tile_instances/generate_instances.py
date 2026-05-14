@@ -99,9 +99,9 @@ def get_k_mfma(dtype, m_per_xdl, n_per_xdl):
             return 4
     else:
         if m_per_xdl == 32:
-            return 8
-        else:
             return 16
+        else:
+            return 32
 
 def check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector):
     if a_scalar_per_vector != 1 and a_scalar_per_vector % 2 != 0:
@@ -269,7 +269,7 @@ def parse_fwd_instances(instances, problem_name):
         warp_size = 64
         k_warp = int(block_size / (warp_size * m_warp * n_warp))
         dtype = get_dtype(problem_name)
-        k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
+        k_per_xdl = min(max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl)), k_per_block)
 
         if split_image:
             print(f"Skipping instance {instance_id} with split_image since it's not supported yet.")
@@ -450,7 +450,7 @@ def parse_bwd_weight_instances(instances, problem_name):
         k_warp = int(block_size / (warp_size * m_warp * n_warp))
         dtype = get_dtype(problem_name)
 
-        k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
+        k_per_xdl = min(max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl)), k_per_block)
 
         if check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector) == False:
             print(f"Skipping instance {instance_id} with irregular load since it's not supported yet.")
@@ -578,7 +578,7 @@ def parse_bwd_data_instances(instances, problem_name):
         k_warp = int(block_size / (warp_size * m_warp * n_warp))
         dtype = get_dtype(problem_name)
 
-        k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
+        k_per_xdl = min(max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl)), k_per_block)
 
         if check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector) == False:
             print(f"Skipping instance {instance_id} with irregular load since it's not supported yet.")
