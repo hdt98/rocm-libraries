@@ -1140,8 +1140,8 @@ namespace TensileLite
 
             int m_mxScaleFormat = 0;
             // The MX scale tensor layout the current GPU's kernels expect.
-            //   kGFX950  -- AITER (preSwizzleScalesGFX950) -- gfx950 subtile.
-            //   kGFX1250 -- dimk (preSwizzleScalesGFX1250) -- gfx1250 (and
+            //   kGFX950  -- preSwizzleScalesGFX950 -- gfx950 subtile.
+            //   kGFX1250 -- preSwizzleScalesGFX1250 (dimk) -- gfx1250 (and
             //               other non-rocroller WMMA architectures).
             //   kNone    -- the user did not request an MX scale format
             //               (`--mx-scale-format=0`); no swizzle is applied.

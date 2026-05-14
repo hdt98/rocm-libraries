@@ -2678,7 +2678,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            // Scale-format takes precedence (AITER pins gfx950); otherwise on
+            // Scale-format takes precedence (it can pin kGFX950); otherwise on
             // gfx1250 use the dimk swizzle.
             MXScaleLayout scaleLayoutA = mxScaleLayoutForFormat(arg.scaleA);
             if(scaleLayoutA == MXScaleLayout::kNone && isGfx1250Arch)
@@ -2714,11 +2714,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                                       blockSize(arg.scaleA),
                                       1,
                                       /*isMatrixA=*/true,
-                                      initDevA,
                                       scaleLayoutA,
                                       hipblaslt_initialization2string(arg.initialization),
                                       /*min_val=*/-1.0f,
-                                      /*max_val=*/1.0f);
+                                      /*max_val=*/1.0f,
+                                      initDevA);
                 refAAll.insert(refAAll.end(), batchRef.begin(), batchRef.end());
             }
             refA.emplace_back(std::move(refAAll));
@@ -2816,11 +2816,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                                       1,
                                       blockSize(arg.scaleB),
                                       /*isMatrixA=*/false,
-                                      initDevB,
                                       scaleLayoutB,
                                       hipblaslt_initialization2string(arg.initialization),
                                       /*min_val=*/-1.0f,
-                                      /*max_val=*/1.0f);
+                                      /*max_val=*/1.0f,
+                                      initDevB);
                 refBAll.insert(refBAll.end(), batchRef.begin(), batchRef.end());
             }
             refB.emplace_back(std::move(refBAll));

@@ -727,7 +727,7 @@ namespace DGen
         // `preSwizzleScalesGFX950` to a device-resident scale buffer.
         //
         // For an `(numRows, numCols)` row-major scale tensor (rounded up to
-        // (paddedRows=mult32, paddedCols=mult8)), the AITER algorithm views
+        // (paddedRows=mult32, paddedCols=mult8)), the algorithm views
         // the buffer as 6D (paddedRows/32, 2, 16, paddedCols/8, 2, 4) and
         // permutes (0,3,5,2,4,1). Each thread writes one output byte by
         // computing its source coordinates from the inverse permutation.
@@ -742,7 +742,7 @@ namespace DGen
             if(tid >= total)
                 return;
 
-            // Decompose tid into 6D output coords matching the AITER permutation.
+            // Decompose tid into 6D output coords matching the host-side permutation.
             // dimOrder = {1, 4, 2, 5, 3, 0} (row-major fastest-varying first).
             // Sizes (in dimOrder order): {2, 2, 16, 4, paddedCols/8, paddedRows/32}.
             size_t s1 = 2;

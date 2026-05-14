@@ -134,11 +134,11 @@ inline int blockSize(hipblaslt_scaling_format s)
 #include "mxDataGen.hpp"
 
 // Map a hipblaslt scale format to the architecture-flavoured scale memory
-// layout `generateMXInput` should produce. The format itself only encodes
-// `kGFX950` (the AITER-packed UE8M0_32_8_EXT layout); for formats that
-// don't fix a layout, callers may upgrade `kNone` to `kGFX1250` based on
-// the live device's gcnArchName, since the kernel for a given problem only
-// supports one layout per architecture.
+// layout `generateMXInput` should produce. The format itself only pins
+// `kGFX950` (UE8M0_32_8_EXT); for formats that don't fix a layout, callers
+// may upgrade `kNone` to `kGFX1250` based on the live device's gcnArchName,
+// since the kernel for a given problem only supports one layout per
+// architecture.
 inline MXScaleLayout mxScaleLayoutForFormat(hipblaslt_scaling_format s)
 {
     switch(s)

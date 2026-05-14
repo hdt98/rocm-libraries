@@ -370,29 +370,25 @@ std::vector<float> generateData(T                           dgen,
 }
 
 /**
- * @brief Generate random data for OCP (MX) F8/F6/F4 types
- *
- * The generated data consist of data part and scale part,
- * and the corresponding float values (combine data and scale)
- * will be returned.
- *
- * @return float values of generated MX type data
+ * @brief Host (CPU) PRNG path for `generateMXInput`. Kept as a file-local helper
+ *        so the unified `generateMXInput` (with MXInitDevice) can delegate to
+ *        it for the Cpu case and for the GPU non-easy-layout fallback.
  */
-std::vector<float> generateMXInput(hipDataType            dataType,
-                                   hipDataType            scaleType,
-                                   void*                  data,
-                                   void*                  scale,
-                                   DGen::index_t          rowSize,
-                                   DGen::index_t          colSize,
-                                   DGen::index_t          stride,
-                                   bool                   isTranspose,
-                                   int const              scaleBlockRowSize,
-                                   int const              scaleBlockColSize,
-                                   bool                   isMatrixA,
-                                   MXScaleLayout          scaleLayout,
-                                   std::string_view const initMethod,
-                                   float                  min_val,
-                                   float                  max_val)
+static std::vector<float> generateMXInputCpu(hipDataType            dataType,
+                                             hipDataType            scaleType,
+                                             void*                  data,
+                                             void*                  scale,
+                                             DGen::index_t          rowSize,
+                                             DGen::index_t          colSize,
+                                             DGen::index_t          stride,
+                                             bool                   isTranspose,
+                                             int const              scaleBlockRowSize,
+                                             int const              scaleBlockColSize,
+                                             bool                   isMatrixA,
+                                             MXScaleLayout          scaleLayout,
+                                             std::string_view const initMethod,
+                                             float                  min_val,
+                                             float                  max_val)
 {
     using namespace DGen;
 
@@ -731,30 +727,30 @@ std::vector<float> generateMXInput(hipDataType            dataType,
                                    int const              scaleBlockRowSize,
                                    int const              scaleBlockColSize,
                                    bool                   isMatrixA,
-                                   MXInitDevice           initDevice,
                                    MXScaleLayout          scaleLayout,
                                    std::string_view const initMethod,
                                    float                  min_val,
-                                   float                  max_val)
+                                   float                  max_val,
+                                   MXInitDevice           initDevice)
 {
-    // CPU init: straight delegation to the host overload.
+    // CPU init: straight delegation to the host helper.
     if(initDevice == MXInitDevice::Cpu)
     {
-        return generateMXInput(dataType,
-                               scaleType,
-                               data,
-                               scale,
-                               row,
-                               col,
-                               stride,
-                               isTranspose,
-                               scaleBlockRowSize,
-                               scaleBlockColSize,
-                               isMatrixA,
-                               scaleLayout,
-                               initMethod,
-                               min_val,
-                               max_val);
+        return generateMXInputCpu(dataType,
+                                  scaleType,
+                                  data,
+                                  scale,
+                                  row,
+                                  col,
+                                  stride,
+                                  isTranspose,
+                                  scaleBlockRowSize,
+                                  scaleBlockColSize,
+                                  isMatrixA,
+                                  scaleLayout,
+                                  initMethod,
+                                  min_val,
+                                  max_val);
     }
 
     // GPU init fast path is wired for the layout combinations where the
@@ -767,21 +763,21 @@ std::vector<float> generateMXInput(hipDataType            dataType,
         = (isMatrixA && isTranspose) || (!isMatrixA && !isTranspose);
     if(!easyLayout)
     {
-        return generateMXInput(dataType,
-                               scaleType,
-                               data,
-                               scale,
-                               row,
-                               col,
-                               stride,
-                               isTranspose,
-                               scaleBlockRowSize,
-                               scaleBlockColSize,
-                               isMatrixA,
-                               scaleLayout,
-                               initMethod,
-                               min_val,
-                               max_val);
+        return generateMXInputCpu(dataType,
+                                  scaleType,
+                                  data,
+                                  scale,
+                                  row,
+                                  col,
+                                  stride,
+                                  isTranspose,
+                                  scaleBlockRowSize,
+                                  scaleBlockColSize,
+                                  isMatrixA,
+                                  scaleLayout,
+                                  initMethod,
+                                  min_val,
+                                  max_val);
     }
 
     // Build the same DataGeneratorOptions the host overload would build,

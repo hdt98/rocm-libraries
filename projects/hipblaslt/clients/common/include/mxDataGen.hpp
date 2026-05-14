@@ -43,8 +43,9 @@ enum class MXInitDevice
 
 // Scale tensor memory layout left in the `scale` buffer.
 //   kNone    : natural mxDataGenerator layout (no swizzle).
-//   kGFX950  : AITER swizzle for gfx950 subtile kernels.
-//   kGFX1250 : dimk swizzle for gfx1250 + non-rocroller WMMA kernels.
+//   kGFX950  : preSwizzleScalesGFX950 layout for gfx950 subtile kernels.
+//   kGFX1250 : preSwizzleScalesGFX1250 (dimk) layout for gfx1250 +
+//              non-rocroller WMMA kernels.
 enum class MXScaleLayout
 {
     kNone    = 0,
@@ -63,8 +64,9 @@ enum class MXScaleLayout
 #include <string_view>
 #include <vector>
 
-// CPU-only overload. Equivalent to passing MXInitDevice::Cpu below.
-// `scaleLayout` selects the post-generation scale memory layout.
+// `scaleLayout` selects the post-generation scale memory layout. `initDevice`
+// selects the host vs device PRNG path; with MXInitDevice::Gpu, data/scale
+// must be device pointers (see MXInitDevice for full semantics).
 std::vector<float> generateMXInput(hipDataType            dataType,
                                    hipDataType            scaleType,
                                    void*                  data,
@@ -79,25 +81,7 @@ std::vector<float> generateMXInput(hipDataType            dataType,
                                    MXScaleLayout          scaleLayout = MXScaleLayout::kNone,
                                    std::string_view const initMethod  = "Bounded",
                                    float                  min_val     = -1.0f,
-                                   float                  max_val     = 1.0f);
-
-// Backend-selectable overload. With MXInitDevice::Gpu, data/scale must be
-// device pointers. See MXInitDevice for the full semantics.
-std::vector<float> generateMXInput(hipDataType            dataType,
-                                   hipDataType            scaleType,
-                                   void*                  data,
-                                   void*                  scale,
-                                   uint64_t               row,
-                                   uint64_t               col,
-                                   uint64_t               stride,
-                                   bool                   isTranspose,
-                                   int const              scaleBlockRowSize,
-                                   int const              scaleBlockColSize,
-                                   bool                   isMatrixA,
-                                   MXInitDevice           initDevice,
-                                   MXScaleLayout          scaleLayout = MXScaleLayout::kNone,
-                                   std::string_view const initMethod  = "Bounded",
-                                   float                  min_val     = -1.0f,
-                                   float                  max_val     = 1.0f);
+                                   float                  max_val     = 1.0f,
+                                   MXInitDevice           initDevice  = MXInitDevice::Cpu);
 
 #endif

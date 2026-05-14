@@ -929,8 +929,8 @@ namespace TensileLite
 
         {
             {
-                // gfx950 subtile kernels read the AITER swizzle; everything else
-                // (gfx1250 + non-rocroller WMMA) reads the dimk K-swizzle.
+                // gfx950 subtile kernels read preSwizzleScalesGFX950; everything
+                // else (gfx1250 + non-rocroller WMMA) reads the dimk K-swizzle.
                 hipDeviceProp_t prop;
                 int deviceIdx = args.count("device-idx") ? args["device-idx"].as<int>() : 0;
                 hipGetDeviceProperties(&prop, deviceIdx);
@@ -2000,9 +2000,10 @@ namespace TensileLite
             m_mxPreswizzledA = false;
             m_mxPreswizzledB = false;
 
-            // Per-side scale layout: gfx950 AITER (only when scale dims are
-            // tile-divisible, since it doesn't pad), gfx1250 dimk (pads internally
-            // so always applicable), or kNone when --mx-scale-format=0.
+            // Per-side scale layout: kGFX950 (only when scale dims are
+            // tile-divisible, since preSwizzleScalesGFX950 doesn't pad), kGFX1250
+            // (pads internally so always applicable), or kNone when
+            // --mx-scale-format=0.
             MXScaleLayout layoutA = MXScaleLayout::kNone;
             MXScaleLayout layoutB = MXScaleLayout::kNone;
 
