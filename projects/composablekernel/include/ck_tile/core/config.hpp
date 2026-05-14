@@ -27,7 +27,8 @@
 #if defined(__gfx1150__) || defined(__gfx1151__) || defined(__gfx1152__) || defined(__gfx1153__)
 #define __gfx115__
 #endif
-#if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__)
+#if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1250__) || \
+    defined(__gfx12_generic__)
 #define __gfx12__
 #endif
 
@@ -515,6 +516,12 @@ struct amdgcn_compiler_target_state
     static constexpr bool CK_TILE_ARCH_GFX1201 = false;
 #endif // __gfx1201__
 
+#if defined(__gfx1250__)
+    static constexpr bool CK_TILE_ARCH_GFX1250 = true;
+#else
+    static constexpr bool CK_TILE_ARCH_GFX1250 = false;
+#endif // __gfx1250__
+
 #if defined(__gfx12_generic__)
     static constexpr bool CK_TILE_ARCH_GFX12_GENERIC = true;
 #else
@@ -571,6 +578,7 @@ CK_TILE_HOST_DEVICE static constexpr uint32_t count_values_of(T search, Ts... se
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX11_GENERIC,   \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1200,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1201,         \
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1250,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX12_GENERIC
 
 // Sanity check: make sure only one target architecture is defined during device compile
