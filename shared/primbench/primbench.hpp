@@ -1039,8 +1039,8 @@ private:
         ss << "\"name\":\"hip\"";
 
         // HIP version.
-        ss << ",\"hip_version\":\"" << HIP_VERSION_MAJOR << "." << HIP_VERSION_MINOR << "."
-           << HIP_VERSION_PATCH << "-" << HIP_VERSION_GITHASH << "\"";
+        ss << ",\"hip_version\":\"" << HIP_VERSION_MAJOR << "." << HIP_VERSION_MINOR << ".";
+        ss << HIP_VERSION_PATCH << "-" << amd_dbgapi_get_git_hash() << "\"";
 
         // HIP runtime version (integer, e.g., 60443482 -> 6.4.43482).
         int runtime_ver;
