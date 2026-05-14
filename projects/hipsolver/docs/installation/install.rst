@@ -53,7 +53,7 @@ This includes hipSOLVER and rocSOLVER.
    * ``<rocm_version>`` is the ROCm Core SDK version to install. Omit this
      suffix to install the latest available version.
 
-   * ``<dev/devel>`` specifies whether to the install library files and
+   * ``<dev/devel>`` specifies whether to install library files and
      headers. Omit this suffix to only install runtime packages.
 
      * ``-dev`` is used on Debian-based distributions, including Ubuntu.
