@@ -33,9 +33,6 @@
 
 namespace miopen {
 
-template <class... Ts>
-using common_type = typename std::common_type<Ts...>::type;
-
 struct float_equal_fn
 {
     template <class T>
@@ -53,7 +50,8 @@ struct float_equal_fn
     template <class T, class U>
     bool operator()(T x, U y) const
     {
-        return float_equal_fn::apply<common_type<T, U>>(x, y);
+        using common_type = typename std::common_type<T,U>::type;
+        return float_equal_fn::apply<common_type>(common_type(x), common_type(y));
     }
 };
 
@@ -78,7 +76,8 @@ struct float_equal_sentinel_fn
     template <class T, class U>
     bool operator()(T x, U y) const
     {
-        return float_equal_sentinel_fn::apply<common_type<T, U>>(x, y);
+        using common_type = typename std::common_type<T,U>::type;
+        return float_equal_sentinel_fn::apply<common_type>(common_type(x), common_type(y));
     }
 };
 

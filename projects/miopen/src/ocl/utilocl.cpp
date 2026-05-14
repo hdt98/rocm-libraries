@@ -1259,7 +1259,7 @@ float transpose_NCHW2Vec(const Handle& handle,
         params += " -DMIOPEN_DEF_READ_TYPE=" + READ_TYPE;
         params += " -DMIOPEN_DEF_WRITE_TYPE=" + WRITE_TYPE;
 
-        if(!float_equal(alpha_fp, 1.0))
+        if(!float_equal(alpha_fp, 1.f))
             params += " -DMIOPEN_DEF_USE_ALPHA=1";
 
         if(!float_equal(beta_fp, 0))

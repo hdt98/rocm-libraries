@@ -192,7 +192,7 @@ bool ConvOclDirectFwd::IsValidPerformanceConfig(const ExecutionContext&,
     // {
     //     float proc_data_ratio = static_cast<float>(result.in_tile1 * result.in_tile0) /
     //                             static_cast<float>(result.grp_tile1 * result.grp_tile0);
-    //     n_read_procs = (proc_data_ratio <= 0.25)
+    //     n_read_procs = (proc_data_ratio <= 0.25f)
     //                        ? (result.grp_tile1 * result.grp_tile0) / 4
     //                        : (proc_data_ratio <= 0.5) ? (result.grp_tile1 * result.grp_tile0) / 2
     //                                                   : (result.grp_tile1 * result.grp_tile0);
@@ -359,9 +359,9 @@ ConvSolution ConvOclDirectFwd::BaseGetSolution(const ExecutionContext& ctx,
     {
         float proc_data_ratio = static_cast<float>(result.in_tile1 * result.in_tile0) /
                                 static_cast<float>(result.grp_tile1 * result.grp_tile0);
-        n_read_procs = (proc_data_ratio <= 0.25)  ? (result.grp_tile1 * result.grp_tile0) / 4
-                       : (proc_data_ratio <= 0.5) ? (result.grp_tile1 * result.grp_tile0) / 2
-                                                  : (result.grp_tile1 * result.grp_tile0);
+        n_read_procs = (proc_data_ratio <= 0.25f)  ? (result.grp_tile1 * result.grp_tile0) / 4
+                       : (proc_data_ratio <= 0.5f) ? (result.grp_tile1 * result.grp_tile0) / 2
+                                                   : (result.grp_tile1 * result.grp_tile0);
     }
 
     int n_out_tile_blocks0 = (problem.GetOutWidth() + result.in_tile0 - 1) / (result.in_tile0);

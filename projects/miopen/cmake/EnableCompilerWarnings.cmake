@@ -47,7 +47,7 @@ set(__clang_cxx_compile_options
     -Wno-c++98-compat
     -Wno-c++98-compat-pedantic
     -Wno-conversion
-    -Wno-double-promotion
+    -Wdouble-promotion
     -Wno-exit-time-destructors
     -Wno-extra-semi
     -Wno-extra-semi-stmt

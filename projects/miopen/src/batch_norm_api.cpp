@@ -425,7 +425,7 @@ miopenBatchNormForwardInferenceActivation(miopenHandle_t handle,
     }
     else
     {
-        miopen::ActivationDescriptor actDesc(miopenActivationPASTHRU, 0.0f, 0.0f, 0.0f);
+        miopen::ActivationDescriptor actDesc(miopenActivationPASTHRU, 0.0, 0.0, 0.0);
         return miopen::try_([&] {
             miopen::BatchNormForwardInference(miopen::deref(handle),
                                               bn_mode,
@@ -513,7 +513,7 @@ extern "C" miopenStatus_t miopenBatchNormForwardInferenceActivationInvVariance(
     miopen::ActivationDescriptor actDesc =
         (activDesc != nullptr)
             ? miopen::deref(activDesc)
-            : miopen::ActivationDescriptor(miopenActivationPASTHRU, 0.0f, 0.0f, 0.0f);
+            : miopen::ActivationDescriptor(miopenActivationPASTHRU, 0.0, 0.0, 0.0);
     return miopen::try_([&] {
         miopen::BatchNormForwardInference(miopen::deref(handle),
                                           bn_mode,
@@ -781,7 +781,7 @@ miopenBatchNormForwardTrainingActivation_V2(miopenHandle_t handle,
     }
     else
     {
-        miopen::ActivationDescriptor actDesc(miopenActivationPASTHRU, 0.0f, 0.0f, 0.0f);
+        miopen::ActivationDescriptor actDesc(miopenActivationPASTHRU, 0.0, 0.0, 0.0);
 
         return miopen::try_([&] {
             miopen::BatchNormForwardTraining(miopen::deref(handle),
@@ -915,7 +915,7 @@ miopenBatchNormBackwardActivation(miopenHandle_t handle,
     }
     else
     {
-        miopen::ActivationDescriptor actDesc(miopenActivationPASTHRU, 0.0f, 0.0f, 0.0f);
+        miopen::ActivationDescriptor actDesc(miopenActivationPASTHRU, 0.0, 0.0, 0.0);
         return miopen::try_([&] {
             miopen::BatchNormBackward(miopen::deref(handle),
                                       bn_mode,

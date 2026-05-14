@@ -52,7 +52,7 @@ T medianOfSortedData(const std::vector<T>& sortedData)
 
     size_t size = sortedData.size();
 
-    T median = (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / 2.0
+    T median = (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / T{2.f}
                                : sortedData[size / 2];
 
     return median;
@@ -107,7 +107,7 @@ std::vector<T> modifiedZScores(const std::vector<T>& sortedData)
         std::transform(sortedData.begin(),
                        sortedData.end(),
                        std::back_inserter(modZScores),
-                       [&](auto& value) { return 0.6745 * (value - medianValue) / mad; });
+                       [&](auto& value) { return T{0.6745f} * (value - medianValue) / mad; });
 
         return modZScores;
     }

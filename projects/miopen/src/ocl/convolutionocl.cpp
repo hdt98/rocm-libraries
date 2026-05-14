@@ -342,7 +342,7 @@ bool HasGoodSolution(const std::vector<miopenConvSolution_t> solutions,
     else
     {
         // test evaluated vs recorded time
-        float VERIFY_TOLERANCE = 1.0 + env::value(MIOPEN_VERIFY_TOLERANCE_PCT) / 100.0f;
+        float VERIFY_TOLERANCE = 1.0f + float(env::value(MIOPEN_VERIFY_TOLERANCE_PCT) / 100.0);
         const float rel_perf   = eval_time_1 / solutions[0].time;
         good_entry             = rel_perf < VERIFY_TOLERANCE;
         MIOPEN_LOG_I2("TrustVerify: evaluated(" << eval_time_1 << ") / recorded("

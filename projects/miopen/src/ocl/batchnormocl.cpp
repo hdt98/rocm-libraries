@@ -202,7 +202,7 @@ void BatchNormForwardTraining(const Handle& handle,
     // Validate training input dimensions (PyTorch-compatible) - fail fast
     ValidateBatchNormTrainingInput(xDesc, bn_mode);
 
-    if(!float_equal(*(static_cast<const float*>(alpha)), 1.0) ||
+    if(!float_equal(*(static_cast<const float*>(alpha)), 1.f) ||
        !float_equal(*(static_cast<const float*>(beta)), 0.0))
     {
         MIOPEN_THROW("Only alpha=1 and beta=0 is supported");
@@ -331,7 +331,7 @@ void BatchNormForwardInference(const Handle& handle,
         {
             MIOPEN_THROW(miopenStatusBadParm);
         }
-        if(!float_equal(*(static_cast<const float*>(alpha)), 1.0) ||
+        if(!float_equal(*(static_cast<const float*>(alpha)), 1.f) ||
            !float_equal(*(static_cast<const float*>(beta)), 0))
         {
             MIOPEN_LOG_E("Only alpha=1 and beta=0 is supported");
@@ -476,13 +476,13 @@ void BatchNormBackward(const Handle& handle,
     // Validate training input dimensions (PyTorch-compatible) - fail fast
     ValidateBatchNormTrainingInput(xDesc, bn_mode);
 
-    if(!float_equal(*(static_cast<const float*>(alphaDataDiff)), 1.0) ||
+    if(!float_equal(*(static_cast<const float*>(alphaDataDiff)), 1.f) ||
        !float_equal(*(static_cast<const float*>(betaDataDiff)), 0))
     {
         MIOPEN_LOG_E("Only alphaDataDiff=1 and betaDataDiff=0 is supported");
         MIOPEN_THROW(miopenStatusBadParm);
     }
-    if(!float_equal(*(static_cast<const float*>(alphaParamDiff)), 1.0) ||
+    if(!float_equal(*(static_cast<const float*>(alphaParamDiff)), 1.f) ||
        !float_equal(*(static_cast<const float*>(betaParamDiff)), 0))
     {
         MIOPEN_LOG_E("Only alphaParamDiff=1 and betaParamDiff=0 is supported");

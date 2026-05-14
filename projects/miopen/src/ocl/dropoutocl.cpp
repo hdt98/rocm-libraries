@@ -209,7 +209,7 @@ void DropoutDescriptor::Dropout(const Handle& handle,
         MIOPEN_THROW("Input/Output datatype does not match");
     }
 
-    if(dropout < 0.0 || dropout > 1.0)
+    if(dropout < 0.f || dropout > 1.f)
     {
         MIOPEN_THROW("Invalid dropout rate");
     }
@@ -308,7 +308,7 @@ void DropoutDescriptor::Dropout(const Handle& handle,
 
     auto&& kernels = handle.GetKernels(kernel_name, network_config);
 
-    float amp_scale = float_equal(dropout, 1.0) ? 0 : 1 / (1 - dropout);
+    float amp_scale = float_equal(dropout, 1.f) ? 0 : 1 / (1 - dropout);
     if(!kernels.empty())
     {
         if(xDesc.AllDimsFitIntoInt())

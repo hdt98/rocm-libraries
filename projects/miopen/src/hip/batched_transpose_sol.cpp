@@ -176,15 +176,15 @@ static inline bool IsApplicable(uint32_t /* batch */,
 
 static inline bool IsSameSide(uint32_t height, uint32_t width, const BatchedTransposeParam* kparam)
 {
-    float radio = 0;
+    float ratio = 0;
     if(width > height)
-        radio = static_cast<float>(kparam->tile_x) / kparam->tile_y;
+        ratio = static_cast<float>(kparam->tile_x) / kparam->tile_y;
     else
-        radio = static_cast<float>(kparam->tile_y) / kparam->tile_x;
+        ratio = static_cast<float>(kparam->tile_y) / kparam->tile_x;
 
     // E.g. for cases like width=1000, height=10
     // Allow at least 32x64, 64x64... 16x64 not allowed
-    return radio >= 0.4;
+    return ratio >= 0.4f;
 }
 
 template <typename T>

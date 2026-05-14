@@ -200,7 +200,7 @@ static int MeasurePerfConfig(const Handle& handle,
         {
             k(bot_ocl_buf, wei_ocl_buf, top_ocl_buf, padding_value);
         }
-        processing_time = handle.GetKernelTime();
+        processing_time = static_cast<double>(handle.GetKernelTime());
     }
     catch(miopen::Exception& ex)
     {
