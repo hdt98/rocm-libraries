@@ -5,7 +5,7 @@ A contributor walkthrough for landing a new op across the hipDNN stack. The [`hi
 ## Table of Contents
 
 **Quick Start**
-- [Three Decisions Before You Run the Agent](#three-decisions-before-you-run-the-agent)
+- [Two Decisions Before You Run the Agent](#two-decisions-before-you-run-the-agent)
 - [Run `/hipdnn-codegen`](#run-hipdnn-codegen)
 - [Review Implementation](#review-implementation)
 - [PR Checklist](#pr-checklist)
@@ -30,7 +30,7 @@ Decisions (you) → /hipdnn-codegen (agent) → Review implementation (you) → 
 
 The skill is **near-autonomous**: it derives what it can, prompts you only when it must (cuDNN naming uncertainty, output-shape strategy, custom validation). For a clean cuDNN-aligned op, the only mandatory prompt is a one-time confirmation of the FBS schema it constructed.
 
-## Three Decisions Before You Run the Agent
+## Two Decisions Before You Run the Agent
 
 1. **FBS schema** — decide whether to write the schema yourself or let the agent construct it. If you have a schema or a written description of one, point the agent at it. Otherwise, leave it to the agent: it derives the schema from the cudnn-frontend source and asks you to confirm before continuing.
 2. **Op semantics** — anything that diverges from or extends cuDNN: discrete mode enum members (e.g., reduction op type, pointwise kind), extra inputs, different output-shape rules, hipDNN-only behavior. The agent uses mode members to populate the `enum_def` block; deviations become comments in the generated code.
@@ -56,7 +56,7 @@ The agent will:
 3. Pick the next free descriptor type and attribute name range, derive the YAML config, run the generator.
 4. Place generated source files; insert fragment snippets into shared files (enum headers, factory switches, string utilities, CMake lists).
 5. Build the project and run unit tests.
-6. May prompt you on `infer_properties_node()` strategy and any non-default `pre_validate_node()` rules.
+6. May ask clarifying questions afterward on isolated pieces of logic (e.g., output-shape strategy, custom validation rules).
 
 If you've already written the FBS schema or have a written description of one, point the agent at it instead.
 
@@ -65,10 +65,13 @@ If you've already written the FBS schema or have a written description of one, p
 After the agent finishes, go through the output before opening a PR:
 
 - **Schema** — re-read the generated FBS schema. Confirm field names, types, and any shared includes look right. The agent asks for confirmation before continuing, but a second read after generation catches anything missed in the preview.
-- **Backend enums vs cuDNN** — open [`docs/PortingGuide.md`](./PortingGuide.md) and the cudnn-frontend node header side-by-side with the generated `HipdnnBackend*.h` entries. Verify `_EXT` is applied where expected and absent where the name matches cuDNN exactly.
+- **Backend enums vs cuDNN** — open [`docs/PortingGuide.md`](./PortingGuide.md) and the cudnn-frontend node header side-by-side with the generated `HipdnnBackend*.h` entries. Verify `_EXT` is applied where expected and absent where the name matches cuDNN exactly. Pay particular attention to the compute-data-type attribute: `MATH_PREC` vs `COMP_TYPE` follows cuDNN — check what the cuDNN equivalent (or the closest op in the same family) uses if unsure.
 - **Node logic** — read `<Op>Node.hpp` alongside the corresponding cudnn-frontend node class (`include/cudnn_frontend/node/<op>.h`). Compare `infer_properties_node()` and `pre_validate_node()` against the cuDNN equivalent: fill in stubs, add any validation rules or shape logic that cuDNN enforces but the agent did not emit, and verify that optional tensors and fields still have appropriate validation (e.g., conditional dim checks, presence guards).
 - **Test cases** — skim the generated integration tests. Add operation-specific tests beyond the round-trips where needed: multi-input variants, multi-op graph chains, edge cases (zero-sized dims, fused activations).
-- **End-user sample** under `samples/<op>/` — add a sample if an engine is available for the op. Wrap the `graph->build(handle)` call with `HIPDNN_FE_CHECK_SKIPPABLE` so the test is gracefully skipped when no engine supports the configuration. See `samples/convolution/ConvFprop.cpp` as a template.
+
+**Optional (if applicable):**
+
+- **End-user sample** under `samples/<op>/` — add if an engine is available for the op. Wrap `graph->build(handle)` with `HIPDNN_FE_CHECK_SKIPPABLE` so the test is gracefully skipped when no engine supports the configuration. See `samples/convolution/ConvFprop.cpp` as a template.
 - **Python bindings** — the one piece the agent does not generate automatically. Add a `.def(...)` line in `python/src/graph_bindings.cpp` and register the attributes class in `python/src/attributes_bindings.cpp` (check that file for the current curated set). You can also explicitly ask the agent to do this before it finishes.
 
 ## PR Checklist
@@ -123,41 +126,15 @@ hipDNN aims for **naming parity** with cuDNN where the operation has a cuDNN equ
 
 ### The `_EXT` Rule
 
-For each name being constructed, decide:
+A name **matches cuDNN** when everything after the `HIPDNN_` / `CUDNN_` prefix is identical. If a match exists, omit `_EXT`; if there is no cuDNN equivalent or the shape differs, add it.
 
-| Name has a real cuDNN equivalent? | Suffix |
-|---|---|
-| Yes, exact match (e.g., `CUDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR`) | **No** `_EXT` |
-| No equivalent, or hipDNN aggregates/splits differently from cuDNN | `_EXT` |
+| Case | Example | Suffix |
+|---|---|---|
+| Exact cuDNN equivalent | `HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR` ↔ `CUDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR` | **No** `_EXT` |
+| hipDNN-specific (no cuDNN equivalent) | `HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT` — no cuDNN operation-type enum | `_EXT` |
+| hipDNN name differs from cuDNN equivalent | `HIPDNN_BACKEND_OPERATION_BATCHNORM_DESCRIPTOR_EXT` — cuDNN uses `CUDNN_BACKEND_OPERATION_NORM_FORWARD_DESCRIPTOR`, not a batchnorm-specific name | `_EXT` |
 
 The decision applies to four name surfaces: the descriptor type name, each per-tensor / per-data-field attribute name, the compute-data-type attribute name, and the operation-type enum name. Reviewers verify by inspecting the resulting `HipdnnBackend*.h` enums.
-
-### Concrete Examples From the Live Configs
-
-`reduction.yaml` — every name matches cuDNN exactly, so **no** `_EXT`:
-```yaml
-descriptor_type:
-  enum_name: "HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR"
-operation_attr_prefix: "HIPDNN_ATTR_OPERATION_REDUCTION"
-```
-
-`batchnorm.yaml` — hipDNN's batchnorm aggregates what cuDNN splits across multiple ops, so the entire shape gets `_EXT`:
-```yaml
-descriptor_type:
-  enum_name: "HIPDNN_BACKEND_OPERATION_BATCHNORM_DESCRIPTOR_EXT"
-tensor_fields:
-  - name: "x"
-    attr_suffix: "X_EXT"
-  - name: "scale"
-    attr_suffix: "SCALE_EXT"
-```
-
-`convolution_fwd.yaml` — descriptor and attribute names match cuDNN; the *operation type* enum is hipDNN-specific, so only it carries `_EXT`:
-```yaml
-descriptor_type:
-  enum_name: "HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR"   # matches cuDNN — no _EXT
-operation_type_enum: "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT"      # hipDNN-only — _EXT
-```
 
 ### Sources of Truth
 

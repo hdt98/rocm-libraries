@@ -195,8 +195,10 @@ Sources of truth, in order of preference:
 
 Reference examples:
 - [`configs/reduction.yaml`](../../../configs/reduction.yaml) — every name matches cuDNN, **no** `_EXT`.
-- [`configs/batchnorm.yaml`](../../../configs/batchnorm.yaml) — hipDNN-specific shape, all `_EXT`.
+- [`configs/batchnorm.yaml`](../../../configs/batchnorm.yaml) — cuDNN uses generic `NORM_FORWARD`/`NORM_BACKWARD` descriptors; hipDNN uses explicit `BATCHNORM`-named descriptors — names differ, all `_EXT`.
 - [`configs/convolution_fwd.yaml`](../../../configs/convolution_fwd.yaml) — descriptor and attributes match cuDNN (no `_EXT`); `operation_type_enum` is hipDNN-only (`_EXT`).
+
+**`MATH_PREC` vs `COMP_TYPE` for `compute_data_type_attr`** — this is not a free choice; it follows cuDNN. Check the cudnn-frontend node header for the op (or the closest op in the same family) before setting this name. Examples: `CUDNN_ATTR_POINTWISE_MATH_PREC` → `HIPDNN_ATTR_POINTWISE_MATH_PREC` (no `_EXT`); `CUDNN_ATTR_REDUCTION_COMP_TYPE` → `HIPDNN_ATTR_REDUCTION_COMP_TYPE` (no `_EXT`). For ops with no cuDNN equivalent, use `COMP_TYPE_EXT`.
 
 ##### 3a-i. Web-check `cudnn-frontend` before prompting
 
