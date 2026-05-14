@@ -30,17 +30,17 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-FOLDER_PATH = os.path.join(_SCRIPT_DIR, "..", "..", "gtest")
+FOLDER_PATH = os.path.join(_SCRIPT_DIR, "..", "gtest")
 
 # Ignore list: Add test names or file paths you want to exclude
 #              (keep the list sorted to min. git conflicts)
 IGNORE_LIST = {
-    "../../test/gtest/binary_tensor_ops.cpp",
-    "../../test/gtest/graphapi_conv_bias_res_add_activ_fwd.cpp",
-    "../../test/gtest/graphapi_operation_rng.cpp",
-    "../../test/gtest/layout_transpose.cpp",
-    "../../test/gtest/reduce_custom_fp32.cpp",
-    "../../test/gtest/unary_tensor_ops.cpp",
+    "binary_tensor_ops.cpp",
+    "graphapi_conv_bias_res_add_activ_fwd.cpp",
+    "graphapi_operation_rng.cpp",
+    "layout_transpose.cpp",
+    "reduce_custom_fp32.cpp",
+    "unary_tensor_ops.cpp",
     "CPU_MIOpenDriverRegressionBigTensorTest_FP32",
     "GPU_UnitTestConvSolverAsmBwdWrW3x3Wrw_FP32",
 }
@@ -92,7 +92,7 @@ def analyze_tests(folder_path):
             file_path = os.path.join(root, file)
 
             # Skip file if it is in the ignore list
-            if file_path in IGNORE_LIST:
+            if os.path.basename(file_path) in IGNORE_LIST:
                 logging.info(f"Skipping ignored file: {file_path}")
                 continue
 
