@@ -2879,6 +2879,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.addComment0("local write addresses: reset inc")
         module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
 
+      if ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"])
+          and not (tdmA and tdmB)
+          and self.isPrefetchAcrossPersistentEnabled(kernel)):
+        module.add(self.dtlRestorePapLdsBank(kernel, tensorParametersA, tensorParametersB))
+
       if (tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1
           and self.isPrefetchAcrossPersistentEnabled(kernel)):
         module.add(self.tdmRestorePapLdsBank(kernel, tensorParametersA, tensorParametersB))
@@ -3035,6 +3040,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     skip2ndWaitForDtl = kernel["DirectToLds%s" % tensorParameters1st["tensorChar"]]
     emitTensorLoad(tensorParameters2nd, skipWait=skip2ndWaitForDtl)
     module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="first PGR group for next persistent iter prefetched"))
+    if ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"])
+        and not (kernel["enableTDMA"] and kernel["enableTDMB"])):
+      module.add(self.dtlSavePapLdsBank(kernel, tensorParametersA, tensorParametersB))
     self.states.ldsTensorTokenIdx = \
         self.states.memTokenLdsBuffer1 if self.states.ldsTensorTokenIdx == self.states.memTokenLdsBuffer0 else self.states.memTokenLdsBuffer0
 

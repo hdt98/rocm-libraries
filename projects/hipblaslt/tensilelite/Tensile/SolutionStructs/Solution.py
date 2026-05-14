@@ -1132,6 +1132,10 @@ class Solution(collections.abc.Mapping):
     if state["UseSubtileImpl"]:
       return True
 
+    if not isaInfoMap[isa].asmCaps["HasDirectToLds"]:
+      reject(state, printRejectionReason, "DirectToLds not supported on ISA %s" % (isa,))
+      return False
+
     # x4 support for directToLds
     canDTLx4 = isaInfoMap[isa].asmCaps["HasDirectToLdsx4"]
 
@@ -1420,8 +1424,6 @@ class Solution(collections.abc.Mapping):
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path requires BufferStore")
         if state.get("SuppressNoLoadLoop", False):
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path requires NoLoadLoop")
-        if state["DirectToLdsA"] or state["DirectToLdsB"]:
-          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with DirectToLds")
         if state["ProblemType"]["Sparse"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with sparse")
         if state.get("UseCustomMainLoopSchedule", 0) == 1:
