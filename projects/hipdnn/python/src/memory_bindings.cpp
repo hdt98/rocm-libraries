@@ -10,6 +10,7 @@
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/vector.h>
 #include <stdexcept>
+#include <string>
 
 namespace nb = nanobind;
 
