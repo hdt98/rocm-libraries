@@ -2545,11 +2545,12 @@ class Solution(collections.abc.Mapping):
           if state[f"LdsPad{tc}"] != -1:
             return state[f"LdsPad{tc}"]
           sub = tc[-1]   # "A" or "B"
+          if not state["ProblemType"][f"MXBlock{sub}"]:
+            return 0
           if isa[:2] == (12, 5):
             return get_mxs_mt_config(state["MatrixInstK"],
                                       state["ProblemType"][f"MXBlock{sub}"],
-                                      state[f"VectorWidth{sub}"], "pad") \
-                   if state["ProblemType"][f"MXBlock{sub}"] else 0
+                                      state[f"VectorWidth{sub}"], "pad")
           return 4 * 2
 
         ldsPadMXSA = calcLdsPadPerMxOperand("MXSA")
