@@ -107,6 +107,7 @@ if(MXDATAGENERATOR_BUILD_TESTING)
     add_executable(
       mxDataGeneratorTests
       test/data_generator_test.cpp
+      test/data_generator_constant_fills_test.cpp
       test/f32_test.cpp
       test/fp16_test.cpp
       test/bf16_test.cpp
