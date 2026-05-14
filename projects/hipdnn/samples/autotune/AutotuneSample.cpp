@@ -46,25 +46,6 @@ std::string getEngineName(int64_t engineId)
     }
 }
 
-/// Checks if an error indicates no engines are available for the graph.
-/// Returns true (skip) on GRAPH_NOT_SUPPORTED. Returns false (continue) on OK.
-/// Exits on any other error.
-bool skipIfNoEngines(const Error& err)
-{
-    if(err.is_good())
-    {
-        return false;
-    }
-    if(err.get_code() == ErrorCode::GRAPH_NOT_SUPPORTED)
-    {
-        std::cout << "  Skipping: no engine has an applicable solution for this "
-                  << "graph on the current device. (" << err.get_message() << ")\n";
-        return true;
-    }
-    std::cerr << "hipDNN Frontend Error: " << err.get_message() << '\n';
-    exit(EXIT_FAILURE);
-}
-
 // ─── ConvGraph helper ───────────────────────────────────────────────────────
 
 /// All state needed to run autotune scenarios against a convolution graph.
@@ -163,11 +144,8 @@ void demonstrateQuickAutotune(hipdnnHandle_t handle, bool fullMode)
 
     auto state = buildConvGraph(handle, fullMode);
 
-    // Discover and add all available engines (skip if none available)
-    if(skipIfNoEngines(state.graph->add_all_engines()))
-    {
-        return;
-    }
+    // Discover and add all available engines
+    HIPDNN_FE_CHECK(state.graph->add_all_engines());
 
     // Allocate workspace for the largest engine
     int64_t maxWs = 0;
@@ -214,10 +192,8 @@ void demonstrateExhaustiveAutotune(hipdnnHandle_t handle, bool fullMode)
 
     auto state = buildConvGraph(handle, fullMode);
 
-    if(skipIfNoEngines(state.graph->add_all_engines()))
-    {
-        return;
-    }
+    // Discover and add all available engines
+    HIPDNN_FE_CHECK(state.graph->add_all_engines());
 
     int64_t maxWs = 0;
     HIPDNN_FE_CHECK(state.graph->get_max_workspace_size(maxWs));
@@ -287,10 +263,7 @@ void demonstrateFilteredAutotune(hipdnnHandle_t handle, bool fullMode)
 
     // Step 1: Discover available engines
     std::vector<EngineConfigInfo> configs;
-    if(skipIfNoEngines(state.graph->get_engine_configs(configs)))
-    {
-        return;
-    }
+    HIPDNN_FE_CHECK(state.graph->get_engine_configs(configs));
 
     std::cout << "  Discovered " << configs.size() << " engine(s):\n";
     for(const auto& cfg : configs)
@@ -356,10 +329,8 @@ void demonstrateSaveToConfigFile(hipdnnHandle_t handle, bool fullMode)
 
     auto state = buildConvGraph(handle, fullMode);
 
-    if(skipIfNoEngines(state.graph->add_all_engines()))
-    {
-        return;
-    }
+    // Discover and add all available engines
+    HIPDNN_FE_CHECK(state.graph->add_all_engines());
 
     int64_t maxWs = 0;
     HIPDNN_FE_CHECK(state.graph->get_max_workspace_size(maxWs));
@@ -452,6 +423,14 @@ int main(int argc, char* argv[])
               << '\n';
 
     initializeFrontendLogging();
+
+    // Check GPU availability
+    int deviceCount = 0;
+    if(hipGetDeviceCount(&deviceCount) != hipSuccess || deviceCount == 0)
+    {
+        std::cout << "SKIPPED: No GPU devices available.\n";
+        return 0;
+    }
 
     hipdnnHandle_t handle = nullptr;
     HIPDNN_CHECK(hipdnnCreate(&handle));

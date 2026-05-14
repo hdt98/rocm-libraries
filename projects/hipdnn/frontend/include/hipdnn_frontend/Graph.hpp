@@ -454,10 +454,11 @@ private:
         return {ErrorCode::OK, ""};
     }
 
-    /// Run one timed iteration using the profiling control descriptor.
-    /// Sets START → execute → STOP → reads ELAPSED_MS.
+    /// Run one timed iteration using a fresh profiling control descriptor.
+    /// Creates descriptor, records START → execute → STOP → finalize → ELAPSED_MS.
+    /// A new descriptor is created each call because ProfilingControlDescriptor
+    /// does not support reset — setAttribute throws after finalize.
     static Error benchmarkOnce(hipdnnHandle_t handle,
-                               detail::ScopedHipdnnBackendDescriptor& profilingDesc,
                                detail::ScopedHipdnnBackendDescriptor& execPlan,
                                std::unordered_map<int64_t, void*>& variantPack,
                                void* workspace,
@@ -465,12 +466,30 @@ private:
     {
         elapsedMs = 0.0f;
 
+        // Create a fresh profiling descriptor for this iteration
+        // NOLINTNEXTLINE(misc-const-correctness)
+        detail::ScopedHipdnnBackendDescriptor profilingDesc(HIPDNN_BACKEND_PROFILING_CONTROL_EXT);
+        if(!profilingDesc.valid())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Failed to create profiling control descriptor"};
+        }
+
+        // Set handle (creates HIP events)
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendSetAttribute(profilingDesc.get(),
+                                                         HIPDNN_ATTR_PROFILING_HANDLE_EXT,
+                                                         HIPDNN_TYPE_HANDLE,
+                                                         1,
+                                                         static_cast<const void*>(&handle)),
+            "Failed to set handle on profiling descriptor");
+
         // Record start event
-        int64_t startVal = 1;
+        bool startVal = true;
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendSetAttribute(profilingDesc.get(),
                                                          HIPDNN_ATTR_PROFILING_START_EXT,
-                                                         HIPDNN_TYPE_INT64,
+                                                         HIPDNN_TYPE_BOOLEAN,
                                                          1,
                                                          &startVal),
             "Failed to set profiling start");
@@ -479,14 +498,19 @@ private:
         HIPDNN_CHECK_ERROR(executeWithPlan(handle, execPlan, variantPack, workspace));
 
         // Record stop event
-        int64_t stopVal = 1;
+        bool stopVal = true;
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendSetAttribute(profilingDesc.get(),
                                                          HIPDNN_ATTR_PROFILING_STOP_EXT,
-                                                         HIPDNN_TYPE_INT64,
+                                                         HIPDNN_TYPE_BOOLEAN,
                                                          1,
                                                          &stopVal),
             "Failed to set profiling stop");
+
+        // Finalize synchronizes events and computes elapsed time
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendFinalize(profilingDesc.get()),
+            "Failed to finalize profiling descriptor");
 
         // Read elapsed time
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
@@ -2715,41 +2739,6 @@ public:
                 }
             }
 
-            // Create profiling descriptor
-            detail::ScopedHipdnnBackendDescriptor profilingDesc(
-                HIPDNN_BACKEND_PROFILING_CONTROL_EXT);
-            if(!profilingDesc.valid())
-            {
-                result.succeeded = false;
-                result.errorMessage = "Failed to create profiling control descriptor";
-                allResults.push_back(std::move(result));
-                continue;
-            }
-
-            // Set handle on profiling descriptor
-            auto profStatus
-                = detail::hipdnnBackend()->backendSetAttribute(profilingDesc.get(),
-                                                               HIPDNN_ATTR_PROFILING_HANDLE_EXT,
-                                                               HIPDNN_TYPE_HANDLE,
-                                                               1,
-                                                               static_cast<const void*>(&handle));
-            if(profStatus != HIPDNN_STATUS_SUCCESS)
-            {
-                result.succeeded = false;
-                result.errorMessage = "Failed to set handle on profiling descriptor";
-                allResults.push_back(std::move(result));
-                continue;
-            }
-
-            profStatus = detail::hipdnnBackend()->backendFinalize(profilingDesc.get());
-            if(profStatus != HIPDNN_STATUS_SUCCESS)
-            {
-                result.succeeded = false;
-                result.errorMessage = "Failed to finalize profiling descriptor";
-                allResults.push_back(std::move(result));
-                continue;
-            }
-
             // ── Warmup iterations ───────────────────────────────────────
             bool warmupFailed = false;
             for(int w = 0; w < config.warmupIterations; ++w)
@@ -2771,13 +2760,27 @@ public:
             }
 
             // ── Device sync before timed iterations ─────────────────────
+            // Use a one-shot ProfilingControlDescriptor to call hipDeviceSynchronize()
+            // via the backend, keeping HIP calls out of the frontend header.
             {
-                int64_t syncVal = 1;
-                detail::hipdnnBackend()->backendSetAttribute(profilingDesc.get(),
-                                                             HIPDNN_ATTR_PROFILING_DEVICE_SYNC_EXT,
-                                                             HIPDNN_TYPE_INT64,
-                                                             1,
-                                                             &syncVal);
+                // NOLINTNEXTLINE(misc-const-correctness)
+                detail::ScopedHipdnnBackendDescriptor syncDesc(
+                    HIPDNN_BACKEND_PROFILING_CONTROL_EXT);
+                if(syncDesc.valid())
+                {
+                    detail::hipdnnBackend()->backendSetAttribute(syncDesc.get(),
+                                                                 HIPDNN_ATTR_PROFILING_HANDLE_EXT,
+                                                                 HIPDNN_TYPE_HANDLE,
+                                                                 1,
+                                                                 static_cast<const void*>(&handle));
+                    bool syncVal = true;
+                    detail::hipdnnBackend()->backendSetAttribute(
+                        syncDesc.get(),
+                        HIPDNN_ATTR_PROFILING_DEVICE_SYNC_EXT,
+                        HIPDNN_TYPE_BOOLEAN,
+                        1,
+                        &syncVal);
+                }
             }
 
             // ── Timed iterations ────────────────────────────────────────
@@ -2787,12 +2790,8 @@ public:
             if(config.strategy == AutotuneStrategy::SINGLE_SHOT)
             {
                 float elapsed = 0.0f;
-                auto benchErr = benchmarkOnce(handle,
-                                              profilingDesc,
-                                              *plan.executionPlanDesc,
-                                              variantPack,
-                                              workspace,
-                                              elapsed);
+                auto benchErr = benchmarkOnce(
+                    handle, *plan.executionPlanDesc, variantPack, workspace, elapsed);
                 if(benchErr.is_bad())
                 {
                     result.succeeded = false;
@@ -2812,12 +2811,8 @@ public:
                 for(int t = 0; t < config.timedIterations; ++t)
                 {
                     float elapsed = 0.0f;
-                    auto benchErr = benchmarkOnce(handle,
-                                                  profilingDesc,
-                                                  *plan.executionPlanDesc,
-                                                  variantPack,
-                                                  workspace,
-                                                  elapsed);
+                    auto benchErr = benchmarkOnce(
+                        handle, *plan.executionPlanDesc, variantPack, workspace, elapsed);
                     if(benchErr.is_bad())
                     {
                         result.succeeded = false;
@@ -2838,12 +2833,8 @@ public:
                 for(int t = 0; t < config.maxIterations; ++t)
                 {
                     float elapsed = 0.0f;
-                    auto benchErr = benchmarkOnce(handle,
-                                                  profilingDesc,
-                                                  *plan.executionPlanDesc,
-                                                  variantPack,
-                                                  workspace,
-                                                  elapsed);
+                    auto benchErr = benchmarkOnce(
+                        handle, *plan.executionPlanDesc, variantPack, workspace, elapsed);
                     if(benchErr.is_bad())
                     {
                         result.succeeded = false;
