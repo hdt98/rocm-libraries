@@ -50,7 +50,7 @@ struct float_equal_fn
     template <class T, class U>
     bool operator()(T x, U y) const
     {
-        using common_type = typename std::common_type<T,U>::type;
+        using common_type = typename std::common_type<T, U>::type;
         return float_equal_fn::apply<common_type>(common_type(x), common_type(y));
     }
 };
@@ -76,7 +76,7 @@ struct float_equal_sentinel_fn
     template <class T, class U>
     bool operator()(T x, U y) const
     {
-        using common_type = typename std::common_type<T,U>::type;
+        using common_type = typename std::common_type<T, U>::type;
         return float_equal_sentinel_fn::apply<common_type>(common_type(x), common_type(y));
     }
 };
