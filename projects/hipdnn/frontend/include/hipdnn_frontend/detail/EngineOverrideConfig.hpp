@@ -25,8 +25,7 @@ namespace hipdnn_frontend::engine_override
 
 /// Result of a successful engine override match.
 /// Contains the resolved engine ID and any knob settings from the config entry.
-/// The knobs vector is empty when the config entry has no knob overrides
-/// (knob parsing from JSON is added in Phase 3).
+/// The knobs vector is empty when the config entry has no knob overrides.
 struct MatchResult
 {
     int64_t engineId;
@@ -84,6 +83,7 @@ struct OperationRule
     std::string op; ///< "conv_fprop" / "conv_dgrad" / "conv_wgrad"
     std::string engineName; ///< Engine name resolved to an ID via engineNameToId()
     std::vector<TensorPattern> tensors; ///< Ordered patterns for operation inputs
+    std::vector<KnobSetting> knobs; ///< Knob settings parsed from JSON (empty if none)
 
     /// Returns true iff every tensor in `tensors` matches the corresponding pattern.
     /// Rejects immediately when the tensor count differs.
@@ -294,7 +294,7 @@ private:
     struct ExactEntry
     {
         int64_t enginedId;
-        std::vector<KnobSetting> knobs; ///< Parsed knob settings (empty until Phase 3)
+        std::vector<KnobSetting> knobs; ///< Parsed knob settings from JSON config entry
         size_t order; ///< position in the original rule list (0 = first)
     };
 
@@ -303,7 +303,7 @@ private:
     {
         OperationRule rule;
         int64_t enginedId; ///< resolved from rule.engineName at index time
-        std::vector<KnobSetting> knobs; ///< Parsed knob settings (empty until Phase 3)
+        std::vector<KnobSetting> knobs; ///< Parsed knob settings from JSON config entry
         size_t order;
     };
 
@@ -373,6 +373,33 @@ private:
                 }
                 rule.tensors.push_back(std::move(pat));
             }
+            if(entry.contains("knobs"))
+            {
+                for(const auto& k : entry.at("knobs"))
+                {
+                    auto name = k.at("name").get<std::string>();
+                    auto type = k.at("type").get<std::string>();
+                    if(type == "int" || type == "integer")
+                    {
+                        rule.knobs.emplace_back(name, k.at("value").get<int64_t>());
+                    }
+                    else if(type == "double" || type == "float")
+                    {
+                        rule.knobs.emplace_back(name, k.at("value").get<double>());
+                    }
+                    else if(type == "string")
+                    {
+                        rule.knobs.emplace_back(name, k.at("value").get<std::string>());
+                    }
+                    else
+                    {
+                        HIPDNN_FE_LOG_WARN("EngineOverrideConfig: unknown knob type '"
+                                           << type << "' for knob '" << name
+                                           << "', treating value as int64_t");
+                        rule.knobs.emplace_back(name, k.at("value").get<int64_t>());
+                    }
+                }
+            }
             rules.push_back(std::move(rule));
         }
         return EngineOverrideConfig(std::move(rules));
@@ -433,16 +460,18 @@ private:
     void indexRule(OperationRule rule, size_t order)
     {
         const int64_t resolvedId = hipdnn_data_sdk::utilities::engineNameToId(rule.engineName);
+        auto knobs = std::move(rule.knobs);
         OpBucket& bucket = _index[rule.op]; // keyed by op (strategy 1)
         if(hasWildcard(rule.tensors))
         {
-            bucket.wildcards.push_back(WildcardEntry{std::move(rule), resolvedId, {}, order});
+            bucket.wildcards.push_back(
+                WildcardEntry{std::move(rule), resolvedId, std::move(knobs), order});
         }
         else
         {
             const auto key = buildDimKey(rule.tensors);
             // try_emplace keeps the first (lowest-order) entry for duplicate keys.
-            bucket.exact.try_emplace(key, ExactEntry{resolvedId, {}, order});
+            bucket.exact.try_emplace(key, ExactEntry{resolvedId, std::move(knobs), order});
         }
     }
 

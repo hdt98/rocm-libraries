@@ -416,4 +416,309 @@ TEST(TestEngineOverrideConfig, JsonWithStrideConstraint)
     EXPECT_FALSE(config->matchOperation("conv_fprop", {xWrong, w}).has_value());
 }
 
+// ── Knob parsing tests ──────────────────────────────────────────────────────
+
+// Test 17: JSON entry with integer knobs
+TEST(TestEngineOverrideConfig, JsonWithIntegerKnobs)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "TILE_SIZE", "type": "int", "value": 128 },
+        { "name": "SPLIT_K", "type": "int", "value": 2 }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->engineId, MIOPEN_ENGINE_ID);
+
+    ASSERT_EQ(result->knobs.size(), 2u);
+    EXPECT_EQ(result->knobs[0].knobId(), "TILE_SIZE");
+    EXPECT_EQ(std::get<int64_t>(result->knobs[0].value()), 128);
+    EXPECT_EQ(result->knobs[1].knobId(), "SPLIT_K");
+    EXPECT_EQ(std::get<int64_t>(result->knobs[1].value()), 2);
+}
+
+// Test 18: JSON entry with double knobs
+TEST(TestEngineOverrideConfig, JsonWithDoubleKnobs)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "LEARNING_RATE", "type": "double", "value": 0.001 }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+
+    ASSERT_EQ(result->knobs.size(), 1u);
+    EXPECT_EQ(result->knobs[0].knobId(), "LEARNING_RATE");
+    EXPECT_DOUBLE_EQ(std::get<double>(result->knobs[0].value()), 0.001);
+}
+
+// Test 19: JSON entry with string knobs
+TEST(TestEngineOverrideConfig, JsonWithStringKnobs)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "ALGORITHM", "type": "string", "value": "gemm_v2" }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+
+    ASSERT_EQ(result->knobs.size(), 1u);
+    EXPECT_EQ(result->knobs[0].knobId(), "ALGORITHM");
+    EXPECT_EQ(std::get<std::string>(result->knobs[0].value()), "gemm_v2");
+}
+
+// Test 20: JSON entry without knobs field → knobs vector is empty
+TEST(TestEngineOverrideConfig, JsonWithoutKnobsFieldGivesEmptyKnobs)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->knobs.empty());
+}
+
+// Test 21: JSON entry with empty knobs array → knobs vector is empty
+TEST(TestEngineOverrideConfig, JsonWithEmptyKnobsArray)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": []
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->knobs.empty());
+}
+
+// Test 22: Wildcard rule with knobs returns correct knobs
+TEST(TestEngineOverrideConfig, WildcardRuleWithKnobs)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [-1, -1, -1, -1] }
+      ],
+      "knobs": [
+        { "name": "TILE_SIZE", "type": "int", "value": 256 }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    // Any 4D tensor should match the wildcard
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({8, 64, 56, 56})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->engineId, MIOPEN_ENGINE_ID);
+
+    ASSERT_EQ(result->knobs.size(), 1u);
+    EXPECT_EQ(result->knobs[0].knobId(), "TILE_SIZE");
+    EXPECT_EQ(std::get<int64_t>(result->knobs[0].value()), 256);
+}
+
+// Test 23: JSON with mixed knob types
+TEST(TestEngineOverrideConfig, JsonWithMixedKnobTypes)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "TILE_SIZE", "type": "int", "value": 128 },
+        { "name": "SCALE", "type": "double", "value": 0.5 },
+        { "name": "ALGO", "type": "string", "value": "implicit_gemm" }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+
+    ASSERT_EQ(result->knobs.size(), 3u);
+    EXPECT_EQ(result->knobs[0].knobId(), "TILE_SIZE");
+    EXPECT_EQ(std::get<int64_t>(result->knobs[0].value()), 128);
+    EXPECT_EQ(result->knobs[1].knobId(), "SCALE");
+    EXPECT_DOUBLE_EQ(std::get<double>(result->knobs[1].value()), 0.5);
+    EXPECT_EQ(result->knobs[2].knobId(), "ALGO");
+    EXPECT_EQ(std::get<std::string>(result->knobs[2].value()), "implicit_gemm");
+}
+
+// Test 24: "integer" as type alias for "int"
+TEST(TestEngineOverrideConfig, JsonKnobTypeIntegerAlias)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "TILE_SIZE", "type": "integer", "value": 64 }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+
+    ASSERT_EQ(result->knobs.size(), 1u);
+    EXPECT_EQ(std::get<int64_t>(result->knobs[0].value()), 64);
+}
+
+// Test 25: "float" as type alias for "double"
+TEST(TestEngineOverrideConfig, JsonKnobTypeFloatAlias)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "RATE", "type": "float", "value": 1.5 }
+      ]
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+
+    ASSERT_EQ(result->knobs.size(), 1u);
+    EXPECT_DOUBLE_EQ(std::get<double>(result->knobs[0].value()), 1.5);
+}
+
+// Test 26: knobs with autotune_metadata present (backward compat)
+TEST(TestEngineOverrideConfig, JsonWithAutotuneMetadata)
+{
+    constexpr const char* CONTENTS = R"({
+  "engine_overrides": [
+    {
+      "op": "conv_fprop",
+      "engine_name": "MIOPEN_ENGINE",
+      "tensors": [
+        { "dim": [1, 3, 224, 224] }
+      ],
+      "knobs": [
+        { "name": "TILE_SIZE", "type": "int", "value": 128 }
+      ],
+      "autotune_metadata": {
+        "min_time_ms": 1.23,
+        "rank": 0
+      }
+    }
+  ]
+})";
+
+    auto config = EngineOverrideConfig::loadFromContent(CONTENTS);
+    ASSERT_TRUE(config.has_value());
+
+    // autotune_metadata should be ignored by the parser; knobs still work
+    const std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    auto result = config->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->engineId, MIOPEN_ENGINE_ID);
+    ASSERT_EQ(result->knobs.size(), 1u);
+    EXPECT_EQ(result->knobs[0].knobId(), "TILE_SIZE");
+}
+
 #endif // HIPDNN_FRONTEND_SKIP_JSON_LIB

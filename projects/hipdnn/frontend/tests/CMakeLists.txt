@@ -74,6 +74,8 @@ add_executable(
     TestTopologicalSortingUtils.cpp
     TestSdkLogging.cpp
     TestVersion.cpp
+    TestAutotune.cpp
+    TestAutotuneFileWriter.cpp
     TestAutotuneTypes.cpp
 )
 

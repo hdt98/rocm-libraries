@@ -16,6 +16,11 @@ namespace hipdnn_frontend::engine_override
 /// operation and return the matching MatchResult from the lazily-loaded
 /// engine override config (pointed to by HIPDNN_ENGINE_OVERRIDE_FILE).
 ///
+/// The returned MatchResult contains the resolved engine ID and any knob
+/// settings from the matching config entry. The caller (Graph) stores the
+/// engine ID in _preferredEngineId and the knobs in _preferredKnobSettings,
+/// forwarding them to the plan creation path.
+///
 /// Returns nullopt when:
 /// - no convolution node is present in the graph,
 /// - no rule in the config matches the operation's tensors, or
