@@ -114,8 +114,8 @@ miopenStatus_t ConvBiasActivFusion(const Handle& handle,
     MIOPEN_CHECK(fusePlanDesc.AddOp(activOp));
 
     MIOPEN_CHECK(fusePlanDesc.Compile(handle));
-    float alpha       = 1.0f;
-    float beta        = 0.0f;
+    float alpha{1.0f};
+    float beta{0.0f};
     double activ_alpha = activationDesc.GetAlpha();
     double activ_beta  = activationDesc.GetBeta();
     double activ_gamma = activationDesc.GetGamma();
