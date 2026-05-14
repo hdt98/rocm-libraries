@@ -19,6 +19,8 @@
 //   IdentityGen    — 1 on diagonal, 0 elsewhere
 //   SequentialGen  — (m * N + n) % modulus
 //   UniformGen     — uniform random in [lo, hi) via xorshift32
+//   RademacherGen  — +1 or -1 with equal probability
+//   NormalGen      — normal distribution (Box-Muller) with mean, stddev, seed
 
 #pragma once
 
@@ -207,6 +209,34 @@ struct RademacherGen
         uint32_t s = seed ^ static_cast<uint32_t>(m * N + n + 1);
         s          = detail::xorshift32(s);
         return (s & 1u) ? 1.0f : -1.0f;
+    }
+};
+
+// ============================================================================
+// Generator: Normal distribution via Box-Muller transform
+// ============================================================================
+
+struct NormalGen
+{
+    float mean;
+    float stddev;
+    uint32_t seed;
+
+    __device__ float operator()(int m, int n, int, int N) const
+    {
+        // Two independent uniform samples from xorshift for Box-Muller
+        uint32_t s = seed ^ static_cast<uint32_t>(m * N + n + 1);
+        s          = detail::xorshift32(s);
+        s          = detail::xorshift32(s);
+
+        // u1 in (0, 1) — must exclude 0 for log
+        float u1 = (static_cast<float>(s) + 1.0f) / 4294967298.0f; // (0xFFFFFFFF + 2)
+        s        = detail::xorshift32(s);
+        float u2 = static_cast<float>(s) / 4294967295.0f; // [0, 1]
+
+        constexpr float kTwoPi = 6.283185307179586f;
+        float z                = sqrtf(-2.0f * logf(u1)) * cosf(kTwoPi * u2);
+        return mean + stddev * z;
     }
 };
 

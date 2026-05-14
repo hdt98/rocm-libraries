@@ -21,6 +21,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_testing()
 
 find_package(hip REQUIRED)
+find_package(rocblas REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm)
 
 # =============================================================================
 # Google Test
@@ -48,7 +49,8 @@ endif()
 # =============================================================================
 
 set(ROCM_CK_CORRECTNESS_TESTS
-    test_gemm_correctness.hip
+    test_gemm_fp32.hip
+    test_gemm_bf16.hip
 )
 
 add_custom_target(rocm_ck_correctness_tests)
@@ -62,7 +64,7 @@ foreach(test_source ${ROCM_CK_CORRECTNESS_TESTS})
         ${CK_INCLUDE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
-    target_link_libraries(${test_name} PRIVATE rocm_ck hip::host GTest::gtest_main)
+    target_link_libraries(${test_name} PRIVATE rocm_ck hip::host GTest::gtest_main roc::rocblas)
 
     # CK Tile requires aggressive optimization and inlining for device code.
     target_compile_options(${test_name} PRIVATE

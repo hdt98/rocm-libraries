@@ -1,17 +1,16 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// GEMM correctness tests: GPU output vs known reference.
+// FP32 GEMM correctness tests.
 //
 // OnesTimesZeros:      A = 1, B = 0  =>  C = 0
 // IdentityTimesMatrix: A = I, B = f(k,n)  =>  C = B
 // RademacherGemm:      A,B random +/-1  =>  C vs CPU reference (exact)
-// BF16OnesCross256:    BF16 A = B = 1, K = 512  =>  C = 512 (BF16 precision)
+// NormalGemmTriple:     A,B ~ N(0,1)  =>  CK vs CPU / multiword / FP64 refs
 
 #include <hip/hip_runtime.h>
 
 #include <rocm_ck/args.hpp>
-#include <rocm_ck/datatype_convert.hpp>
 #include <rocm_ck/gemm_spec.hpp>
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/layout.hpp>
@@ -22,6 +21,7 @@
 #include <rocm_ck/gemm_dev.hpp>
 #endif
 
+#include "gemm_ref_gpu.hip"
 #include "gemm_test_data.hpp"
 #include "gemm_test_utils.hpp"
 
@@ -29,7 +29,7 @@
 #include <vector>
 
 // ============================================================================
-// Specs + kernels
+// Spec + kernel
 // ============================================================================
 
 static constexpr auto kSpec = rocm_ck::makeSpec(
@@ -47,26 +47,11 @@ __global__ void gemm_kernel(rocm_ck::Args args)
 #endif
 }
 
-static constexpr auto kSpecBF16 = rocm_ck::makeSpec(
-    rocm_ck::Signature{.dtype = rocm_ck::DataType::BF16,
-                       .ops   = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-    rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},
-                           .block_waves = {2, 2, 1},
-                           .wave_tile   = {16, 16, 16}},
-    rocm_ck::TargetSet::cdna());
-
-__global__ void gemm_kernel_bf16(rocm_ck::Args args)
-{
-#ifdef __HIP_DEVICE_COMPILE__
-    rocm_ck::run<kSpecBF16>(args);
-#endif
-}
-
 // ============================================================================
 // Test fixture
 // ============================================================================
 
-class GemmCorrectness : public ::testing::Test
+class GemmFP32 : public ::testing::Test
 {
 protected:
     void SetUp() override { rocm_ck::test::skipIfNoGpu(); }
@@ -76,41 +61,34 @@ protected:
 // Test: A = all 1s, B = all 0s => C = all 0s
 // ============================================================================
 
-TEST_F(GemmCorrectness, OnesTimesZeros)
+TEST_F(GemmFP32, OnesTimesZeros)
 {
     constexpr int M = 128;
     constexpr int N = 128;
     constexpr int K = 32;
 
-    // Allocate device buffers
     rocm_ck::TypedBuffer buf_a(kSpec.lhs().dtype, M * K);
     rocm_ck::TypedBuffer buf_b(kSpec.rhs().dtype, K * N);
     rocm_ck::TypedBuffer buf_c(kSpec.output().dtype, M * N);
 
-    // Build Args — strides computed from spec layout, stored in tensor slots
     auto args = rocm_ck::test::buildGemmArgs(
         kSpec, buf_a.ptr(), buf_b.ptr(), buf_c.ptr(), M, N, K);
 
-    // Fill A = 1.0, B = 0.0, C = 0.0 on GPU using Args tensor slots
     rocm_ck::test::fillConstant2D(args, kSpec.lhs().args_slot, kSpec.lhs().dtype, 1.0f);
     rocm_ck::test::fillConstant2D(args, kSpec.rhs().args_slot, kSpec.rhs().dtype, 0.0f);
     rocm_ck::test::fillConstant2D(args, kSpec.output().args_slot, kSpec.output().dtype, 0.0f);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Launch GEMM
     dim3 grid  = rocm_ck::test::gemmGrid(kSpec, M, N);
     dim3 block(kSpec.workgroup_size);
     gemm_kernel<<<grid, block>>>(args);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Download result
     std::vector<float> result(M * N);
     buf_c.download(result.data());
 
-    // Reference: all zeros
     std::vector<float> ref(M * N, 0.0f);
 
-    // Verify
     auto vr = rocm_ck::verify(result.data(), ref.data(), M * N, kSpec.output().dtype);
     EXPECT_TRUE(vr.passed) << "Mismatch at [" << vr.first_mismatch
                            << "] got=" << vr.got << " expected=" << vr.expected;
@@ -120,23 +98,20 @@ TEST_F(GemmCorrectness, OnesTimesZeros)
 // Test: A = identity, B = sequential pattern => C = B
 // ============================================================================
 
-TEST_F(GemmCorrectness, IdentityTimesMatrix)
+TEST_F(GemmFP32, IdentityTimesMatrix)
 {
-    constexpr int M   = 128;
-    constexpr int N   = 128;
-    constexpr int K   = 128; // M == K so A is a square identity
-    constexpr int kMod = 8;  // small ints, exact in any FP format
+    constexpr int M    = 128;
+    constexpr int N    = 128;
+    constexpr int K    = 128; // M == K so A is a square identity
+    constexpr int kMod = 8;   // small ints, exact in any FP format
 
-    // Allocate device buffers
     rocm_ck::TypedBuffer buf_a(kSpec.lhs().dtype, M * K);
     rocm_ck::TypedBuffer buf_b(kSpec.rhs().dtype, K * N);
     rocm_ck::TypedBuffer buf_c(kSpec.output().dtype, M * N);
 
-    // Build Args
     auto args = rocm_ck::test::buildGemmArgs(
         kSpec, buf_a.ptr(), buf_b.ptr(), buf_c.ptr(), M, N, K);
 
-    // Fill: A = identity, B = sequential pattern, C = zero
     rocm_ck::test::fill2D(
         args, kSpec.lhs().args_slot, kSpec.lhs().dtype, rocm_ck::test::IdentityGen{});
     rocm_ck::test::fill2D(
@@ -145,25 +120,20 @@ TEST_F(GemmCorrectness, IdentityTimesMatrix)
         args, kSpec.output().args_slot, kSpec.output().dtype, 0.0f);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Launch GEMM
     dim3 grid  = rocm_ck::test::gemmGrid(kSpec, M, N);
     dim3 block(kSpec.workgroup_size);
     gemm_kernel<<<grid, block>>>(args);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Download result
     std::vector<float> result(M * N);
     buf_c.download(result.data());
 
-    // Reference: C(m,n) = I * B = B(m,n) = (m * N + n) % kMod
-    // Build in C's flat layout using output strides.
     auto [c_sm, c_sn] = rocm_ck::layoutStrides(kSpec.output().layout, M, N);
     std::vector<float> ref(M * N);
     for(int m = 0; m < M; ++m)
         for(int n = 0; n < N; ++n)
             ref[m * c_sm + n * c_sn] = static_cast<float>((m * N + n) % kMod);
 
-    // Verify
     auto vr = rocm_ck::verify(result.data(), ref.data(), M * N, kSpec.output().dtype);
     EXPECT_TRUE(vr.passed) << "Mismatch at [" << vr.first_mismatch
                            << "] got=" << vr.got << " expected=" << vr.expected;
@@ -173,22 +143,19 @@ TEST_F(GemmCorrectness, IdentityTimesMatrix)
 // Test: A,B = Rademacher (+/-1) => C vs CPU reference (exact in FP32)
 // ============================================================================
 
-TEST_F(GemmCorrectness, RademacherGemm)
+TEST_F(GemmFP32, RademacherGemm)
 {
     constexpr int M = 128;
     constexpr int N = 128;
     constexpr int K = 128;
 
-    // Allocate device buffers
     rocm_ck::TypedBuffer buf_a(kSpec.lhs().dtype, M * K);
     rocm_ck::TypedBuffer buf_b(kSpec.rhs().dtype, K * N);
     rocm_ck::TypedBuffer buf_c(kSpec.output().dtype, M * N);
 
-    // Build Args
     auto args = rocm_ck::test::buildGemmArgs(
         kSpec, buf_a.ptr(), buf_b.ptr(), buf_c.ptr(), M, N, K);
 
-    // Fill: A,B = Rademacher with different seeds, C = zero
     rocm_ck::test::fill2D(
         args, kSpec.lhs().args_slot, kSpec.lhs().dtype, rocm_ck::test::RademacherGen{37});
     rocm_ck::test::fill2D(
@@ -197,88 +164,127 @@ TEST_F(GemmCorrectness, RademacherGemm)
         args, kSpec.output().args_slot, kSpec.output().dtype, 0.0f);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Download A and B for CPU reference
     std::vector<float> host_a(M * K);
     std::vector<float> host_b(K * N);
     buf_a.download(host_a.data());
     buf_b.download(host_b.data());
 
-    // CPU reference: C_ref = A * B (exact — all values are +/-1, sums are integers)
     std::vector<float> ref(M * N, 0.0f);
-    rocm_ck::test::cpuGemm(host_a.data(), host_b.data(), ref.data(),
-                            M, N, K, args,
-                            kSpec.lhs().args_slot,
-                            kSpec.rhs().args_slot,
-                            kSpec.output().args_slot);
+    rocm_ck::test::cpuGemm(kSpec, host_a.data(), host_b.data(), ref.data(),
+                            M, N, K, args);
 
-    // Launch GEMM on GPU
     dim3 grid  = rocm_ck::test::gemmGrid(kSpec, M, N);
     dim3 block(kSpec.workgroup_size);
     gemm_kernel<<<grid, block>>>(args);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Download GPU result
     std::vector<float> result(M * N);
     buf_c.download(result.data());
 
-    // Verify — exact match since all arithmetic is integer-valued in FP32
     auto vr = rocm_ck::verify(result.data(), ref.data(), M * N, kSpec.output().dtype);
     EXPECT_TRUE(vr.passed) << "Mismatch at [" << vr.first_mismatch
                            << "] got=" << vr.got << " expected=" << vr.expected;
 }
 
 // ============================================================================
-// Test: BF16 A = B = all 1s, K = 512 => C = 512 (crosses BF16 256 threshold)
+// Test: A,B ~ N(0,1) => CK vs CPU reference, GPU multiword, GPU FP64
 //
-// BF16 has 7 mantissa bits. Above 256, ULP = 2 — only even integers are
-// representable. Accumulation is in FP32 (exact), but the store to BF16
-// output rounds. The reference uses BF16 roundtrip so the test catches
-// incorrect rounding at any K value.
+// Compares the CK kernel result against all three reference implementations.
+// Random normal data exercises general FP32 accumulation (not exact).
 // ============================================================================
 
-TEST_F(GemmCorrectness, BF16OnesCross256)
+TEST_F(GemmFP32, NormalGemmTriple)
 {
-    constexpr int M = 128;
-    constexpr int N = 128;
-    constexpr int K = 512; // result > 256, tests BF16 precision boundary
+    constexpr int M = 256;
+    constexpr int N = 256;
+    constexpr int K = 128;
 
-    // Allocate device buffers
-    rocm_ck::TypedBuffer buf_a(kSpecBF16.lhs().dtype, M * K);
-    rocm_ck::TypedBuffer buf_b(kSpecBF16.rhs().dtype, K * N);
-    rocm_ck::TypedBuffer buf_c(kSpecBF16.output().dtype, M * N);
+    rocm_ck::TypedBuffer buf_a(kSpec.lhs().dtype, M * K);
+    rocm_ck::TypedBuffer buf_b(kSpec.rhs().dtype, K * N);
+    rocm_ck::TypedBuffer buf_c(kSpec.output().dtype, M * N);
 
-    // Build Args
     auto args = rocm_ck::test::buildGemmArgs(
-        kSpecBF16, buf_a.ptr(), buf_b.ptr(), buf_c.ptr(), M, N, K);
+        kSpec, buf_a.ptr(), buf_b.ptr(), buf_c.ptr(), M, N, K);
 
-    // Fill A = 1.0, B = 1.0, C = 0.0 in BF16
+    // --- Fill A, B with standard normal N(0, 1) ---
+    rocm_ck::test::fill2D(
+        args, kSpec.lhs().args_slot, kSpec.lhs().dtype,
+        rocm_ck::test::NormalGen{0.0f, 1.0f, 42});
+    rocm_ck::test::fill2D(
+        args, kSpec.rhs().args_slot, kSpec.rhs().dtype,
+        rocm_ck::test::NormalGen{0.0f, 1.0f, 137});
     rocm_ck::test::fillConstant2D(
-        args, kSpecBF16.lhs().args_slot, kSpecBF16.lhs().dtype, 1.0f);
-    rocm_ck::test::fillConstant2D(
-        args, kSpecBF16.rhs().args_slot, kSpecBF16.rhs().dtype, 1.0f);
-    rocm_ck::test::fillConstant2D(
-        args, kSpecBF16.output().args_slot, kSpecBF16.output().dtype, 0.0f);
+        args, kSpec.output().args_slot, kSpec.output().dtype, 0.0f);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Launch BF16 GEMM
-    dim3 grid  = rocm_ck::test::gemmGrid(kSpecBF16, M, N);
-    dim3 block(kSpecBF16.workgroup_size);
-    gemm_kernel_bf16<<<grid, block>>>(args);
+    // --- Download A, B for CPU reference ---
+    std::vector<float> host_a(M * K);
+    std::vector<float> host_b(K * N);
+    buf_a.download(host_a.data());
+    buf_b.download(host_b.data());
+
+    // --- CPU reference (FP64 accumulation) ---
+    std::vector<float> ref_cpu(M * N, 0.0f);
+    rocm_ck::test::cpuGemm(kSpec, host_a.data(), host_b.data(), ref_cpu.data(),
+                            M, N, K, args);
+
+    // --- CK kernel ---
+    dim3 grid  = rocm_ck::test::gemmGrid(kSpec, M, N);
+    dim3 block(kSpec.workgroup_size);
+    gemm_kernel<<<grid, block>>>(args);
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Download result (BF16 -> float conversion in download)
-    std::vector<float> result(M * N);
-    buf_c.download(result.data());
+    std::vector<float> result_ck(M * N);
+    buf_c.download(result_ck.data());
 
-    // Reference: each element = K, rounded through BF16
-    // (K = 512 is exact, but this stays correct if K is changed to
-    // a non-representable value like 513 where BF16 rounds to 512)
-    float expected = rocm_ck::bf16BitsToFloat(
-        rocm_ck::floatToBf16Bits(static_cast<float>(K)));
-    std::vector<float> ref(M * N, expected);
+    // --- GPU references (operate on device float arrays) ---
+    rocm_ck::test::GemmBackend backend;
+    auto* dev_a = static_cast<float*>(buf_a.ptr());
+    auto* dev_b = static_cast<float*>(buf_b.ptr());
 
-    auto vr = rocm_ck::verify(result.data(), ref.data(), M * N, kSpecBF16.output().dtype);
-    EXPECT_TRUE(vr.passed) << "Mismatch at [" << vr.first_mismatch
-                           << "] got=" << vr.got << " expected=" << vr.expected
-                           << " (expected BF16 repr of " << K << " = " << expected << ")";
+    // Multiword reference
+    float* dev_ref_mw = nullptr;
+    HIP_CHECK(hipMalloc(&dev_ref_mw, M * N * sizeof(float)));
+    rocm_ck::test::gpuGemmMultiword(kSpec, dev_ref_mw, dev_a, dev_b,
+                                    M, N, K, args, backend);
+
+    std::vector<float> ref_mw(M * N);
+    HIP_CHECK(hipMemcpy(ref_mw.data(), dev_ref_mw,
+                         M * N * sizeof(float), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipFree(dev_ref_mw));
+
+    // FP64 reference
+    float* dev_ref_f64 = nullptr;
+    HIP_CHECK(hipMalloc(&dev_ref_f64, M * N * sizeof(float)));
+    rocm_ck::test::gpuGemmFP64(kSpec, dev_ref_f64, dev_a, dev_b,
+                                M, N, K, args, backend);
+
+    std::vector<float> ref_f64(M * N);
+    HIP_CHECK(hipMemcpy(ref_f64.data(), dev_ref_f64,
+                         M * N * sizeof(float), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipFree(dev_ref_f64));
+
+    // --- Compare CK vs each reference ---
+    auto vr_cpu = rocm_ck::verify(
+        result_ck.data(), ref_cpu.data(), M * N, kSpec.output().dtype);
+    EXPECT_TRUE(vr_cpu.passed) << "CK vs CPU: mismatch at [" << vr_cpu.first_mismatch
+                               << "] got=" << vr_cpu.got << " expected=" << vr_cpu.expected;
+
+    auto vr_mw = rocm_ck::verify(
+        result_ck.data(), ref_mw.data(), M * N, kSpec.output().dtype);
+    EXPECT_TRUE(vr_mw.passed) << "CK vs Multiword: mismatch at [" << vr_mw.first_mismatch
+                              << "] got=" << vr_mw.got << " expected=" << vr_mw.expected;
+
+    auto vr_f64 = rocm_ck::verify(
+        result_ck.data(), ref_f64.data(), M * N, kSpec.output().dtype);
+    EXPECT_TRUE(vr_f64.passed) << "CK vs FP64: mismatch at [" << vr_f64.first_mismatch
+                               << "] got=" << vr_f64.got << " expected=" << vr_f64.expected;
+
+    // --- Cross-check: multiword vs FP64 (should be very close) ---
+    auto vr_cross = rocm_ck::verify(
+        ref_mw.data(), ref_f64.data(), M * N, kSpec.output().dtype);
+    EXPECT_TRUE(vr_cross.passed) << "Multiword vs FP64: mismatch at ["
+                                 << vr_cross.first_mismatch
+                                 << "] got=" << vr_cross.got
+                                 << " expected=" << vr_cross.expected;
 }
