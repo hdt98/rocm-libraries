@@ -237,7 +237,7 @@ pipeline {
                     dir("projects/composablekernel") {
                         ck = load "vars/ck.groovy"
                     }
-                    ck.ck.checkoutComposableKernel()
+                    ck.checkoutComposableKernel()
                     env.SHOULD_RUN_CI = String.valueOf(params.FORCE_CI.toBoolean() || ck.shouldRunCICheck())
                     echo "SHOULD_RUN_CI: ${env.SHOULD_RUN_CI}"
                 }
@@ -252,7 +252,9 @@ pipeline {
                 stage('Docker /opt/rocm'){
                     agent{ label rocmnode("nogpu") }
                     steps{
-                        ck.buildDocker('/opt/rocm')
+                        script {
+                            ck.buildDocker('/opt/rocm')
+                        }
                         cleanWs()
                     }
                 }
@@ -283,7 +285,9 @@ pipeline {
                                 --file-filter=*.cpp --force --enable=all --output-file=ck_cppcheck.log"""
                     }
                     steps{
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, setup_cmd: "", build_cmd: "", execute_cmd: execute_cmd)
+                        script {
+                            ck.buildHipClangJobAndReboot(setup_args:setup_args, setup_cmd: "", build_cmd: "", execute_cmd: execute_cmd)
+                        }
                         archiveArtifacts "build/ck_cppcheck.log"
                         cleanWs()
                     }
@@ -302,7 +306,9 @@ pipeline {
                                 xargs -P 8 -I{} sh -c 'clang-format-18 -style=file {} | diff -u - {} || (echo "ERROR: {} needs formatting" && exit 1)'"""
                     }
                     steps{
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, setup_cmd: "", build_cmd: "", execute_cmd: execute_cmd)
+                        script {
+                            ck.buildHipClangJobAndReboot(setup_args:setup_args, setup_cmd: "", build_cmd: "", execute_cmd: execute_cmd)
+                        }
                         cleanWs()
                     }
                 }
@@ -324,7 +330,9 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        ck.run_downstream_tests(image: "${env.CK_PYTORCH_IMAGE}", timeoutHours: 2, execute_cmds: ck.getPytorchTestsCmds())
+                        script {
+                            ck.run_downstream_tests(image: "${env.CK_PYTORCH_IMAGE}", timeoutHours: 2, execute_cmds: ck.getPytorchTestsCmds())
+                        }
                         cleanWs()
                     }
                 }
@@ -336,7 +344,9 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        ck.run_downstream_tests(image: "${env.CK_AITER_IMAGE}", timeoutHours: 5, execute_cmds: ck.getAiterTestsCmds())
+                        script {
+                            ck.run_downstream_tests(image: "${env.CK_AITER_IMAGE}", timeoutHours: 5, execute_cmds: ck.getAiterTestsCmds())
+                        }
                         cleanWs()
                     }
                 }
@@ -348,7 +358,9 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx950")}
                     steps{
-                        ck.run_downstream_tests(image: "${env.CK_AITER_IMAGE}", timeoutHours: 5, execute_cmds: ck.getAiterTestsCmds())
+                        script {
+                            ck.run_downstream_tests(image: "${env.CK_AITER_IMAGE}", timeoutHours: 5, execute_cmds: ck.getAiterTestsCmds())
+                        }
                         cleanWs()
                     }
                 }
@@ -360,7 +372,9 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        ck.run_downstream_tests(image: "${env.CK_FA_IMAGE}", timeoutHours: 5, execute_cmds: ck.getFaTestsCmds())
+                        script {
+                            ck.run_downstream_tests(image: "${env.CK_FA_IMAGE}", timeoutHours: 5, execute_cmds: ck.getFaTestsCmds())
+                        }
                         cleanWs()
                     }
                 }
@@ -372,7 +386,9 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx950")}
                     steps{
-                        ck.run_downstream_tests(image: "${env.CK_FA_IMAGE}", timeoutHours: 5, execute_cmds: ck.getFaTestsCmds())
+                        script {
+                            ck.run_downstream_tests(image: "${env.CK_FA_IMAGE}", timeoutHours: 5, execute_cmds: ck.getFaTestsCmds())
+                        }
                         cleanWs()
                     }
                 }
@@ -402,7 +418,9 @@ pipeline {
                                            ./bin/test_grouped_convnd_fwd_tile"""
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -430,7 +448,9 @@ pipeline {
                                            ./bin/test_grouped_convnd_fwd_large_cases && ./bin/test_grouped_convnd_bwd_data_large_cases && ./bin/test_grouped_convnd_fwd_bias_clamp_large_cases"""
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -470,7 +490,9 @@ pipeline {
                                            ./bin/test_grouped_convnd_bwd_weight_dataset_xdl"""
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -496,7 +518,9 @@ pipeline {
                         execute_args = ck.build_and_run_fmha("gfx90a")
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -512,7 +536,9 @@ pipeline {
                         execute_args = ck.build_and_run_fmha("gfx942")
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -528,7 +554,9 @@ pipeline {
                         execute_args = ck.build_and_run_fmha("gfx950")
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -544,7 +572,9 @@ pipeline {
                         execute_args = ck.build_and_run_fmha("gfx1201")
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -587,7 +617,9 @@ pipeline {
                                            python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -632,7 +664,9 @@ pipeline {
                                            python3 ../tile_engine/ops/gemm/grouped_gemm/grouped_gemm_benchmark.py . --problem-sizes "1024,1024,1024" --group-counts 8 --warmup 5 --repeat 5 --verbose --json grouped_gemm_results.json """
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -662,7 +696,9 @@ pipeline {
                                            python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -686,7 +722,9 @@ pipeline {
                                            python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
                     }
                     steps{
+                        script {
                         ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        }
                         cleanWs()
                     }
                 }
@@ -713,7 +751,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx942")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -729,7 +769,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx950")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -746,7 +788,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx908")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -763,7 +807,9 @@ pipeline {
                         execute_args = ck.build_client_examples_and_codegen_tests("gfx90a")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -798,7 +844,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx10-1-generic")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -814,7 +862,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx10-3-generic")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -830,7 +880,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx11-generic")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -846,7 +898,9 @@ pipeline {
                         execute_args = ck.build_client_examples("gfx12-generic")
                     }
                     steps{
+                        script {
                         ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        }
                         cleanWs()
                     }
                 }
@@ -887,7 +941,9 @@ pipeline {
                     }
                     agent { label 'mici' }
                     steps{
+                        script {
                         ck.process_results()
+                        }
                         cleanWs()
                     }
                 }
