@@ -1,8 +1,8 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include <hipdnn_data_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_plugin_sdk/PluginException.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 
@@ -13,8 +13,9 @@ namespace miopen_plugin
 {
 
 ConvBwdParams::ConvBwdParams(
-    const hipdnn_data_sdk::data_objects::ConvolutionBwdAttributes& attributes,
-    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+    const hipdnn_flatbuffers_sdk::data_objects::ConvolutionBwdAttributes& attributes,
+    const std::unordered_map<int64_t,
+                             const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
         tensorMap,
     bool deterministicEnabled)
     : _spatialDimCount(miopen_utils::getSpatialDimCount(
@@ -28,9 +29,9 @@ ConvBwdParams::ConvBwdParams(
     const auto& attrDY = miopen_utils::findTensorAttributes(tensorMap, _dy.uid());
 
     const auto inputDims
-        = hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(attrDX.dims());
+        = hipdnn_flatbuffers_sdk::utilities::convertFlatBufferVectorToStdVector(attrDX.dims());
     const auto weightDims
-        = hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(attrW.dims());
+        = hipdnn_flatbuffers_sdk::utilities::convertFlatBufferVectorToStdVector(attrW.dims());
     const auto groupCount = hipdnn_data_sdk::utilities::calculateGroupCount(inputDims, weightDims);
 
     _conv = MiopenConvDescriptor(
@@ -151,7 +152,10 @@ void ConvBwdPlan::execute(const HipdnnMiopenHandle& handle,
                 "Convolution Bwd: Performing algorithm selection (first execution)");
 
             bool traceEnabled = HIPDNN_PLUGIN_LOG_IS_TRACE_ENABLED();
-            int requestCount = traceEnabled ? 10 : 1;
+            // Find dedupes by algorithm class (ShrinkToFind10Results in
+            // projects/miopen/src/ocl/convolutionocl.cpp:238), so it returns at most one
+            // entry per value of miopenConvBwdDataAlgorithm_t (6 enumerators incl. deprecated).
+            int requestCount = traceEnabled ? 6 : 1;
 
             std::vector<miopenConvAlgoPerf_t> perfResults(static_cast<size_t>(requestCount));
             int returnedAlgoCount;

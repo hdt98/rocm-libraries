@@ -939,6 +939,8 @@ def get_fwd_splitkv_blobs(
                     cond = dtype in ["fp16", "bf16"]
                     cond &= pipeline.F_vlayout == "row"
                     cond &= pipeline.F_bias in ["no", "alibi"]
+                    # FlashAttention splitkv paths use softcap-disabled kernels only.
+                    cond &= pipeline.F_logits == "f"
                     cond &= pipeline.F_squant == "f"
                     cond &= pipeline.F_sink == "f"
                     if not cond:
@@ -968,6 +970,8 @@ def get_fwd_splitkv_blobs(
                     cond &= pipeline.F_squant == "f"
                     if not cond:
                         continue
+                elif receipt == 700:
+                    continue  # TE does not use this API
 
                 # fp32 only
                 if receipt == 800 or receipt == 801:
@@ -1142,4 +1146,7 @@ def list_blobs(
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
-        f.write((file_path.parent / GEN_DIR / FMHA_FWD_SPLITKV_API_FILENAME).as_posix() + "\n")
+        f.write(
+            (file_path.parent / GEN_DIR / FMHA_FWD_SPLITKV_API_FILENAME).as_posix()
+            + "\n"
+        )

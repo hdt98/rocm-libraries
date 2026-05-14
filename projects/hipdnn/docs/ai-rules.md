@@ -4,6 +4,14 @@ alwaysApply: true
 
 # AI Rules for hipDNN Project
 
+## Project AI Skills
+
+Reusable AI skills for hipDNN live under `tools/ai/skills/`. Each skill entry below describes what it does and when an agent should suggest or use it. When a user asks for a workflow covered by a project skill, tell them the project has a matching skill, offer to use it, and read the relevant `SKILL.md` before acting. If the skill is not installed in the active agent environment, offer to help copy or adapt it from the project-local path.
+
+- `tools/ai/skills/pr-summary/SKILL.md`
+  - Drafts or revises new or existing pull request titles and bodies with hipDNN's preferred summary, risk, testing, and technical-change format.
+  - Suggest this skill when the user asks for PR creation, PR body updates, PR summaries, risk summaries, testing sections, or review-ready PR descriptions.
+
 ## Project Overview & Architecture
 
 hipDNN is a graph-based deep learning library for AMD GPUs with a plugin-based architecture.
@@ -12,8 +20,9 @@ hipDNN is a graph-based deep learning library for AMD GPUs with a plugin-based a
 | Component | Type | Links To | Purpose |
 |-----------|------|----------|---------|
 | **Backend** (`backend/`) | Shared library (C API) | Data SDK | Core engine, plugin loading, graph execution |
-| **Frontend** (`frontend/`) | Header-only C++ | Backend, Data SDK | User-friendly wrapper around backend C API |
-| **Data SDK** (`data_sdk/`) | Header-only | Third-party deps | Shared data objects, Flatbuffer schemas, logging |
+| **Frontend** (`frontend/`) | Header-only C++ | Backend, Data SDK | User-friendly wrapper around backend C API (uses Data SDK for types/logging, not FlatBuffers) |
+| **Data SDK** (`data_sdk/`) | Header-only | (none) | Shared data types, logging |
+| **FlatBuffers SDK** (`flatbuffers_sdk/`) | Header-only | FlatBuffers, nlohmann_json | FlatBuffer schemas, generated headers, JSON helpers |
 | **Plugin SDK** (`plugin_sdk/`) | Header-only | Data SDK | Interfaces for plugin development |
 | **Test SDK** (`test_sdk/`) | Header-only | Data SDK | Shared test utilities |
 
@@ -137,7 +146,7 @@ When requested to build/test:
 - **Avoid implicit casts** — use explicit `static_cast<>`. The codebase compiles with `-Wconversion` and `-Wsign-conversion`
 - Always use braces for if/for/while bodies, even single-line
 - Use CMake for managing C/C++ dependencies
-- Use Flatbuffers for serialization needs
+- Use Flatbuffers for serialization needs (backend/data_sdk only; frontend uses the backend C API)
 
 ### RAII & Resource Management
 
@@ -147,12 +156,12 @@ When requested to build/test:
 
 | Pattern | Wrong | Right |
 |---------|-------|-------|
-| FlatBuffers Graph unpacking | `auto obj = graph->UnPack();` (raw `GraphT*`) | `auto obj = UnPackGraph(serialized.ptr);` (returns `unique_ptr<GraphT>`) |
-| FlatBuffers `UnPack()` (other types) | `auto obj = table->UnPack();` (raw `T*`) | `auto obj = std::unique_ptr<T>(table->UnPack());` |
+| FlatBuffers Graph unpacking (backend/data_sdk) | `auto obj = graph->UnPack();` (raw `GraphT*`) | `auto obj = UnPackGraph(serialized.ptr);` (returns `unique_ptr<GraphT>`) |
+| FlatBuffers `UnPack()` (backend/data_sdk) | `auto obj = table->UnPack();` (raw `T*`) | `auto obj = std::unique_ptr<T>(table->UnPack());` |
 | `getAttribute()` for tensor arrays | Use raw pointer, forget cleanup | Wrap immediately: `auto owned = std::unique_ptr<HipdnnBackendDescriptor>(rawPtr);` |
 | `createDescriptorPtr<T>()` | Store raw pointer | Use `createDescriptor<T>()` which returns `unique_ptr` |
 
-**FlatBuffers `UnPack()` returns owning raw pointers.** The generated `Graph::UnPack()`, `Node::UnPack()`, etc. all return `T*` allocated with `new`. Prefer the generated helpers like `UnPackGraph()` which return `std::unique_ptr<T>` directly. For types without helpers, wrap manually: `std::unique_ptr<T>(table->UnPack())`.
+**FlatBuffers `UnPack()` returns owning raw pointers (backend/data_sdk only).** The generated `Graph::UnPack()`, `Node::UnPack()`, etc. all return `T*` allocated with `new`. Prefer the generated helpers like `UnPackGraph()` which return `std::unique_ptr<T>` directly. For types without helpers, wrap manually: `std::unique_ptr<T>(table->UnPack())`.
 
 **`getAttribute()` with `HIPDNN_TYPE_BACKEND_DESCRIPTOR` allocates new descriptors.** The C API packs shared descriptors into fresh `HipdnnBackendDescriptor*` via `packDescriptor()`. Ownership transfers to the caller — wrap in `std::unique_ptr<HipdnnBackendDescriptor>` immediately after retrieval.
 
@@ -168,19 +177,19 @@ Rules apply to the TestSuite name (first param of `TEST` / `TEST_F` / `TEST_P`).
 
 **Composition (left → right):**
 
-1. Optional `Integration` prefix (only for integration tests, always first)
-2. Optional `Gpu` (immediately after `Integration` if both apply, otherwise first)
+1. Required `Test` (unit tests) or `Integration` (integration tests) prefix, always first
+2. Optional `Gpu` immediately after `Test`/`Integration` if the test needs GPU support
 3. Core Feature / Subject under test (PascalCase, no underscores)
 4. Optional Datatype token: `Bfp16`, `Fp16`, `Fp32`
 
-Omit any position that does not apply.
+Omit any optional position that does not apply.
 
-**Unit tests**: Mirror the class under test — `TestMyClass` or `GpuTestMyClass` if GPU is required.
+**Unit tests**: Mirror the class under test — `TestMyClass` or `TestGpuMyClass` if GPU is required.
 
 **Valid examples:**
 ```
-IntegrationGpuConvolutionPlannerNchwFp32   GpuTestActivationKernelNchwFp32
-GpuTestExecutionPlanBuilderFp32            IntegrationGraphFusion
+IntegrationGpuConvolutionPlannerNchwFp32   TestGpuActivationKernelNchwFp32
+TestGpuExecutionPlanBuilderFp32            IntegrationGraphFusion
 TestConvolutionHeuristicsFp32              TestConvolutionHeuristics
 ```
 

@@ -19,6 +19,8 @@ on:
       use_prebuilt_artifacts:
         type: string
         default: "false"
+      build_runs_on:
+        type: string
 
 permissions:
   contents: read
@@ -26,8 +28,7 @@ permissions:
 jobs:
   therock-build-windows:
     name: Build (${{ inputs.amdgpu_families }})
-    if: ${{ inputs.use_prebuilt_artifacts == 'false' }}
-    runs-on: azure-windows-scale-rocm
+    runs-on: ${{ inputs.build_runs_on }}
     outputs:
       AMDGPU_FAMILIES: ${{ env.AMDGPU_FAMILIES }}
     permissions:
@@ -54,7 +55,7 @@ jobs:
         with:
           repository: "ROCm/TheRock"
           path: "TheRock"
-          ref: c903a7bdaee58ab217bb0ee005f17452ebac4433 # 2026-03-25
+          ref: 482ff586c261379e1132cf776f122e1d0972a8a0 # 2026-05-11 commit
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
@@ -161,17 +162,16 @@ jobs:
             --build-dir ${{ env.BUILD_DIR }} \
             --upload
 
-      - name: Notify MIOpen Teams Channel on Failure
-        # Channel name "MIOpen CI Reporting"
-        if: ${{ contains(inputs.projects_to_test, 'miopen') && failure() && !github.event.pull_request.head.repo.fork }}
+      - name: Notify Teams Channel on Failure
+        if: ${{ failure() && !github.event.pull_request.head.repo.fork }}
         run: |
           python3 .github/scripts/notify_teams.py \
-            --project miopen \
             --failure-stage build \
             --log-path "${{ env.BUILD_DIR }}/logs" \
-            --webhook-url "${{ secrets.MIOPEN_CI_WEBHOOK_URL }}" \
+            --webhook-urls '{"miopen":"${{ secrets.MIOPEN_CI_WEBHOOK_URL }}","hipdnn":"${{ secrets.HIPDNN_CI_WEBHOOK_URL }}"}' \
             --pr-number "${{ github.event.pull_request.number }}" \
-            --pr-title "${{ github.event.pull_request.title }}"
+            --pr-title "${{ github.event.pull_request.title }}" \
+            --component-name "${{ inputs.projects_to_test }}"
 
   therock-test-windows:
     name: Test (${{ inputs.amdgpu_families }})
