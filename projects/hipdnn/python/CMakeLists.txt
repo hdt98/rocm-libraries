@@ -82,6 +82,8 @@ else()
                 -C \"cmake.define.CMAKE_PREFIX_PATH=\${CMAKE_INSTALL_PREFIX}\"
                 -C \"cmake.define.nanobind_DIR=${nanobind_DIR}\"
                 -C \"cmake.define.tsl-robin-map_DIR=${tsl-robin-map_DIR}\"
+                -C \"cmake.define.FETCHCONTENT_SOURCE_DIR_NANOBIND=${nanobind_SOURCE_DIR}\"
+                -C \"cmake.define.FETCHCONTENT_SOURCE_DIR_TSL-ROBIN-MAP=${tsl-robin-map_SOURCE_DIR}\"
             RESULT_VARIABLE _result
         )
         if(_result)

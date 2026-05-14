@@ -57,10 +57,7 @@ wheel.install-dir = "hipdnn_frontend"
 wheel.packages = ["hipdnn_frontend"]
 
 [tool.scikit-build.cmake.define]
-# Pass any additional CMake definitions if needed
 CMAKE_PREFIX_PATH = "${CMAKE_PREFIX_PATH}"
-CMAKE_C_COMPILER = "/opt/rocm/llvm/bin/clang"
-CMAKE_CXX_COMPILER = "/opt/rocm/llvm/bin/clang++"
 
 hip_DIR = "${hip_DIR}"
 hipdnn_frontend_DIR = "${hipdnn_frontend_DIR}"
