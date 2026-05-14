@@ -32,17 +32,6 @@
 
 #pragma once
 
-#define HIP_TRACE(call)                                                              \
-    do {                                                                             \
-        hipError_t _err = (call);                                                    \
-        hipError_t _last = hipGetLastError(); /* resets after read */                \
-        std::fprintf(stderr, "[HIP_TRACE] %s:%d  call=%-60s  ret=%s(%d)  last=%s(%d)\n", \
-            __FILE__, __LINE__, #call,                                               \
-            hipGetErrorName(_err), (int)_err,                                        \
-            hipGetErrorName(_last), (int)_last);                                     \
-        if(_err != hipSuccess) { /* std::abort(); */ }                                     \
-    } while(0)
-
 #include <cstdlib>
 #include <sstream>
 
@@ -62,6 +51,23 @@ static bool print_debug_messages_latrd_forsytrd
 static bool latrd_forsytrd_multi_kernel = std::getenv("LATRD_MULTI_KERNEL") != nullptr ? true : false;
 
 static bool force_coop_launch = std::getenv("COOP_LAUNCH") != nullptr ? true : false;
+
+#define HIP_TRACE(call)                                                                      \
+    do                                                                                       \
+    {                                                                                        \
+        hipError_t _err = (call);                                                            \
+        hipError_t _last = hipGetLastError(); /* resets after read */                        \
+        if(print_debug_messages_latrd_forsytrd)                                              \
+            std::fprintf(stderr, "[HIP_TRACE] %s:%d  call=%-60s  ret=%s(%d)  last=%s(%d)\n", \
+                         __FILE__, __LINE__, #call, hipGetErrorName(_err), (int)_err,        \
+                         hipGetErrorName(_last), (int)_last);                                \
+        if(_err != hipSuccess)                                                               \
+        {                                                                                    \
+            std::fprintf(stderr, "[HIP_TRACE] %s:%d  call=%-60s  ret=%s(%d)  last=%s(%d)\n", \
+                         __FILE__, __LINE__, #call, hipGetErrorName(_err), (int)_err,        \
+                         hipGetErrorName(_last), (int)_last);                                \
+        }                                                                                    \
+    } while(0)
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -2300,7 +2306,7 @@ auto rocsolver_latrd_forsytrd_getWorkItems(rocblas_handle handle,
 
     std::size_t size_A = n * lda;
     std::size_t size_W = k * ldw;
-    std::size_t buffer = n * n;
+    std::size_t buffer = 3 * n * n;
     size_work = std::max(size_work, size_A + size_W + buffer);
     auto work_items = create_work_item({"latrd_scalars", size_scalars})
         + create_work_item({"latrd_workArr", size_workArr})
@@ -2704,22 +2710,21 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 }
 
 template <int MAX_THDS, typename T, typename I, typename S, typename U>
-__global__ void // __launch_bounds__(MAX_THDS)
-    latrd_lower_kernel_naive(const I n,
-                             const rocblas_int nb,
-                             U AA,
-                             const rocblas_stride shiftA,
-                             const I lda,
-                             const rocblas_stride strideA,
-                             S* EE,
-                             const rocblas_stride strideE,
-                             T* tauA,
-                             const rocblas_stride strideP,
-                             T* WW,
-                             const rocblas_int shiftW,
-                             const rocblas_int ldw,
-                             const rocblas_stride strideW,
-                             T* work)
+__global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
+                                                                     const rocblas_int nb,
+                                                                     U AA,
+                                                                     const rocblas_stride shiftA,
+                                                                     const I lda,
+                                                                     const rocblas_stride strideA,
+                                                                     S* EE,
+                                                                     const rocblas_stride strideE,
+                                                                     T* tauA,
+                                                                     const rocblas_stride strideP,
+                                                                     T* WW,
+                                                                     const rocblas_int shiftW,
+                                                                     const rocblas_int ldw,
+                                                                     const rocblas_stride strideW,
+                                                                     T* work)
 {
     constexpr bool is_complex_t = rocblas_is_complex<T>;
     auto grid = cooperative_groups::this_grid();
@@ -2736,7 +2741,9 @@ __global__ void // __launch_bounds__(MAX_THDS)
     T* pw = nullptr;
     T* pv = nullptr;
     T* Atmp = nullptr;
+    T* pSAtmp = nullptr;
     T* Wtmp = nullptr;
+    T* pSWtmp = nullptr;
 
     // Shared variables
     extern __shared__ double lmem[];
@@ -2747,10 +2754,18 @@ __global__ void // __launch_bounds__(MAX_THDS)
     T* pSW = W;
     /* T* v = reinterpret_cast<T*>(pSW + n * nb); */
     T* v = reinterpret_cast<T*>(lmem + 1);
-    T* w = reinterpret_cast<T*>(v + n); // this piece of LDS is left unused for the time being
-    T* pSmem = reinterpret_cast<T*>(w + n);
+    T* w = reinterpret_cast<T*>(v + n);
+    T* pSz1 = reinterpret_cast<T*>(w + n);
+    T* pSz2 = reinterpret_cast<T*>(pSz1 + nb);
+    T* pSmem = reinterpret_cast<T*>(pSz2 + nb);
+
+    // Workspace
+    // work is aligned at 64 bytes
+    T* pz1 = work;
+    T* pz2 = work + n;
 
     T tauj;
+    T alpha;
     I ldSA = lda;
     I ldSW = ldw;
 
@@ -2765,25 +2780,25 @@ __global__ void // __launch_bounds__(MAX_THDS)
     /* } */
     /* __syncthreads(); */
 
-    // Remove later if not necessary
-    for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
-    {
-        const auto tidy = tid / (MAX_THDS / 2);
-        for(I jj = tidy; jj < n; jj += 2)
-        {
-            // Ignore imaginary part of the diagonal
-            if(ii == jj)
-            {
-                pSA[ii + jj * ldSA] = std::real(pSA[ii + jj * ldSA]);
-            }
-            // Copy lower triangular part to upper triangle
-            if(ii < jj)
-            {
-                pSA[ii + jj * ldSA] = conj(pSA[jj + ii * ldSA]);
-            }
-        }
-    }
-    __syncthreads();
+    /* // Remove later if not necessary */
+    /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
+    /* { */
+    /*     const auto tidy = tid / (MAX_THDS / 2); */
+    /*     for(I jj = tidy; jj < n; jj += 2) */
+    /*     { */
+    /*         // Ignore imaginary part of the diagonal */
+    /*         if(ii == jj) */
+    /*         { */
+    /*             pSA[ii + jj * ldSA] = std::real(pSA[ii + jj * ldSA]); */
+    /*         } */
+    /*         // Copy lower triangular part to upper triangle */
+    /*         if(ii < jj) */
+    /*         { */
+    /*             pSA[ii + jj * ldSA] = conj(pSA[jj + ii * ldSA]); */
+    /*         } */
+    /*     } */
+    /* } */
+    /* grid.sync(); */
 
     /* // Zero W */
     /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
@@ -2811,46 +2826,31 @@ __global__ void // __launch_bounds__(MAX_THDS)
             w[ii] = T(0);
         }
 
+        // Part A:
         //
         // Update A(j:n-1, j) with previously computed reflectors and pSW.
-        // (Notice that the triangle below the diagonal of A(:, 0:j-1) holds
+        // (Notice that the triangle below the diagonal of A holds
         // previously computed Householder reflectors.)
         //
         if(j > 0)
         {
             // Step 1: A(j:n-1, j) = -A(j:n-1, 0:j-1) * W(j, 0:1-j)^H + A(j:n-1, j)
+            // Step 2: A(j:n-1, j) = -W(j:n-1, 0:j-1) * A(j, 0:j-1)^H + A(j:n-1, j)
             //
-            Atmp = pSA + j + j * ldSA;
             for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
             {
                 temp = T(0);
                 for(I jj = 0; jj < j; jj++)
                 {
                     temp += pSA[j + ii + jj * ldSA] * pSW[j + jj * ldSW];
-                }
-                Atmp[ii] -= temp;
-            }
-            __syncthreads();
-
-            // Step 2: A(j:n-1, j) = -W(j:n-1, 0:j-1) * A(j, 0:j-1)^H + A(j:n-1, j)
-            //
-            Atmp = pSA + j + j * ldSA;
-            for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
-            {
-                temp = T(0);
-                for(I jj = 0; jj < j; jj++)
-                {
                     temp += pSW[j + ii + jj * ldSW] * pSA[j + jj * ldSA];
                 }
-                Atmp[ii] -= temp;
+                pSA[ii + j + j * ldSA] -= temp;
             }
-            __syncthreads();
-
-            // grid.sync()
-            //
+            grid.sync();
             // Note: since
             //
-            //     z1 = A(j:n-1, 0:j-1) * W(j, 0:1-j)^H (computed in Step 1), and
+            //     z1 = A(j:n-1, 0:j-1) * W(j, 0:j-1)^H (computed in Step 1), and
             //     z2 = W(j:n-1, 0:j-1) * A(j, 0:j-1)^H (computed in Step 2)
             //
             // are independent, these two GEMVs above can be fused to compute:
@@ -2863,60 +2863,60 @@ __global__ void // __launch_bounds__(MAX_THDS)
             // Householder reflector in Step 3.
         }
 
+        // Part B:
         //
         // Step 3: Generate Householder reflector to annihilate A(j+2:n-1,j)
         // and copy off-diagonal element to E[j]
         //
-
-        // Load A(j+1:n-1,j) into v
-        for(I ii = tid; ii < nj; ii += MAX_THDS)
-        {
-            v[ii] = pSA[ii + (j + 1) + j * ldSA];
-        }
-
-        // LARFG
-        temp = T(0);
-        for(I ii = tid; ii < nj - 1; ii += MAX_THDS)
-        {
-            temp += v[ii + 1] * conj(v[ii + 1]);
-        }
-        reduce_block_sum(temp, pSmem);
-
-        if(tid == 0)
-        {
-            // set tau, beta, and put scaling factor into pSmem[0]
-            run_set_taubeta<T>(tau_j, &temp, v, E + j);
-
-            tau[j] = tau_j[0];
-            pSmem[0] = temp;
-        }
-        __syncthreads();
-
-        // Scale v
-        T scal = pSmem[0];
-        for(I ii = tid; ii < nj - 1; ii += MAX_THDS)
-        {
-            v[ii + 1] *= scal;
-        }
-        __syncthreads();
-
-        // grid.sync()
-        //
         // Note: both v and tau_j are required for the next steps.
-
-        // Copy v back to A(j+1:n-1,j)
-        // This data will only be used on the next iteration,
-        // provided that j < nb - 1.
-        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        if(bid == 0)
         {
-            pSA[(ii + j + 1) + j * ldSA] = v[ii];
+            // Load A(j+1:n-1,j) into v
+            for(I ii = tid; ii < nj; ii += MAX_THDS)
+            {
+                v[ii] = pSA[ii + (j + 1) + j * ldSA];
+            }
+            __syncthreads();
+
+            // LARFG
+            temp = T(0);
+            for(I ii = tid; ii < nj - 1; ii += MAX_THDS)
+            {
+                temp += v[ii + 1] * conj(v[ii + 1]);
+            }
+            reduce_block_sum(temp, pSmem);
+
+            if(tid == 0)
+            {
+                // set tau, beta, and put scaling factor into pSmem[0]
+                run_set_taubeta<T>(tau_j, &temp, v, E + j);
+
+                tau[j] = tau_j[0];
+                pSmem[0] = temp;
+            }
+            __syncthreads();
+
+            // Scale v
+            T scal = pSmem[0];
+            for(I ii = tid; ii < nj - 1; ii += MAX_THDS)
+            {
+                v[ii + 1] *= scal;
+            }
+
+            // Copy v back to A(j+1:n-1,j)
+            for(I ii = tid; ii < nj; ii += MAX_THDS)
+            {
+                pSA[(ii + j + 1) + j * ldSA] = v[ii];
+            }
         }
-        __syncthreads();
+        grid.sync();
 
         //
         // Compute w = tau_j*A*v - 1/2*tau_j^2*(v'*A*v)*v
         //
 
+        // Part C:
+        //
         // SYMV
         //
         // Step 4: w_0 = A(j+1:n-1, j+1:n-1) * v(0:n-1-j)
@@ -2931,9 +2931,8 @@ __global__ void // __launch_bounds__(MAX_THDS)
             }
             w[ii + j + 1] = temp;
         }
-        __syncthreads();
 
-        // Step 5: w(0:j-1) = W(j+1:n-1, 0:j-1)^H * v(0:n-1-j)
+        // Step 5: z1(0:j-1) = W(j+1:n-1, 0:j-1)^H * v(0:n-1-j)
         //
         Wtmp = pSW + (j + 1);
         for(I jj = tid; jj < j; jj += MAX_THDS)
@@ -2945,30 +2944,10 @@ __global__ void // __launch_bounds__(MAX_THDS)
             }
             /* reduce_block_sum(temp, pSmem); */
             /* pSW[jj + j * ldSW] = pSmem[0]; */
-            w[jj] = temp;
+            pSz1[jj] = temp;
         }
-        __syncthreads();
 
-        // Step 6: w(j+1:n-1) = -A(j+1:n-1, 0:j-1) * w(0:j-1) + w(j+1:n-1)
-        //
-        Atmp = pSA + (j + 1);
-        for(I ii = tid; ii < nj; ii += MAX_THDS)
-        {
-            temp = T(0);
-            for(I jj = 0; jj < j; ++jj)
-            {
-                temp -= Atmp[ii + jj * ldSA] * w[jj];
-            }
-            w[j + 1 + ii] += temp;
-        }
-        __syncthreads();
-
-        // grid.sync()
-        //
-        // Note: notice that Steps 4, 5 and 7 are functionally independent
-        // and can be computed without synchronization.
-
-        // Step 7: w(0:j-1) = A(j+1:n-1, 0:j-1)^H * v(0:n - 1 -j);
+        // Step 7: z2(0:j-1) = A(j+1:n-1, 0:j-1)^H * v(0:n - 1 -j);
         //
         Atmp = pSA + (j + 1);
         for(I jj = tid; jj < j; jj += MAX_THDS)
@@ -2980,59 +2959,86 @@ __global__ void // __launch_bounds__(MAX_THDS)
             }
             /* reduce_block_sum(temp, pSmem); */
             /* pSW[jj + j * ldSW] = pSmem[0]; */
-            w[jj] = temp;
+            pSz2[jj] = temp;
         }
-        __syncthreads();
+        grid.sync();
 
-        // Step 8: w(j+1:n-1) = -W(j+1:n, 0:j-1) * w(0:j-1) + W(j+1:n-1)
+        // Part D:
         //
+        // Step 6: w(j+1:n-1) = -A(j+1:n-1, 0:j-1) * z1(0:j-1) + w(j+1:n-1)
+        // Step 8: w(j+1:n-1) = -W(j+1:n-1, 0:j-1) * z2(0:j-1) + w(j+1:n-1)
+        //
+        Atmp = pSA + (j + 1);
         Wtmp = pSW + (j + 1);
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
             temp = T(0);
             for(I jj = 0; jj < j; ++jj)
             {
-                temp -= Wtmp[ii + jj * ldSW] * w[jj];
+                temp -= Atmp[ii + jj * ldSA] * pSz1[jj];
+                temp -= Wtmp[ii + jj * ldSW] * pSz2[jj];
             }
             w[j + 1 + ii] += temp;
         }
-        __syncthreads();
+        /* __syncthreads(); */
 
         // grid.sync()
         //
-        // Note: Steps 6 and 8 can be fused.
+        // Note: notice that Steps 4, 5 and 7 are functionally independent
+        // and can be computed without synchronization.
 
+        // Step 8: w(j+1:n-1) = -W(j+1:n, 0:j-1) * z2(0:j-1) + W(j+1:n-1)
+        //
+        /* Wtmp = pSW + (j + 1); */
+        /* for(I ii = tid; ii < nj; ii += MAX_THDS) */
+        /* { */
+        /*     temp = T(0); */
+        /*     for(I jj = 0; jj < j; ++jj) */
+        /*     { */
+        /*         temp -= Wtmp[ii + jj * ldSW] * pz2[jj]; */
+        /*     } */
+        /*     w[j + 1 + ii] += temp; */
+        /* } */
+        /* __syncthreads(); */
+        // Note: Steps 6 and 8 can be fused.
+        grid.sync();
+
+        // Part E:
+        //
         // Step 9: w(j+1:n-1) = alpha * v(0:n-j-1) + tauj * w(j+1:n-1)
         //
         // alpha = -0.5 * tauj^2 * <v, w>
         //
         // Dot product <v, w>
-        temp = 0;
-        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        if(bid == 0)
         {
-            temp += v[ii] * conj(w[ii + j + 1]);
-        }
-        reduce_block_sum(temp, pSmem);
+            temp = 0;
+            for(I ii = tid; ii < nj; ii += MAX_THDS)
+            {
+                temp += v[ii] * conj(w[ii + j + 1]);
+            }
+            reduce_block_sum(temp, pSmem);
 
-        if(tid == 0)
-        {
-            // alpha = - 1/2 * tauj^2 * <v, w>
-            pSmem[0] = -0.5 * tau_j[0] * tau_j[0] * temp;
-        }
-        __syncthreads();
+            if(tid == 0)
+            {
+                // alpha = - 1/2 * tauj^2 * <v, w>
+                pSmem[0] = -0.5 * tau_j[0] * tau_j[0] * temp;
+            }
+            __syncthreads();
 
-        // AXPY
-        for(I ii = tid; ii < nj; ii += MAX_THDS)
-        {
-            w[ii + j + 1] = pSmem[0] * v[ii] + tau_j[0] * w[ii + j + 1];
-        }
-        __syncthreads();
+            // AXPY
+            for(I ii = tid; ii < nj; ii += MAX_THDS)
+            {
+                w[ii + j + 1] = pSmem[0] * v[ii] + tau_j[0] * w[ii + j + 1];
+            }
+            __syncthreads();
 
-        for(I ii = tid; ii < n; ii += MAX_THDS)
-        {
-            pSW[ii + j * ldSW] = w[ii];
+            for(I ii = tid; ii < n; ii += MAX_THDS)
+            {
+                pSW[ii + j * ldSW] = w[ii];
+            }
         }
-        __syncthreads();
+        grid.sync();
 
         // grid.sync()
         //
@@ -3140,11 +3146,13 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         const size_t lmemsize_small
             = ((256 / props->warpSize) + 2 * nn + 1 + nn * nn + nn * k) * sizeof(T);
         constexpr size_t small_switch_size = 128;
-        bool use_small_kernel
-            = !select_coop_launch && (n < small_switch_size) && (lmemsize_small <= props->sharedMemPerBlock);
+        bool use_small_kernel = !select_coop_launch && (n < small_switch_size)
+            && (lmemsize_small <= props->sharedMemPerBlock);
 
-        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * n + 2 * k * k) * sizeof(T);
-        bool use_fused_kernel = select_coop_launch && !rocblas_is_complex<T> && (lmemsize_fused <= props->sharedMemPerBlock);
+        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * n + 5 * k) * sizeof(T);
+        std::cout << "lmemsize = " << std::to_string(lmemsize_fused / 1024.0) << "KB" << std::endl;
+        bool use_fused_kernel = select_coop_launch
+            && !rocblas_is_complex<T> && (lmemsize_fused <= props->sharedMemPerBlock);
 
         if(!latrd_forsytrd_multi_kernel && use_small_kernel)
         {
@@ -3185,7 +3193,6 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             if(!supports_coop_launch)
             {
                 std::cout << "::: Device does not support cooperative launch" << std::endl;
-                /* return hipErrorIllegalState; */
                 abort();
             }
 
@@ -3197,12 +3204,9 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                   (void*)&tau_j_, (void*)&strideP, (void*)&W,    (void*)&shiftW,
                                   (void*)&ldw,    (void*)&strideW, (void*)&work};
 
-            hipStream_t stream2;
-            HIP_TRACE(hipStreamCreate(&stream2));
-            HIP_TRACE(hipDeviceSynchronize());
             HIP_TRACE(hipLaunchCooperativeKernel(
                 (void*)(latrd_lower_kernel_naive<256, T, rocblas_int, S, U>),
-                dim3(1, 1, batch_count), dim3(256), kernelArgs, lmemsize_fused, stream2));
+                dim3(1, 1, batch_count), dim3(256), kernelArgs, lmemsize_fused, stream));
             HIP_TRACE(hipDeviceSynchronize());
         }
         else
