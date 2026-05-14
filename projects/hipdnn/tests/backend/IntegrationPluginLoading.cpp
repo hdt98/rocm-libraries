@@ -277,8 +277,7 @@ TEST_F(IntegrationPluginLoading, MultiplePluginsOneApplicableEngine)
                   heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
               HIPDNN_STATUS_SUCCESS);
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter policyEnv(
-        "HIPDNN_HEUR_POLICY_ORDER",
-        hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
+        "HIPDNN_HEUR_POLICY_ORDER", hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
 
     ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR, &_engineConfig),
@@ -320,8 +319,7 @@ TEST_F(IntegrationPluginLoading, MultiplePluginsMultipleApplicableEngines)
                   heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
               HIPDNN_STATUS_SUCCESS);
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter policyEnv(
-        "HIPDNN_HEUR_POLICY_ORDER",
-        hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
+        "HIPDNN_HEUR_POLICY_ORDER", hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
 
     ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR, &_engineConfig),
