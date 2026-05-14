@@ -51,7 +51,8 @@ void rocsolver_getri_outofplace_getMemorySize(rocblas_handle handle,
                                               const rocblas_stride strideC,
                                               rocblas_int* info,
                                               const rocblas_int batch_count,
-                                              rocsolver_workspace_helper* work_helper)
+                                              rocsolver_workspace_helper* work_helper,
+                                              const bool pivot)
 {
     // if quick return, no need of workspace
     if(n == 0 || batch_count == 0)
@@ -60,7 +61,7 @@ void rocsolver_getri_outofplace_getMemorySize(rocblas_handle handle,
     // requirements for calling GETRS
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, n, n, A, shiftA, 1, lda, strideA, ipiv, strideP, C, shiftC,
-        1, ldc, strideC, batch_count, work_helper);
+        1, ldc, strideC, batch_count, work_helper, pivot);
 }
 
 template <typename T>

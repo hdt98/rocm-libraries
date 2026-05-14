@@ -50,8 +50,8 @@ rocblas_status rocsolver_getrs_argCheck(rocblas_handle handle,
                                         T A,
                                         T B,
                                         const I* ipiv,
-                                        const I batch_count = 1,
-                                        const bool pivot = true)
+                                        const bool pivot,
+                                        const I batch_count = 1)
 {
     // order is important for unit tests:
 
@@ -103,7 +103,8 @@ void rocsolver_getrs_getMemorySize(rocblas_handle handle,
                                    const I ldb,
                                    const rocblas_stride strideB,
                                    const I batch_count,
-                                   rocsolver_workspace_helper* work_helper)
+                                   rocsolver_workspace_helper* work_helper,
+                                   const bool pivot)
 {
     // if quick return, no workspace is needed
     if(n == 0 || nrhs == 0 || batch_count == 0)

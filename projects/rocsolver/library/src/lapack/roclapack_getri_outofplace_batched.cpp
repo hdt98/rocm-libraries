@@ -68,7 +68,7 @@ rocblas_status rocsolver_getri_outofplace_batched_impl(rocblas_handle handle,
     rocsolver_workspace_helper work_helper;
     rocsolver_getri_outofplace_getMemorySize<true, false, T>(
         handle, n, A, shiftA, lda, strideA, ipiv, shiftP, strideP, C, shiftC, ldc, strideC, info,
-        batch_count, &work_helper);
+        batch_count, &work_helper, pivot);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size<T>());

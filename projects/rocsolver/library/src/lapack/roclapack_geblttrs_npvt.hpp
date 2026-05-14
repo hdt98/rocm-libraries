@@ -70,7 +70,7 @@ void rocsolver_geblttrs_npvt_getMemorySize(rocblas_handle handle,
     // size requirements for getrs
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, nb, nrhs, B, shiftB, incb, ldb, strideB,
-        (rocblas_int*)nullptr, 0, X, shiftX, incx, ldx, strideX, batch_count, work_helper);
+        (rocblas_int*)nullptr, 0, X, shiftX, incx, ldx, strideX, batch_count, work_helper, false);
 }
 
 template <typename T>

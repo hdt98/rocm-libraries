@@ -91,7 +91,7 @@ void rocsolver_geblttrf_npvt_getMemorySize(rocblas_handle handle,
     rocsolver_workspace_helper* getrs_work = work_helper->add_nested("getrs");
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, nb, nb, B, shiftB, incb, ldb, strideB,
-        (rocblas_int*)nullptr, 0, C, shiftC, incc, ldc, strideC, batch_count, getrs_work);
+        (rocblas_int*)nullptr, 0, C, shiftC, incc, ldc, strideC, batch_count, getrs_work, false);
 
     work_helper->assign_sizes({{"iinfo", size_iinfo}});
 }

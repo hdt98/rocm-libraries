@@ -111,7 +111,7 @@ void rocsolver_gesv_getMemorySize(rocblas_handle handle,
     rocsolver_workspace_helper* getrs_work = phase2_work->add_nested("getrs");
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, n, nrhs, A, shiftA, 1, lda, strideA, ipiv, strideP, B,
-        shiftB, 1, ldb, strideB, batch_count, getrs_work);
+        shiftB, 1, ldb, strideB, batch_count, getrs_work, true);
 
     // extra space to copy B
     size_t size_copyB = sizeof(T) * n * nrhs * batch_count;
@@ -174,9 +174,9 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                                                   strideP, info, batch_count, getrf_work, true);
 
     // save elements of B that will be overwritten by GETRS for cases where info is nonzero
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(BS2, BS2),
-                            0, stream, copymat_to_buffer, n, nrhs, B, shiftB, ldb, strideB,
-                            (T*)copyB, info_mask(info));
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count),
+                            dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B, shiftB, ldb,
+                            strideB, (T*)copyB, info_mask(info));
 
     // solve AX = B, overwriting B with X
     rocsolver_getrs_template<BATCHED, STRIDED, T>(handle, rocblas_operation_none, n, nrhs, A,
@@ -184,9 +184,9 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                                                   1, ldb, strideB, batch_count, getrs_work, true);
 
     // restore elements of B that were overwritten by GETRS in cases where info is nonzero
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(BS2, BS2),
-                            0, stream, copymat_from_buffer, n, nrhs, B, shiftB, ldb, strideB,
-                            (T*)copyB, info_mask(info));
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count),
+                            dim3(BS2, BS2), 0, stream, copymat_from_buffer, n, nrhs, B, shiftB, ldb,
+                            strideB, (T*)copyB, info_mask(info));
 
     return rocblas_status_success;
 }

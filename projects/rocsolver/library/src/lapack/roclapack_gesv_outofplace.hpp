@@ -111,7 +111,7 @@ void rocsolver_gesv_outofplace_getMemorySize(rocblas_handle handle,
     rocsolver_workspace_helper* getrs_work = work_helper->add_nested("getrs");
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, n, nrhs, A, shiftA, 1, lda, strideA, ipiv, strideP, X,
-        shiftX, 1, ldx, strideX, batch_count, getrs_work);
+        shiftX, 1, ldx, strideX, batch_count, getrs_work, true);
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U>
