@@ -202,6 +202,7 @@ struct Modifier {
         COMMENT,
         MATRIX_FMT,
         MEM_TOKEN,
+        MEM_HINT,
     };
 
     Modifier(Type type) : type(type) {}
@@ -898,6 +899,27 @@ struct MemTokenData : public TypedModifier<MemTokenData> {
 
     MemTokenData(const std::vector<int>& tokens = {})
         : TypedModifier<MemTokenData>(), tokens(tokens) {}
+};
+
+// Memory-hint modifier (gfx12+).  Carries the temporal-hint token (`th:`)
+// that some memory ops accept (e.g. `tensor_load_to_lds ... th:TH_LOAD_NT`,
+// `buffer_store_b128 ... th:TH_STORE_NT`).  Layered ON TOP of the op's own
+// modifier struct (MUBUF / TENSOR / ...) so the same hint shape can
+// attach across instruction families without duplicating it on each.
+//
+// The hint value is kept as a string for now — the TH_* token set is not
+// modelled as a typed enum yet. When/if that lands, this struct can grow
+// the typed field while keeping the string accessor for round-trip.
+struct MemHintData : public TypedModifier<MemHintData> {
+    static constexpr Modifier::Type Type = Modifier::Type::MEM_HINT;
+
+    std::string th;  // e.g. "TH_LOAD_NT", "TH_STORE_NT"; empty = no hint
+
+    MemHintData(std::string th = "") : TypedModifier<MemHintData>(), th(std::move(th)) {}
+
+    bool empty() const {
+        return th.empty();
+    }
 };
 
 }  // namespace stinkytofu

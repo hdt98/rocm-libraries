@@ -619,14 +619,30 @@ bool hasDPPFields(const FieldMap& fields) {
            fields.count("fi");
 }
 
+/// True when \p fields holds the memory-hint modifier key (gfx12+ `th:`,
+/// e.g. `th:TH_LOAD_NT` on `tensor_load_to_lds`, `th:TH_STORE_NT` on
+/// `buffer_store_b128`). Layered ON TOP of the op's primary modifier
+/// type, so MemHintData is also cross-attached at the end of the dispatch
+/// regardless of the primary modKey (see parseModifiers).
+bool hasMemHintFields(const FieldMap& fields) {
+    return fields.count("th");
+}
+
 /// Single decision point for "this generic field set looks like which modKey?".
 /// Used after field collection, only when the microcode-based switch did not
 /// already assign a modKey. Modifier kinds that ride on top of generic
-/// encoding shapes (matrix_fmt on VOP3PX2/3, DPP on many VOP*) are detected
-/// here by field presence rather than by microcode format.
+/// encoding shapes (matrix_fmt on VOP3PX2/3, DPP on many VOP*, memory-hint
+/// on TENSOR/MUBUF) are detected here by field presence rather than by
+/// microcode format.
+///
+/// MemHint is the last fallback because it can co-exist with any other
+/// modifier kind — when both apply (e.g. MUBUF + th:), the primary modKey
+/// wins this inference and MemHintData is cross-attached separately at
+/// the end of the dispatch.
 std::string inferModKeyFromFields(const FieldMap& fields) {
     if (hasMatrixFmtFields(fields)) return "mod.matrix_fmt";
     if (hasDPPFields(fields)) return "mod.dpp";
+    if (hasMemHintFields(fields)) return "mod.memhint";
     return {};
 }
 
@@ -877,6 +893,15 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
         // deserializer creates both modifier types.
         if (fields.count("matrix_a_reuse")) inst.modifiers["mod.mfma"]["reuseA"] = "true";
         if (fields.count("matrix_b_reuse")) inst.modifiers["mod.mfma"]["reuseB"] = "true";
+    }
+
+    // Cross-cutting: th: temporal hint can ride on top of any memory op
+    // (MUBUF buffer_store_*, TENSOR tensor_load_to_lds, ...). Always
+    // attach as a separate MemHintData modifier so its consumer doesn't
+    // depend on the primary modKey, and so the per-modKey dispatches
+    // above (mod.mubuf etc.) don't have to each remember to thread it.
+    if (fields.count("th")) {
+        inst.modifiers["mod.memhint"]["th"] = fields["th"];
     }
 
     return !sawUnrepresentable;

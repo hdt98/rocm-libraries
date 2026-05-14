@@ -69,6 +69,11 @@ inline std::ostream& operator<<(std::ostream& os, const SWaitTensorCntData& wait
     return os;
 }
 
+inline std::ostream& operator<<(std::ostream& os, const MemHintData& memHint) {
+    if (!memHint.th.empty()) os << " th:" << memHint.th;
+    return os;
+}
+
 inline std::ostream& operator<<(std::ostream& os, const SDelayAluData& delayAluData) {
     auto typeToString = [](SDelayAluData::InstType type) -> const char* {
         switch (type) {
@@ -720,6 +725,9 @@ static void emitTrailingModifiers(std::ostream& os, const StinkyInstruction& ins
             EMIT_TRAILING_MODIFIER(DPP, DPP);
             EMIT_TRAILING_MODIFIER(MFMA_DATA, MFMA);
             EMIT_TRAILING_MODIFIER(MATRIX_FMT, MatrixFmt);
+            case Modifier::Type::MEM_HINT:
+                os << *static_cast<const MemHintData*>(mod.get());
+                break;
             default:
                 break;
         }

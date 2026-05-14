@@ -379,6 +379,12 @@ bool serializeVisit(const MemTokenData& mod, std::ostream& os) {
     return true;
 }
 
+// MemHintData
+bool serializeVisit(const MemHintData& mod, std::ostream& os) {
+    os << ", mod.memhint = { th = \"" << mod.th << "\" }";
+    return true;
+}
+
 template <typename ModifierType, typename... Rest, unsigned Dummy = 0>
 bool serializeVisit(const Modifier& mod, std::ostream& os) {
     if (auto* modifier = dyn_cast<ModifierType>(&mod)) {
@@ -393,7 +399,7 @@ bool ModifierSerializer::serialize(const Modifier& mod, std::ostream& os) {
                           SMEMModifiers, SDWAModifiers, DPPModifiers, VOP3Modifiers, VOP3PModifiers,
                           True16Modifiers, EXEC, VCC, SWaitCntData, SWaitTensorCntData,
                           SWaitStoreCntData, SDelayAluData, SWaitAluData, MFMAModifiers,
-                          MatrixFmtModifiers, MemTokenData>(mod, os);
+                          MatrixFmtModifiers, MemTokenData, MemHintData>(mod, os);
 }
 
 /*
@@ -520,6 +526,10 @@ void deserializeVisit(StinkyInstruction* inst, const std::string& attrKey,
     } else if (attrKey == "mod.memtoken") {
         if (fields.count("tokens")) {
             inst->addModifier(MemTokenData(getIntVector(fields, "tokens")));
+        }
+    } else if (attrKey == "mod.memhint") {
+        if (fields.count("th")) {
+            inst->addModifier(MemHintData(getStr(fields, "th")));
         }
     }
     // mod.sdwa, mod.vop3p, mod.true16: no deserialize support yet
