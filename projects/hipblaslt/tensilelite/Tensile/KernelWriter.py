@@ -8523,12 +8523,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel["ForceUnrollSubIter"]:
         numA = numA // factorSubIterA
       if kernel["ProblemType"]["MXBlockA"]:
-        self.states.numReadsPerUnrollMXSA = 1
-        numMXSA = kernel["InnerUnroll"] * kernel["MIWaveTile"][0] // tensorParametersMXSA["localReadInstruction"].numOffsets
-        if self.states.lrvwTileMXSA > 1:
-          numMXSA = numMXSA // kernel["VectorWidthA"]
-
-      if kernel["ProblemType"]["MXBlockA"]:
         if kernel["UnrollMajorLDSMXSA"]:
           self.states.numReadsPerUnrollMXSA = ceil(kernel["MIInputPerThreadMXSA"] / int(tensorParametersA["MX"]["localReadInstruction"].blockWidth * 4))
         else:
@@ -8565,12 +8559,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         numB = numB // kernel["VectorWidthB"]
       if kernel["ForceUnrollSubIter"]:
         numB = numB // factorSubIterB
-      if kernel["ProblemType"]["MXBlockB"]:
-        self.states.numReadsPerUnrollMXSB = 1
-        numMXSB = kernel["InnerUnroll"] * kernel["MIWaveTile"][1] // tensorParametersMXSB["localReadInstruction"].numOffsets
-        if self.states.lrvwTileMXSB > 1:
-          numMXSB = numMXSB // kernel["VectorWidthB"]
-
       if kernel["ProblemType"]["MXBlockB"]:
         if kernel["UnrollMajorLDSMXSB"]:
           self.states.numReadsPerUnrollMXSB = ceil(kernel["MIInputPerThreadMXSB"] / int(tensorParametersB["MX"]["localReadInstruction"].blockWidth * 4))
