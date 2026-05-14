@@ -78,6 +78,8 @@ add_hipdnn_sample(hipdnn_sample_serialization_roundtrip serialization/Serializat
 
 add_hipdnn_sample(hipdnn_sample_knobs_usage knobs/KnobsUsage.cpp)
 
+add_hipdnn_sample(hipdnn_sample_autotune autotune/AutotuneSample.cpp)
+
 # Enable testing and add sample tests
 enable_testing()
 
@@ -139,6 +141,9 @@ add_hipdnn_sample_test(hipdnn_sample_serialization_roundtrip)
 # Register knobs sample
 # Note: knobs_usage is informational/educational, not validation
 install(TARGETS hipdnn_sample_knobs_usage RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Register autotune sample
+add_hipdnn_sample_test(hipdnn_sample_autotune)
 
 # Umbrella target for superbuild dependency tracking
 add_custom_target(hipdnn_samples COMMENT "Building all hipDNN samples" DEPENDS ${HIPDNN_ALL_SAMPLES})

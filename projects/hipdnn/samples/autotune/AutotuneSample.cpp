@@ -1,0 +1,480 @@
+// Copyright © Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier:  MIT
+
+// Standalone sample demonstrating the hipDNN autotune API end-to-end.
+// Follows the pattern of KnobsUsage.cpp: a main() with demonstration
+// scenarios in individual functions.
+//
+// Run with --help for usage information.
+// Default mode uses compact tensors and SINGLE_SHOT for fast completion (<10s).
+// Use --full for larger dimensions and FIXED_AVERAGE timing.
+
+#include <algorithm>
+#include <filesystem>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_data_sdk/utilities/Workspace.hpp>
+#include <hipdnn_frontend.hpp>
+
+#include "../utils/Helpers.hpp"
+
+using namespace hipdnn_frontend;
+using namespace hipdnn_data_sdk;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/// Retrieves the engine name for a given engine ID. Returns a hex-formatted
+/// fallback string when the engine ID is not in the registered engine map.
+std::string getEngineName(int64_t engineId)
+{
+    try
+    {
+        return std::string(utilities::getEngineNameFromId(engineId));
+    }
+    catch(const std::out_of_range&)
+    {
+        std::ostringstream oss;
+        oss << "engine_0x" << std::hex << std::uppercase << engineId;
+        return oss.str();
+    }
+}
+
+/// Checks if an error indicates no engines are available for the graph.
+/// Returns true (skip) on GRAPH_NOT_SUPPORTED. Returns false (continue) on OK.
+/// Exits on any other error.
+bool skipIfNoEngines(const Error& err)
+{
+    if(err.is_good())
+    {
+        return false;
+    }
+    if(err.get_code() == ErrorCode::GRAPH_NOT_SUPPORTED)
+    {
+        std::cout << "  Skipping: no engine has an applicable solution for this "
+                  << "graph on the current device. (" << err.get_message() << ")\n";
+        return true;
+    }
+    std::cerr << "hipDNN Frontend Error: " << err.get_message() << '\n';
+    exit(EXIT_FAILURE);
+}
+
+// ─── ConvGraph helper ───────────────────────────────────────────────────────
+
+/// All state needed to run autotune scenarios against a convolution graph.
+struct ConvGraphState
+{
+    std::shared_ptr<graph::Graph> graph;
+    std::shared_ptr<graph::Tensor_attributes> xAttr;
+    std::shared_ptr<graph::Tensor_attributes> wAttr;
+    std::shared_ptr<graph::Tensor_attributes> yAttr;
+    std::unique_ptr<utilities::Tensor<float>> xTensor;
+    std::unique_ptr<utilities::Tensor<float>> wTensor;
+    std::unique_ptr<utilities::Tensor<float>> yTensor;
+    std::unordered_map<int64_t, void*> variantPack;
+};
+
+/// Creates a convolution fprop graph, validates it, builds the operation graph,
+/// and allocates device tensors. Does NOT call build() (that is the simple path).
+/// For autotune, call add_*() + autotune() after this function.
+ConvGraphState buildConvGraph(hipdnnHandle_t handle, bool fullMode)
+{
+    // Tensor dimensions: compact by default for fast completion, larger with --full
+    // for meaningful timing differentiation. Default matches ConvFprop sample dimensions
+    // (the minimum that MIOpen engines reliably support).
+    const int64_t n = fullMode ? 64 : 16;
+    const int64_t c = fullMode ? 32 : 16;
+    const int64_t h = fullMode ? 32 : 16;
+    const int64_t w = fullMode ? 32 : 16;
+
+    const int64_t k = fullMode ? 32 : 16;
+    // Filter channels must match input channels
+    const int64_t r = 3;
+    const int64_t s = 3;
+
+    const int64_t padH = 1;
+    const int64_t padW = 1;
+    const int64_t strideH = 1;
+    const int64_t strideW = 1;
+    const int64_t dilH = 1;
+    const int64_t dilW = 1;
+
+    const auto inputType = hipdnn_frontend::DataType::FLOAT;
+    const auto layout = utilities::TensorLayout::NCHW;
+
+    auto graph = std::make_shared<graph::Graph>();
+    graph->set_io_data_type(inputType).set_compute_data_type(hipdnn_frontend::DataType::FLOAT);
+
+    auto xAttr = createTensor({n, c, h, w}, inputType, layout);
+    auto wAttr = createTensor({k, c, r, s}, inputType, layout);
+
+    graph::ConvFpropAttributes convAttributes;
+    convAttributes.set_name("autotune_conv_fprop");
+    convAttributes.set_padding({padH, padW});
+    convAttributes.set_stride({strideH, strideW});
+    convAttributes.set_dilation({dilH, dilW});
+
+    auto yAttr = graph->conv_fprop(xAttr, wAttr, convAttributes);
+    yAttr->set_output(true);
+
+    HIPDNN_FE_CHECK(graph->validate());
+    HIPDNN_FE_CHECK(graph->build_operation_graph(handle));
+
+    // Allocate device tensors
+    auto xTensor = std::make_unique<utilities::Tensor<float>>(xAttr->get_dim(), layout);
+    auto wTensor = std::make_unique<utilities::Tensor<float>>(wAttr->get_dim(), layout);
+    auto yTensor = std::make_unique<utilities::Tensor<float>>(yAttr->get_dim(), layout);
+
+    xTensor->fillWithRandomValues(0.0f, 1.0f);
+    wTensor->fillWithRandomValues(0.0f, 1.0f);
+    yTensor->fillWithValue(0.0f);
+
+    std::unordered_map<int64_t, void*> variantPack;
+    variantPack[xAttr->get_uid()] = xTensor->memory().deviceData();
+    variantPack[wAttr->get_uid()] = wTensor->memory().deviceData();
+    variantPack[yAttr->get_uid()] = yTensor->memory().deviceData();
+
+    ConvGraphState state;
+    state.graph = std::move(graph);
+    state.xAttr = std::move(xAttr);
+    state.wAttr = std::move(wAttr);
+    state.yAttr = std::move(yAttr);
+    state.xTensor = std::move(xTensor);
+    state.wTensor = std::move(wTensor);
+    state.yTensor = std::move(yTensor);
+    state.variantPack = std::move(variantPack);
+
+    return state;
+}
+
+// ─── Scenario 1: Quick Autotune ────────────────────────────────────────────
+
+/// Simplest possible autotune flow:
+/// add_all_engines() -> autotune() -> execute()
+void demonstrateQuickAutotune(hipdnnHandle_t handle, bool fullMode)
+{
+    std::cout << "\n=== Scenario 1: Quick Autotune ===\n";
+
+    auto state = buildConvGraph(handle, fullMode);
+
+    // Discover and add all available engines (skip if none available)
+    if(skipIfNoEngines(state.graph->add_all_engines()))
+    {
+        return;
+    }
+
+    // Allocate workspace for the largest engine
+    int64_t maxWs = 0;
+    HIPDNN_FE_CHECK(state.graph->get_max_workspace_size(maxWs));
+    utilities::Workspace workspace(static_cast<size_t>(maxWs));
+
+    // Configure for speed: AUTO mode, SINGLE_SHOT, minimal warmup
+    AutotuneConfig config;
+    config.mode = TuneMode::AUTO;
+    config.strategy = AutotuneStrategy::SINGLE_SHOT;
+    config.warmupIterations = 1;
+
+    // Autotune selects the fastest engine and sets it as active
+    HIPDNN_FE_CHECK(state.graph->autotune(handle, state.variantPack, workspace.get(), config));
+
+    // After autotune(), get_workspace_size() returns the active plan's workspace
+    int64_t ws = 0;
+    HIPDNN_FE_CHECK(state.graph->get_workspace_size(ws));
+    utilities::Workspace execWorkspace(static_cast<size_t>(ws));
+
+    // Execute with the autotuned engine
+    HIPDNN_FE_CHECK(state.graph->execute(handle, state.variantPack, execWorkspace.get()));
+
+    // Verify output
+    state.yTensor->memory().markDeviceModified();
+    const auto* yHostPtr = state.yTensor->memory().hostData();
+    std::cout << "  Execution OK, output[0..4]: ";
+    for(int i = 0; i < 5; ++i)
+    {
+        std::cout << yHostPtr[i] << " ";
+    }
+    std::cout << '\n';
+
+    std::cout << "  Autotuned successfully.\n";
+}
+
+// ─── Scenario 2: Exhaustive Autotune with Result Inspection ─────────────
+
+/// Uses EXHAUSTIVE mode and inspects the ranked results.
+/// Prints a table showing all engines with timing and status.
+void demonstrateExhaustiveAutotune(hipdnnHandle_t handle, bool fullMode)
+{
+    std::cout << "\n=== Scenario 2: Exhaustive Autotune ===\n";
+
+    auto state = buildConvGraph(handle, fullMode);
+
+    if(skipIfNoEngines(state.graph->add_all_engines()))
+    {
+        return;
+    }
+
+    int64_t maxWs = 0;
+    HIPDNN_FE_CHECK(state.graph->get_max_workspace_size(maxWs));
+    utilities::Workspace workspace(static_cast<size_t>(maxWs));
+
+    // EXHAUSTIVE mode with SINGLE_SHOT for speed in default mode
+    AutotuneConfig config;
+    config.mode = TuneMode::EXHAUSTIVE;
+    config.strategy = fullMode ? AutotuneStrategy::FIXED_AVERAGE : AutotuneStrategy::SINGLE_SHOT;
+    config.warmupIterations = fullMode ? 3 : 1;
+    config.timedIterations = fullMode ? 10 : 1;
+    config.continueOnPrimingFailure = true;
+
+    // Use the overload that populates results
+    std::vector<AutotuneResult> results;
+    HIPDNN_FE_CHECK(
+        state.graph->autotune(handle, state.variantPack, workspace.get(), config, {}, &results));
+
+    // Print ranked results table
+    std::cout << "  " << std::left << std::setw(6) << "Rank" << std::setw(30) << "Engine"
+              << std::setw(12) << "Min (ms)" << std::setw(12) << "Avg (ms)" << std::setw(14)
+              << "Workspace" << std::setw(10) << "Converged" << std::setw(12) << "Exhaustive"
+              << '\n';
+    std::cout << "  " << std::string(96, '-') << '\n';
+
+    for(const auto& result : results)
+    {
+        const std::string rankStr = result.rank >= 0 ? std::to_string(result.rank) : "FAIL";
+        const std::string name
+            = result.engineName.empty() ? getEngineName(result.engineId) : result.engineName;
+
+        std::cout << "  " << std::left << std::setw(6) << rankStr << std::setw(30) << name;
+
+        if(result.succeeded)
+        {
+            std::cout << std::setw(12) << std::fixed << std::setprecision(4) << result.minTimeMs
+                      << std::setw(12) << std::fixed << std::setprecision(4) << result.avgTimeMs
+                      << std::setw(14) << result.workspaceSize << std::setw(10)
+                      << (result.converged ? "yes" : "no") << std::setw(12)
+                      << (result.ranExhaustive ? "yes" : "no");
+        }
+        else
+        {
+            std::cout << std::setw(12) << "n/a" << std::setw(12) << "n/a" << std::setw(14)
+                      << result.workspaceSize << std::setw(10) << "n/a" << std::setw(12) << "n/a";
+            if(!result.errorMessage.empty())
+            {
+                std::cout << " [" << result.errorMessage << "]";
+            }
+        }
+        std::cout << '\n';
+    }
+
+    std::cout << "  Total engines benchmarked: " << results.size() << '\n';
+}
+
+// ─── Scenario 3: Filtered Autotune ─────────────────────────────────────────
+
+/// Demonstrates engine discovery and workspace-constrained autotuning.
+/// Inspects EngineConfigInfo entries, filters by workspace, then autotunes
+/// only the selected engines.
+void demonstrateFilteredAutotune(hipdnnHandle_t handle, bool fullMode)
+{
+    std::cout << "\n=== Scenario 3: Filtered Autotune (Workspace Constrained) ===\n";
+
+    auto state = buildConvGraph(handle, fullMode);
+
+    // Step 1: Discover available engines
+    std::vector<EngineConfigInfo> configs;
+    if(skipIfNoEngines(state.graph->get_engine_configs(configs)))
+    {
+        return;
+    }
+
+    std::cout << "  Discovered " << configs.size() << " engine(s):\n";
+    for(const auto& cfg : configs)
+    {
+        const std::string name
+            = cfg.engineName.empty() ? getEngineName(cfg.engineId) : cfg.engineName;
+        std::cout << "    " << name << " (workspace=" << cfg.workspaceSize
+                  << ", exhaustive=" << (cfg.supportsExhaustive ? "yes" : "no")
+                  << ", knobs=" << cfg.knobs.size() << ")\n";
+    }
+
+    // Step 2: Filter engines by workspace size
+    // Use a generous limit: allow any engine with workspace <= 256 MB
+    const int64_t workspaceLimit = int64_t{256} * 1024 * 1024;
+    std::vector<EngineConfigInfo> filteredConfigs;
+    for(const auto& cfg : configs)
+    {
+        if(cfg.workspaceSize <= workspaceLimit)
+        {
+            filteredConfigs.push_back(cfg);
+        }
+    }
+
+    std::cout << "  After filtering (workspace <= " << workspaceLimit
+              << " bytes): " << filteredConfigs.size() << " engine(s)\n";
+
+    if(filteredConfigs.empty())
+    {
+        std::cout << "  No engines within workspace limit, skipping autotune.\n";
+        return;
+    }
+
+    // Step 3: Add only filtered engines
+    HIPDNN_FE_CHECK(state.graph->add_engine_configs(filteredConfigs));
+
+    // Allocate workspace up to the limit
+    int64_t maxWs = 0;
+    HIPDNN_FE_CHECK(state.graph->get_max_workspace_size(maxWs));
+    const int64_t allocatedWs = std::min(maxWs, workspaceLimit);
+    utilities::Workspace workspace(static_cast<size_t>(allocatedWs));
+
+    // Step 4: Autotune with maxWorkspaceBytes as secondary guard
+    AutotuneConfig config;
+    config.mode = TuneMode::AUTO;
+    config.strategy = AutotuneStrategy::SINGLE_SHOT;
+    config.warmupIterations = 1;
+    config.maxWorkspaceBytes = static_cast<size_t>(workspaceLimit);
+
+    HIPDNN_FE_CHECK(state.graph->autotune(handle, state.variantPack, workspace.get(), config));
+
+    std::cout << "  Autotuned with workspace constraint successfully.\n";
+}
+
+// ─── Scenario 4: Save Results to Config File ───────────────────────────────
+
+/// Autotunes and saves results to a JSON config file that can be reused via
+/// HIPDNN_ENGINE_OVERRIDE_FILE environment variable.
+void demonstrateSaveToConfigFile(hipdnnHandle_t handle, bool fullMode)
+{
+    std::cout << "\n=== Scenario 4: Save Results to Config File ===\n";
+
+    const std::filesystem::path configFile = "sample_autotune_results.json";
+
+    auto state = buildConvGraph(handle, fullMode);
+
+    if(skipIfNoEngines(state.graph->add_all_engines()))
+    {
+        return;
+    }
+
+    int64_t maxWs = 0;
+    HIPDNN_FE_CHECK(state.graph->get_max_workspace_size(maxWs));
+    utilities::Workspace workspace(static_cast<size_t>(maxWs));
+
+    AutotuneConfig config;
+    config.mode = TuneMode::AUTO;
+    config.strategy = AutotuneStrategy::SINGLE_SHOT;
+    config.warmupIterations = 1;
+
+    // Write results to a config file
+    const AutotuneStorageConfig storageConfig{configFile, false};
+
+    HIPDNN_FE_CHECK(
+        state.graph->autotune(handle, state.variantPack, workspace.get(), config, storageConfig));
+
+    std::cout << "  Results saved to " << configFile << '\n';
+    std::cout << "  To reuse: export HIPDNN_ENGINE_OVERRIDE_FILE=" << configFile << '\n';
+
+    // Clean up the demo file
+    std::error_code removeEc;
+    const bool removed = std::filesystem::remove(configFile, removeEc);
+    if(removed && removeEc.value() == 0)
+    {
+        std::cout << "  (Demo file cleaned up)\n";
+    }
+}
+
+// ─── Argument Parsing ──────────────────────────────────────────────────────
+
+struct AutotuneSampleConfig
+{
+    int scenario = 0; // 0 = run all, 1-4 = specific scenario
+    bool fullMode = false;
+};
+
+AutotuneSampleConfig parseArgs(int argc, char* argv[])
+{
+    AutotuneSampleConfig cfg;
+
+    for(int i = 1; i < argc; ++i)
+    {
+        const std::string arg(argv[i]);
+
+        if(arg == "--help" || arg == "-h")
+        {
+            std::cout << "Usage: " << argv[0] << " [OPTIONS]\n"
+                      << "  --scenario=N  Run specific scenario (1-4, default=all)\n"
+                      << "  --full        Use realistic tensor dimensions and iterations\n"
+                      << "  --verify-cpu  Accepted but ignored (compatibility with test harness)\n"
+                      << "  --help, -h    Show this help\n";
+            exit(EXIT_SUCCESS);
+        }
+
+        if(arg.rfind("--scenario=", 0) == 0)
+        {
+            cfg.scenario = std::stoi(arg.substr(11));
+            if(cfg.scenario < 1 || cfg.scenario > 4)
+            {
+                std::cerr << "Invalid scenario: " << cfg.scenario << " (must be 1-4)\n";
+                exit(EXIT_FAILURE);
+            }
+        }
+        else if(arg == "--full")
+        {
+            cfg.fullMode = true;
+        }
+        else if(arg == "--verify-cpu" || arg == "-vc")
+        {
+            // Accepted but ignored: autotune has no CPU validation path.
+            // This flag is passed by add_hipdnn_sample_test().
+        }
+        else
+        {
+            std::cerr << "Unknown argument: " << arg << " (use --help)\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return cfg;
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────
+
+int main(int argc, char* argv[])
+{
+    const auto config = parseArgs(argc, argv);
+
+    std::cout << "hipDNN Autotune Sample" << (config.fullMode ? " (full mode)" : " (fast mode)")
+              << '\n';
+
+    initializeFrontendLogging();
+
+    hipdnnHandle_t handle = nullptr;
+    HIPDNN_CHECK(hipdnnCreate(&handle));
+
+    if(config.scenario == 0 || config.scenario == 1)
+    {
+        demonstrateQuickAutotune(handle, config.fullMode);
+    }
+    if(config.scenario == 0 || config.scenario == 2)
+    {
+        demonstrateExhaustiveAutotune(handle, config.fullMode);
+    }
+    if(config.scenario == 0 || config.scenario == 3)
+    {
+        demonstrateFilteredAutotune(handle, config.fullMode);
+    }
+    if(config.scenario == 0 || config.scenario == 4)
+    {
+        demonstrateSaveToConfigFile(handle, config.fullMode);
+    }
+
+    HIPDNN_CHECK(hipdnnDestroy(handle));
+
+    std::cout << "\nDone.\n";
+    return 0;
+}
