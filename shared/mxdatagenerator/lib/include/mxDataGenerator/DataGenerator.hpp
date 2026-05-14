@@ -132,9 +132,10 @@ namespace DGen
         }
     };
 
-    // Constant-value fills.  Each writes the same data byte to every element
-    // and a neutral (1.0) scale to every block, so dequantizing reproduces
-    // the named float value (modulo the data type's quantisation).
+    // Constant-value fills: every element dequantizes to the named value
+    // (scale=1.0). NaN/Inf are broadcast via setNaN/setInf, which routes
+    // to the data byte for F8 E5M2 and to the scale byte for F4/F6.
+    // Inf only exists for F8 E5M2; the generator throws otherwise.
     struct Twos
     {
         std::string toString() const
@@ -151,9 +152,6 @@ namespace DGen
         }
     };
 
-    // Largest representable normal value for the data type (sign +,
-    // scale = 1.0).  The dequantized magnitude equals the data type's
-    // `dataMaxNormalNumber` (e.g. 6.0 for F4, 448.0 for F8 E4M3).
     struct MaxVals
     {
         std::string toString() const
@@ -162,8 +160,6 @@ namespace DGen
         }
     };
 
-    // Smallest non-zero subnormal data value (mantissa LSB only) with
-    // scale = 1.0.
     struct DenormMins
     {
         std::string toString() const
@@ -172,7 +168,6 @@ namespace DGen
         }
     };
 
-    // Largest subnormal data value with scale = 1.0.
     struct DenormMaxs
     {
         std::string toString() const
@@ -181,11 +176,6 @@ namespace DGen
         }
     };
 
-    // Pathological inputs.  NaN is broadcast through whichever buffer the
-    // data type can encode it in (data byte for E4M3 / E5M2 data; scale byte
-    // for F4 / F6).  Inf only exists for E5M2 data; for any other data type
-    // the generator throws so the test fails loudly instead of silently
-    // producing 1.0s.
     struct NaNs
     {
         std::string toString() const
@@ -202,14 +192,9 @@ namespace DGen
         }
     };
 
-    // Uniform-integer fill in the closed interval [lo, hi]. Each generated
-    // integer is converted to the target data type via the same
-    // `satConvertToType<DTYPE>` path used by Sequential / RowIndex (so values
-    // outside the data type's representable range saturate rather than wrap),
-    // and every block scale is set to neutral 1.0. Caller picks the range
-    // because the appropriate magnitude is data-type / use-case dependent
-    // (e.g. F4 max is 6.0, F8 E5M2 max is 57344, and the legacy hipBLASLt
-    // `random_int<T>` hand-tuned a per-DTYPE range to fit each format).
+    // Uniform-integer fill in [lo, hi], converted via satConvertToType (so
+    // out-of-range values saturate). Caller picks the range because the
+    // appropriate magnitude is data-type dependent.
     struct RandInt
     {
         int lo = -10;
@@ -351,11 +336,8 @@ namespace DGen
                                              const float                 mean,
                                              const float                 std_dev);
 
-        // Constant-value fills.  All share the same shape: write a fixed
-        // data bit-pattern (the low `m_dataDesc.byte_size` bytes of `bits`,
-        // little-endian) to every element and a neutral 1.0 scale to every
-        // block.  `uint64_t` is wide enough for every supported DTYPE
-        // (max is f32 / 4 bytes); MX data types only use the low byte.
+        // Broadcasts the low `m_dataDesc.byte_size` bytes of `bits` to every
+        // element with a neutral 1.0 scale. uint64_t fits every supported DTYPE.
         void generate_data_constant_bits(uint64_t bits);
         void generate_data_twos();
         void generate_data_neg_ones();
@@ -365,7 +347,6 @@ namespace DGen
         void generate_data_nans();
         void generate_data_infs();
 
-        // Uniform random integer in [lo, hi], converted via satConvertToType.
         void generate_data_rand_int(int lo, int hi);
 
         uint32_t scale_block_mean(const std::vector<uint32_t>& scales,
@@ -1151,19 +1132,12 @@ namespace DGen
         }
     }
 
-    // Common constant-fill helper.  Broadcasts `dataByte` to every unpacked
-    // data element and a neutral (1.0) scale byte to every scale block.  All
-    // MX data types use a 1-byte unpacked element representation so a single
-    // byte is enough; bit-packing happens later in `getDataBytes()`.  The
-    // scale baseline is taken from `setOne<DTYPE>` so it picks up the right
-    // per-DTYPE scale-1.0 encoding (E8M0_127, E5M3 0x78, E4M3 0x38, ...).
+    // Broadcasts the low `byte_size` bytes of `bits` to every data element and
+    // a neutral 1.0 scale to every block. setOne supplies the per-DTYPE scale=1.0
+    // encoding (E8M0_127, E5M3 0x78, E4M3 0x38).
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_constant_bits(uint64_t bits)
     {
-        // Element width must fit in our uint64_t carrier.  Every currently
-        // supported DTYPE has byte_size <= 4 (f32 is the widest), so this
-        // is a guard against accidentally adding a >8-byte type and then
-        // silently truncating its constant-fill bit pattern.
         if(m_dataDesc.byte_size > sizeof(bits))
             throw std::runtime_error(
                 "DataGenerator::generate_data_constant_bits: data byte_size "
@@ -1171,17 +1145,11 @@ namespace DGen
 
         std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
         std::vector<uint8_t> d_dummy(m_dataDesc.byte_size, 0x00);
-        // forceDenorm=false to get the canonical scale=1.0 byte rather than
-        // the subnormal-paired form.
         setOne<DTYPE>(s_one.data(), d_dummy.data(), 0, 0, /*subNormal=*/false);
 
 #pragma omp parallel for num_threads(m_num_threads)
         for(index_t i = 0; i < m_dataDesc.array_size; i++)
         {
-            // memcpy of the low `byte_size` bytes of `bits` matches the
-            // little-endian on-disk layout every host x86 / ARM target uses
-            // and mirrors what setDataMax / setOne already write through
-            // setDataFP16 / setDataF32 directly.
             std::memcpy(
                 &m_dataBytes[i * m_dataDesc.byte_size], &bits, m_dataDesc.byte_size);
         }
@@ -1196,25 +1164,16 @@ namespace DGen
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_twos()
     {
-        // satConvertToType encodes 2.0 in the data type's full native bit
-        // layout (saturating to data_max if 2.0 doesn't fit, which it does
-        // for every supported MX data type).  We pass the entire uint64_t
-        // through; the helper memcpy's only the low byte_size bytes, so MX
-        // (1 byte) and host (2/4 byte) types all land with the right pattern.
-        const uint64_t bits = satConvertToType<DTYPE>(2.0f);
-        generate_data_constant_bits(bits);
+        generate_data_constant_bits(satConvertToType<DTYPE>(2.0f));
     }
 
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_neg_ones()
     {
-        const uint64_t bits = satConvertToType<DTYPE>(-1.0f);
-        generate_data_constant_bits(bits);
+        generate_data_constant_bits(satConvertToType<DTYPE>(-1.0f));
     }
 
-    // Read the low `byte_size` bytes of `src` into a uint64_t (little-endian),
-    // so we can hand a setDataMax-style mask off to generate_data_constant_bits
-    // without it caring how many bytes the underlying DTYPE uses.
+    // Reads the low `byte_size` bytes of `src` into a uint64_t (little-endian).
     template <typename DTYPE>
     inline uint64_t read_data_bits_le(uint8_t const* src, index_t byte_size)
     {
@@ -1226,10 +1185,6 @@ namespace DGen
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_max_vals()
     {
-        // Use the per-DTYPE setDataMax primitive directly so we get the
-        // canonical positive-normal-max bit pattern (e.g. 0x7E for F8 E4M3,
-        // 0x07 for F4, 0x7F7F for bf16, 0x7F7FFFFF for f32) instead of
-        // relying on satConvertToType to round trip.
         std::vector<uint8_t> d_max(m_dataDesc.byte_size, 0x00);
         setDataMax<DTYPE>(d_max.data(), 0, /*subNormal=*/false, /*positive=*/true);
         generate_data_constant_bits(read_data_bits_le<DTYPE>(d_max.data(), m_dataDesc.byte_size));
@@ -1246,23 +1201,14 @@ namespace DGen
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_denorm_mins()
     {
-        // Smallest non-zero subnormal: sign=0, exp=0, mantissa=LSB=1.
-        // Encoded value is 0x1 across every supported DTYPE (in the low
-        // byte for MX 4/6/8-bit unpacked, and in the low byte of bf16 /
-        // fp16 / f32 with the higher bytes left at 0 -- which is also the
-        // correct denorm-min pattern for those host types).
+        // Smallest non-zero subnormal (mantissa LSB) is 0x1 across every
+        // supported DTYPE.
         generate_data_constant_bits(uint64_t{0x1});
     }
 
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_nans()
     {
-        // Build a (scale=1.0, data=oneMask) baseline then overlay NaN.
-        // setNaN<DTYPE> writes whichever buffer can encode NaN for this
-        // DTYPE (data byte for F8 with E8M0 scale; scale byte for F4 / F6
-        // and the F8 + E4M3 / E5M3 scale variants).  The other buffer keeps
-        // its neutral baseline so the dequantized result is unambiguously
-        // NaN everywhere.
         std::vector<uint8_t> s_nan(m_scaleDesc.byte_size, 0x00);
         std::vector<uint8_t> d_nan(m_dataDesc.byte_size, 0x00);
         setOne<DTYPE>(s_nan.data(), d_nan.data(), 0, 0, /*subNormal=*/false);
@@ -1284,11 +1230,9 @@ namespace DGen
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_infs()
     {
-        // Inf only exists in the data of F8 E5M2.  Every other supported MX
-        // data type (F8 E4M3, F4, F6) lacks an Inf representation, and none
-        // of the supported scale types (E8M0 / E4M3 / E5M3) carry Inf either.
-        // Bail out loudly rather than silently generating ones (the existing
-        // setInf<DTYPE> for those types is a documented no-op).
+        // Only F8 E5M2 data has an Inf representation; every other supported
+        // MX data/scale type lacks one, so throw rather than silently produce
+        // ones via setInf's documented no-op.
         if constexpr(!DTYPE::dataInfo.hasInf)
         {
             throw std::runtime_error(
@@ -1325,7 +1269,6 @@ namespace DGen
             throw std::invalid_argument(
                 "DataGenerator::generate_data_rand_int: lo must be <= hi");
 
-        // Neutral 1.0 scale broadcast (same setup the constant fills use).
         std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
         std::vector<uint8_t> d_dummy(m_dataDesc.byte_size, 0x00);
         setOne<DTYPE>(s_one.data(), d_dummy.data(), 0, 0, /*subNormal=*/false);
@@ -1336,10 +1279,7 @@ namespace DGen
             std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
         }
 
-        // Per-element uniform integer draw, then quantize to the data type.
-        // satConvertToType saturates if the integer is outside the type's
-        // representable range, so callers that pick a too-wide range will
-        // see clipped values rather than wrap-around.
+        // satConvertToType saturates out-of-range values rather than wrapping.
 #pragma omp parallel for num_threads(m_num_threads)
         for(index_t i = 0; i < m_dataDesc.array_size; i++)
         {

@@ -929,11 +929,8 @@ namespace TensileLite
 
         {
             {
-                // gfx950 subtile kernels expect the preswizzled (AITER) MX scale
-                // layout. Every other architecture currently uses the dimk K-swizzle
-                // layout (gfx1250 + non-rocroller WMMA backends). Both layouts are
-                // produced by `generateMXInput` via `MXScaleLayout`, so the only
-                // arch-specific decision is which enum value to pick here.
+                // gfx950 subtile kernels read the AITER swizzle; everything else
+                // (gfx1250 + non-rocroller WMMA) reads the dimk K-swizzle.
                 hipDeviceProp_t prop;
                 int deviceIdx = args.count("device-idx") ? args["device-idx"].as<int>() : 0;
                 hipGetDeviceProperties(&prop, deviceIdx);
@@ -1792,13 +1789,10 @@ namespace TensileLite
 
         void DataInitialization::initializeCPUInputs(ContractionProblemGemm const& problem)
         {
-            // We always drive `mxDataGenerator` for any MX side (FP4, FP6, FP8) so the
-            // values are coordinated with their E8/E4M3/E5M3 scales. `initializeMXData`
-            // also handles the arch-appropriate scale swizzle (kGFX950 for gfx950
-            // subtile kernels when --mx-scale-format>0, kGFX1250 for gfx1250 +
-            // non-rocroller WMMA backends), so `copySwizzledToGPUBuffer` doesn't
-            // need its own MX scale swizzle path -- it just hands back the
-            // already-swizzled gpuInput.valid.
+            // Always drive mxDataGenerator for MX sides so data and scales stay
+            // coordinated. initializeMXData also produces the arch-appropriate
+            // swizzled scale into gpuInput.valid, so copySwizzledToGPUBuffer just
+            // forwards it.
             bool useMXGenerator = isMXProblem(problem);
             if(useMXGenerator)
                 initializeMXData(problem);
@@ -1895,7 +1889,7 @@ namespace TensileLite
                 }
             }
 
-            /** Maps Tensile MX data element type to hipDataType for generateMXInput. */
+            // Tensile MX data element type -> hipDataType for generateMXInput.
             hipDataType hipMxDataTypeForDataGenerator(rocisa::DataType dt)
             {
                 switch(dt)
@@ -1935,8 +1929,7 @@ namespace TensileLite
                 return "DenormMins";
             case InitMode::DenormMax:
                 return "DenormMaxs";
-            // BadInput / BadOutput in tensilelite alias to NaN / Inf for
-            // every datatype they're defined on, so route them the same way.
+            // BadInput/BadOutput alias to NaN/Inf in tensilelite.
             case InitMode::NaN:
             case InitMode::BadInput:
                 return "NaNs";
@@ -1949,11 +1942,8 @@ namespace TensileLite
             case InitMode::SerialDim0:
             case InitMode::SerialDim1:
                 return "Sequential";
-            // mxDataGenerator only has a single trig family (TrigonometricFromFloat),
-            // so the four sin/cos/abs-sin/abs-cos variants and their problem-
-            // independent (TrigInd*) cousins all collapse to the same string.
-            // Better to lose the specific waveform than to silently fall through
-            // to Bounded uniform [-1,1] for tests that explicitly asked for trig.
+            // mxDataGenerator has a single trig family, so all sin/cos/abs/ind
+            // variants collapse to the same string.
             case InitMode::TrigSin:
             case InitMode::TrigCos:
             case InitMode::TrigAbsSin:
@@ -1963,26 +1953,14 @@ namespace TensileLite
             case InitMode::TrigIndAbsSin:
             case InitMode::TrigIndAbsCos:
                 return "TrigonometricFromFloat";
-            // Map the random-uniform family to Bounded explicitly so the
-            // intent is documented at the dispatch site rather than relying
-            // on a catch-all default.  RandomNegPosLimited is the closest
-            // semantic match (legacy spec: fp -1.0~1.0); plain Random for
-            // non-MX types is per-DTYPE integer-bounded (float [-100,100],
-            // double [-1000,1000], half [-3,3]) but no mxDataGenerator MX
-            // type has that specialisation, so the best-effort approximation
-            // is the same Bounded[-1,1] window generateMXInput is already
-            // pinned to from the call site.
+            // Random* all map to Bounded[-1,1] (the window generateMXInput is
+            // already pinned to). Closest match: RandomNegPosLimited.
             case InitMode::Random:
             case InitMode::RandomNarrow:
             case InitMode::RandomNegPosLimited:
                 return "Bounded";
-            // No silent fallback: any InitMode without an explicit mapping
-            // (today: Free, Count, plus anything added to the enum after
-            // this switch was last touched) gets a loud error so the test
-            // misconfiguration surfaces instead of being papered over with
-            // an unrelated distribution.  Free in particular is "leave the
-            // buffer uninitialised" in the legacy initArray path, which
-            // has no meaningful mxDataGenerator analogue.
+            // Free / Count have no mxDataGenerator analogue; throw rather than
+            // silently fall through to an unrelated distribution.
             case InitMode::Free:
             case InitMode::Count:
                 break;
@@ -1998,12 +1976,10 @@ namespace TensileLite
 
         void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
         {
-            // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
-            // can safely skip them. For any MX side (FP4, FP6, FP8) we drive
-            // mxDataGenerator so the values are coordinated with their scales; for any
-            // non-MX side (e.g. mixed-mode A=MX, B=BF16) we fall back to the same
-            // initArray path the default loop would have taken, to avoid leaving the
-            // malloc'd buffers uninitialized.
+            // Seeds A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
+            // can skip them. MX sides go through mxDataGenerator (data + scales
+            // generated together); non-MX sides (mixed-mode A=MX, B=BF16) fall back
+            // to the default initArray path so buffers don't stay uninitialised.
             auto const& tensors = problem.tensors();
 
             auto initTensorFromDefault = [&](int i) {
@@ -2024,14 +2000,9 @@ namespace TensileLite
             m_mxPreswizzledA = false;
             m_mxPreswizzledB = false;
 
-            // Decide per-side which scale layout the kernel will read from.
-            //   * gfx950: only the AITER swizzle (preSwizzleScalesGFX950) is
-            //     supported, and it has no built-in padding -- so we fall
-            //     back to kNone for problems whose padded scale dims are not
-            //     divisible by the AITER tiling.
-            //   * gfx1250: the dimk swizzle (preSwizzleScalesGFX1250) pads
-            //     internally, so we can always apply it to any MX problem.
-            //   * kNone arch (--mx-scale-format=0): no preswizzle.
+            // Per-side scale layout: gfx950 AITER (only when scale dims are
+            // tile-divisible, since it doesn't pad), gfx1250 dimk (pads internally
+            // so always applicable), or kNone when --mx-scale-format=0.
             MXScaleLayout layoutA = MXScaleLayout::kNone;
             MXScaleLayout layoutB = MXScaleLayout::kNone;
 
@@ -2075,10 +2046,8 @@ namespace TensileLite
                     layoutB = MXScaleLayout::kGFX1250;
             }
 
-            // Per-side helper. We hand `generateMXInput` host pointers (cpuInput.valid)
-            // -- the tensilelite client's CPU reference path requires those bytes
-            // host-side anyway, and a GPU-side init would just add an extra
-            // device->host hipMemcpy.
+            // We pass cpuInput.valid (host) pointers because the CPU reference
+            // path needs those bytes host-side anyway.
             auto initOneMXSide
                 = [&](int                     dataTensorEnum,
                       int                     scaleTensorEnum,
@@ -2098,8 +2067,7 @@ namespace TensileLite
                   auto& pristineData = m_vdata[dataTensorEnum].pristine[dataDesc.dataType()];
                   auto& pristineScale = m_vdata[scaleTensorEnum].pristine[scaleEltType];
 
-                  // Element-size-aware byte stride. Handles FP4 (0.5 byte/elt),
-                  // FP6 (0.75) and FP8 (1.0) uniformly.
+                  // Element-size-aware byte stride: FP4 (0.5), FP6 (0.75), FP8 (1.0).
                   size_t dataBatchStrideBytes  = 0;
                   size_t scaleBatchStrideBytes = 0;
                   if(batchCount > 1)
@@ -2118,8 +2086,7 @@ namespace TensileLite
                   hipDataType const hipDataT = hipMxDataTypeForDataGenerator(dataDesc.dataType());
                   hipDataType const hipScaleT = hipMxScaleTypeForDataGenerator(scaleEltType);
 
-                  // cpuInput.valid always holds canonical (non-preswizzled) scale so
-                  // the CPU reference reads it with correct linear strides.
+                  // cpuInput.valid always holds the canonical (non-swizzled) scale.
                   for(size_t b = 0; b < batchCount; b++)
                   {
                       auto* dataPtr = static_cast<uint8_t*>(pristineData.cpuInput.valid.get())
@@ -2143,26 +2110,18 @@ namespace TensileLite
                                       1.0f);
                   }
 
-                  // When the kernel needs the scale in a swizzled layout, regenerate
-                  // it with the requested layout and upload straight to gpuInput.valid.
-                  // copySwizzledToGPUBuffer will use gpuInput.valid as-is rather than
-                  // re-swizzling. The cpuInput.valid copy generated above stays in the
-                  // canonical layout for the CPU reference path.
+                  // When the kernel needs a swizzled scale, regenerate it with the
+                  // requested layout straight into gpuInput.valid; the cpuInput.valid
+                  // copy stays canonical for the CPU reference.
                   if(swizzleLayout != MXScaleLayout::kNone && pristineScale.gpuInput.valid)
                   {
                       size_t const eltSize
                           = DataTypeInfo::Get(scaleDesc.dataType()).elementSize;
                       size_t const canonicalScaleElems = scaleDesc.totalAllocatedElements();
 
-                      // preSwizzleScalesGFX1250 internally pads the fast dim
-                      // (scaleRows = data rows / mxBlock) up to a multiple of
-                      // dimk = 128 / mxBlock. On gfx1250 the scale tensor itself
-                      // is allocated unpadded (m_padMXScaleTensor = false), so
-                      // generateMXInput's swizzle output can be larger than
-                      // canonicalScaleElems. Size the staging buffer (and the
-                      // hipMemcpy) for that worst case so we never overrun the
-                      // host vector. preSwizzleScalesGFX950 has no built-in
-                      // padding, so the canonical size suffices there.
+                      // gfx1250 dimk pads the fast dim up to dimk = 128/mxBlock.
+                      // The scale tensor is allocated unpadded on gfx1250, so size
+                      // the staging buffer for the padded worst case.
                       size_t swizzledScaleElems = canonicalScaleElems;
                       if(swizzleLayout == MXScaleLayout::kGFX1250 && mxBlock > 0)
                       {
@@ -2174,9 +2133,7 @@ namespace TensileLite
                               = (dimk == 0) ? fastDim
                                             : ((fastDim + dimk - 1) / dimk) * dimk;
                           size_t const paddedElemsPerBatch = slowDim * paddedFast;
-                          // Account for batched problems: keep the same per-batch
-                          // stride contract that generateMXInput sees.
-                          size_t const totalPaddedElems = paddedElemsPerBatch * batchCount;
+                          size_t const totalPaddedElems    = paddedElemsPerBatch * batchCount;
                           if(totalPaddedElems > swizzledScaleElems)
                               swizzledScaleElems = totalPaddedElems;
                       }
@@ -2211,11 +2168,9 @@ namespace TensileLite
                   }
               };
 
-            // For an MX problem the scale tensor must agree with the data tensor
-            // (mxDataGenerator generates A and MXSA in lock-step from a single
-            // initMode), so any user-supplied --init-MXSA / --init-MXSB is
-            // silently ignored. Surface that once per process so the disagreement
-            // doesn't look like a working knob that quietly does nothing.
+            // mxDataGenerator generates data + scale in lock-step from one initMode,
+            // so any conflicting --init-MXSA / --init-MXSB is silently ignored. Warn
+            // once per process so the user sees the knob isn't being honoured.
             static std::atomic<bool> warnedScaleInitIgnored{false};
             auto warnIfScaleInitMismatched
                 = [&](int dataTensorEnum, int scaleTensorEnum) {
@@ -2238,13 +2193,9 @@ namespace TensileLite
                           << ". This warning is shown once per process." << std::endl;
                   };
 
-            // Per-side dispatch. For any MX side (FP4 / FP6 / FP8) we drive
-            // mxDataGenerator via `initOneMXSide`; if the (data, scale) combination
-            // is not one mxDataGenerator templates for, `generateMXInput` throws
-            // (see `generateMXInputSupported` in `mxDataGen.hpp`) -- the test fails
-            // loudly rather than silently mis-dispatching to a wrong scale type.
-            // Non-MX sides (e.g. mixed-mode A=MX, B=BF16) just go through the same
-            // default initArray path the main init loop would have used.
+            // MX sides go through initOneMXSide (which throws for unsupported
+            // data/scale combinations); non-MX sides reuse the default initArray
+            // path so buffers don't stay uninitialised.
             if(isMXTensor(problem.a(), problem.mxBlockA()))
             {
                 warnIfScaleInitMismatched(ContractionProblemGemm::TENSOR::A,
@@ -2262,9 +2213,8 @@ namespace TensileLite
             }
             else
             {
-                // A is not MX (or mxBlockA == 0). The default-init loop will skip A and
-                // MXSA because useMXGenerator is true, so seed them here with the same
-                // initArray path the default loop would have used.
+                // A is non-MX: seed via the default initArray path so it doesn't
+                // get skipped by the MX-aware default loop.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::A);
                 if(problem.mxBlockA() > 0)
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
@@ -2287,7 +2237,7 @@ namespace TensileLite
             }
             else
             {
-                // B is not MX (or mxBlockB == 0). Same fallback rationale as the A side.
+                // B is non-MX: same fallback as the A side.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::B);
                 if(problem.mxBlockB() > 0)
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);
@@ -2725,14 +2675,9 @@ namespace TensileLite
                 }
                 else if(needMXSwizzle)
                 {
-                    // initializeMXData has already populated gpuInput.valid with the
-                    // arch-appropriate swizzled MX scale (gfx950 AITER or gfx1250
-                    // dimk) when the architecture and problem geometry allow. In
-                    // that case, just hand back gpuInput.valid as-is. Otherwise
-                    // (preswizzle didn't fire -- e.g. --mx-scale-format=0, or
-                    // gfx950 with a problem geometry that doesn't fit the AITER
-                    // tiling) the kernel expects the canonical layout, which is
-                    // exactly what cpuInput.valid holds.
+                    // initializeMXData populates gpuInput.valid with the swizzled
+                    // scale when arch + geometry allow. Otherwise the kernel reads
+                    // the canonical layout from cpuInput.valid.
                     bool const isMXSA            = (i == ContractionProblemGemm::TENSOR::MXSA);
                     bool const isMXSB            = (i == ContractionProblemGemm::TENSOR::MXSB);
                     bool const preswizzledAlready = (isMXSA && m_mxPreswizzledA)

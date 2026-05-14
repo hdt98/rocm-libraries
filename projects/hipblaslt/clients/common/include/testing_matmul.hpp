@@ -2647,9 +2647,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         hipblaslt_seedrand();
 
-        // Detect gfx1250 once per gemm. Drives the dimk scale swizzle inside
-        // `generateMXInput`. We do not cache this across iterations because
-        // the loop is short and the call is essentially free.
+        // gfx1250 detection drives the dimk scale swizzle in generateMXInput.
         bool isGfx1250Arch = false;
         {
             hipDeviceProp_t mxDeviceProps{};
@@ -2664,10 +2662,8 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
         if(isBlockScaling(arg.scaleA))
         {
-            // MX A is always populated through `mxDataGenerator` -- regardless
-            // of whether the build links rocroller. The only architecture
-            // dependency is the scale layout on its way out, which is selected
-            // by the `MXScaleLayout` argument threaded through `generateMXInput`.
+            // MX A always goes through mxDataGenerator; the only arch-dependent
+            // bit is the scale layout, selected via MXScaleLayout below.
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2682,11 +2678,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            // Pick the scale memory layout the kernel will read from. The
-            // scale-format selection (e.g. AITER UE8M0_32_8_EXT) is the
-            // strongest signal -- it directly encodes the gfx950 layout. If
-            // the format doesn't pin a layout and we're running on gfx1250,
-            // fall through to the gfx1250 dimk swizzle.
+            // Scale-format takes precedence (AITER pins gfx950); otherwise on
+            // gfx1250 use the dimk swizzle.
             MXScaleLayout scaleLayoutA = mxScaleLayoutForFormat(arg.scaleA);
             if(scaleLayoutA == MXScaleLayout::kNone && isGfx1250Arch)
                 scaleLayoutA = MXScaleLayout::kGFX1250;
@@ -2694,14 +2687,9 @@ void testing_matmul_with_bias(const Arguments& arg,
             size_t scaleBatchBytesA = (num_batches[i] > 1) ? size_scaleAVec[i] : 0;
             std::vector<float> refAAll;
             refAAll.reserve(static_cast<size_t>(A_row[i]) * A_col[i] * num_batches[i]);
-            // GPU init writes packed bytes / scales straight into the device
-            // buffers. The only matrix layouts that exercise the on-device
-            // PRNG are those where the host generator returns
-            // `dgen.getReferenceFloat()` directly (for matrix A:
-            // `transA == HIPBLAS_OP_T`); other layouts go through
-            // `getAlignedFloat` host-side and the GPU overload silently
-            // falls back to the CPU path. For the fall-back we must hand it
-            // host pointers and re-sync ourselves afterwards.
+            // GPU init writes straight to device buffers; only transA == T
+            // exercises the on-device PRNG, other layouts silently fall back
+            // to the CPU path (which needs host pointers + a re-sync).
             bool const easyLayoutA      = (transA == HIPBLAS_OP_T);
             MXInitDevice const initDevA = easyLayoutA ? MXInitDevice::Gpu : MXInitDevice::Cpu;
             for(int64_t b = 0; b < num_batches[i]; b++)
@@ -2779,8 +2767,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleB_col = ((transB == HIPBLAS_OP_T) ? blockSize(arg.scaleB) : 1);
         if(isBlockScaling(arg.scaleB))
         {
-            // MX B is always populated through `mxDataGenerator`. See the
-            // matching A block above for the rationale.
+            // MX B always goes through mxDataGenerator (mirrors the A side above).
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2804,8 +2791,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             size_t             scaleBatchBytesB   = (num_batches[i] > 1) ? size_scaleBVec[i] : 0;
             std::vector<float> refBAll;
             refBAll.reserve(static_cast<size_t>(B_row[i]) * B_col[i] * num_batches[i]);
-            // For matrix B the GPU overload's "easy layout" is
-            // `!isMatrixA && !isTranspose` -> `transB == HIPBLAS_OP_N`.
+            // GPU overload's easy-layout for B is transB == N.
             bool const easyLayoutB      = (transB == HIPBLAS_OP_N);
             MXInitDevice const initDevB = easyLayoutB ? MXInitDevice::Gpu : MXInitDevice::Cpu;
             for(int64_t b = 0; b < num_batches[i]; b++)
@@ -2892,9 +2878,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   stride_c[i],
                                   num_batches[i]);
 
-        // Reference floats and the kernel-ready (gfx950 AITER / gfx1250 dimk)
-        // scale layout are produced inside `generateMXInput` above for both
-        // A and B; nothing to do here.
+        // generateMXInput already produced the reference floats and the
+        // kernel-ready scale layout for both A and B; nothing to do here.
             // broadcast first block
             CHECK_HIP_ERROR(broadcast(dA[i], block_count));
             CHECK_HIP_ERROR(broadcast(dB[i], block_count));

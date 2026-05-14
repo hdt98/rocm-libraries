@@ -3,19 +3,9 @@
 
 #pragma once
 
-// Header-only HIP/GPU backend for the mxDataGenerator library. The class
-// template `DGen::DataGeneratorGPU<DTYPE>` mirrors the public surface of
-// `DGen::DataGenerator<DTYPE>` (CPU) but generates MX-formatted data on the
-// device.
-//
-// Compile-time isolation: the entire surface is wrapped in a HIP guard so
-// host-only translation units that only need the CPU path can include the
-// rest of mxDataGenerator without dragging in HIP. Consumers that want the
-// GPU API must compile the including TU with hipcc/clang in HIP mode and
-// link against `hip::device`.
-//
-// CMake: gated by the option `MXDATAGENERATOR_ENABLE_GPU` (default ON);
-// `roc::mxDataGenerator` then adds `hip::device` to its INTERFACE link.
+// Header-only HIP/GPU backend mirroring DataGenerator<DTYPE> (CPU). The body
+// is HIP-guarded so non-HIP TUs can include the rest of mxDataGenerator
+// without dragging in HIP. Gated by CMake option MXDATAGENERATOR_ENABLE_GPU.
 
 #include "DataGenerator.hpp"
 #include "PreSwizzle.hpp"
@@ -36,18 +26,13 @@ namespace DGen
     /**
      * @brief HIP/GPU backend for MX data generation.
      *
-     * Generates MX-formatted data (data + scale buffers) directly into device
-     * memory. Designed to mirror the public interface of `DGen::DataGenerator`,
-     * but with semantically equivalent (not bit-identical) output: it uses a
-     * separate device PRNG, so a fixed seed will reproduce identical bytes
-     * across runs of the GPU backend, but bytes will differ from the CPU
-     * backend. Statistical properties (mean, std-dev, zero frequency) match.
+     * Mirrors the public interface of DGen::DataGenerator but uses a separate
+     * device PRNG: bytes are deterministic per-seed within this backend but
+     * will not match the CPU backend bit-for-bit (statistics match).
      *
-     * Supported data types: ocp_e2m1_mxfp4 (and its e4m3/e5m3 scale variants),
+     * Supported data types: ocp_e2m1_mxfp4 (+ e4m3/e5m3 scale variants),
      * ocp_e2m3_mxfp6, ocp_e3m2_mxfp6, ocp_e4m3_mxfp8, ocp_e5m2_mxfp8.
-     * Scale formats: E8M0, E4M3, E5M3.
-     *
-     * Supported init modes (mirrors `DataInitMode`): Bounded,
+     * Scale formats: E8M0, E4M3, E5M3. Init modes: Bounded,
      * BoundedAlternatingSign, Unbounded, Identity, Ones, Zeros, Sequential,
      * RowIndex, ColIndex, Checkerboard, ScaledDiagonal,
      * TrigonometricFromFloat, NormalFromFloat.
