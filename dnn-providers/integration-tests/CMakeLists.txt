@@ -111,6 +111,15 @@ fetch_gtest_dependency()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# Copy golden reference data into the build tree so tests can find it at
+# <exe_dir>/../lib/hipdnn_reference_data/
+set(HIPDNN_REFERENCE_DATA_SOURCE
+    "${ROCM_LIBRARIES_ROOT}/projects/hipdnn/hipdnn_reference_data")
+if(EXISTS "${HIPDNN_REFERENCE_DATA_SOURCE}")
+    file(COPY "${HIPDNN_REFERENCE_DATA_SOURCE}/"
+         DESTINATION "${CMAKE_BINARY_DIR}/lib/hipdnn_reference_data")
+endif()
+
 set(INTEGRATION_TESTS_EXE hipdnn_integration_tests)
 
 add_executable(${INTEGRATION_TESTS_EXE}
