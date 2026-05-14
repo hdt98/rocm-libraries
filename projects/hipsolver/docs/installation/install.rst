@@ -46,26 +46,28 @@ This includes hipSOLVER and rocSOLVER.
 
    .. code-block:: shell-session
 
-      amdrocm-solver<dev/devel><rocm_version>-<llvm_target>
+      amdrocm-solver<-dev/-devel><rocm_version><-llvm_target>
 
    Where:
 
-   * ``<rocm_version>`` is the ROCm Core SDK version to install. Omit this
-     suffix to install the latest available version.
-
-   * ``<dev/devel>`` specifies whether to install library files and
+   * ``<-dev/-devel>`` specifies whether to install the library files and
      headers. Omit this suffix to only install runtime packages.
 
      * ``-dev`` is used on Debian-based distributions, including Ubuntu.
 
      * ``-devel`` is used on RPM-based distributions, including RHEL and SLES.
 
-   * ``<llvm_target>`` (starting with ``gfx``) is used if you are installing
-     for a single AMD GPU architecture. Omit this suffix to install for all
+   * ``<rocm_version>`` is the ROCm Core SDK version to install. Omit this
+     suffix to install the latest available version.
+
+   * ``<-llvm_target>`` (starting with ``gfx``) is used if you are installing
+     for a single AMD GPU architecture. Omit this to install for all
      architectures at the cost of disk space.
 
-   For example, to install the latest ROCm solver development package release for
-   supported GPU architectures:
+   For example: ``amdrocm-solver-dev7.13-gfx950``
+
+   Use the following command to install the latest FFT development package
+   release for supported GPU architectures:
 
    .. tab-set::
 
