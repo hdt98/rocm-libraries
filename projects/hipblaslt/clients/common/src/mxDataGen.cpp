@@ -35,7 +35,61 @@
 #include <cmath>
 #include <cstring>
 #include <stdexcept>
+#include <utility>
 
+namespace
+{
+    // Per-DTYPE integer range for the legacy "rand_int" init method. Mirrors
+    // hand-tuned ranges in `random_int<T>` (see hipblaslt_init_device.cpp):
+    //   F4 (E2M1)    -> [-4, 4]   matches hipblaslt_f4x2  : %9 - 4
+    //   F6 E2M3      -> [-7, 7]   matches hipblaslt_f6x16 : %15 - 7
+    //   F6 E3M2      -> [-28, 28] matches hipblaslt_bf6x16: %57 - 28
+    //   F8 (E4M3/E5M2) -> [1, 10] matches the default template T(...% 10 + 1)
+    // Each range is chosen to fit comfortably inside the data type's max
+    // representable normal value (F4 max = 6, F6 E2M3 max = 7.5, F6 E3M2
+    // max = 28, F8 maxes are >> 10) so satConvertToType doesn't saturate.
+    inline std::pair<int, int> randIntRangeFor(hipDataType dataType)
+    {
+        switch(static_cast<int>(dataType))
+        {
+        case static_cast<int>(HIP_R_4F_E2M1):
+            return {-4, 4};
+        case static_cast<int>(HIP_R_6F_E2M3):
+            return {-7, 7};
+        case static_cast<int>(HIP_R_6F_E3M2):
+            return {-28, 28};
+        case static_cast<int>(HIP_R_8F_E4M3):
+        case static_cast<int>(HIP_R_8F_E5M2):
+            return {1, 10};
+        default:
+            // Fallback for any non-MX data type that may pass through
+            // generateMXInput in the future. Mirrors the legacy default
+            // template -- positive small integers that fit in any float
+            // and aren't large enough to overflow narrow accumulators.
+            return {1, 10};
+        }
+    }
+
+    // Per-DTYPE std_dev for the legacy "norm_dist" init method.  The legacy
+    // device-side `box_muller_normal` always emits N(0, 1); mxDataGenerator's
+    // NormalFromFloat is the same distribution, *but* MX block scaling
+    // pre-normalises each block to ~[-1, 1] so std=1 sits well inside FP4's
+    // round-to-zero band and ~20% of FP4 samples come back exactly 0.0.
+    // Widen std on FP4 only so the realised zero rate is closer to ~5%
+    // (NormalFromFloat(0, 5) on FP4 measured at 3.96% zeros, vs 19.83% for
+    // std=1).  Other MX widths already have a tight enough zero band that
+    // std=1 produces ~0-5% zeros without help.
+    inline double normDistStdDevFor(hipDataType dataType)
+    {
+        switch(static_cast<int>(dataType))
+        {
+        case static_cast<int>(HIP_R_4F_E2M1):
+            return 5.0;
+        default:
+            return 1.0;
+        }
+    }
+} // namespace
 
 template <typename DT>
 std::vector<uint8_t> unpackData(std::vector<uint8_t> const& packedBytes, size_t elementCount)
@@ -394,13 +448,60 @@ std::vector<float> generateMXInput(hipDataType            dataType,
         opt.initMode = DataInitMode(Identity{});
     else if(initMethod == "Ones")
         opt.initMode = DataInitMode(Ones{});
-    else if(initMethod == "Zeros")
+    else if(initMethod == "Zeros" || initMethod == "zero")
         opt.initMode = DataInitMode(Zeros{});
-    else if(initMethod == "Bounded" || initMethod == "uniform_01")
+    else if(initMethod == "Twos")
+        opt.initMode = DataInitMode(Twos{});
+    else if(initMethod == "NegOnes")
+        opt.initMode = DataInitMode(NegOnes{});
+    else if(initMethod == "MaxVals")
+        opt.initMode = DataInitMode(MaxVals{});
+    else if(initMethod == "DenormMins")
+        opt.initMode = DataInitMode(DenormMins{});
+    else if(initMethod == "DenormMaxs")
+        opt.initMode = DataInitMode(DenormMaxs{});
+    else if(initMethod == "NaNs")
+        opt.initMode = DataInitMode(NaNs{});
+    else if(initMethod == "Infs")
+        opt.initMode = DataInitMode(Infs{});
+    else if(initMethod == "Bounded" || initMethod == "uniform_01" || initMethod == "hpl")
+        // "hpl" is the legacy `random_hpl` pattern: uniform random in
+        // [-0.5, 0.5].  The min/max above are already overridden to
+        // {-0.5, 0.5} for "hpl", so dispatching to Bounded reproduces the
+        // same distribution (modulo the PRNG -- mxDataGenerator's mt19937
+        // and `pseudo_random_device` will not match bit-for-bit, so any
+        // golden-reference test pinned to a specific seed needs a refresh).
         opt.initMode = DataInitMode(Bounded{});
-    else
-        // TODO initMethod == "hpl" should also be Bounded, but fails some tests
+    else if(initMethod == "TrigonometricFromFloat" || initMethod == "trig_float")
         opt.initMode = DataInitMode(TrigonometricFromFloat{});
+    else if(initMethod == "norm_dist")
+        // Legacy `norm_dist` is a standard normal (mean=0, std_dev=1) via
+        // device-side Box-Muller (`hipblaslt_norm_dist::box_muller_normal`).
+        // mxDataGenerator's NormalFromFloat is the matching distribution;
+        // std_dev is per-DTYPE (see normDistStdDevFor) so FP4 doesn't
+        // collapse ~20% of its samples into the round-to-zero bin.
+        opt.initMode = DataInitMode(NormalFromFloat{0.0, normDistStdDevFor(dataType)});
+    else if(initMethod == "rand_int")
+    {
+        // Mirror legacy `random_int<T>`: hand-tuned per-DTYPE integer range
+        // so the generated values fit each MX format's dynamic range.
+        auto const range = randIntRangeFor(dataType);
+        opt.initMode     = DataInitMode(RandInt{range.first, range.second});
+    }
+    else
+        // No silent fallback: legacy modes that have no mxDataGenerator
+        // equivalent (special, integer_exact, fp16_accumulator_probe, ...)
+        // would otherwise be silently mis-dispatched and produce unrelated
+        // data, hiding the test misconfiguration.  Bail out loudly so the
+        // failing test surfaces the unsupported method instead.
+        throw std::runtime_error(
+            std::string("generateMXInput: unsupported initMethod '")
+            + std::string(initMethod)
+            + "'. Supported methods: Bounded/uniform_01, hpl, "
+              "TrigonometricFromFloat/trig_float, norm_dist, rand_int, "
+              "Sequential, RowIndex, ColIndex, Checkerboard, ScaledDiagonal, "
+              "Identity, Ones, Zeros/zero, Twos, NegOnes, MaxVals, "
+              "DenormMins, DenormMaxs, NaNs, Infs.");
 
     const uint32_t seed = 1713573849;
 
@@ -832,12 +933,50 @@ std::vector<float> generateMXInput(hipDataType            dataType,
         opt.initMode = DGen::DataInitMode(DGen::Identity{});
     else if(initMethod == "Ones")
         opt.initMode = DGen::DataInitMode(DGen::Ones{});
-    else if(initMethod == "Zeros")
+    else if(initMethod == "Zeros" || initMethod == "zero")
         opt.initMode = DGen::DataInitMode(DGen::Zeros{});
-    else if(initMethod == "Bounded" || initMethod == "uniform_01")
+    else if(initMethod == "Twos")
+        opt.initMode = DGen::DataInitMode(DGen::Twos{});
+    else if(initMethod == "NegOnes")
+        opt.initMode = DGen::DataInitMode(DGen::NegOnes{});
+    else if(initMethod == "MaxVals")
+        opt.initMode = DGen::DataInitMode(DGen::MaxVals{});
+    else if(initMethod == "DenormMins")
+        opt.initMode = DGen::DataInitMode(DGen::DenormMins{});
+    else if(initMethod == "DenormMaxs")
+        opt.initMode = DGen::DataInitMode(DGen::DenormMaxs{});
+    else if(initMethod == "NaNs")
+        opt.initMode = DGen::DataInitMode(DGen::NaNs{});
+    else if(initMethod == "Infs")
+        opt.initMode = DGen::DataInitMode(DGen::Infs{});
+    else if(initMethod == "Bounded" || initMethod == "uniform_01" || initMethod == "hpl")
+        // See note in the host overload above. min/max for "hpl" are
+        // already overridden to {-0.5, 0.5} a few lines above, so this
+        // dispatches Bounded over the same range as the legacy random_hpl.
         opt.initMode = DGen::DataInitMode(DGen::Bounded{});
-    else
+    else if(initMethod == "TrigonometricFromFloat" || initMethod == "trig_float")
         opt.initMode = DGen::DataInitMode(DGen::TrigonometricFromFloat{});
+    else if(initMethod == "norm_dist")
+        // See note in the host overload above; std_dev is per-DTYPE so FP4
+        // doesn't collapse most samples into the round-to-zero bin.
+        opt.initMode = DGen::DataInitMode(
+            DGen::NormalFromFloat{0.0, normDistStdDevFor(dataType)});
+    else if(initMethod == "rand_int")
+    {
+        auto const range = randIntRangeFor(dataType);
+        opt.initMode     = DGen::DataInitMode(DGen::RandInt{range.first, range.second});
+    }
+    else
+        // See note in the host overload above -- no silent fallback; throw
+        // on any unrecognised method so the misconfiguration is loud.
+        throw std::runtime_error(
+            std::string("generateMXInput (GPU): unsupported initMethod '")
+            + std::string(initMethod)
+            + "'. Supported methods: Bounded/uniform_01, hpl, "
+              "TrigonometricFromFloat/trig_float, norm_dist, rand_int, "
+              "Sequential, RowIndex, ColIndex, Checkerboard, ScaledDiagonal, "
+              "Identity, Ones, Zeros/zero, Twos, NegOnes, MaxVals, "
+              "DenormMins, DenormMaxs, NaNs, Infs.");
 
     constexpr uint32_t               kSeed = 1713573849;
     std::vector<DGen::index_t> const sizes

@@ -38,6 +38,8 @@
 #include <hip/hip_runtime.h>
 
 #include <algorithm>
+#include <atomic>
+#include <iostream>
 #include <list>
 #include <map>
 #include <tuple>
@@ -1923,15 +1925,75 @@ namespace TensileLite
                 return "Zeros";
             case InitMode::One:
                 return "Ones";
+            case InitMode::Two:
+                return "Twos";
+            case InitMode::NegOne:
+                return "NegOnes";
+            case InitMode::Max:
+                return "MaxVals";
+            case InitMode::DenormMin:
+                return "DenormMins";
+            case InitMode::DenormMax:
+                return "DenormMaxs";
+            // BadInput / BadOutput in tensilelite alias to NaN / Inf for
+            // every datatype they're defined on, so route them the same way.
+            case InitMode::NaN:
+            case InitMode::BadInput:
+                return "NaNs";
+            case InitMode::Inf:
+            case InitMode::BadOutput:
+                return "Infs";
             case InitMode::Identity:
                 return "Identity";
             case InitMode::SerialIdx:
             case InitMode::SerialDim0:
             case InitMode::SerialDim1:
                 return "Sequential";
-            default:
+            // mxDataGenerator only has a single trig family (TrigonometricFromFloat),
+            // so the four sin/cos/abs-sin/abs-cos variants and their problem-
+            // independent (TrigInd*) cousins all collapse to the same string.
+            // Better to lose the specific waveform than to silently fall through
+            // to Bounded uniform [-1,1] for tests that explicitly asked for trig.
+            case InitMode::TrigSin:
+            case InitMode::TrigCos:
+            case InitMode::TrigAbsSin:
+            case InitMode::TrigAbsCos:
+            case InitMode::TrigIndSin:
+            case InitMode::TrigIndCos:
+            case InitMode::TrigIndAbsSin:
+            case InitMode::TrigIndAbsCos:
+                return "TrigonometricFromFloat";
+            // Map the random-uniform family to Bounded explicitly so the
+            // intent is documented at the dispatch site rather than relying
+            // on a catch-all default.  RandomNegPosLimited is the closest
+            // semantic match (legacy spec: fp -1.0~1.0); plain Random for
+            // non-MX types is per-DTYPE integer-bounded (float [-100,100],
+            // double [-1000,1000], half [-3,3]) but no mxDataGenerator MX
+            // type has that specialisation, so the best-effort approximation
+            // is the same Bounded[-1,1] window generateMXInput is already
+            // pinned to from the call site.
+            case InitMode::Random:
+            case InitMode::RandomNarrow:
+            case InitMode::RandomNegPosLimited:
                 return "Bounded";
+            // No silent fallback: any InitMode without an explicit mapping
+            // (today: Free, Count, plus anything added to the enum after
+            // this switch was last touched) gets a loud error so the test
+            // misconfiguration surfaces instead of being papered over with
+            // an unrelated distribution.  Free in particular is "leave the
+            // buffer uninitialised" in the legacy initArray path, which
+            // has no meaningful mxDataGenerator analogue.
+            case InitMode::Free:
+            case InitMode::Count:
+                break;
             }
+            throw std::runtime_error(
+                "initModeToMXMethod: InitMode '" + ToString(mode)
+                + "' has no mxDataGenerator mapping; either pick a supported "
+                  "InitMode (Zero, One, Two, NegOne, Max, DenormMin, DenormMax, "
+                  "NaN, Inf, BadInput, BadOutput, Identity, SerialIdx/Dim0/Dim1, "
+                  "Trig{Sin,Cos,AbsSin,AbsCos}[Ind], Random, RandomNarrow, "
+                  "RandomNegPosLimited) or add a mapping in initModeToMXMethod.");
         }
 
         void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
@@ -2151,6 +2213,33 @@ namespace TensileLite
                   }
               };
 
+            // For an MX problem the scale tensor must agree with the data tensor
+            // (mxDataGenerator generates A and MXSA in lock-step from a single
+            // initMode), so any user-supplied --init-MXSA / --init-MXSB is
+            // silently ignored. Surface that once per process so the disagreement
+            // doesn't look like a working knob that quietly does nothing.
+            static std::atomic<bool> warnedScaleInitIgnored{false};
+            auto warnIfScaleInitMismatched
+                = [&](int dataTensorEnum, int scaleTensorEnum) {
+                      if(warnedScaleInitIgnored.load(std::memory_order_relaxed))
+                          return;
+                      auto const& dataInit  = m_vdata[dataTensorEnum].init;
+                      auto const& scaleInit = m_vdata[scaleTensorEnum].init;
+                      if(dataInit == scaleInit)
+                          return;
+                      bool expected = false;
+                      if(!warnedScaleInitIgnored.compare_exchange_strong(
+                             expected, true, std::memory_order_relaxed))
+                          return;
+                      std::cerr
+                          << "Warning: --init-" << m_vdata[scaleTensorEnum].name << "="
+                          << ToString(scaleInit) << " is ignored for MX problems; "
+                          << "scale tensors are generated together with their data "
+                          << "tensor and inherit --init-" << m_vdata[dataTensorEnum].name
+                          << "=" << ToString(dataInit)
+                          << ". This warning is shown once per process." << std::endl;
+                  };
+
             // Per-side dispatch. For any MX side (FP4 / FP6 / FP8) we drive
             // mxDataGenerator via `initOneMXSide`; if the (data, scale) combination
             // is not one mxDataGenerator templates for, `generateMXInput` throws
@@ -2160,6 +2249,8 @@ namespace TensileLite
             // default initArray path the main init loop would have used.
             if(isMXTensor(problem.a(), problem.mxBlockA()))
             {
+                warnIfScaleInitMismatched(ContractionProblemGemm::TENSOR::A,
+                                          ContractionProblemGemm::TENSOR::MXSA);
                 initOneMXSide(ContractionProblemGemm::TENSOR::A,
                               ContractionProblemGemm::TENSOR::MXSA,
                               problem.a(),
@@ -2186,6 +2277,8 @@ namespace TensileLite
 
             if(isMXTensor(problem.b(), problem.mxBlockB()))
             {
+                warnIfScaleInitMismatched(ContractionProblemGemm::TENSOR::B,
+                                          ContractionProblemGemm::TENSOR::MXSB);
                 initOneMXSide(ContractionProblemGemm::TENSOR::B,
                               ContractionProblemGemm::TENSOR::MXSB,
                               problem.b(),

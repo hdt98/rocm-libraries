@@ -120,10 +120,35 @@ namespace DGen
                         cfg.mean   = static_cast<float>(mode.mean);
                         cfg.stdDev = static_cast<float>(mode.std_dev);
                     }
+                    // Note: the constant-fill / pathological modes (Twos,
+                    // NegOnes, MaxVals, DenormMins, DenormMaxs, NaNs, Infs)
+                    // and RandInt are handled by the host-fallback path in
+                    // `generateInto` and never reach this visitor.
                 },
                 options.initMode);
 
             return cfg;
+        }
+
+        // The on-device kernel quantises a float-per-element through the
+        // block-max scale derivation, which can't reproduce the exact bit
+        // patterns these modes need (e.g. NaN propagation, denorm-min, a
+        // constant 2.0 with scale=1.0 instead of an auto-derived scale, or
+        // exact-integer values that would lose their integer-ness once they
+        // pass through the device PRNG and the auto-derived scale).  Route
+        // them through the host CPU `DataGenerator<DTYPE>` and then
+        // hipMemcpy the bytes to device.
+        inline bool requiresHostFallback(DataInitMode const& initMode)
+        {
+            return std::visit(
+                [](auto const& mode) -> bool {
+                    using T = std::decay_t<decltype(mode)>;
+                    return std::is_same_v<T, Twos> || std::is_same_v<T, NegOnes>
+                           || std::is_same_v<T, MaxVals> || std::is_same_v<T, DenormMins>
+                           || std::is_same_v<T, DenormMaxs> || std::is_same_v<T, NaNs>
+                           || std::is_same_v<T, Infs> || std::is_same_v<T, RandInt>;
+                },
+                initMode);
         }
 
         // ----------------------------------------------------------------------
@@ -931,6 +956,32 @@ namespace DGen
                 "DataGeneratorGPU::generateInto: array size must be a multiple of blockScaling");
 
         size_t numBlocks = arraySize / static_cast<size_t>(options.blockScaling);
+
+        // Constant-fill / pathological modes can't go through the on-device
+        // PRNG-quantize-derive-scale pipeline (the auto-derived scale would
+        // pick up the constant magnitude rather than 1.0, NaN bit patterns
+        // would round-trip through float quantisation, etc.).  Generate on
+        // the host CPU and hipMemcpy.
+        if(gpu_detail::requiresHostFallback(options.initMode))
+        {
+            DataGenerator<DTYPE> hostGen;
+            hostGen.setSeed(m_seed);
+            hostGen.generate(sizes, strides, options);
+            auto hostData  = hostGen.getDataBytes();
+            auto hostScale = hostGen.getScaleBytes();
+            DGEN_GPU_CHECK_HIP(hipMemcpyAsync(
+                devData, hostData.data(), hostData.size(), hipMemcpyHostToDevice, stream));
+            if(devScale != nullptr && !hostScale.empty())
+            {
+                DGEN_GPU_CHECK_HIP(hipMemcpyAsync(devScale,
+                                                  hostScale.data(),
+                                                  hostScale.size(),
+                                                  hipMemcpyHostToDevice,
+                                                  stream));
+            }
+            DGEN_GPU_CHECK_HIP(hipStreamSynchronize(stream));
+            return;
+        }
 
         // Configuration for the kernel.
         gpu_detail::DeviceInitConfig cfg = gpu_detail::makeConfig(options, sizes);
