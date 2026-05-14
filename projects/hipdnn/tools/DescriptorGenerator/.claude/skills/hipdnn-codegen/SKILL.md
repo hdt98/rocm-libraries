@@ -491,6 +491,13 @@ The generator produces complete integration tests for both lowering and lifting.
 
 All tests must use `K_TENSOR_*` constants from the shared constants header — no inline literals.
 
+Both integration test files must include and use the shared utilities from `test_sdk/include/hipdnn_test_sdk/utilities/`:
+- `IntegrationTestFixture.hpp` — base fixture class; test classes inherit from `hipdnn_tests::IntegrationTestFixture`
+- `LoweringTestHelpers.hpp` — `lowerAndDeserialize`, `TestableGraphLowering`, `buildTensorMap` (lowering file)
+- `LiftingTestHelpers.hpp` — `lowerAndLift`, `TestableGraphLifting` (lifting file)
+
+The generator templates produce these includes automatically. If they are absent from a placed file, the template was not used or the output was truncated — regenerate rather than hand-adding helpers ad hoc.
+
 After verifying, consider adding operation-specific tests for multi-input variants (e.g., pointwise ternary) or multi-operation graphs (e.g., conv+bias+relu chains) as needed.
 
 If the frontend node class or graph method does not exist yet (e.g., backend-only mode), skip this step but note it as pending.
