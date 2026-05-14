@@ -29,6 +29,7 @@ Full documentation for MIOpen is available [here](https://rocm.docs.amd.com/proj
 * Removed GraphAPI experimental feature and related code
 
 ### Resolved issues
+* [Conv] Enabled grouped Composable Kernel (CK) xdlops convolution solvers (2D and 3D, fwd/bwd/wrw) for tensors whose strides exceed the int32 range.
 * [Conv] Fixed Winograd Fury grouped convolution correctness on gfx12 when G > 1.
 * [Conv] Fixed bf16 WrW convolution precision loss in inter-batch accumulation.
 * [Conv] Fixed GPU memory fault in Winograd v3.0 WrW solver for large tensor shapes.

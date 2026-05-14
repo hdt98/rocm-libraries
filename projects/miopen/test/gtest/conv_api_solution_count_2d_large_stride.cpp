@@ -7,10 +7,11 @@
 // boundary for x = (1, 96, H, W) with weight (32, 96, 3, 3).
 //
 // What this test asserts:
-//   * miopenConvolution{Forward,BackwardData,BackwardWeights}GetSolutionCount
-//     returns > 0 for each shape × dtype × direction.
-//   * At least one returned solution has algorithm == miopenConvolutionAlgoImplicitGEMM
-//     (i.e. the CK path remains applicable for large-stride 2D shapes).
+//   * miopenConvolution{Forward,BackwardData,BackwardWeights}CompileSolution
+//     succeeds for the corresponding 2D grouped CK xdlops solver
+//     (ConvHipImplicitGemmGroup{Fwd,Bwd,Wrw}Xdlops) — i.e. the specific solver
+//     whose AllTensorsDimsFitIntoInt() guard was removed by ROCM-23997 is
+//     applicable and compilable for these large-stride shapes.
 //
 // What this test does NOT do:
 //   * No kernel is launched, no buffers are allocated, no numerical compare is
@@ -18,8 +19,8 @@
 //     would not be caught here.
 
 #include <miopen/miopen.h>
+#include <miopen/solver_id.hpp>
 #include <gtest/gtest.h>
-#include <array>
 #include <vector>
 
 namespace {
@@ -177,20 +178,9 @@ bool IsWrwKnownFailing2D(miopenDataType_t dtype, const Shape2D& s)
     return false;
 }
 
-void ExpectAtLeastOneImplicitGemm(const std::vector<miopenConvSolution_t>& solutions,
-                                  const Shape2D& s,
-                                  const char* direction)
+uint64_t SolverIdFromName(const char* name)
 {
-    bool has_ck_implicit_gemm = false;
-    for(const auto& sol : solutions)
-        if(sol.algorithm == miopenConvolutionAlgoImplicitGEMM)
-        {
-            has_ck_implicit_gemm = true;
-            break;
-        }
-    EXPECT_TRUE(has_ck_implicit_gemm)
-        << "No ImplicitGEMM (CK) " << direction << " solution returned for shape " << s.n << "x"
-        << s.c << "x" << s.h << "x" << s.w;
+    return miopen::solver::Id(name).Value();
 }
 
 void RunFwd(const Shape2D& s, miopenDataType_t dtype)
@@ -202,27 +192,16 @@ void RunFwd(const Shape2D& s, miopenDataType_t dtype)
     Descriptors d;
     ASSERT_TRUE(SetupDescriptors(s, dtype, d));
 
-    size_t count = 0;
-    ASSERT_EQ(miopenConvolutionForwardGetSolutionCount(
-                  d.handle, d.wDesc, d.xDesc, d.convDesc, d.yDesc, &count),
-              miopenStatusSuccess);
-    ASSERT_GT(count, 0u) << "MIOpen reports zero forward solutions for shape " << s.n << "x" << s.c
-                         << "x" << s.h << "x" << s.w;
-
-    std::vector<miopenConvSolution_t> solutions(count);
-    size_t returned = 0;
-    ASSERT_EQ(miopenConvolutionForwardGetSolution(d.handle,
-                                                  d.wDesc,
-                                                  d.xDesc,
-                                                  d.convDesc,
-                                                  d.yDesc,
-                                                  count,
-                                                  &returned,
-                                                  solutions.data()),
-              miopenStatusSuccess);
-    ASSERT_GT(returned, 0u);
-    solutions.resize(returned);
-    ExpectAtLeastOneImplicitGemm(solutions, s, "forward");
+    EXPECT_EQ(miopenConvolutionForwardCompileSolution(
+                  d.handle,
+                  d.wDesc,
+                  d.xDesc,
+                  d.convDesc,
+                  d.yDesc,
+                  SolverIdFromName("ConvHipImplicitGemmGroupFwdXdlops")),
+              miopenStatusSuccess)
+        << "ConvHipImplicitGemmGroupFwdXdlops not applicable/compilable for shape " << s.n << "x"
+        << s.c << "x" << s.h << "x" << s.w;
 }
 
 void RunBwdData(const Shape2D& s, miopenDataType_t dtype)
@@ -234,27 +213,16 @@ void RunBwdData(const Shape2D& s, miopenDataType_t dtype)
     Descriptors d;
     ASSERT_TRUE(SetupDescriptors(s, dtype, d));
 
-    size_t count = 0;
-    ASSERT_EQ(miopenConvolutionBackwardDataGetSolutionCount(
-                  d.handle, d.yDesc, d.wDesc, d.convDesc, d.xDesc, &count),
-              miopenStatusSuccess);
-    ASSERT_GT(count, 0u) << "MIOpen reports zero backward-data solutions for shape " << s.n << "x"
-                         << s.c << "x" << s.h << "x" << s.w;
-
-    std::vector<miopenConvSolution_t> solutions(count);
-    size_t returned = 0;
-    ASSERT_EQ(miopenConvolutionBackwardDataGetSolution(d.handle,
-                                                       d.yDesc,
-                                                       d.wDesc,
-                                                       d.convDesc,
-                                                       d.xDesc,
-                                                       count,
-                                                       &returned,
-                                                       solutions.data()),
-              miopenStatusSuccess);
-    ASSERT_GT(returned, 0u);
-    solutions.resize(returned);
-    ExpectAtLeastOneImplicitGemm(solutions, s, "backward-data");
+    EXPECT_EQ(miopenConvolutionBackwardDataCompileSolution(
+                  d.handle,
+                  d.yDesc,
+                  d.wDesc,
+                  d.convDesc,
+                  d.xDesc,
+                  SolverIdFromName("ConvHipImplicitGemmGroupBwdXdlops")),
+              miopenStatusSuccess)
+        << "ConvHipImplicitGemmGroupBwdXdlops not applicable/compilable for shape " << s.n << "x"
+        << s.c << "x" << s.h << "x" << s.w;
 }
 
 void RunWrw(const Shape2D& s, miopenDataType_t dtype)
@@ -266,27 +234,16 @@ void RunWrw(const Shape2D& s, miopenDataType_t dtype)
     Descriptors d;
     ASSERT_TRUE(SetupDescriptors(s, dtype, d));
 
-    size_t count = 0;
-    ASSERT_EQ(miopenConvolutionBackwardWeightsGetSolutionCount(
-                  d.handle, d.yDesc, d.xDesc, d.convDesc, d.wDesc, &count),
-              miopenStatusSuccess);
-    ASSERT_GT(count, 0u) << "MIOpen reports zero backward-weights solutions for shape " << s.n
-                         << "x" << s.c << "x" << s.h << "x" << s.w;
-
-    std::vector<miopenConvSolution_t> solutions(count);
-    size_t returned = 0;
-    ASSERT_EQ(miopenConvolutionBackwardWeightsGetSolution(d.handle,
-                                                          d.yDesc,
-                                                          d.xDesc,
-                                                          d.convDesc,
-                                                          d.wDesc,
-                                                          count,
-                                                          &returned,
-                                                          solutions.data()),
-              miopenStatusSuccess);
-    ASSERT_GT(returned, 0u);
-    solutions.resize(returned);
-    ExpectAtLeastOneImplicitGemm(solutions, s, "backward-weights");
+    EXPECT_EQ(miopenConvolutionBackwardWeightsCompileSolution(
+                  d.handle,
+                  d.yDesc,
+                  d.xDesc,
+                  d.convDesc,
+                  d.wDesc,
+                  SolverIdFromName("ConvHipImplicitGemmGroupWrwXdlops")),
+              miopenStatusSuccess)
+        << "ConvHipImplicitGemmGroupWrwXdlops not applicable/compilable for shape " << s.n << "x"
+        << s.c << "x" << s.h << "x" << s.w;
 }
 
 class GPU_ConvApi_SolutionCount2DLargeStride_FP16 : public ::testing::TestWithParam<Shape2D>
