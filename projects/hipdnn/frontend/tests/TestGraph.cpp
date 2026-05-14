@@ -54,10 +54,32 @@ public:
     GraphTestUtils() = default;
 
     using Graph::build_operation_graph_via_descriptors;
+    using Graph::CompiledPlan;
+    using Graph::compilePlanFromSpec;
 
     std::vector<std::shared_ptr<INode>>& getPrivateGraphSubnodes()
     {
         return _sub_nodes;
+    }
+
+    size_t getCompiledPlansCount() const
+    {
+        return _compiledPlans.size();
+    }
+
+    size_t getActivePlanIndex() const
+    {
+        return _activePlanIndex;
+    }
+
+    detail::ScopedHipdnnBackendDescriptor* getActiveEngineConfigPtr()
+    {
+        return activeEngineConfigPtr();
+    }
+
+    detail::ScopedHipdnnBackendDescriptor* getActiveExecutionPlanPtr()
+    {
+        return activeExecutionPlanPtr();
     }
 };
 }
@@ -6725,3 +6747,311 @@ INSTANTIATE_TEST_SUITE_P(GraphTopologies,
                          [](const ::testing::TestParamInfo<GraphTopologyParam>& info) {
                              return info.param.name;
                          });
+
+// ── CompiledPlan Infrastructure Tests (Phase 2) ─────────────────────────
+
+// Verify that accessor helpers return nullptr / throw when no plans exist.
+TEST_F(TestGraph, ActiveAccessorsReturnNullptrWhenEmpty)
+{
+    hipdnn_frontend::GraphTestUtils graph;
+    EXPECT_EQ(graph.getCompiledPlansCount(), 0u);
+    EXPECT_EQ(graph.getActivePlanIndex(), 0u);
+    EXPECT_EQ(graph.getActiveEngineConfigPtr(), nullptr);
+    EXPECT_EQ(graph.getActiveExecutionPlanPtr(), nullptr);
+}
+
+// Verify that the single-plan path (create_execution_plans) produces
+// a vector of size 1 with the active index at 0.
+TEST_F(TestGraph, SinglePlanPathProducesVectorOfSizeOne)
+{
+    ::testing::FLAGS_gmock_verbose = "error";
+    hipdnn_frontend::GraphTestUtils graph;
+    auto tensorAttributes = createBasicBatchnormGraph(graph);
+    ASSERT_TRUE(graph.validate().is_good());
+    graph.build_operation_graph(_handle);
+
+    auto heurDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0x5678);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_ENGINEHEUR_DESCRIPTOR, _))
+        .WillOnce(
+            [&heurDesc](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = heurDesc;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    EXPECT_CALL(
+        *_mockBackend,
+        backendSetAttribute(
+            heurDesc, HIPDNN_ATTR_ENGINEHEUR_OPERATION_GRAPH, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, _))
+        .WillOnce(Return(HIPDNN_STATUS_SUCCESS));
+
+    EXPECT_CALL(
+        *_mockBackend,
+        backendSetAttribute(heurDesc, HIPDNN_ATTR_ENGINEHEUR_MODE, HIPDNN_TYPE_HEUR_MODE, 1, _))
+        .WillOnce(Return(HIPDNN_STATUS_SUCCESS));
+
+    EXPECT_CALL(*_mockBackend, backendFinalize(heurDesc));
+
+    // elementCount query
+    EXPECT_CALL(*_mockBackend,
+                backendGetAttribute(heurDesc,
+                                    HIPDNN_ATTR_ENGINEHEUR_RESULTS,
+                                    HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                    0,
+                                    _,
+                                    nullptr))
+        .WillOnce([](hipdnnBackendDescriptor_t,
+                     hipdnnBackendAttributeName_t,
+                     hipdnnBackendAttributeType_t,
+                     int64_t,
+                     int64_t* elementCount,
+                     void*) {
+            *elementCount = 1;
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    auto engineConfigDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0x2345);
+    auto engineDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0x3345);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR, _))
+        .WillOnce([&engineConfigDesc](hipdnnBackendDescriptorType_t,
+                                      hipdnnBackendDescriptor_t* descriptor) {
+            *descriptor = engineConfigDesc;
+            return HIPDNN_STATUS_SUCCESS;
+        });
+    EXPECT_CALL(*_mockBackend, backendFinalize(engineConfigDesc));
+
+    EXPECT_CALL(*_mockBackend,
+                backendGetAttribute(engineConfigDesc,
+                                    HIPDNN_ATTR_ENGINECFG_ENGINE,
+                                    HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                    1,
+                                    nullptr,
+                                    _))
+        .WillOnce([&engineDesc](hipdnnBackendDescriptor_t,
+                                hipdnnBackendAttributeName_t,
+                                hipdnnBackendAttributeType_t,
+                                int64_t,
+                                int64_t*,
+                                void* arrayOfElements) {
+            *static_cast<hipdnnBackendDescriptor_t*>(arrayOfElements) = engineDesc;
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    EXPECT_CALL(*_mockBackend,
+                backendGetAttribute(
+                    engineDesc, HIPDNN_ATTR_ENGINE_GLOBAL_INDEX, HIPDNN_TYPE_INT64, 1, nullptr, _))
+        .WillOnce([](hipdnnBackendDescriptor_t,
+                     hipdnnBackendAttributeName_t,
+                     hipdnnBackendAttributeType_t,
+                     int64_t,
+                     int64_t*,
+                     void* arrayOfElements) {
+            *static_cast<int64_t*>(arrayOfElements) = 10;
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    // Actual data retrieval
+    EXPECT_CALL(*_mockBackend,
+                backendGetAttribute(heurDesc,
+                                    HIPDNN_ATTR_ENGINEHEUR_RESULTS,
+                                    HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                    1,
+                                    _,
+                                    NotNull()))
+        .WillOnce([](hipdnnBackendDescriptor_t,
+                     hipdnnBackendAttributeName_t,
+                     hipdnnBackendAttributeType_t,
+                     int64_t,
+                     int64_t* retrievedCount,
+                     void*) {
+            *retrievedCount = 1;
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    auto executionPlanDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0x9876);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, _))
+        .WillOnce([&executionPlanDesc](hipdnnBackendDescriptorType_t,
+                                       hipdnnBackendDescriptor_t* descriptor) {
+            *descriptor = executionPlanDesc;
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    auto execPlanResult = graph.create_execution_plans({HeuristicMode::FALLBACK});
+    ASSERT_TRUE(execPlanResult.is_good());
+
+    // Verify vector model invariants
+    EXPECT_EQ(graph.getCompiledPlansCount(), 1u);
+    EXPECT_EQ(graph.getActivePlanIndex(), 0u);
+    EXPECT_NE(graph.getActiveEngineConfigPtr(), nullptr);
+    EXPECT_NE(graph.getActiveExecutionPlanPtr(), nullptr);
+}
+
+// Verify create_execution_plan_ext() uses compilePlanFromSpec and produces
+// a vector of size 1.
+TEST_F(TestGraph, CreateExecutionPlanExtProducesVectorOfSizeOne)
+{
+    ::testing::FLAGS_gmock_verbose = "error";
+    hipdnn_frontend::GraphTestUtils graph;
+    auto tensorAttributes = createBasicBatchnormGraph(graph);
+    ASSERT_TRUE(graph.validate().is_good());
+    graph.build_operation_graph(_handle);
+
+    const int64_t engineId = 42;
+
+    // Mock: get_knob_lookup_for_engine — return empty knobs
+    auto engineDesc2 = reinterpret_cast<hipdnnBackendDescriptor_t>(0xAA01);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_ENGINE_DESCRIPTOR, _))
+        .WillRepeatedly(
+            [&engineDesc2](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = engineDesc2;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    // Knob query returns 0 knobs
+    EXPECT_CALL(
+        *_mockBackend,
+        backendGetAttribute(
+            engineDesc2, HIPDNN_ATTR_ENGINE_KNOB_INFO, HIPDNN_TYPE_BACKEND_DESCRIPTOR, _, _, _))
+        .WillRepeatedly([](hipdnnBackendDescriptor_t,
+                           hipdnnBackendAttributeName_t,
+                           hipdnnBackendAttributeType_t,
+                           int64_t,
+                           int64_t* elementCount,
+                           void*) {
+            if(elementCount)
+            {
+                *elementCount = 0;
+            }
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    // Engine config creation
+    auto engineCfgDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0xBB01);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR, _))
+        .WillOnce(
+            [&engineCfgDesc](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = engineCfgDesc;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    // Execution plan creation
+    auto execPlanDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0xCC01);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, _))
+        .WillOnce(
+            [&execPlanDesc](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = execPlanDesc;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    auto result = graph.create_execution_plan_ext(engineId, {});
+    ASSERT_TRUE(result.is_good()) << result.get_message();
+
+    // Verify vector model invariants after create_execution_plan_ext
+    EXPECT_EQ(graph.getCompiledPlansCount(), 1u);
+    EXPECT_EQ(graph.getActivePlanIndex(), 0u);
+    EXPECT_NE(graph.getActiveEngineConfigPtr(), nullptr);
+    EXPECT_NE(graph.getActiveExecutionPlanPtr(), nullptr);
+}
+
+// Verify that compilePlanFromSpec produces a valid CompiledPlan without
+// modifying the Graph's _compiledPlans vector.
+TEST_F(TestGraph, CompilePlanFromSpecProducesValidPlan)
+{
+    ::testing::FLAGS_gmock_verbose = "error";
+    hipdnn_frontend::GraphTestUtils graph;
+    auto tensorAttributes = createBasicBatchnormGraph(graph);
+    ASSERT_TRUE(graph.validate().is_good());
+    graph.build_operation_graph(_handle);
+
+    const int64_t engineId = 99;
+
+    // Mock: engine descriptor for get_knob_lookup
+    auto engineDesc2 = reinterpret_cast<hipdnnBackendDescriptor_t>(0xAA02);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_ENGINE_DESCRIPTOR, _))
+        .WillRepeatedly(
+            [&engineDesc2](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = engineDesc2;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    // Knob query returns 0 knobs
+    EXPECT_CALL(
+        *_mockBackend,
+        backendGetAttribute(
+            engineDesc2, HIPDNN_ATTR_ENGINE_KNOB_INFO, HIPDNN_TYPE_BACKEND_DESCRIPTOR, _, _, _))
+        .WillRepeatedly([](hipdnnBackendDescriptor_t,
+                           hipdnnBackendAttributeName_t,
+                           hipdnnBackendAttributeType_t,
+                           int64_t,
+                           int64_t* elementCount,
+                           void*) {
+            if(elementCount)
+            {
+                *elementCount = 0;
+            }
+            return HIPDNN_STATUS_SUCCESS;
+        });
+
+    // Engine config creation for compilePlanFromSpec
+    auto engineCfgDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0xBB02);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR, _))
+        .WillOnce(
+            [&engineCfgDesc](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = engineCfgDesc;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    // Execution plan creation for compilePlanFromSpec
+    auto execPlanDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0xCC02);
+    EXPECT_CALL(*_mockBackend, backendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, _))
+        .WillOnce(
+            [&execPlanDesc](hipdnnBackendDescriptorType_t, hipdnnBackendDescriptor_t* descriptor) {
+                *descriptor = execPlanDesc;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    // The Graph's compiled plans should be untouched
+    EXPECT_EQ(graph.getCompiledPlansCount(), 0u);
+
+    hipdnn_frontend::GraphTestUtils::CompiledPlan plan;
+    auto result = graph.compilePlanFromSpec(engineId, {}, plan);
+    ASSERT_TRUE(result.is_good()) << result.get_message();
+
+    // Verify the compiled plan has valid descriptors and metadata
+    EXPECT_NE(plan.engineConfigDesc, nullptr);
+    EXPECT_NE(plan.executionPlanDesc, nullptr);
+    EXPECT_EQ(plan.engineId, engineId);
+    EXPECT_TRUE(plan.knobSettings.empty());
+    EXPECT_EQ(plan.workspaceSize, -1); // Not yet queried
+
+    // The Graph's compiled plans should still be empty — compilePlanFromSpec
+    // does not modify Graph state.
+    EXPECT_EQ(graph.getCompiledPlansCount(), 0u);
+}
+
+// Verify that deserialized compiled plan clears the vector and sets up
+// a plan with no engine config (only execution plan).
+TEST_F(TestGraph, DeserializeCompiledPlanUsesVectorModel)
+{
+    hipdnn_frontend::GraphTestUtils graph;
+
+    // Set up mock for deserialize
+    auto execPlanDesc = reinterpret_cast<hipdnnBackendDescriptor_t>(0xDD01);
+    EXPECT_CALL(*_mockBackend, backendCreateAndDeserializeExecutionPlanExt(_, _, _, _))
+        .WillOnce(
+            [&execPlanDesc](
+                hipdnnHandle_t, hipdnnBackendDescriptor_t* descriptor, const uint8_t*, size_t) {
+                *descriptor = execPlanDesc;
+                return HIPDNN_STATUS_SUCCESS;
+            });
+
+    const std::vector<uint8_t> fakeData = {0x01, 0x02};
+    auto result = graph.deserialize_compiled_plan(_handle, fakeData);
+    ASSERT_TRUE(result.is_good()) << result.get_message();
+
+    // Verify vector model
+    EXPECT_EQ(graph.getCompiledPlansCount(), 1u);
+    EXPECT_EQ(graph.getActivePlanIndex(), 0u);
+    EXPECT_NE(graph.getActiveExecutionPlanPtr(), nullptr);
+    // Engine config is null for deserialized plans
+    EXPECT_EQ(graph.getActiveEngineConfigPtr(), nullptr);
+}

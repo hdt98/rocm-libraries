@@ -159,13 +159,163 @@ namespace hipdnn_frontend::graph
  */
 class Graph : public INode
 {
+protected:
+    /// A compiled execution plan containing both the engine config and execution
+    /// plan descriptors, along with metadata identifying which engine and knob
+    /// settings produced it. The single-plan lifecycle populates a vector of size 1
+    /// at index 0; autotuning populates multiple entries and sets the active index
+    /// to the winner.
+    struct CompiledPlan
+    {
+        std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> engineConfigDesc;
+        std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> executionPlanDesc;
+        int64_t engineId = -1;
+        std::vector<KnobSetting> knobSettings;
+        int64_t workspaceSize = -1; ///< Cached workspace size; -1 = not yet queried
+    };
+
+    /// All compiled plans. The single-plan path (create_execution_plans /
+    /// create_execution_plan_ext) clears and emplaces one entry. Autotuning
+    /// populates multiple entries and selects a winner via _activePlanIndex.
+    std::vector<CompiledPlan> _compiledPlans;
+
+    /// Index of the active plan in _compiledPlans. Must be < _compiledPlans.size()
+    /// whenever _compiledPlans is non-empty. Reset to 0 when the vector is cleared.
+    size_t _activePlanIndex = 0;
+
+    /// Get the active plan's engine config descriptor, or nullptr if no active plan exists.
+    detail::ScopedHipdnnBackendDescriptor* activeEngineConfigPtr()
+    {
+        if(_compiledPlans.empty() || _activePlanIndex >= _compiledPlans.size())
+        {
+            return nullptr;
+        }
+        return _compiledPlans[_activePlanIndex].engineConfigDesc.get();
+    }
+
+    /// Get the active plan's execution plan descriptor, or nullptr if no active plan exists.
+    detail::ScopedHipdnnBackendDescriptor* activeExecutionPlanPtr()
+    {
+        if(_compiledPlans.empty() || _activePlanIndex >= _compiledPlans.size())
+        {
+            return nullptr;
+        }
+        return _compiledPlans[_activePlanIndex].executionPlanDesc.get();
+    }
+
+    /// Get the active plan's execution plan descriptor, or nullptr if no active plan exists.
+    const detail::ScopedHipdnnBackendDescriptor* activeExecutionPlanPtr() const
+    {
+        if(_compiledPlans.empty() || _activePlanIndex >= _compiledPlans.size())
+        {
+            return nullptr;
+        }
+        return _compiledPlans[_activePlanIndex].executionPlanDesc.get();
+    }
+
+    /// Compile a single plan from an engine ID and knob settings.
+    /// This is the core compilation logic extracted for reuse by both
+    /// create_execution_plan_ext() (single-plan path) and autotune()
+    /// (multi-plan path). Does not modify _compiledPlans or _activePlanIndex.
+    /// @param engineId The engine to compile a plan for
+    /// @param knobSettings The knob settings to apply
+    /// @param[out] plan The compiled plan (moved on success)
+    /// @return ErrorCode::OK on success
+    Error compilePlanFromSpec(int64_t engineId,
+                              const std::vector<KnobSetting>& knobSettings,
+                              CompiledPlan& plan)
+    {
+        // Create engine descriptor and engine config descriptor
+        detail::ScopedHipdnnBackendDescriptor engineDesc;
+        HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::createEngineDescriptorForGraph(
+            engineDesc, _graphDesc->get(), engineId));
+
+        auto engineConfigDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+            HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR);
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
+                                             engineConfigDesc->get(),
+                                             HIPDNN_ATTR_ENGINECFG_ENGINE,
+                                             HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                             1,
+                                             static_cast<const void*>(&engineDesc.get())),
+                                         "Failed to set engine on the engine config descriptor.");
+
+        // Validate and apply knob settings
+        std::unordered_map<KnobType_t, Knob> existingKnobs;
+        HIPDNN_CHECK_ERROR(get_knob_lookup_for_engine(engineId, existingKnobs));
+
+        std::vector<KnobSetting> validatedSettings;
+        HIPDNN_CHECK_ERROR(
+            validateAndFilterKnobSettings(knobSettings, existingKnobs, validatedSettings));
+
+        if(!validatedSettings.empty())
+        {
+            HIPDNN_CHECK_ERROR(detail::applyKnobSettingsViaDescriptors(engineConfigDesc->get(),
+                                                                       validatedSettings));
+        }
+
+        // Finalize engine config
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendFinalize(engineConfigDesc->get()),
+            "Failed to finalize engine config descriptor");
+
+        // Create execution plan descriptor
+        auto executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+            HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR);
+
+        if(!executionPlanDesc->valid())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Failed to create backend execution descriptor."};
+        }
+
+        plan.engineConfigDesc = std::move(engineConfigDesc);
+        plan.executionPlanDesc = std::move(executionPlanDesc);
+        plan.engineId = engineId;
+        plan.knobSettings = validatedSettings;
+
+        return {ErrorCode::OK, ""};
+    }
+
 private:
     std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> _graphDesc;
     bool _graphDescFinalized = false;
-    std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> _engineConfigDesc;
-    std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> _executionPlanDesc;
 
     std::optional<int64_t> _preferredEngineId;
+
+    /// Get the active plan's engine config descriptor. Throws if no active plan exists.
+    detail::ScopedHipdnnBackendDescriptor& activeEngineConfig()
+    {
+        auto* ptr = activeEngineConfigPtr();
+        if(ptr == nullptr)
+        {
+            throw Error(ErrorCode::INVALID_VALUE, "No active engine config");
+        }
+        return *ptr;
+    }
+
+    /// Get the active plan's execution plan descriptor. Throws if no active plan exists.
+    detail::ScopedHipdnnBackendDescriptor& activeExecutionPlan()
+    {
+        auto* ptr = activeExecutionPlanPtr();
+        if(ptr == nullptr)
+        {
+            throw Error(ErrorCode::INVALID_VALUE, "No active execution plan");
+        }
+        return *ptr;
+    }
+
+    /// Get the active plan's execution plan descriptor (const). Throws if no active plan exists.
+    const detail::ScopedHipdnnBackendDescriptor& activeExecutionPlan() const
+    {
+        const auto* ptr = activeExecutionPlanPtr();
+        if(ptr == nullptr)
+        {
+            throw Error(ErrorCode::INVALID_VALUE, "No active execution plan");
+        }
+        return *ptr;
+    }
 
     static std::optional<int64_t> getDefaultEngineId()
     {
@@ -193,7 +343,8 @@ private:
             return {ErrorCode::OK, ""};
         }
 
-        return detail::applyKnobSettingsViaDescriptors(_engineConfigDesc->get(), validatedSettings);
+        return detail::applyKnobSettingsViaDescriptors(activeEngineConfig().get(),
+                                                       validatedSettings);
     }
 
     Error validateAndFilterKnobSettings(const std::vector<KnobSetting>& settings,
@@ -282,26 +433,6 @@ private:
     bool hasReadyGraphDesc() const
     {
         return hasValidGraphDesc() && _graphDescFinalized;
-    }
-
-    Error finalizeExecutionPlanDescriptor()
-    {
-        // Finalize engine config after knobs have been set
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendFinalize(_engineConfigDesc->get()),
-            "Failed to finalize engine config descriptor");
-
-        // Create execution plan descriptor
-        _executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
-            HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR);
-
-        if(!_executionPlanDesc->valid())
-        {
-            return {ErrorCode::HIPDNN_BACKEND_ERROR,
-                    "Failed to create backend execution descriptor."};
-        }
-
-        return {ErrorCode::OK, ""};
     }
 
     void assignUnsetTensorUids()
@@ -461,12 +592,19 @@ private:
 
         HIPDNN_FE_LOG_INFO("Selected engine id " << engineIds[selectedIndex]
                                                  << " for execution plan.");
-        _engineConfigDesc = std::move(engineConfigs[selectedIndex]);
+
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
+        auto& plan = _compiledPlans.emplace_back();
+        plan.engineConfigDesc = std::move(engineConfigs[selectedIndex]);
+        plan.engineId = engineIds[selectedIndex];
 
         return {ErrorCode::OK, ""};
     }
 
     /// Initialize engine config for a specific engine ID.
+    /// Clears the compiled plans vector and creates a single plan entry with
+    /// the engine config set but not yet finalized.
     /// @param engineId The engine to configure
     /// @note This method does NOT finalize the engine config. The caller must
     ///       finalize after setting any knobs on the config.
@@ -488,7 +626,12 @@ private:
                                              static_cast<const void*>(&engineDesc.get())),
                                          "Failed to set engine on the engine config descriptor.");
 
-        _engineConfigDesc = std::move(engineConfigDesc);
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
+        auto& plan = _compiledPlans.emplace_back();
+        plan.engineConfigDesc = std::move(engineConfigDesc);
+        plan.engineId = engineId;
+
         return {ErrorCode::OK, ""};
     }
 
@@ -932,8 +1075,8 @@ protected:
         // Any cached backend descriptors are stale and must be cleared. The caller
         // must call build_operation_graph() to rebuild them.
         resetGraphDesc();
-        _engineConfigDesc.reset();
-        _executionPlanDesc.reset();
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
         return {};
     }
 
@@ -1062,10 +1205,11 @@ public:
 
         HIPDNN_CHECK_ERROR(initializeEngineConfig(engineHeuristicDesc.get()));
 
-        _executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+        auto& plan = _compiledPlans[_activePlanIndex];
+        plan.executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
             HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR);
 
-        if(!_executionPlanDesc->valid())
+        if(!plan.executionPlanDesc->valid())
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR,
                     "Failed to create backend execution descriptor."};
@@ -1101,16 +1245,14 @@ public:
                     "execution plan."};
         }
 
-        std::unordered_map<KnobType_t, Knob> existingKnobs;
-        HIPDNN_CHECK_ERROR(get_knob_lookup_for_engine(engineId, existingKnobs));
-        HIPDNN_CHECK_ERROR(initializeEngineConfig(engineId));
+        CompiledPlan plan;
+        HIPDNN_CHECK_ERROR(compilePlanFromSpec(engineId, settings, plan));
 
-        std::vector<KnobSetting> validatedSettings;
-        HIPDNN_CHECK_ERROR(
-            validateAndFilterKnobSettings(settings, existingKnobs, validatedSettings));
-        HIPDNN_CHECK_ERROR(applyKnobSettingsToEngineConfig(validatedSettings));
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
+        _compiledPlans.push_back(std::move(plan));
 
-        return finalizeExecutionPlanDescriptor();
+        return {ErrorCode::OK, ""};
     }
 
     /**
@@ -1124,7 +1266,8 @@ public:
         HIPDNN_FE_LOG_INFO("Checking execution plan support for graph "
                            << graph_attributes.get_name());
 
-        if(!_executionPlanDesc || !_executionPlanDesc->valid())
+        const auto* execPlan = activeExecutionPlanPtr();
+        if(execPlan == nullptr || !execPlan->valid())
         {
             return {ErrorCode::HIPDNN_BACKEND_ERROR,
                     "Execution plan descriptor is not created or invalid."};
@@ -1302,8 +1445,8 @@ public:
         graph_attributes = std::move(tempAttrs);
         _preferredEngineId = tempEngineId;
         setGraphDesc(std::move(graphDesc), handle != nullptr);
-        _engineConfigDesc.reset();
-        _executionPlanDesc.reset();
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
         return {};
     }
 
@@ -1328,7 +1471,8 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error serialize_compiled_plan(std::vector<uint8_t>& data) const
     {
-        if(!_executionPlanDesc || !_executionPlanDesc->valid())
+        const auto* execPlan = activeExecutionPlanPtr();
+        if(execPlan == nullptr || !execPlan->valid())
         {
             return {ErrorCode::INVALID_VALUE,
                     "Graph has no compiled execution plan. Call build() or build_plans() first."};
@@ -1337,7 +1481,7 @@ public:
         size_t planByteSize = 0;
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendGetSerializedExecutionPlanExt(
-                _executionPlanDesc->get(), 0, &planByteSize, nullptr),
+                execPlan->get(), 0, &planByteSize, nullptr),
             "Failed to query serialized compiled plan size");
 
         if(planByteSize == 0)
@@ -1348,7 +1492,7 @@ public:
         data.resize(planByteSize);
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendGetSerializedExecutionPlanExt(
-                _executionPlanDesc->get(), planByteSize, &planByteSize, data.data()),
+                execPlan->get(), planByteSize, &planByteSize, data.data()),
             "Failed to serialize compiled plan");
         data.resize(planByteSize);
 
@@ -1378,8 +1522,12 @@ public:
                 handle, &executionPlan, data.data(), data.size()),
             "Failed to deserialize compiled plan");
 
-        _executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(executionPlan);
-        _engineConfigDesc.reset();
+        // Deserialized plans have no engine config — only the execution plan.
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
+        auto& plan = _compiledPlans.emplace_back();
+        plan.executionPlanDesc
+            = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(executionPlan);
         resetGraphDesc();
         _sub_nodes.clear();
 
@@ -1529,8 +1677,8 @@ public:
         graph_attributes = std::move(tempAttrs);
         _preferredEngineId = tempEngineId;
         setGraphDesc(std::move(graphDesc), handle != nullptr);
-        _engineConfigDesc.reset();
-        _executionPlanDesc.reset();
+        _compiledPlans.clear();
+        _activePlanIndex = 0;
         return {};
     }
 
@@ -1618,15 +1766,15 @@ public:
         HIPDNN_FE_LOG_INFO("Building plans for graph " << graph_attributes.get_name());
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
-                                             _executionPlanDesc->get(),
+                                             activeExecutionPlan().get(),
                                              HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
                                              HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                                              1,
-                                             static_cast<const void*>(&_engineConfigDesc->get())),
+                                             static_cast<const void*>(&activeEngineConfig().get())),
                                          "Failed to set the engine config on execution plan.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendFinalize(_executionPlanDesc->get()),
+            detail::hipdnnBackend()->backendFinalize(activeExecutionPlan().get()),
             "Failed to finalize execution plan descriptor");
 
         return {ErrorCode::OK, ""};
@@ -1698,7 +1846,7 @@ public:
     Error get_workspace_size(int64_t& workspaceSize) const
     {
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendGetAttribute(_executionPlanDesc->get(),
+            detail::hipdnnBackend()->backendGetAttribute(activeExecutionPlan().get(),
                                                          HIPDNN_ATTR_EXECUTION_PLAN_WORKSPACE_SIZE,
                                                          HIPDNN_TYPE_INT64,
                                                          1,
@@ -1774,7 +1922,8 @@ public:
     {
         HIPDNN_FE_LOG_INFO("Executing graph " << graph_attributes.get_name());
 
-        if(!_executionPlanDesc || !_executionPlanDesc->valid())
+        const auto* execPlan = activeExecutionPlanPtr();
+        if(execPlan == nullptr || !execPlan->valid())
         {
             return {ErrorCode::INVALID_VALUE,
                     "Graph has no compiled execution plan. Call build() or "
@@ -1827,10 +1976,9 @@ public:
             detail::hipdnnBackend()->backendFinalize(variantPackDesc->get()),
             "Failed to finalize variant pack descriptor");
 
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendExecute(
-                handle, _executionPlanDesc->get(), variantPackDesc->get()),
-            "Execute failed.");
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendExecute(
+                                             handle, execPlan->get(), variantPackDesc->get()),
+                                         "Execute failed.");
 
         return {ErrorCode::OK, ""};
     }
