@@ -1467,6 +1467,20 @@ class Solution(collections.abc.Mapping):
       if not state["MIWaveTile"] or len(state["MIWaveTile"]) != 2:
         reject(state, printRejectionReason, "invalid MIWaveTile")
         return
+      # LraTileAssignment computes wave/block offsets with vectorStaticRemainder
+      # using num1DWaves (=MIWaveGroup[0|1]) or num1DBlocks (=MatrixInstBM|BN)
+      # as the divisor, and reuses one vgpr for dividend / quotient / remainder.
+      # That aliasing is safe only on the power-of-2 fast path (single
+      # v_and_b32); the magic-number path would overwrite the dividend with the
+      # quotient before computing the remainder.
+      for _name, _val in (("MIWaveGroup[0]", state["MIWaveGroup"][0]),
+                          ("MIWaveGroup[1]", state["MIWaveGroup"][1]),
+                          ("MatrixInstBM",   state["MatrixInstBM"]),
+                          ("MatrixInstBN",   state["MatrixInstBN"])):
+        if _val > 1 and (_val & (_val - 1)) != 0:
+          reject(state, printRejectionReason,
+                 f"{_name}={_val} must be a power of two (LraTileAssignment vectorStaticRemainder fast path)")
+          return
       if state["UseSubtileImpl"] and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
         if state["MIWaveTile"][0] % 2 != 0 or state["MIWaveTile"][1] % 2 != 0:
           reject(state, printRejectionReason,
