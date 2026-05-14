@@ -1,13 +1,13 @@
 # Adding a New Operation to hipDNN
 
-A contributor walkthrough for landing a new op across the hipDNN stack. The [`hipdnn-codegen`](../tools/DescriptorGenerator/.claude/skills/hipdnn-codegen/SKILL.md) agent skill handles the mechanical work; this guide tells you what to decide upfront and what to polish afterward.
+A contributor walkthrough for landing a new op across the hipDNN stack. The [`hipdnn-codegen`](../tools/DescriptorGenerator/.claude/skills/hipdnn-codegen/SKILL.md) agent skill handles the mechanical work; this guide tells you what to decide upfront and what to review afterward.
 
 ## Table of Contents
 
 **Quick Start**
 - [Three Decisions Before You Run the Agent](#three-decisions-before-you-run-the-agent)
 - [Run `/hipdnn-codegen`](#run-hipdnn-codegen)
-- [Polish the Stubs](#polish-the-stubs)
+- [Review Implementation](#review-implementation)
 - [PR Checklist](#pr-checklist)
 
 **Supplementary Reference** *(read when you need it, not by default)*
@@ -25,7 +25,7 @@ A contributor walkthrough for landing a new op across the hipDNN stack. The [`hi
 Adding a new op touches FlatBuffers schemas, backend descriptors, frontend nodes, JSON utilities, and tests at four levels. Most of it is mechanical and is automated by the agent skill.
 
 ```
-Decisions (you) → /hipdnn-codegen (agent) → Polish stubs (you) → PR
+Decisions (you) → /hipdnn-codegen (agent) → Review implementation (you) → PR
 ```
 
 The skill is **near-autonomous**: it derives what it can, prompts you only when it must (cuDNN naming uncertainty, output-shape strategy, custom validation). For a clean cuDNN-aligned op, the only mandatory prompt is a one-time confirmation of the FBS schema it constructed.
@@ -33,8 +33,7 @@ The skill is **near-autonomous**: it derives what it can, prompts you only when 
 ## Three Decisions Before You Run the Agent
 
 1. **FBS schema** — decide whether to write the schema yourself or let the agent construct it. If you have a schema or a written description of one, point the agent at it. Otherwise, leave it to the agent: it derives the schema from the cudnn-frontend source and asks you to confirm before continuing.
-2. **Mode enum members** — if the op has discrete modes (e.g., reduction op type, pointwise kind), list the members you want. The agent uses them to populate the `enum_def` block in the YAML config.
-3. **Semantic deviations from cuDNN** — extra inputs, different output-shape rules, hipDNN-only behavior. These become comments in the generated code.
+2. **Op semantics** — anything that diverges from or extends cuDNN: discrete mode enum members (e.g., reduction op type, pointwise kind), extra inputs, different output-shape rules, hipDNN-only behavior. The agent uses mode members to populate the `enum_def` block; deviations become comments in the generated code.
 
 The agent handles cuDNN naming parity (`_EXT` decisions) automatically and will prompt you if it cannot determine the cuDNN equivalent. See [cuDNN Parity Rules](#cudnn-parity-rules) for details.
 
@@ -61,15 +60,16 @@ The agent will:
 
 If you've already written the FBS schema or have a written description of one, point the agent at it instead.
 
-## Polish the Stubs
+## Review Implementation
 
-The agent leaves these pieces for you to author:
+After the agent finishes, go through the output before opening a PR:
 
-- **JSON serialization helper** — `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/<Op>Attributes.hpp`. Template: [`MatmulAttributes.hpp`](../flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/MatmulAttributes.hpp).
-- **Python bindings (optional)** — only if your op is on the curated Python surface (current set: `batchnorm`, `batchnorm_backward`, `batchnorm_inference`, `pointwise`, `conv_fprop`, `matmul`). Add a `.def(...)` line in `python/src/graph_bindings.cpp` and register the attributes class in `python/src/attributes_bindings.cpp`.
-- **`infer_properties_node()` body** — fill in the stub the agent left in `<Op>Node.hpp`. Document the output-dimension formula in a comment for non-trivial shape rules.
-- **Operation-specific tests** beyond the auto-generated round-trips: multi-input variants, multi-op graph chains, edge cases (zero-sized dims, fused activations).
-- **End-user sample** under `samples/<op>/` — optional but expected.
+- **Schema** — re-read the generated FBS schema. Confirm field names, types, and any shared includes look right. The agent asks for confirmation before continuing, but a second read after generation catches anything missed in the preview.
+- **Backend enums vs cuDNN** — open [`docs/PortingGuide.md`](./PortingGuide.md) and the cudnn-frontend node header side-by-side with the generated `HipdnnBackend*.h` entries. Verify `_EXT` is applied where expected and absent where the name matches cuDNN exactly.
+- **Node logic** — read `<Op>Node.hpp` alongside the corresponding cudnn-frontend node class (`include/cudnn_frontend/node/<op>.h`). Compare `infer_properties_node()` and `pre_validate_node()` against the cuDNN equivalent: fill in stubs, add any validation rules or shape logic that cuDNN enforces but the agent did not emit, and verify that optional tensors and fields still have appropriate validation (e.g., conditional dim checks, presence guards).
+- **Test cases** — skim the generated integration tests. Add operation-specific tests beyond the round-trips where needed: multi-input variants, multi-op graph chains, edge cases (zero-sized dims, fused activations).
+- **End-user sample** under `samples/<op>/` — add a sample if an engine is available for the op. Wrap the `graph->build(handle)` call with `HIPDNN_FE_CHECK_SKIPPABLE` so the test is gracefully skipped when no engine supports the configuration. See `samples/convolution/ConvFprop.cpp` as a template.
+- **Python bindings** — the one piece the agent does not generate automatically. Add a `.def(...)` line in `python/src/graph_bindings.cpp` and register the attributes class in `python/src/attributes_bindings.cpp` (check that file for the current curated set). You can also explicitly ask the agent to do this before it finishes.
 
 ## PR Checklist
 
@@ -77,8 +77,16 @@ Copy-paste this into your PR description.
 
 ```markdown
 ## Adding-a-New-Operation Checklist
-- [ ] cuDNN equivalent identified (per docs/PortingGuide.md); naming + attribute set + semantics aligned
-- [ ] `_EXT` suffix applied correctly: present on hipDNN-specific names, absent on names matching cuDNN exactly (verify against the descriptor type, per-attribute, compute-data-type, and operation-type enum entries in `HipdnnBackend*.h`; numeric value parity is NOT required)
+
+### Review
+- [ ] FBS schema field names, types, and shared includes look correct
+- [ ] cuDNN equivalent identified (per docs/PortingGuide.md); attribute set and semantics aligned
+- [ ] `_EXT` suffix correct: present on hipDNN-specific names, absent where the name matches cuDNN exactly (numeric value parity is NOT required)
+- [ ] `infer_properties_node()` and `pre_validate_node()` reviewed against the cudnn-frontend node class; stubs filled in, validation rules aligned, and optional tensors/fields have appropriate presence guards
+- [ ] Integration tests cover the op's meaningful variants; no important edge cases missing
+- [ ] (Optional) Python bindings updated if op is on the Python surface
+
+### Implementation
 - [ ] FBS schema added in `flatbuffers_sdk/schemas/` (NOT `data_sdk/`)
 - [ ] Schema added to the `SCHEMAS` list in `flatbuffers_sdk/CMakeLists.txt`
 - [ ] `graph.fbs` `NodeAttributes` union updated and include added
@@ -89,10 +97,8 @@ Copy-paste this into your PR description.
 - [ ] Backend descriptor + DescriptorFactory + NodeFactory + BackendEnumStringUtils.hpp updated
 - [ ] Frontend `Types.hpp` enum + `toBackend*` + `fromHipdnn*` converters present (if new mode enum)
 - [ ] Frontend attributes + packer + unpacker + OperationUnpacker switch + node + Graph API method present
-- [ ] JSON utilities for attributes (de)serialization in place (hand-authored)
-- [ ] (Optional) Python bindings updated if op is on the Python surface
 - [ ] All `CMakeLists.txt` updated (backend src, backend tests, frontend tests, tests/frontend)
-- [ ] All test layers from the matrix have at least one test (see [Testing Requirements](#testing-requirements))
+- [ ] All test layers from the matrix have at least one test (see Testing Requirements)
 - [ ] Lowering + lifting round-trip + tensor sharing + auto-UID + per-scalar tests present
 - [ ] `TestBackendEnumStringUtils.cpp` updated with new enum entries
 - [ ] `ninja unit-check` and `ninja integration-check` pass
@@ -192,7 +198,7 @@ The complete surface area for a single op, using **Matmul** as the canonical exa
 | Frontend operation unpacker switch | `frontend/include/hipdnn_frontend/detail/OperationUnpacker.hpp` |
 | Frontend node class | `frontend/include/hipdnn_frontend/node/MatmulNode.hpp` |
 | Frontend Graph API | `frontend/include/hipdnn_frontend/Graph.hpp` (`Graph::matmul(...)`) |
-| JSON utility (hand-authored) | `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/MatmulAttributes.hpp` |
+| JSON utility | `flatbuffers_sdk/include/hipdnn_flatbuffers_sdk/utilities/json/MatmulAttributes.hpp` |
 | Python bindings (optional) | `python/src/graph_bindings.cpp`, `python/src/attributes_bindings.cpp` |
 | Backend descriptor unit test | `backend/tests/descriptors/TestMatmulOperationDescriptor.cpp` |
 | Backend fromNode test | `backend/tests/descriptors/TestMatmulOperationFromNode.cpp` |
