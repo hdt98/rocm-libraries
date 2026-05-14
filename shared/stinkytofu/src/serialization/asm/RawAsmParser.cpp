@@ -40,6 +40,7 @@
 
 #define DEBUG_TYPE "RawAsmParser"
 #include "stinkytofu/ir/asm/StinkyAsmIR.hpp"
+#include "stinkytofu/ir/asm/StinkyModifiers.hpp"
 #include "stinkytofu/ir/asm/StinkyRegister.hpp"
 #include "stinkytofu/ir/asm/StinkySignature.hpp"
 
@@ -564,6 +565,31 @@ bool hasMatrixFmtFields(const FieldMap& fields) {
            fields.count("matrix_a_reuse") || fields.count("matrix_b_reuse");
 }
 
+/// All asm-form field names that map into the 9-bit DPP `dpp_ctrl` selector
+/// (see DppCtrl enum in StinkyModifiers.hpp). Used by hasDPPFields() and by
+/// the `mod.dpp` dispatch to find which key holds the dpp_ctrl token.
+inline const std::array<const char*, 13>& dppCtrlKeys() {
+    static const std::array<const char*, 13> kKeys = {
+        "quad_perm", "row_shl",    "row_shr",         "row_ror",   "wave_shl",
+        "wave_shr",  "wave_rol",   "wave_ror",        "row_bcast", "row_share",
+        "row_xmask", "row_mirror", "row_half_mirror",
+    };
+    return kKeys;
+}
+
+/// True when \p fields holds any DPP-related modifier key. DPP is an add-on
+/// encoding variant layered on top of many VOP formats; the assembler picks
+/// the wider DPP encoding whenever such a token is present. Detection is
+/// field-based rather than microcode-based because the same VOP* encoding
+/// may or may not carry DPP depending on the opcode/usage.
+bool hasDPPFields(const FieldMap& fields) {
+    for (const char* k : dppCtrlKeys())
+        if (fields.count(k)) return true;
+    // Encoding-side fields that accompany DPP regardless of the dpp_ctrl mode.
+    return fields.count("bound_ctrl") || fields.count("row_mask") || fields.count("bank_mask") ||
+           fields.count("fi");
+}
+
 /// Single decision point for "this generic field set looks like which modKey?".
 /// Used after field collection, only when the microcode-based switch did not
 /// already assign a modKey. Modifier kinds that ride on top of generic
@@ -571,6 +597,7 @@ bool hasMatrixFmtFields(const FieldMap& fields) {
 /// here by field presence rather than by microcode format.
 std::string inferModKeyFromFields(const FieldMap& fields) {
     if (hasMatrixFmtFields(fields)) return "mod.matrix_fmt";
+    if (hasDPPFields(fields)) return "mod.dpp";
     return {};
 }
 
@@ -768,6 +795,30 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
         if (fields.count("offset")) modFields["offset"] = fields["offset"];
         if (fields.count("glc")) modFields["glc"] = "true";
         if (fields.count("nv")) modFields["nv"] = "true";
+
+    } else if (modKey == "mod.dpp") {
+        // Reconstruct the asm-form dpp_ctrl token from the parsed fields and
+        // run it through parseDppCtrlFromAsm() so the deserializer receives
+        // the integer DppCtrl enum value it expects (the deserializer reads
+        // `dppCtrl` as an int via getInt).
+        DppCtrl ctrl = DppCtrl::NONE;
+        for (const char* k : dppCtrlKeys()) {
+            auto it = fields.find(k);
+            if (it == fields.end()) continue;
+            // Boolean flags (`row_mirror`, `row_half_mirror`) are stored as
+            // "true"; their asm form is just the bare key. Everything else
+            // is `key:value`.
+            std::string token =
+                (it->second == "true") ? std::string(k) : std::string(k) + ":" + it->second;
+            ctrl = parseDppCtrlFromAsm(token);
+            if (ctrl != DppCtrl::NONE) break;
+        }
+        if (ctrl != DppCtrl::NONE) modFields["dppCtrl"] = std::to_string(static_cast<int>(ctrl));
+        // Encoding-side DPP fields. Map asm-form names to deserializer names.
+        if (fields.count("bound_ctrl")) modFields["boundCtrl"] = fields["bound_ctrl"];
+        if (fields.count("row_mask")) modFields["rowMask"] = fields["row_mask"];
+        if (fields.count("bank_mask")) modFields["bankMask"] = fields["bank_mask"];
+        if (fields.count("fi")) modFields["fi"] = fields["fi"];
 
     } else if (modKey == "mod.matrix_fmt") {
         // Map asm-form keys to the field names the mod.matrix_fmt deserializer
