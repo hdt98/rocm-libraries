@@ -44,7 +44,9 @@ TEST(TestSdpaFwdPlan, ExecutePlan)
                          *tensorMap.at(nodeAttributes->v_tensor_uid()),
                          *tensorMap.at(nodeAttributes->o_tensor_uid()),
                          std::nullopt,
-                         false);
+                         /*leftBound=*/-1,
+                         /*rightBound-=*/-1,
+                         /*topLeftAlignment=*/true);
 
     std::unordered_map<int64_t, void*> variantPack;
     variantPack[nodeAttributes->q_tensor_uid()] = planTensorBundle.qTensor.memory().hostData();
@@ -91,7 +93,9 @@ TEST(TestSdpaFwdPlan, ExecutePlanWithCausalMask)
                          *tensorMap.at(nodeAttributes->v_tensor_uid()),
                          *tensorMap.at(nodeAttributes->o_tensor_uid()),
                          std::nullopt,
-                         /*causalMask=*/true);
+                         /*leftBound=*/-1,
+                         /*rightBound-=*/0,
+                         /*topLeftAlignment=*/true);
 
     std::unordered_map<int64_t, void*> variantPack;
     variantPack[nodeAttributes->q_tensor_uid()] = planTensorBundle.qTensor.memory().hostData();
