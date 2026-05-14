@@ -18,6 +18,8 @@
 #         TARGET_NAME   <name>
 #         PLUGIN_TARGET <target>
 #         ENGINE_NAME   <engine>
+#         [INSTALL_SUBDIR <subdir>]
+#         [TEST_CONFIG <path>]
 #         [GTEST_FILTER <filter>...]
 #     )
 #
@@ -32,6 +34,14 @@
 #   ``ENGINE_NAME``
 #     Engine name passed via ``--test-engine`` to the test binary.
 #
+#   ``INSTALL_SUBDIR``
+#     Optional. When provided, also stage an install-tree ``add_test()``
+#     entry so this test appears in the installed ``CTestTestfile.cmake``
+#     produced by ``install_provider_ctest_files(<subdir>)``. The value
+#     must match the subdir passed to that helper. The test config TOML
+#     (if any) is installed alongside the CTestTestfile so it resolves
+#     relative to ctest's working directory.
+#
 #   ``TEST_CONFIG``
 #     Optional path to a TOML configuration file for per-test tolerance
 #     overrides. Passed via ``--test-config`` to the test binary.
@@ -42,7 +52,7 @@
 #     If omitted, all tests run. Patterns can be specified one per line for
 #     readability.
 function(add_external_integration_test_target)
-    cmake_parse_arguments(ARG "" "TARGET_NAME;PLUGIN_TARGET;ENGINE_NAME;TEST_CONFIG" "GTEST_FILTER" ${ARGN})
+    cmake_parse_arguments(ARG "" "TARGET_NAME;PLUGIN_TARGET;ENGINE_NAME;INSTALL_SUBDIR;TEST_CONFIG" "GTEST_FILTER" ${ARGN})
 
     # Validate required arguments
     if(NOT ARG_TARGET_NAME)
@@ -83,8 +93,49 @@ function(add_external_integration_test_target)
     # project's build subdir. Labels mirror add_integration_test_target so the
     # test is selected the same way as the provider's own integration tests,
     # plus an `external_integration_test` label and the engine name for filtering.
+    set(_LABELS "integration_test;slow;external_integration_test;${ARG_ENGINE_NAME}")
     add_test(NAME ${ARG_TARGET_NAME} COMMAND ${_CMD})
-    set_tests_properties(${ARG_TARGET_NAME} PROPERTIES
-        LABELS "integration_test;slow;external_integration_test;${ARG_ENGINE_NAME}"
-    )
+    set_tests_properties(${ARG_TARGET_NAME} PROPERTIES LABELS "${_LABELS}")
+
+    # Stage an install-tree add_test() snippet so install_provider_ctest_files
+    # can include this test in the installed CTestTestfile.cmake. Required for
+    # CI flows that invoke ctest from the install tree (e.g. TheRock).
+    if(ARG_INSTALL_SUBDIR)
+        # Install the TOML config alongside the installed CTestTestfile so the
+        # test can reference it by basename.
+        if(ARG_TEST_CONFIG)
+            get_filename_component(_config_filename "${ARG_TEST_CONFIG}" NAME)
+            install(FILES "${ARG_TEST_CONFIG}"
+                DESTINATION "${CMAKE_INSTALL_BINDIR}/${ARG_INSTALL_SUBDIR}"
+            )
+        endif()
+
+        # Install-tree paths are relative to the directory ctest runs from,
+        # which is ${CMAKE_INSTALL_BINDIR}/${INSTALL_SUBDIR}/. Compute filenames
+        # at configure time (file(WRITE) does not evaluate generator expressions).
+        set(_install_bin
+            "../hipdnn_integration_tests${CMAKE_EXECUTABLE_SUFFIX}"
+        )
+        set(_install_plugin
+            "../${HIPDNN_PLUGIN_ENGINE_SUBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${ARG_PLUGIN_TARGET}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        )
+
+        set(_install_args "${_install_plugin}" "${ARG_ENGINE_NAME}")
+        set(_install_cmd "add_test([=[${ARG_TARGET_NAME}]=] \"${_install_bin}\" \"--test-article\" \"${_install_plugin}\" \"--test-engine\" \"${ARG_ENGINE_NAME}\"")
+        if(ARG_TEST_CONFIG)
+            string(APPEND _install_cmd " \"--test-config\" \"${_config_filename}\"")
+        endif()
+        if(ARG_GTEST_FILTER)
+            string(APPEND _install_cmd " \"--gtest_filter=${_GTEST_FILTER_STR}\"")
+        endif()
+        string(APPEND _install_cmd ")\n")
+        string(APPEND _install_cmd
+            "set_tests_properties([=[${ARG_TARGET_NAME}]=] PROPERTIES LABELS \"${_LABELS}\")\n"
+        )
+
+        set_property(GLOBAL APPEND_STRING
+            PROPERTY "EXTERNAL_TEST_INSTALL_STAGING_${ARG_INSTALL_SUBDIR}"
+            "${_install_cmd}"
+        )
+    endif()
 endfunction()
