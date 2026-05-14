@@ -13,7 +13,7 @@ with open('../CMakeLists.txt', encoding='utf-8') as f:
     if not match:
         raise ValueError("VERSION not found!")
     version_number = match[1]
-left_nav_title = f"rocWMMA {version_number} Documentation"
+left_nav_title = f"rocWMMA 2.2.1 Documentation"
 
 # for PDF output on Read the Docs
 project = "rocWMMA Documentation"
