@@ -1122,18 +1122,19 @@ TEST_F(TestEngineHeuristicDescriptor, EnvironmentVariablePolicyOrderIsRespected)
     ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
 }
 
-TEST_F(TestEngineHeuristicDescriptor, DescriptorPolicyOrderTakesPrecedenceOverEnvironment)
+TEST_F(TestEngineHeuristicDescriptor, EnvironmentPolicyOrderTakesPrecedenceOverDescriptor)
 {
-    // Same mock setup. Env var lists an unregistered policy (which would throw
-    // on its own), but the descriptor-level attribute lists only StaticOrdering.
-    // The descriptor attribute is highest priority, so finalize() must succeed.
+    // Same mock setup. The env var (highest priority) lists only
+    // StaticOrdering — which the mock makes succeed — while the descriptor
+    // attribute lists an unregistered policy that would otherwise throw.
+    // Env winning means finalize() succeeds.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
-        "HIPDNN_HEUR_POLICY_ORDER", "Vendor::Unregistered");
+        "HIPDNN_HEUR_POLICY_ORDER", "SelectionHeuristic::StaticOrdering");
 
     auto heur = getEngineHeuristicDescriptor();
 
     const std::vector<int64_t> descriptorOrder = {
-        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        hipdnn_data_sdk::utilities::policyNameToId("Vendor::Unregistered"),
     };
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
                                        HIPDNN_TYPE_INT64,
@@ -1145,6 +1146,32 @@ TEST_F(TestEngineHeuristicDescriptor, DescriptorPolicyOrderTakesPrecedenceOverEn
     EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
         .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
 
+    ASSERT_NO_THROW(heur->finalize());
+}
+
+TEST_F(TestEngineHeuristicDescriptor, EnvironmentPolicyOrderAcceptsRawIds)
+{
+    // HIPDNN_HEUR_POLICY_ORDER tokens may be either policy names or raw int64
+    // policy IDs. Mixing both forms — including a negative ID for an
+    // unregistered policy — must round-trip through resolution and reach the
+    // outer policy loop in the order written.
+    const int64_t staticOrderingId
+        = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
+    const std::string envValue
+        = "-1234567890," + std::to_string(staticOrderingId) + ",SelectionHeuristic::Config";
+
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
+        "HIPDNN_HEUR_POLICY_ORDER", envValue);
+
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    // The first token is an unregistered ID (slot becomes a null placeholder),
+    // the StaticOrdering ID succeeds, and Config (no rules → declines) is the
+    // last. Finalize succeeds because StaticOrdering is reached.
     ASSERT_NO_THROW(heur->finalize());
 }
 
