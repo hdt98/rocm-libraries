@@ -584,7 +584,6 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                         {
                             Base::LocalPrefill(b_copy_lds_window1, elementwise_Bs_res);
                         }
-                        block_sync_lds();
 
                         elementwise_As_res =
                             load_tile_with_elementwise(a_tile_windows, a_element_func);
