@@ -5019,7 +5019,7 @@ TEST_F(TestGraph, EngineOverrideConfigMatchesConvFpropTensors)
 
     auto result = config.matchOperation("conv_fprop", {x, w});
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, hipdnn_data_sdk::utilities::HIPBLASLT_ENGINE_ID);
+    EXPECT_EQ(result->engineId, hipdnn_data_sdk::utilities::HIPBLASLT_ENGINE_ID);
 
     // Wrong op must not match
     EXPECT_FALSE(config.matchOperation("conv_dgrad", {x, w}).has_value());
@@ -5065,7 +5065,7 @@ TEST_F(TestGraph, EngineOverrideConfigFromContentMatchesConvFpropGraph)
 
     auto result = config->matchOperation("conv_fprop", {x, w});
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, kEngine);
+    EXPECT_EQ(result->engineId, kEngine);
 
     // A different batch size must not match the exact rule
     auto x8 = std::make_shared<TensorAttributes>();

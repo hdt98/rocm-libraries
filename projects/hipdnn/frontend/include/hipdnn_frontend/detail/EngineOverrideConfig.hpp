@@ -5,6 +5,7 @@
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
+#include <hipdnn_frontend/knob/KnobSetting.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -21,6 +22,16 @@
 
 namespace hipdnn_frontend::engine_override
 {
+
+/// Result of a successful engine override match.
+/// Contains the resolved engine ID and any knob settings from the config entry.
+/// The knobs vector is empty when the config entry has no knob overrides
+/// (knob parsing from JSON is added in Phase 3).
+struct MatchResult
+{
+    int64_t engineId;
+    std::vector<KnobSetting> knobs; ///< Empty if no knobs in config entry
+};
 
 /// Dimension value meaning "match any value in this slot".
 inline constexpr int64_t WILDCARD_DIM = -1;
@@ -221,13 +232,13 @@ public:
         return s_cached ? &*s_cached : nullptr;
     }
 
-    /// Scan rules in declaration order; return the first matching enginedId or nullopt.
+    /// Scan rules in declaration order; return the first matching MatchResult or nullopt.
     ///
     /// Strategy 1: only the bucket for `op` is examined (hash map lookup).
     /// Strategy 2: within the bucket, exact rules are probed in O(1) via hash map;
     ///             wildcard rules are scanned linearly but the scan terminates as
     ///             soon as a lower-order exact match is known to exist.
-    std::optional<int64_t>
+    std::optional<MatchResult>
         matchOperation(const std::string& op,
                        const std::vector<std::shared_ptr<graph::TensorAttributes>>& tensors) const
     {
@@ -265,7 +276,7 @@ public:
                 // would have broken otherwise), so it is the first-match winner.
                 HIPDNN_FE_LOG_INFO("EngineOverrideConfig: matched op="
                                    << op << " enginedId=" << entry.enginedId << " (wildcard rule)");
-                return entry.enginedId;
+                return MatchResult{entry.enginedId, entry.knobs};
             }
         }
 
@@ -273,24 +284,26 @@ public:
         {
             HIPDNN_FE_LOG_INFO("EngineOverrideConfig: matched op="
                                << op << " enginedId=" << exactHit->enginedId << " (exact rule)");
-            return exactHit->enginedId;
+            return MatchResult{exactHit->enginedId, exactHit->knobs};
         }
         return std::nullopt;
     }
 
 private:
-    /// enginedId and declaration index for an exact-match rule.
+    /// enginedId, knobs, and declaration index for an exact-match rule.
     struct ExactEntry
     {
         int64_t enginedId;
+        std::vector<KnobSetting> knobs; ///< Parsed knob settings (empty until Phase 3)
         size_t order; ///< position in the original rule list (0 = first)
     };
 
-    /// Wildcard rule paired with its declaration index and resolved engine ID.
+    /// Wildcard rule paired with its declaration index, resolved engine ID, and knobs.
     struct WildcardEntry
     {
         OperationRule rule;
         int64_t enginedId; ///< resolved from rule.engineName at index time
+        std::vector<KnobSetting> knobs; ///< Parsed knob settings (empty until Phase 3)
         size_t order;
     };
 
@@ -423,13 +436,13 @@ private:
         OpBucket& bucket = _index[rule.op]; // keyed by op (strategy 1)
         if(hasWildcard(rule.tensors))
         {
-            bucket.wildcards.push_back(WildcardEntry{std::move(rule), resolvedId, order});
+            bucket.wildcards.push_back(WildcardEntry{std::move(rule), resolvedId, {}, order});
         }
         else
         {
             const auto key = buildDimKey(rule.tensors);
             // try_emplace keeps the first (lowest-order) entry for duplicate keys.
-            bucket.exact.try_emplace(key, ExactEntry{resolvedId, order});
+            bucket.exact.try_emplace(key, ExactEntry{resolvedId, {}, order});
         }
     }
 
@@ -445,13 +458,13 @@ private:
     }
 };
 
-/// Match op/tensors against a config and return the first matching enginedId.
+/// Match op/tensors against a config and return the first matching MatchResult.
 /// When `config` is null the process-lifetime config loaded from
 /// HIPDNN_ENGINE_OVERRIDE_FILE is used (read once on first call, thread-safe
 /// per C++11).  Passing an explicit config bypasses the env-var lookup entirely,
 /// which is useful for testing or when the caller manages the config lifetime.
 /// Returns nullopt when no rule matches or JSON support is compiled out.
-inline std::optional<int64_t>
+inline std::optional<MatchResult>
     checkEngineOverride(const std::string& op,
                         const std::vector<std::shared_ptr<graph::TensorAttributes>>& tensors,
                         const EngineOverrideConfig* config = nullptr)

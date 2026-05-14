@@ -344,8 +344,12 @@ private:
 
         if(!_preferredEngineId.has_value())
         {
-            _preferredEngineId
+            auto overrideResult
                 = hipdnn_frontend::engine_override::getPreferredIdFromOverrideConfig(*this);
+            if(overrideResult.has_value())
+            {
+                _preferredEngineId = overrideResult->engineId;
+            }
         }
 
         std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor> tensorDescs;
