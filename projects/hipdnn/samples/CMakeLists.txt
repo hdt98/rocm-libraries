@@ -80,6 +80,8 @@ add_hipdnn_sample(hipdnn_sample_knobs_usage knobs/KnobsUsage.cpp)
 
 add_hipdnn_sample(hipdnn_sample_autotune autotune/AutotuneSample.cpp)
 
+add_hipdnn_sample(hipdnn_autotune_integration_tests autotune/TestAutotuneIntegration.cpp)
+
 # Enable testing and add sample tests
 enable_testing()
 
@@ -144,6 +146,9 @@ install(TARGETS hipdnn_sample_knobs_usage RUNTIME DESTINATION ${CMAKE_INSTALL_BI
 
 # Register autotune sample
 add_hipdnn_sample_test(hipdnn_sample_autotune)
+
+# Register autotune integration tests
+add_hipdnn_sample_test(hipdnn_autotune_integration_tests)
 
 # Umbrella target for superbuild dependency tracking
 add_custom_target(hipdnn_samples COMMENT "Building all hipDNN samples" DEPENDS ${HIPDNN_ALL_SAMPLES})
