@@ -25,11 +25,19 @@ from .population import Individual, Population, IndividualSet, ExceedsCapacity
 from typing import Callable, Union
 
 import os
+import sys
 import math
 import numpy as np
 import joblib
 import contextlib
 import tqdm
+
+# Use threading backend during pytest to avoid nested multiprocessing conflicts
+# with pytest-xdist parallel execution. Multiprocessing/loky can cause semaphore
+# file errors when temp directories are cleaned up during test runs.
+# In production (non-test), multiprocessing provides better performance.
+JOBLIB_BACKEND = "threading" if "pytest" in sys.modules else "multiprocessing"
+
 
 class MaxIterationsReached(Exception):
     pass
@@ -120,7 +128,8 @@ class SearchSpace:
                 total_to_generate = max((size - len(pop)) * 25, n_jobs * 4)
                 chunk_size = total_to_generate // n_jobs
                 seeds = self.seed_seq.spawn(n_jobs)
-                res = joblib.Parallel(n_jobs=n_jobs, backend="multiprocessing")(
+        
+                res = joblib.Parallel(n_jobs=n_jobs, backend=JOBLIB_BACKEND)(
                     joblib.delayed(sample_chunk)(self.valid, p, self.sizes, chunk_size, seed) 
                     for seed in seeds
                 )
