@@ -122,7 +122,7 @@ TEST(TestAutotuneTypes, PlanSpecNotEqualDifferentKnobNames)
 
 TEST(TestAutotuneTypes, CartesianProductEmptyAxes)
 {
-    std::vector<KnobSweepAxis> axes;
+    const std::vector<KnobSweepAxis> axes;
     std::vector<std::vector<KnobSetting>> result;
 
     auto error = autotune::computeCartesianProduct(axes, result);
@@ -132,7 +132,7 @@ TEST(TestAutotuneTypes, CartesianProductEmptyAxes)
 
 TEST(TestAutotuneTypes, CartesianProductSingleAxis)
 {
-    std::vector<KnobSweepAxis> axes = {{"SPLIT_K", {int64_t{1}, int64_t{2}, int64_t{4}}}};
+    const std::vector<KnobSweepAxis> axes = {{"SPLIT_K", {int64_t{1}, int64_t{2}, int64_t{4}}}};
     std::vector<std::vector<KnobSetting>> result;
 
     auto error = autotune::computeCartesianProduct(axes, result);
@@ -149,7 +149,7 @@ TEST(TestAutotuneTypes, CartesianProductSingleAxis)
 
 TEST(TestAutotuneTypes, CartesianProductTwoAxes)
 {
-    std::vector<KnobSweepAxis> axes
+    const std::vector<KnobSweepAxis> axes
         = {{"SPLIT_K", {int64_t{1}, int64_t{2}}}, {"TILE_SIZE", {int64_t{64}, int64_t{128}}}};
     std::vector<std::vector<KnobSetting>> result;
 
@@ -166,9 +166,9 @@ TEST(TestAutotuneTypes, CartesianProductTwoAxes)
 
 TEST(TestAutotuneTypes, CartesianProductThreeAxesCorrectCount)
 {
-    std::vector<KnobSweepAxis> axes = {{"A", {int64_t{1}, int64_t{2}, int64_t{3}}},
-                                       {"B", {int64_t{10}, int64_t{20}}},
-                                       {"C", {int64_t{100}, int64_t{200}, int64_t{300}}}};
+    const std::vector<KnobSweepAxis> axes = {{"A", {int64_t{1}, int64_t{2}, int64_t{3}}},
+                                             {"B", {int64_t{10}, int64_t{20}}},
+                                             {"C", {int64_t{100}, int64_t{200}, int64_t{300}}}};
     std::vector<std::vector<KnobSetting>> result;
 
     auto error = autotune::computeCartesianProduct(axes, result);
@@ -179,7 +179,7 @@ TEST(TestAutotuneTypes, CartesianProductThreeAxesCorrectCount)
 
 TEST(TestAutotuneTypes, CartesianProductEmptyAxisProducesEmptyResult)
 {
-    std::vector<KnobSweepAxis> axes = {
+    const std::vector<KnobSweepAxis> axes = {
         {"SPLIT_K", {int64_t{1}, int64_t{2}}}, {"TILE_SIZE", {}} // empty values
     };
     std::vector<std::vector<KnobSetting>> result;
@@ -194,17 +194,19 @@ TEST(TestAutotuneTypes, CartesianProductErrorAtLimit)
     // Create axes that would produce > 10,000 combinations
     // 101 * 100 = 10,100 > 10,000
     std::vector<KnobValueVariant> values101;
+    values101.reserve(101);
     for(int64_t i = 0; i < 101; ++i)
     {
-        values101.push_back(i);
+        values101.emplace_back(i);
     }
     std::vector<KnobValueVariant> values100;
+    values100.reserve(100);
     for(int64_t i = 0; i < 100; ++i)
     {
-        values100.push_back(i);
+        values100.emplace_back(i);
     }
 
-    std::vector<KnobSweepAxis> axes = {{"A", values101}, {"B", values100}};
+    const std::vector<KnobSweepAxis> axes = {{"A", values101}, {"B", values100}};
     std::vector<std::vector<KnobSetting>> result;
 
     auto error = autotune::computeCartesianProduct(axes, result);
@@ -216,12 +218,13 @@ TEST(TestAutotuneTypes, CartesianProductAtExactLimit)
 {
     // 100 * 100 = 10,000 — should succeed (limit is >10,000)
     std::vector<KnobValueVariant> values100;
+    values100.reserve(100);
     for(int64_t i = 0; i < 100; ++i)
     {
-        values100.push_back(i);
+        values100.emplace_back(i);
     }
 
-    std::vector<KnobSweepAxis> axes = {{"A", values100}, {"B", values100}};
+    const std::vector<KnobSweepAxis> axes = {{"A", values100}, {"B", values100}};
     std::vector<std::vector<KnobSetting>> result;
 
     auto error = autotune::computeCartesianProduct(axes, result);
@@ -235,32 +238,32 @@ TEST(TestAutotuneTypes, CartesianProductAtExactLimit)
 
 TEST(TestAutotuneTypes, MeanSingleValue)
 {
-    std::vector<float> values = {5.0f};
+    const std::vector<float> values = {5.0f};
     EXPECT_FLOAT_EQ(autotune::computeMean(values), 5.0f);
 }
 
 TEST(TestAutotuneTypes, MeanMultipleValues)
 {
-    std::vector<float> values = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    const std::vector<float> values = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
     EXPECT_FLOAT_EQ(autotune::computeMean(values), 3.0f);
 }
 
 TEST(TestAutotuneTypes, MeanDoubleValues)
 {
-    std::vector<double> values = {2.0, 4.0, 6.0};
+    const std::vector<double> values = {2.0, 4.0, 6.0};
     EXPECT_DOUBLE_EQ(autotune::computeMean(values), 4.0);
 }
 
 TEST(TestAutotuneTypes, MeanThrowsOnEmpty)
 {
-    std::vector<float> values;
+    const std::vector<float> values;
     EXPECT_THROW(autotune::computeMean(values), std::invalid_argument);
 }
 
 TEST(TestAutotuneTypes, StddevUniformValues)
 {
     // All identical values should have zero standard deviation
-    std::vector<float> values = {3.0f, 3.0f, 3.0f, 3.0f};
+    const std::vector<float> values = {3.0f, 3.0f, 3.0f, 3.0f};
     EXPECT_FLOAT_EQ(autotune::computeStddev(values), 0.0f);
 }
 
@@ -272,46 +275,46 @@ TEST(TestAutotuneTypes, StddevKnownValues)
     // (9-5)^2) / 8
     //          = (9+1+1+1+0+0+4+16)/8 = 32/8 = 4.0
     // Stddev = sqrt(4) = 2.0
-    std::vector<double> values = {2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0};
+    const std::vector<double> values = {2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0};
     EXPECT_DOUBLE_EQ(autotune::computeStddev(values), 2.0);
 }
 
 TEST(TestAutotuneTypes, StddevThrowsOnEmpty)
 {
-    std::vector<float> values;
+    const std::vector<float> values;
     EXPECT_THROW(autotune::computeStddev(values), std::invalid_argument);
 }
 
 TEST(TestAutotuneTypes, CoVKnownValues)
 {
     // Mean = 5.0, Stddev = 2.0, CoV = 2.0/5.0 = 0.4
-    std::vector<double> values = {2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0};
+    const std::vector<double> values = {2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0};
     EXPECT_DOUBLE_EQ(autotune::computeCoefficientOfVariation(values), 0.4);
 }
 
 TEST(TestAutotuneTypes, CoVUniformValuesIsZero)
 {
-    std::vector<float> values = {7.0f, 7.0f, 7.0f};
+    const std::vector<float> values = {7.0f, 7.0f, 7.0f};
     EXPECT_FLOAT_EQ(autotune::computeCoefficientOfVariation(values), 0.0f);
 }
 
 TEST(TestAutotuneTypes, CoVAllZerosIsZero)
 {
     // When mean is 0, CoV returns 0 to avoid division by zero
-    std::vector<float> values = {0.0f, 0.0f, 0.0f};
+    const std::vector<float> values = {0.0f, 0.0f, 0.0f};
     EXPECT_FLOAT_EQ(autotune::computeCoefficientOfVariation(values), 0.0f);
 }
 
 TEST(TestAutotuneTypes, CoVThrowsOnEmpty)
 {
-    std::vector<double> values;
+    const std::vector<double> values;
     EXPECT_THROW(autotune::computeCoefficientOfVariation(values), std::invalid_argument);
 }
 
 TEST(TestAutotuneTypes, StddevSingleValue)
 {
     // Single value: stddev = 0
-    std::vector<float> values = {42.0f};
+    const std::vector<float> values = {42.0f};
     EXPECT_FLOAT_EQ(autotune::computeStddev(values), 0.0f);
 }
 
@@ -321,7 +324,7 @@ TEST(TestAutotuneTypes, StddevSingleValue)
 
 TEST(TestAutotuneTypes, AutotuneConfigDefaults)
 {
-    AutotuneConfig config;
+    const AutotuneConfig config;
     EXPECT_EQ(config.mode, TuneMode::AUTO);
     EXPECT_EQ(config.strategy, AutotuneStrategy::FIXED_AVERAGE);
     EXPECT_EQ(config.warmupIterations, 3);
@@ -345,7 +348,7 @@ TEST(TestAutotuneTypes, AutotuneConfigCustomValues)
     config.maxIterations = 200;
     config.windowSize = 10;
     config.stabilityThreshold = 0.02f;
-    config.maxWorkspaceBytes = 1024 * 1024;
+    config.maxWorkspaceBytes = static_cast<size_t>(1024) * 1024;
     config.engineIdFilter = {1, 2, 3};
     config.continueOnPrimingFailure = true;
 
@@ -407,7 +410,7 @@ TEST(TestAutotuneTypes, AutotuneConfigStabilityThresholdBoundsDetectable)
 
 TEST(TestAutotuneTypes, AutotuneResultDefaults)
 {
-    AutotuneResult result;
+    const AutotuneResult result;
     EXPECT_EQ(result.engineId, -1);
     EXPECT_TRUE(result.engineName.empty());
     EXPECT_TRUE(result.knobSettings.empty());
@@ -462,7 +465,7 @@ TEST(TestAutotuneTypes, AutotuneResultPopulated)
 
 TEST(TestAutotuneTypes, AutotuneStorageConfigDefaults)
 {
-    AutotuneStorageConfig config;
+    const AutotuneStorageConfig config;
     EXPECT_TRUE(config.filePath.empty());
     EXPECT_FALSE(config.deleteAllExistingFileContent);
 }
@@ -489,7 +492,7 @@ TEST(TestAutotuneTypes, AutotuneRankingFnIsCallable)
                 return a.avgTimeMs < b.avgTimeMs;
             });
     };
-    AutotuneRankingFn fn = sortByAvgTime;
+    const AutotuneRankingFn fn = sortByAvgTime;
     EXPECT_NE(fn, nullptr);
 
     std::vector<AutotuneResult> results(2);
@@ -522,7 +525,7 @@ TEST(TestAutotuneTypes, AutotuneStrategyValues)
 
 TEST(TestAutotuneTypes, EngineConfigInfoDefaults)
 {
-    EngineConfigInfo info;
+    const EngineConfigInfo info;
     EXPECT_EQ(info.engineId, -1);
     EXPECT_TRUE(info.engineName.empty());
     EXPECT_TRUE(info.knobs.empty());

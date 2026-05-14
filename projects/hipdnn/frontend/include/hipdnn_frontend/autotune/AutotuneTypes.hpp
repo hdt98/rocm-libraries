@@ -139,7 +139,7 @@ struct AutotuneConfig
     /// Engine filter: only benchmark plan specs with these engine IDs (empty = all engines).
     /// Does not discover or add new specs. A warning is logged for engine IDs
     /// in this list that have no plan specs.
-    std::vector<int64_t> engineIdFilter = {};
+    std::vector<int64_t> engineIdFilter;
 
     /// Custom ranking function (nullptr = rank by minTimeMs ascending)
     AutotuneRankingFn rankingFn = nullptr;
