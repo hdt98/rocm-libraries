@@ -3,6 +3,7 @@
 
 #include <argparse.hpp>
 #include <gtest/gtest.h>
+#include <hip/hip_runtime.h>
 
 #include <algorithm>
 #include <cctype>
@@ -49,6 +50,19 @@ bool engineIsLoaded(hipdnnHandle_t handle, std::string_view targetEngineName)
 
 int main(int argc, char** argv) noexcept
 {
+    // Skip the entire suite when no GPU is present. main() eagerly creates a
+    // shared hipdnn handle and HIP stream below, before any test fixture's
+    // SetUp() runs, so the per-fixture SKIP_IF_NO_DEVICES check would never
+    // fire on a no-GPU CI runner. Exit 0 so ctest reports PASS, mirroring
+    // GTEST_SKIP() semantics for individual tests.
+    int deviceCount = 0;
+    auto deviceStatus = hipGetDeviceCount(&deviceCount);
+    if(deviceStatus == hipErrorNoDevice || deviceCount == 0)
+    {
+        std::cout << "No HIP devices available; skipping " << argv[0] << "\n";
+        return 0;
+    }
+
     try
     {
         // Parse custom arguments before InitGoogleTest to avoid unknown flag warnings
