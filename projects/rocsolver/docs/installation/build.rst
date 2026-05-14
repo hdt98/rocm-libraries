@@ -31,17 +31,6 @@ In terms of compatibility, it's best to always use rocSOLVER with the
 matching rocBLAS and rocSPARSE versions. For example, to install the rocSOLVER version from ROCm 6.4,
 ensure the ROCm 6.4 versions of rocBLAS and rocSPARSE are also installed.
 
-Install using prebuilt packages
-====================================
-
-If you have added the ROCm repositories to your Linux system, you can install the latest release version of
-rocSOLVER using a package manager. For example, use these commands on Ubuntu:
-
-.. code-block:: bash
-
-    sudo apt-get update
-    sudo apt-get install rocsolver
-
 .. _linux-install-source:
 
 Build and install from source
