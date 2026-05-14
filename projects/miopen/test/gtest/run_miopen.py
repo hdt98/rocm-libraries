@@ -5,6 +5,7 @@
 import importlib.util
 import logging
 import os
+import platform
 from pathlib import Path
 import re
 import shlex
@@ -12,9 +13,168 @@ import subprocess
 
 logging.basicConfig(level=logging.INFO)
 
-VALID_TEST_CATEGORIES = {"quick", "standard", "comprehensive", "full"}
 TEST_DIR_NAME = "MIOpen"
 CTEST_TIMEOUT_SECONDS = 7200
+_ROCMINFO_NAME_PATTERN = re.compile(r"^\s*Name:\s+(gfx[0-9a-z]+)\s*$", re.IGNORECASE)
+
+# These filters mirror the pre-RFC0010 TheRock MIOpen runner. The fallback path
+# uses them directly so the installed script can run without vendoring TheRock's
+# shared utility implementation.
+POSITIVE_FILTERS = [
+    "*Fusion*",
+    "*/GPU_BNBWD*_*",
+    "*/GPU_BNOCLBWD*_*",
+    "*/GPU_BNFWD*_*",
+    "*/GPU_BNOCLFWD*_*",
+    "*/GPU_BNInfer*_*",
+    "*/GPU_BNActivInfer_*",
+    "*/GPU_BNOCLInfer*_*",
+    "*/GPU_bn_infer*_*",
+    "CPU_*",
+    "*/CPU_*",
+    "*/GPU_Cat_*",
+    "*/GPU_ConvBiasActiv*",
+    "*/GPU_Conv*",
+    "*/GPU_conv*",
+    "*/GPU_UnitTestConv*",
+    "*/GPU_GetitemBwd*",
+    "*/GPU_GLU_*",
+    "*/GPU_GroupConv*",
+    "*/GPU_GroupNorm_*",
+    "*/GPU_GRUExtra_*",
+    "*/GPU_TestActivation*",
+    "*/GPU_HipBLASLtGEMMTest*",
+    "*/GPU_KernelTuningNetTestConv*",
+    "*/GPU_Kthvalue_*",
+    "*/GPU_LayerNormTest*",
+    "*/GPU_LayoutTransposeTest_*",
+    "*/GPU_Lrn*",
+    "*/GPU_lstm_extra*",
+    "*/GPU_MultiMarginLoss_*",
+    "*/GPU_ConvNonpack*",
+    "*/GPU_PerfConfig_HipImplicitGemm*",
+    "*/GPU_AsymPooling2d_*",
+    "*/GPU_WidePooling2d_*",
+    "*/GPU_PReLU_*",
+    "*/GPU_Reduce*",
+    "*/GPU_reduce_custom_*",
+    "*/GPU_regression_issue_*",
+    "*/GPU_RNNExtra_*",
+    "*/GPU_RoPE*",
+    "*/GPU_SoftMarginLoss*",
+    "*/GPU_T5LayerNormTest_*",
+    "*/GPU_Op4dTensorGenericTest_*",
+    "*/GPU_TernaryTensorOps_*",
+    "*/GPU_unaryTensorOps_*",
+    "*/GPU_Transformers*",
+    "*/GPU_TunaNetTest_*",
+    "*/GPU_UnitTestActivationDescriptor_*",
+    "*/GPU_FinInterfaceTest*",
+    "*/GPU_VecAddTest_*",
+    "*/GPU_KernelTuningNetTest*",
+    "*/GPU_Bwd_Mha_*",
+    "*/GPU_Fwd_Mha_*",
+    "*/GPU_Softmax*",
+    "*/GPU_Dropout*",
+    "*/GPU_MhaBackward_*",
+    "*/GPU_MhaForward_*",
+    "*GPU_TestMhaFind20*",
+    "*/GPU_MIOpenDriver*",
+]
+
+NEGATIVE_FILTERS = [
+    "*DeepBench*",
+    "*MIOpenTestConv*",
+    # Keep the old TheRock smoke policy for standalone fallback runs.
+    "Full/GPU_MIOpenDriverConv2dTransTest*",
+    "Full/GPU_Reduce_FP64*",
+    "Full/GPU_BNOCLFWDTrainSerialRun3D_BFP16*",
+    "Full/GPU_Lrn_FP32*",
+    "Full/GPU_Lrn_FP16*",
+    "Full/GPU_BNOCLInferSerialRun3D_BFP16*",
+    "Smoke/GPU_BNOCLFWDTrainLarge2D_BFP16*",
+    "Smoke/GPU_BNOCLInferLarge2D_BFP16*",
+    "Full/GPU_BNOCLBWDSerialRun3D_BFP16*",
+    "Smoke/GPU_BNOCLBWDLarge2D_BFP16*",
+    "Full/GPU_UnitTestActivationDescriptor_FP32*",
+    "Full/GPU_UnitTestActivationDescriptor_FP16*",
+    "Full/GPU_MIOpenDriverRegressionBigTensorTest_FP32*",
+    "Smoke/GPU_BNOCLBWDLargeFusedActivation2D_BFP16*",
+    "Smoke/GPU_BNOCLBWDLargeFusedActivation2D_FP16*",
+    "Full/GPU_ConvGrpBiasActivInfer_BFP16*",
+    "Full/GPU_ConvGrpBiasActivInfer_FP32*",
+    "Full/GPU_ConvGrpBiasActivInfer_FP16*",
+    "Full/GPU_ConvGrpActivInfer_BFP16*",
+    "Full/GPU_ConvGrpActivInfer_FP32*",
+    "Full/GPU_ConvGrpActivInfer_FP16*",
+    "Full/GPU_ConvGrpBiasActivInfer3D_BFP16*",
+    "Full/GPU_ConvGrpBiasActivInfer3D_FP32*",
+    "Full/GPU_ConvGrpBiasActivInfer3D_FP16*",
+    "Full/GPU_ConvGrpActivInfer3D_BFP16*",
+    "Full/GPU_ConvGrpActivInfer3D_FP32*",
+    "Full/GPU_ConvGrpActivInfer3D_FP16*",
+]
+
+TESTS_TO_IGNORE = {
+    "gfx110X-all": {
+        "windows": [
+            "Smoke/CPU_Handle_NONE.TestHIP/with_stream_false_test_id_0",
+            "Full/GPU_reduce_custom_fp32_fp16_FP32.FloatTest_reduce_custom_fp32_fp16/1",
+            "Full/GPU_reduce_custom_fp32_fp16_FP32.FloatTest_reduce_custom_fp32_fp16/5",
+            "Full/GPU_reduce_custom_fp32_fp16_FP32.FloatTest_reduce_custom_fp32_fp16/9",
+            "Full/GPU_reduce_custom_fp32_fp16_FP32.FloatTest_reduce_custom_fp32_fp16/13",
+            "Full/GPU_reduce_custom_fp32_fp16_FP32.FloatTest_reduce_custom_fp32_fp16/17",
+            "Full/GPU_reduce_custom_fp32_fp16_FP16.HalfTest_reduce_custom_fp32_fp16/1",
+            "Full/GPU_reduce_custom_fp32_fp16_FP16.HalfTest_reduce_custom_fp32_fp16/5",
+            "Full/GPU_reduce_custom_fp32_fp16_FP16.HalfTest_reduce_custom_fp32_fp16/9",
+            "Full/GPU_reduce_custom_fp32_fp16_FP16.HalfTest_reduce_custom_fp32_fp16/13",
+            "Full/GPU_reduce_custom_fp32_fp16_FP16.HalfTest_reduce_custom_fp32_fp16/17",
+        ]
+    },
+    "gfx1151": {
+        "windows": ["Full/GPU_UnitTestConvSolverGemmBwdRestBwd_FP16.GemmBwdRest/0"]
+    },
+    "gfx950-dcgpu": {"linux": ["*DBSync*"]},
+}
+
+NAVI_NEGATIVE_FILTERS = [
+    "Smoke/GPU_BNFWDTrainLargeFusedActivation2D_FP32.BnV2LargeFWD_TrainCKfp32Activation/NCHW_BNSpatial_testBNAPIV1_Dim_2_test_id_32",
+    "Smoke/GPU_BNFWDTrainLarge2D_FP32.BnV2LargeFWD_TrainCKfp32/NCHW_BNSpatial_testBNAPIV2_Dim_2_test_id_64",
+    "*SerialRun3D*",
+    "*gfx942*",
+    "*GPU_UnitTestConvSolverFFTFwd_FP32*",
+    "*GPU_UnitTestConvSolverFFTBwd_FP32*",
+    "*GPU_TernaryTensorOps_FP64*",
+    "*GPU_TernaryTensorOps_FP16*",
+    "*GPU_TernaryTensorOps_FP32*",
+    "*GPU_Op4dTensorGenericTest_FP32*",
+    "*GPU_UnitTestActivationDescriptor_FP16*",
+    "*GPU_UnitTestActivationDescriptor_FP32*",
+    "*CPU_TuningPolicy_NONE*",
+    "*GPU_Dropout_FP32*",
+    "*GPU_Dropout_FP16*",
+    "*GPU_GroupConv3D_BackwardData_FP16.GroupConv3D_BackwardData_half_Test*",
+    "*GPU_GroupConv3D_BackwardData_BFP16.GroupConv3D_BackwardData_bfloat16_Test*",
+    "*GPU_UnitTestConvSolverImplicitGemmGroupWrwXdlops_BFP16.ConvHipImplicitGemmGroupWrwXdlops*",
+    "Smoke/GPU_MultiMarginLoss*",
+    "*CPU_UnitTestConvSolverImplicitGemmGroupWrwXdlopsDevApplicability_FP16.ConvHipImplicitGemmGroupWrwXdlops*",
+    "Full/GPU_Softmax_FP32*",
+    "Full/GPU_Softmax_BFP16*",
+    "Full/GPU_Softmax_FP16*",
+    "Smoke/GPU_Reduce_FP32*",
+    "Smoke/GPU_Reduce_FP16*",
+]
+
+QUICK_FILTERS = [
+    "Smoke/GPU_BNCKFWDTrainLarge2D_FP16*",
+    "Smoke/GPU_BNOCLFWDTrainLarge2D_FP16*",
+    "Smoke/GPU_BNOCLFWDTrainLarge3D_FP16*",
+    "Smoke/GPU_BNCKFWDTrainLarge2D_BFP16*",
+    "Smoke/GPU_BNOCLFWDTrainLarge2D_BFP16*",
+    "Smoke/GPU_BNOCLFWDTrainLarge3D_BFP16*",
+    "Smoke/GPU_UnitTestConvSolverImplicitGemmFwdXdlops_FP16*",
+    "Smoke/GPU_UnitTestConvSolverImplicitGemmFwdXdlops_BFP16*",
+]
 
 
 def load_shared_test_utils():
@@ -36,45 +196,42 @@ def load_shared_test_utils():
     return module
 
 
+def miopen_gtest_candidates(bin_dir: Path) -> list[Path]:
+    candidates = [bin_dir / "miopen_gtest"]
+    if os.name == "nt":
+        candidates.insert(0, bin_dir / "miopen_gtest.exe")
+    return candidates
+
+
+def resolve_miopen_gtest(bin_dir: Path) -> Path:
+    for candidate in miopen_gtest_candidates(bin_dir):
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"MIOpen gtest executable not found in {bin_dir}: "
+        f"{', '.join(str(p.name) for p in miopen_gtest_candidates(bin_dir))}"
+    )
+
+
+def has_miopen_gtest(bin_dir: Path) -> bool:
+    return any(candidate.is_file() for candidate in miopen_gtest_candidates(bin_dir))
+
+
 def derive_rocm_path(script_dir: Path) -> Path:
     for candidate in (script_dir, *script_dir.parents):
         if (candidate / "bin" / TEST_DIR_NAME / "CTestTestfile.cmake").is_file():
             return candidate
-        if (
-            candidate.name == "bin"
-            and (candidate / TEST_DIR_NAME / "CTestTestfile.cmake").is_file()
-        ):
-            return candidate.parent
+        if candidate.name == "bin":
+            if (candidate / TEST_DIR_NAME / "CTestTestfile.cmake").is_file():
+                return candidate.parent
+            if has_miopen_gtest(candidate):
+                return candidate.parent
+        if has_miopen_gtest(candidate / "bin"):
+            return candidate
     raise RuntimeError(
         "ROCM_PATH is required when run_miopen.py is not executed from an "
-        "installed ROCm tree containing bin/MIOpen/CTestTestfile.cmake."
+        "installed ROCm tree containing bin/miopen_gtest."
     )
-
-
-def find_matching_gpu_arch(gpu_arch: str, available_gpu_archs: set[str]) -> str | None:
-    if gpu_arch in available_gpu_archs:
-        return gpu_arch
-
-    for i in range(len(gpu_arch) - 1, 4, -1):
-        pattern = gpu_arch[:i] + "X"
-        if pattern in available_gpu_archs:
-            return pattern
-
-    return None
-
-
-def normalize_test_category(test_type: str | None) -> str:
-    if not test_type:
-        return "quick"
-    category = test_type.strip().lower()
-    return category if category in VALID_TEST_CATEGORIES else "quick"
-
-
-def extract_gpu_arch(amdgpu_families: str | None) -> str:
-    if not amdgpu_families:
-        return ""
-    match = re.search(r"gfx[0-9a-zA-Z]+", amdgpu_families)
-    return match.group(0).lower() if match else ""
 
 
 def positive_int(name: str, value: str | int) -> int:
@@ -85,17 +242,6 @@ def positive_int(name: str, value: str | int) -> int:
     if parsed < 1:
         raise ValueError(f"{name} must be >= 1, got {parsed}")
     return parsed
-
-
-def ctest_shard_args(shard_index: str | int, total_shards: str | int) -> list[str]:
-    parsed_shard_index = positive_int("shard_index", shard_index)
-    parsed_total_shards = positive_int("total_shards", total_shards)
-    if parsed_shard_index > parsed_total_shards:
-        raise ValueError(
-            "shard_index must be less than or equal to total_shards, "
-            f"got {parsed_shard_index} > {parsed_total_shards}"
-        )
-    return ["--tests-information", f"{parsed_shard_index},,{parsed_total_shards}"]
 
 
 def gtest_shard_env(shard_index: str | int, total_shards: str | int) -> dict[str, str]:
@@ -112,71 +258,6 @@ def gtest_shard_env(shard_index: str | int, total_shards: str | int) -> dict[str
     }
 
 
-def count_ctest_tests(test_dir: Path) -> int:
-    result = subprocess.run(
-        ["ctest", "-N", "--test-dir", str(test_dir)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return sum(
-        1 for line in result.stdout.splitlines() if re.search(r"Test\s+#\d+:", line)
-    )
-
-
-def read_ctest_labels(test_dir: Path) -> set[str]:
-    result = subprocess.run(
-        ["ctest", "--print-labels", "--test-dir", str(test_dir)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
-
-
-def discover_ctest_labels(test_dir: Path) -> tuple[set[str], set[str]]:
-    if count_ctest_tests(test_dir) == 0:
-        raise RuntimeError(f"No CTest tests found in {test_dir}")
-
-    gpu_archs = set()
-    exclude_labels = set()
-    for label in read_ctest_labels(test_dir):
-        if label.startswith("ex_gpu_"):
-            gpu_arch = label.removeprefix("ex_gpu_")
-            if gpu_arch.startswith("gfx"):
-                gpu_archs.add(gpu_arch)
-        elif label.endswith("_exclude"):
-            exclude_labels.add(label)
-    return gpu_archs, exclude_labels
-
-
-def build_ctest_label_args(
-    category: str,
-    gpu_arch: str,
-    available_gpu_archs: set[str],
-    exclude_labels: set[str],
-) -> list[str]:
-    args = ["-L", category]
-    exclude_patterns = []
-
-    category_exclude_label = f"{category}_exclude"
-    if category_exclude_label in exclude_labels:
-        exclude_patterns.append(category_exclude_label)
-
-    if gpu_arch in ("", "generic", "none"):
-        exclude_patterns.append("ex_gpu")
-    else:
-        matching_arch = find_matching_gpu_arch(gpu_arch, available_gpu_archs)
-        if matching_arch:
-            args.extend(["-L", f"ex_gpu_{matching_arch}"])
-        else:
-            exclude_patterns.append("ex_gpu")
-
-    if exclude_patterns:
-        args.extend(["-LE", "|".join(exclude_patterns)])
-    return args
-
-
 def ctest_parallel_count() -> int:
     amdgpu_families = os.getenv("AMDGPU_FAMILIES", "")
     if "gfx1152" in amdgpu_families or "gfx1153" in amdgpu_families:
@@ -184,36 +265,86 @@ def ctest_parallel_count() -> int:
     return 8
 
 
-def build_fallback_ctest_command(test_dir: Path) -> list[str]:
-    category = normalize_test_category(os.getenv("TEST_TYPE", "quick"))
-    gpu_arch = extract_gpu_arch(os.getenv("AMDGPU_FAMILIES"))
-    available_gpu_archs, exclude_labels = discover_ctest_labels(test_dir)
+def rocminfo_command(bin_dir: Path) -> str:
+    rocminfo = bin_dir / ("rocminfo.exe" if os.name == "nt" else "rocminfo")
+    return str(rocminfo) if rocminfo.is_file() else "rocminfo"
 
-    cmd = ["ctest"]
-    cmd.extend(
-        build_ctest_label_args(
-            category,
-            gpu_arch,
-            available_gpu_archs,
-            exclude_labels,
+
+def parse_rocminfo_gpu_archs(output: str) -> list[str]:
+    gpu_archs = []
+    for line in output.splitlines():
+        match = _ROCMINFO_NAME_PATTERN.match(line)
+        if match:
+            gpu_archs.append(match.group(1).lower())
+    return gpu_archs
+
+
+def detect_gpu_arch(bin_dir: Path) -> str:
+    try:
+        result = subprocess.run(
+            [rocminfo_command(bin_dir)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
         )
+    except FileNotFoundError:
+        logging.warning("rocminfo not found; GPU-specific MIOpen filters disabled")
+        return ""
+
+    if result.returncode != 0:
+        logging.warning("rocminfo failed; GPU-specific MIOpen filters disabled")
+        return ""
+
+    gpu_archs = parse_rocminfo_gpu_archs(result.stdout or "")
+    if not gpu_archs:
+        logging.warning("No GPU architecture found in rocminfo output")
+        return ""
+
+    logging.info("Detected GPU architecture: %s", gpu_archs[0])
+    return gpu_archs[0]
+
+
+def amdgpu_family_for_filters(bin_dir: Path) -> str:
+    amdgpu_families = os.getenv("AMDGPU_FAMILIES")
+    if amdgpu_families:
+        return amdgpu_families
+    # Standalone runs outside TheRock CI usually do not have AMDGPU_FAMILIES.
+    # Use rocminfo so the old architecture-specific filter policy still works.
+    return detect_gpu_arch(bin_dir)
+
+
+def build_miopen_gtest_filter(bin_dir: Path) -> str:
+    amdgpu_family = amdgpu_family_for_filters(bin_dir)
+    os_type = platform.system().lower()
+    positive_filters = list(POSITIVE_FILTERS)
+    negative_filters = list(NEGATIVE_FILTERS)
+
+    if amdgpu_family in TESTS_TO_IGNORE and os_type in TESTS_TO_IGNORE[amdgpu_family]:
+        negative_filters.extend(TESTS_TO_IGNORE[amdgpu_family][os_type])
+
+    if "gfx110" in amdgpu_family:
+        negative_filters.extend(
+            [
+                "*/GPU_MIOpenDriver*",
+                "Smoke/CPU_Handle_NONE*",
+                "Full/GPU_reduce_custom_fp32*",
+            ]
+        )
+
+    if any(prefix in amdgpu_family for prefix in ["gfx110", "gfx115", "gfx120"]):
+        negative_filters.extend(NAVI_NEGATIVE_FILTERS)
+
+    quick_filters = list(QUICK_FILTERS)
+    if amdgpu_family != "gfx950-dcgpu":
+        quick_filters.append("*DBSync*")
+        positive_filters.append("*DBSync*")
+
+    if os.getenv("TEST_TYPE", "full").strip().lower() == "quick":
+        return "--gtest_filter=" + ":".join(quick_filters)
+    return "--gtest_filter=" + ":".join(positive_filters) + "-" + ":".join(
+        negative_filters
     )
-    cmd.extend(
-        [
-            "--output-on-failure",
-            "--parallel",
-            str(ctest_parallel_count()),
-            "--timeout",
-            str(CTEST_TIMEOUT_SECONDS),
-            "--test-dir",
-            str(test_dir),
-            "-V",
-        ]
-    )
-    cmd.extend(
-        ctest_shard_args(os.getenv("SHARD_INDEX", 1), os.getenv("TOTAL_SHARDS", 1))
-    )
-    return cmd
 
 
 def build_env(rocm_path: Path) -> dict[str, str]:
@@ -249,8 +380,9 @@ def run_with_shared_utils(test_utils, rocm_path: Path, test_dir: Path) -> int:
     return result.returncode
 
 
-def run_with_fallback(rocm_path: Path, test_dir: Path) -> int:
-    cmd = build_fallback_ctest_command(test_dir)
+def run_with_fallback(rocm_path: Path) -> int:
+    bin_dir = rocm_bin_dir(rocm_path)
+    cmd = [str(resolve_miopen_gtest(bin_dir)), build_miopen_gtest_filter(bin_dir)]
     logging.info("++ Exec [%s]$ %s", rocm_path, shlex.join(cmd))
     result = subprocess.run(cmd, cwd=rocm_path, env=build_env(rocm_path), check=False)
     return result.returncode
@@ -263,13 +395,13 @@ def main() -> int:
         Path(rocm_path_env).resolve() if rocm_path_env else derive_rocm_path(script_dir)
     )
     test_dir = rocm_bin_dir(rocm_path) / TEST_DIR_NAME
-    if not (test_dir / "CTestTestfile.cmake").is_file():
-        raise FileNotFoundError(f"MIOpen CTest metadata not found in {test_dir}")
 
     test_utils = load_shared_test_utils()
     if test_utils is not None:
+        if not (test_dir / "CTestTestfile.cmake").is_file():
+            raise FileNotFoundError(f"MIOpen CTest metadata not found in {test_dir}")
         return run_with_shared_utils(test_utils, rocm_path, test_dir)
-    return run_with_fallback(rocm_path, test_dir)
+    return run_with_fallback(rocm_path)
 
 
 if __name__ == "__main__":
