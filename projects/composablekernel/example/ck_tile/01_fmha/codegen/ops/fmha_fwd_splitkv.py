@@ -770,6 +770,7 @@ class KernelComponentFactoryBase:
                 pipelines.append(Pipeline("qr", "row", "t", "f", "f", "f", logits, bias, "t", squant, pagedkv, sink, mask))  # fmt: skip
                 pipelines.append(Pipeline("qr", "row", "t", "t", "f", "f", logits, bias, "t", squant, pagedkv, sink, mask))  # fmt: skip
                 pipelines.append(Pipeline("qr", "row", "t", "t", "t", "t", logits, bias, "t", squant, pagedkv, sink, mask))  # fmt: skip
+                pipelines.append(Pipeline("qr_nwarp_sshuffle", "row", "t", "t", "f", "f", logits, bias, "t", squant, pagedkv, sink, mask))  # fmt: skip
         elif dtype in ["fp8", "bf8"]:
             for logits, mask, bias in itertools.product(
                 ["t", "f"], get_mask_map(mask_impl).keys(), BIAS_MAP.keys()
@@ -853,11 +854,15 @@ class KernelComponentFactoryGfx11(KernelComponentFactoryBase):
     def get_hdim_tile_size_dict(dtype: str) -> Optional[dict]:
         if dtype in ["fp16", "bf16"]:
             return {
-                #                      bm0, bn0, bk0, bn1, bk1,
-                "32" : FmhaFwdTileSize( 64,  64,  16,  32,  32,   32,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-                "64" : FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-                "128": FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-                "256": FmhaFwdTileSize( 64,  64,  32, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
+                #                       bm0, bn0, bk0, bn1, bk1,
+                "32" : [FmhaFwdTileSize( 16,  64,  16,  32,  32,   32,  1, 2, 1,  1, 2, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  16,  32,  32,   32,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                "64" : [FmhaFwdTileSize( 16,  64,  32,  64,  32,   64,  1, 4, 1,  1, 4, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                "128": [FmhaFwdTileSize( 16,  64,  32, 128,  32,  128,  1, 4, 1,  1, 4, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                "256": [FmhaFwdTileSize( 16,  64,  32, 256,  32,  256,  1, 4, 1,  1, 4, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  32, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
             }  # fmt: skip
         else:
             return None
@@ -870,11 +875,15 @@ class KernelComponentFactoryGfx12(KernelComponentFactoryBase):
     def get_hdim_tile_size_dict(dtype: str) -> Optional[dict]:
         if dtype in ["fp16", "bf16"]:
             return {
-                #                      bm0, bn0, bk0, bn1, bk1,
-                "32" : FmhaFwdTileSize( 64,  64,  16,  32,  32,   32,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-                "64" : FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-                "128": FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-                "256": FmhaFwdTileSize( 64,  64,  32, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
+                #                       bm0, bn0, bk0, bn1, bk1,
+                "32" : [FmhaFwdTileSize( 16,  64,  16,  32,  32,   32,  1, 2, 1,  1, 2, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  16,  32,  32,   32,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                "64" : [FmhaFwdTileSize( 16,  64,  32,  64,  32,   64,  1, 4, 1,  1, 4, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                "128": [FmhaFwdTileSize( 16, 128,  32, 128,  32,  128,  1, 8, 1,  1, 8, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                "256": [FmhaFwdTileSize( 16, 128,  32, 256,  32,  256,  1, 8, 1,  1, 8, 1,  16, 16, 16,  16, 16, 16,  -1),
+                        FmhaFwdTileSize( 64,  64,  32, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
             }  # fmt: skip
         elif dtype in ["fp8", "bf8"]:
             return {
@@ -921,6 +930,9 @@ def get_fwd_splitkv_blobs(
             for tile, pipeline in itertools.product(
                 tiles, factory.get_pipelines(dtype, hdim, mask_impl)
             ):
+                # Use qr_nwarp_sshuffle with multiple N warps and qr otherwise
+                if (tile.F_rn0 != 1) != (pipeline.tag == "qr_nwarp_sshuffle"):
+                    continue
                 if mode == "group":
                     if pipeline.F_spad != "t" or pipeline.F_skpad != "t":
                         # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
