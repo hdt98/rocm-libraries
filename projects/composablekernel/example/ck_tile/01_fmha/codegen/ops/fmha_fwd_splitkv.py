@@ -280,7 +280,7 @@ float fmha_fwd_splitkv(fmha_fwd_splitkv_traits t, fmha_fwd_splitkv_args a, const
 """
 
 FMHA_FWD_SPLITKV_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.do_fp8_static_quant == {F_squant}) &&
-        ((a.block_table_ptr != nullptr) == {F_pagedkv}) && (t.has_sink == {F_sink}) && ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck})) {{
+        ((a.block_table_ptr != nullptr) == {F_pagedkv}) && (t.has_sink == {F_sink}) && ({F_scheck}) && ({F_seqtune}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck})) {{
     using traits_ = fmha_fwd_splitkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, true, {F_squant}, {F_pagedkv},{F_sink}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}>;
 
     // get combine kernel tile sizes
@@ -360,6 +360,14 @@ class FmhaFwdSplitKVApiTrait:
                 return f"a.seqlen_q % {self.bm0} == 0"
         else:
             assert False
+
+    def seqtune(self, max_bm0: int) -> str:
+        if self.bm0 == max_bm0:
+            return "true/*fall back to largest tile*/"
+        else:
+            if self.mode == "group":
+                return f"a.max_seqlen_q <= {self.bm0}"
+            return f"a.seqlen_q <= {self.bm0}"
 
     @property
     def skcheck(self) -> str:
@@ -558,6 +566,7 @@ class FmhaFwdSplitKVApiPool:
             for i_dtype, (dtype, pool_by_dtype) in enumerate(pool_by_arch.items()):
                 per_hdim_case = str()
                 for i_hdim, (hdim, pool_by_hdim) in enumerate(pool_by_dtype.items()):
+                    max_bm0 = max((t.bm0 for t in pool_by_hdim), default=0)
                     inners = str()
                     for i_trait, trait in enumerate(pool_by_hdim):
                         inners += FMHA_FWD_SPLITKV_API_INNER_DISPATCH.format(
@@ -576,6 +585,7 @@ class FmhaFwdSplitKVApiPool:
                             F_pagedkv=BOOL_MAP[trait.pagedkv],
                             F_sink=BOOL_MAP[trait.sink],
                             F_scheck=trait.scheck,
+                            F_seqtune=trait.seqtune(max_bm0),
                             F_skcheck=trait.skcheck,
                             F_dcheck=trait.dcheck,
                             F_dvcheck=trait.dvcheck,
@@ -903,11 +913,14 @@ def get_fwd_splitkv_blobs(
         d = factory.get_hdim_tile_size_dict(dtype)
         if d is None:
             continue
-        # for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
         for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
-            tile = d[hdim_str]
+            tiles = d[hdim_str]
+            if not isinstance(tiles, list):
+                tiles = [tiles]
             hdim = int(hdim_str)
-            for pipeline in factory.get_pipelines(dtype, hdim, mask_impl):
+            for tile, pipeline in itertools.product(
+                tiles, factory.get_pipelines(dtype, hdim, mask_impl)
+            ):
                 if mode == "group":
                     if pipeline.F_spad != "t" or pipeline.F_skpad != "t":
                         # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
