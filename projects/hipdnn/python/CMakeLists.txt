@@ -80,8 +80,6 @@ else()
                 -w \"\${_wheel_dir}\"
                 \"${CMAKE_CURRENT_SOURCE_DIR}\"
                 -C \"cmake.define.CMAKE_PREFIX_PATH=\${CMAKE_INSTALL_PREFIX}\"
-                -C \"cmake.define.HIPDNN_NANOBIND_VERSION=${HIPDNN_NANOBIND_VERSION}\"
-                -C \"cmake.define.HIPDNN_TSL_ROBIN_MAP_VERSION=${HIPDNN_TSL_ROBIN_MAP_VERSION}\"
                 -C \"cmake.define.nanobind_DIR=${nanobind_DIR}\"
                 -C \"cmake.define.tsl-robin-map_DIR=${tsl-robin-map_DIR}\"
             RESULT_VARIABLE _result
