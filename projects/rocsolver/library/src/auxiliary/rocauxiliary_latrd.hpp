@@ -2754,13 +2754,17 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
     T* pSW = W;
     /* T* v = reinterpret_cast<T*>(pSW + n * nb); */
     T* v = reinterpret_cast<T*>(lmem + 1);
+    T* pSv = v;
     T* w = reinterpret_cast<T*>(v + n);
+    T* pSw = w;
     T* pSz1 = reinterpret_cast<T*>(w + n);
     T* pSz2 = reinterpret_cast<T*>(pSz1 + nb);
     T* pSmem = reinterpret_cast<T*>(pSz2 + nb);
 
     // Workspace
     // work is aligned at 64 bytes
+    T* pA = A;
+    T* pW = W;
     T* pz1 = work;
     T* pz2 = work + n;
 
@@ -2769,56 +2773,14 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
     I ldSA = lda;
     I ldSW = ldw;
 
-    /* // Load A into LDS */
-    /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
-    /* { */
-    /*     const auto tidy = tid / (MAX_THDS / 2); */
-    /*     for(I jj = tidy; jj < n; jj += 2) */
-    /*     { */
-    /*         pSA[ii + jj * n] = A[ii + jj * lda]; */
-    /*     } */
-    /* } */
-    /* __syncthreads(); */
-
-    /* // Remove later if not necessary */
-    /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
-    /* { */
-    /*     const auto tidy = tid / (MAX_THDS / 2); */
-    /*     for(I jj = tidy; jj < n; jj += 2) */
-    /*     { */
-    /*         // Ignore imaginary part of the diagonal */
-    /*         if(ii == jj) */
-    /*         { */
-    /*             pSA[ii + jj * ldSA] = std::real(pSA[ii + jj * ldSA]); */
-    /*         } */
-    /*         // Copy lower triangular part to upper triangle */
-    /*         if(ii < jj) */
-    /*         { */
-    /*             pSA[ii + jj * ldSA] = conj(pSA[jj + ii * ldSA]); */
-    /*         } */
-    /*     } */
-    /* } */
-    /* grid.sync(); */
-
-    /* // Zero W */
-    /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
-    /* { */
-    /*     const auto tidy = tid / (MAX_THDS / 2); */
-    /*     for(I jj = tidy; jj < nb; jj += 2) */
-    /*     { */
-    /*         pSW[ii + jj * n] = T(0); */
-    /*     } */
-    /* } */
-    /* __syncthreads(); */
-
     // Reduce the lower part of A: main loop running forwards (for each column)
     I nj{};
     T temp{};
     for(rocblas_int j = 0; j < nb; ++j)
     {
         nj = n - j - 1;
-        pv = A + j * lda;
-        pw = W + j * ldw;
+        /* pv = A + j * lda; */
+        /* pw = W + j * ldw; */
 
         // Zero W
         for(I ii = tid; ii < n; ii += MAX_THDS)
@@ -2828,7 +2790,7 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
 
         // Part A:
         //
-        // Update A(j:n-1, j) with previously computed reflectors and pSW.
+        // Update A(j:n-1, j) with previously computed reflectors and W.
         // (Notice that the triangle below the diagonal of A holds
         // previously computed Householder reflectors.)
         //
@@ -2836,29 +2798,17 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
         {
             // Step 1: A(j:n-1, j) = -A(j:n-1, 0:j-1) * W(j, 0:1-j)^H + A(j:n-1, j)
             // Step 2: A(j:n-1, j) = -W(j:n-1, 0:j-1) * A(j, 0:j-1)^H + A(j:n-1, j)
-            //
             for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
             {
                 temp = T(0);
                 for(I jj = 0; jj < j; jj++)
                 {
-                    temp += pSA[j + ii + jj * ldSA] * pSW[j + jj * ldSW];
-                    temp += pSW[j + ii + jj * ldSW] * pSA[j + jj * ldSA];
+                    temp += pA[j + ii + jj * ldSA] * pW[j + jj * ldSW];
+                    temp += pW[j + ii + jj * ldSW] * pA[j + jj * ldSA];
                 }
-                pSA[ii + j + j * ldSA] -= temp;
+                pA[ii + j + j * ldSA] -= temp;
             }
             grid.sync();
-            // Note: since
-            //
-            //     z1 = A(j:n-1, 0:j-1) * W(j, 0:j-1)^H (computed in Step 1), and
-            //     z2 = W(j:n-1, 0:j-1) * A(j, 0:j-1)^H (computed in Step 2)
-            //
-            // are independent, these two GEMVs above can be fused to compute:
-            //
-            //     A(j:n-1, j) -= z1 + z2
-            //
-            // in a single pass.
-            //
             // Work has to be synchronized here because A(j:n-1, j) is used to compute a
             // Householder reflector in Step 3.
         }
@@ -2874,7 +2824,7 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
             // Load A(j+1:n-1,j) into v
             for(I ii = tid; ii < nj; ii += MAX_THDS)
             {
-                v[ii] = pSA[ii + (j + 1) + j * ldSA];
+                v[ii] = pA[ii + (j + 1) + j * ldSA];
             }
             __syncthreads();
 
@@ -2906,7 +2856,7 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
             // Copy v back to A(j+1:n-1,j)
             for(I ii = tid; ii < nj; ii += MAX_THDS)
             {
-                pSA[(ii + j + 1) + j * ldSA] = v[ii];
+                pA[(ii + j + 1) + j * ldSA] = v[ii];
             }
         }
         grid.sync();
@@ -2921,7 +2871,7 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
         //
         // Step 4: w_0 = A(j+1:n-1, j+1:n-1) * v(0:n-1-j)
         //
-        Atmp = pSA + (j + 1) + (j + 1) * ldSA;
+        Atmp = pA + (j + 1) + (j + 1) * ldSA;
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
             temp = T(0);
@@ -2934,7 +2884,7 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
 
         // Step 5: z1(0:j-1) = W(j+1:n-1, 0:j-1)^H * v(0:n-1-j)
         //
-        Wtmp = pSW + (j + 1);
+        Wtmp = pW + (j + 1);
         for(I jj = tid; jj < j; jj += MAX_THDS)
         {
             temp = T(0);
@@ -2949,7 +2899,7 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
 
         // Step 7: z2(0:j-1) = A(j+1:n-1, 0:j-1)^H * v(0:n - 1 -j);
         //
-        Atmp = pSA + (j + 1);
+        Atmp = pA + (j + 1);
         for(I jj = tid; jj < j; jj += MAX_THDS)
         {
             temp = T(0);
@@ -2968,8 +2918,9 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
         // Step 6: w(j+1:n-1) = -A(j+1:n-1, 0:j-1) * z1(0:j-1) + w(j+1:n-1)
         // Step 8: w(j+1:n-1) = -W(j+1:n-1, 0:j-1) * z2(0:j-1) + w(j+1:n-1)
         //
-        Atmp = pSA + (j + 1);
-        Wtmp = pSW + (j + 1);
+        // Note: Steps 6 and 8 can be fused.
+        Atmp = pA + (j + 1);
+        Wtmp = pW + (j + 1);
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
             temp = T(0);
@@ -2980,27 +2931,6 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
             }
             w[j + 1 + ii] += temp;
         }
-        /* __syncthreads(); */
-
-        // grid.sync()
-        //
-        // Note: notice that Steps 4, 5 and 7 are functionally independent
-        // and can be computed without synchronization.
-
-        // Step 8: w(j+1:n-1) = -W(j+1:n, 0:j-1) * z2(0:j-1) + W(j+1:n-1)
-        //
-        /* Wtmp = pSW + (j + 1); */
-        /* for(I ii = tid; ii < nj; ii += MAX_THDS) */
-        /* { */
-        /*     temp = T(0); */
-        /*     for(I jj = 0; jj < j; ++jj) */
-        /*     { */
-        /*         temp -= Wtmp[ii + jj * ldSW] * pz2[jj]; */
-        /*     } */
-        /*     w[j + 1 + ii] += temp; */
-        /* } */
-        /* __syncthreads(); */
-        // Note: Steps 6 and 8 can be fused.
         grid.sync();
 
         // Part E:
@@ -3044,29 +2974,6 @@ __global__ void __launch_bounds__(MAX_THDS) latrd_lower_kernel_naive(const I n,
         //
         // Note: the result of the AXPY is required for Steps 1 and 2.
     }
-
-    /* // Write LDS back to A */
-    /* for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2)) */
-    /* { */
-    /*     const auto tidy = tid / (MAX_THDS / 2); */
-    /*     for(I j = tidy; j < n; j += 2) */
-    /*     { */
-    /*         if(i >= j) */
-    /*         { */
-    /*             A[i + j * lda] = pSA[i + j * ldSA]; */
-    /*         } */
-    /*     } */
-    /* } */
-
-    /* // Write LDS back to W */
-    /* for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2)) */
-    /* { */
-    /*     const auto tidy = tid / (MAX_THDS / 2); */
-    /*     for(I j = tidy; j < nb; j += 2) */
-    /*     { */
-    /*         W[i + j * ldw] = pSW[i + j * ldSW]; */
-    /*     } */
-    /* } */
 }
 
 template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
@@ -3150,7 +3057,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             && (lmemsize_small <= props->sharedMemPerBlock);
 
         const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * n + 5 * k) * sizeof(T);
-        std::cout << "lmemsize = " << std::to_string(lmemsize_fused / 1024.0) << "KB" << std::endl;
+        /* std::cout << "lmemsize = " << std::to_string(lmemsize_fused / 1024.0) << "KB" << std::endl; */
         bool use_fused_kernel = select_coop_launch
             && !rocblas_is_complex<T> && (lmemsize_fused <= props->sharedMemPerBlock);
 
