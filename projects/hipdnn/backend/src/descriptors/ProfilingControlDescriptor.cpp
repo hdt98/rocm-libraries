@@ -37,7 +37,7 @@ void ProfilingControlDescriptor::createEvents()
     if(status != hipSuccess)
     {
         // Clean up the start event before throwing
-        hipEventDestroy(_startEvent);
+        static_cast<void>(hipEventDestroy(_startEvent));
         _startEvent = nullptr;
         throw HipdnnException(HIPDNN_STATUS_INTERNAL_ERROR,
                               "ProfilingControlDescriptor: hipEventCreate(stop) failed.");
@@ -55,12 +55,12 @@ void ProfilingControlDescriptor::destroyEvents()
 
     if(_stopEvent != nullptr)
     {
-        hipEventDestroy(_stopEvent);
+        static_cast<void>(hipEventDestroy(_stopEvent));
         _stopEvent = nullptr;
     }
     if(_startEvent != nullptr)
     {
-        hipEventDestroy(_startEvent);
+        static_cast<void>(hipEventDestroy(_startEvent));
         _startEvent = nullptr;
     }
 
