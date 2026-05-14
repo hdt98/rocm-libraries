@@ -127,7 +127,7 @@ using trait_{F_idx} = fmha_fwd_splitkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F
 namespace {{
 template <bool kHasUnevenSplits>
 void run_instance(const ck_tile::stream_config& s, fmha_fwd_splitkv_args a) {{
-    if constexpr ({F_hdim} == 128 && {F_bias} == ck_tile::BlockAttentionBiasEnum::NO_BIAS
+    if constexpr ({F_bias} == ck_tile::BlockAttentionBiasEnum::NO_BIAS
                   && (std::is_same_v<{F_mask}, ck_tile::SimplifiedGenericAttentionMask<false>>
                       || std::is_same_v<{F_mask}, FmhaMasks::NoMask>)) {{
         if (a.max_seqlen_q == 1 && a.nhead_k < a.nhead_q) {{
