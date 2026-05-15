@@ -993,6 +993,69 @@ TEST_F(TestGpuEngineHeuristicDescriptor, FinalizeWithPolicyThrowingException)
     ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
 }
 
+TEST_F(TestGpuEngineHeuristicDescriptor, FinalizeWithSetDevicePropertiesThrowingDisablesSlot)
+{
+    // setDeviceProperties failure for a plugin must disable that plugin's slots
+    // (mirroring the policy loop's fail-soft contract). With the only available
+    // policy disabled, finalize falls through to the "no policy succeeded" throw.
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    auto mockHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(0x1234);
+    EXPECT_CALL(*_mockHeuristicPlugin, setDeviceProperties(mockHandle, _))
+        .WillOnce(Throw(
+            HipdnnException(HIPDNN_STATUS_INTERNAL_ERROR, "Mock setDeviceProperties failure")));
+
+    ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
+}
+
+TEST_F(TestGpuEngineHeuristicDescriptor,
+       FinalizeWithSetDevicePropertiesFailingForOnePluginContinuesWithOthers)
+{
+    // When one plugin's setDeviceProperties throws, only that plugin's policy
+    // slots are disabled. Policies backed by other plugins still get
+    // setDeviceProperties called and remain selectable.
+    const int64_t failingPolicyId = hipdnn_data_sdk::utilities::policyNameToId("Vendor::Failing");
+    const int64_t staticOrderingId
+        = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
+
+    auto failingHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(0xABCD);
+    auto failingPlugin = std::make_shared<NiceMock<MockHeuristicPlugin>>();
+
+    // Wire the failing policy to a distinct plugin/handle. Registering after
+    // setupMockHeuristicPlugin's catch-all (LIFO match) routes failingPolicyId
+    // to this plugin while staticOrderingId continues to use _mockHeuristicPlugin.
+    EXPECT_CALL(*_mockHeuristicPluginResourceManager, getPluginForPolicyId(failingPolicyId))
+        .WillRepeatedly(Return(failingPlugin.get()));
+    EXPECT_CALL(*_mockHeuristicPluginResourceManager,
+                getHeuristicHandleForPolicyId(failingPolicyId))
+        .WillRepeatedly(Return(failingHandle));
+    EXPECT_CALL(*failingPlugin, setDeviceProperties(failingHandle, _))
+        .WillRepeatedly(Throw(
+            HipdnnException(HIPDNN_STATUS_INTERNAL_ERROR, "Mock setDeviceProperties failure")));
+
+    auto heur = getEngineHeuristicDescriptor();
+
+    // Failing policy first, then StaticOrdering. The failing slot is disabled
+    // by setDeviceProperties throwing; StaticOrdering succeeds.
+    const std::vector<int64_t> policyIds = {failingPolicyId, staticOrderingId};
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    ASSERT_NO_THROW(heur->finalize());
+}
+
 // ========== toString Tests ==========
 
 TEST_F(TestEngineHeuristicDescriptor, ToStringBeforeFinalize)

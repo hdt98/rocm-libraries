@@ -245,9 +245,42 @@ void EngineHeuristicDescriptor::finalize()
         return a.first < b.first;
     });
 
+    // Mirror the policy loop's fail-soft contract below: a single plugin's
+    // setDeviceProperties failure must not break the chain. Disable every slot
+    // backed by a failed plugin handle so the policy loop skips it via the
+    // existing nullptr branch.
+    auto disableSlotsForHandle = [&](hipdnnHeuristicHandle_t failedHandle) {
+        for(size_t i = 0; i < _policySlots.size(); ++i)
+        {
+            if(_policySlots[i] != nullptr
+               && heurRm->getHeuristicHandleForPolicyId(_orderedPolicyIds[i]) == failedHandle)
+            {
+                _policySlots[i].reset();
+            }
+        }
+    };
+
     for(const auto& [pluginHandle, plugin] : sortedHandles)
     {
-        plugin->setDeviceProperties(pluginHandle, &devicePropsWrapper);
+        try
+        {
+            plugin->setDeviceProperties(pluginHandle, &devicePropsWrapper);
+        }
+        catch(const std::exception& e)
+        {
+            HIPDNN_BACKEND_LOG_WARN("setDeviceProperties failed for heuristic plugin '{}': {}. "
+                                    "Disabling all policies provided by this plugin.",
+                                    plugin->name(),
+                                    e.what());
+            disableSlotsForHandle(pluginHandle);
+        }
+        catch(...)
+        {
+            HIPDNN_BACKEND_LOG_WARN("setDeviceProperties threw unknown exception for heuristic "
+                                    "plugin '{}'. Disabling all policies provided by this plugin.",
+                                    plugin->name());
+            disableSlotsForHandle(pluginHandle);
+        }
     }
 
     // Outer policy loop: try each policy in order until one succeeds
