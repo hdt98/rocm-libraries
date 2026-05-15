@@ -17,8 +17,6 @@
 #include "ck_tile/ops/flatmm.hpp"
 #include "ck_tile/ops/gemm.hpp"
 
-// FIXME: remove this include. It points to the 18_flatmm/mxgemm example directory, which is not
-//  a good place for a test header file.
 #include "mx_flatmm.hpp"
 
 template <ck_tile::index_t NLane, typename dtype>
