@@ -589,9 +589,10 @@ CK_TILE_DEVICE void load_tile_transpose_convert_with_offset(
     constexpr auto y_in_element_space_size  = y_in_desc.get_element_space_size();
     constexpr auto y_out_element_space_size = y_out_desc.get_element_space_size();
 
-    // For mixed precision: element space size must be the same (total bytes match)
-    static_assert(y_in_element_space_size == y_out_element_space_size,
-                  "For mixed precision transpose, input and output element space size must match!");
+    // For mixed precision: input and output element space sizes must be the same.
+    static_assert(
+        y_in_element_space_size == y_out_element_space_size,
+        "For mixed precision transpose, input and output element space sizes must match!");
 
     // Ensure total element counts are consistent and divisible by the input vector length.
     constexpr index_t total_elems_in =
