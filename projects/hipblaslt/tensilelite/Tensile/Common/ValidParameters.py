@@ -299,9 +299,10 @@ validParameters = { # we need to make sure this matches develop
     #    SIA3: 1LDSBuffer works only when PGR=True
     # TODO: optimize scheduling to support more cases.
     "1LDSBuffer": [-1, 0, 1],
-    # StreamK persistent loop: after global write, warm up SGPR state for the next tile
-    # (skTileIndex + skIndexToWG) before the persistent back-edge. Full overlap of global
-    # loads with the next tile's compute requires additional SRD/LDS double-buffer plumbing.
+    # StreamK persistent loop: use the current tile's no-load-loop window to
+    # issue the first global-read group for the next persistent tile. The
+    # generated code keeps that first-PGR data durable and restores borrowed
+    # current-tile state before current tail/NLL code resumes.
     "PrefetchAcrossPersistent": [0, 1],
     # Split the unroll summation into multiple sections and combine the sections
     # GSU applies only to the unroll summation dimension

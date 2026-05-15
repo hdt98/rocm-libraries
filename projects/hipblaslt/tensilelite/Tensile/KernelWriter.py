@@ -2882,11 +2882,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"])
           and not (tdmA and tdmB)
           and self.isPrefetchAcrossPersistentEnabled(kernel)):
-        module.add(self.dtlRestorePapLdsBank(kernel, tensorParametersA, tensorParametersB))
+        module.add(self.papDtlRestoreLdsBank(kernel, tensorParametersA, tensorParametersB))
 
       if (tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1
           and self.isPrefetchAcrossPersistentEnabled(kernel)):
-        module.add(self.tdmRestorePapLdsBank(kernel, tensorParametersA, tensorParametersB))
+        module.add(self.papTdmRestoreLdsBank(kernel, tensorParametersA, tensorParametersB))
 
       if self.do["executeToInitEnd"]:
         module.add(self.functionEnd(kernel, addLabel=False))
@@ -2973,7 +2973,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
         return self.states.use64bShadowLimitMX
       return self.states.use64bShadowLimit
 
-    def snapshotSrd(tP, tmpSgpr):
+    # PAP borrows the current descriptor registers long enough to compute and
+    # issue next-tile first-PGR loads. Restore them before current-tail code
+    # resumes; only the issued loads and SkPrefetchPrimed are durable.
+    def checkpointDescriptorState(tP, tmpSgpr):
       tc = tP["tensorChar"]
       module.addComment0("PAP: snapshot current %s descriptor" % tc)
       module.add(SMovB64(dst=sgpr(tmpSgpr + 0, 2), src=sgpr("Srd%s+0" % tc, 2), comment="checkpoint Srd%s[0:1]" % tc))
@@ -2996,7 +2999,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.add(SOrB32(sgpr("Srd%s+1" % tc), sgpr("Srd%s+1" % tc), sgpr(tmpSgpr)))
         module.add(SLShiftRightB32(sgpr("Srd%s+2" % tc), 7, sgpr("Srd%s+2" % tc)))
 
-    def restoreSrd(tP, tmpSgpr):
+    def restoreDescriptorState(tP, tmpSgpr):
       tc = tP["tensorChar"]
       module.addComment0("PAP: restore current %s descriptor" % tc)
       module.add(SMovB64(dst=sgpr("Srd%s+0" % tc, 2), src=sgpr(tmpSgpr + 0, 2), comment="restore Srd%s[0:1]" % tc))
@@ -3006,7 +3009,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         module.add(SMovB64(dst=sgpr("Srd%s+2" % tc, 2), src=sgpr(tmpSgpr + 2, 2), comment="restore Srd%s[2:3]" % tc))
 
-    def papStaggerState():
+    def borrowedStaggerState():
+      # calculateStagger mutates this state for the next tile. The current NLL
+      # and tail path can still observe it after PAP, so treat it as borrowed.
       if not self.states.staggerUCode:
         return []
 
@@ -3022,41 +3027,47 @@ class KernelWriter(metaclass=abc.ABCMeta):
         state.append(("WrapUMetadata", 2))
       return state
 
-    def moveStaggerState(dstBase, srcBase, state, comment):
+    def copyBorrowedStaggerState(dstBase, srcBase, state, comment):
       offset = 0
       for name, size in state:
-        if size == 1:
-          module.add(SMovB32(dst=sgpr(dstBase + offset) if isinstance(dstBase, int) else sgpr(name),
-                             src=sgpr(name) if isinstance(dstBase, int) else sgpr(srcBase + offset),
-                             comment="%s %s" % (comment, name)))
-        else:
-          for i in range(size):
-            module.add(SMovB32(dst=sgpr(dstBase + offset + i) if isinstance(dstBase, int) else sgpr("%s+%u" % (name, i)),
-                               src=sgpr("%s+%u" % (name, i)) if isinstance(dstBase, int) else sgpr(srcBase + offset + i),
-                               comment="%s %s+%u" % (comment, name, i)))
+        for i in range(size):
+          regName = name if i == 0 else "%s+%u" % (name, i)
+          module.add(SMovB32(dst=sgpr(dstBase + offset + i) if dstBase is not None else sgpr(regName),
+                             src=sgpr(srcBase + offset + i) if srcBase is not None else sgpr(regName),
+                             comment="%s %s" % (comment, regName)))
         offset += size
+
+    def checkpointBorrowedStaggerState(tmpSgpr, state):
+      copyBorrowedStaggerState(tmpSgpr, None, state, "checkpoint")
+
+    def restoreBorrowedStaggerState(tmpSgpr, state):
+      copyBorrowedStaggerState(None, tmpSgpr, state, "restore")
 
     def emitTensorLoad(tP, skipWait=False):
       tc = tP["tensorChar"]
       module.addComment1("PAP: next-tile addresses and first-PGR load %s" % tc)
       if kernel["BufferLoad"] and usesCanonicalSrd(tP):
         with self.allocTmpSgpr(4, 2, "PAP%sSrdSnapshot" % tc) as tmpSgprInfo:
-          snapshotSrd(tP, tmpSgprInfo.idx)
+          checkpointDescriptorState(tP, tmpSgprInfo.idx)
           module.add(self.graAddresses(kernel, tP))
           if self.states.staggerUCode:
             module.add(self.calculateStagger(kernel, tP))
           moduleTmp = self.directToLdsM0Update(kernel, 0, tP, skipWait)
           module.add(replaceHolder(moduleTmp, 0))
           module.add(self.globalReadDo(kernel, 0, tP))
-          restoreSrd(tP, tmpSgprInfo.idx)
+          restoreDescriptorState(tP, tmpSgprInfo.idx)
       else:
         moduleTmp = self.directToLdsM0Update(kernel, 0, tP, skipWait)
         module.add(replaceHolder(moduleTmp, 0))
         module.add(self.globalReadDo(kernel, 0, tP))
 
-    # PAP contract: durable state is only the issued first-PGR loads and
-    # SkPrefetchPrimed. Tile identity is borrowed/restored by the caller, and
-    # current-tail descriptors are restored here before current execution resumes.
+    # StreamK PAP contract:
+    #   Durable state: issued first-PGR loads for the next persistent iteration,
+    #   SkPrefetchPrimed, and the saved PAP TDM/DTL LDS-bank bits encoded there.
+    #   Borrowed state: current tile identity, descriptors/shadow limits,
+    #   StaggerU registers, and LDS bank/descriptor state needed when current
+    #   NLL or tail code resumes. Each borrowed group must be restored before
+    #   leaving this handoff or by the caller immediately after it.
     tensorParameters1st = tensorParametersA
     tensorParameters2nd = tensorParametersB
     if self.isSwapGlobalReadOrderForDtvOrDtl(kernel, prefetch1=True):
@@ -3075,19 +3086,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
       skip2ndWaitForDtl = kernel["DirectToLds%s" % tensorParameters1st["tensorChar"]]
       emitTensorLoad(tensorParameters2nd, skipWait=skip2ndWaitForDtl)
 
-    staggerState = papStaggerState()
+    staggerState = borrowedStaggerState()
     if staggerState:
       numStaggerSnapshotSgprs = sum(size for _, size in staggerState)
       with self.allocTmpSgpr(numStaggerSnapshotSgprs, 2, "PAPStaggerSnapshot") as tmpSgprInfo:
-        moveStaggerState(tmpSgprInfo.idx, None, staggerState, "checkpoint")
+        checkpointBorrowedStaggerState(tmpSgprInfo.idx, staggerState)
         emitPrefetchGroup()
-        moveStaggerState(None, tmpSgprInfo.idx, staggerState, "restore")
+        restoreBorrowedStaggerState(tmpSgprInfo.idx, staggerState)
     else:
       emitPrefetchGroup()
     module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="first PGR group for next persistent iter prefetched"))
     if ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"])
         and not (kernel["enableTDMA"] and kernel["enableTDMB"])):
-      module.add(self.dtlSavePapLdsBank(kernel, tensorParametersA, tensorParametersB))
+      module.add(self.papDtlSaveLdsBank(kernel, tensorParametersA, tensorParametersB))
     self.states.ldsTensorTokenIdx = \
         self.states.memTokenLdsBuffer1 if self.states.ldsTensorTokenIdx == self.states.memTokenLdsBuffer0 else self.states.memTokenLdsBuffer0
 
@@ -5466,12 +5477,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel["enableTDMA"] and kernel["enableTDMB"]:
         if prod(kernel["MIWaveGroup"]) > 1:
           if self.isPrefetchAcrossPersistentEnabled(kernel):
-            module.add(self.resetTDMDescriptorForTailPapWaveSeparated(kernel, tensorParametersA, tensorParametersB))
+            module.add(self.papResetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA, tensorParametersB))
           else:
             module.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA, tensorParametersB))
           if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
             if self.isPrefetchAcrossPersistentEnabled(kernel):
-              module.add(self.resetTDMDescriptorForTailPapWaveSeparated(kernel, tensorParametersA["MX"], \
+              module.add(self.papResetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA["MX"], \
                                                                         tensorParametersB["MX"]))
             else:
               module.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tensorParametersA["MX"], \
@@ -5728,7 +5739,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
         if (kernel["enableTDMA"] and kernel["enableTDMB"]
             and self.isPrefetchAcrossPersistentEnabled(kernel)):
-          module.add(self.tdmShiftTailLdsBank(kernel, tensorParametersA, tensorParametersB))
+          module.add(self.papTdmShiftTailLdsBank(kernel, tensorParametersA, tensorParametersB))
 
       # tail: macs
       module.addComment1("tail loop: macs")
@@ -9802,19 +9813,25 @@ class KernelWriter(metaclass=abc.ABCMeta):
   def tdmApplyStreamKOffsetWaveSeparated(self, kernel, tPA, tPB) -> Module:
     assert False, "Should be overrided"
 
-  def resetTDMDescriptorForTailPapWaveSeparated(self, kernel, tPA, tPB) -> Module:
+  def papResetTDMDescriptorForTailWaveSeparated(self, kernel, tPA, tPB) -> Module:
     assert False, "Should be overrided"
 
-  def tdmUpdateDescriptorForPAP(self, kernel, tPA, tPB, preservePapBank=True) -> Module:
+  def papTdmUpdateDescriptor(self, kernel, tPA, tPB, preservePapBank=True) -> Module:
     assert False, "Should be overrided"
 
-  def tdmSavePapLdsBank(self, kernel) -> Module:
+  def papTdmSaveLdsBank(self, kernel) -> Module:
     assert False, "Should be overrided"
 
-  def tdmRestorePapLdsBank(self, kernel, tPA, tPB) -> Module:
+  def papTdmRestoreLdsBank(self, kernel, tPA, tPB) -> Module:
     assert False, "Should be overrided"
 
-  def tdmShiftTailLdsBank(self, kernel, tPA, tPB) -> Module:
+  def papDtlSaveLdsBank(self, kernel, tPA, tPB) -> Module:
+    assert False, "Should be overrided"
+
+  def papDtlRestoreLdsBank(self, kernel, tPA, tPB) -> Module:
+    assert False, "Should be overrided"
+
+  def papTdmShiftTailLdsBank(self, kernel, tPA, tPB) -> Module:
     assert False, "Should be overrided"
 
   def tdmIncrementAB(self, kernel, tP) -> Module:

@@ -1407,6 +1407,11 @@ class Solution(collections.abc.Mapping):
         if state["LocalSplitU"] > 1:
           reject(state, printRejectionReason, "Atomic Stream-K not working with LocalSplitU")
       if state.get("PrefetchAcrossPersistent", 0):
+        # StreamK PAP emits a next-tile first-PGR handoff inside the NLL
+        # window, then restores borrowed tile identity, descriptors/shadow
+        # limits, stagger state, and LDS bank state before current-tile code
+        # resumes. Keep rejecting axes whose borrowed-state contract is not
+        # audited below.
         if state["StreamK"] != 3:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent is currently supported only with StreamK=3")
         if not state["BufferLoad"]:
