@@ -53,9 +53,9 @@ void run_cpu_validation(const ckt::Args<SIGNATURE>& args,
         hipMemcpy(&ref.data()[0], reference.output, output_bytes_num, hipMemcpyDeviceToHost));
     HIP_CHECK_ERROR(
         hipMemcpy(&out.data()[0], outputs.output, output_bytes_num, hipMemcpyDeviceToHost));
-        
-    constexpr double rtol = 10.0*ck::profiler::get_rtol<DataType>();
-    constexpr double atol = 10.0*ck::profiler::get_atol<DataType>();
+    
+    constexpr double rtol = ck::profiler::get_rtol<DataType>();
+    constexpr double atol = ck::profiler::get_atol<DataType>();
     ck_tile::check_err(out, ref, "Error: Incorrect results!", rtol, atol);
 }
 
@@ -125,8 +125,8 @@ run_grouped_conv_forward_tile_algs(const ckt::Args<SIGNATURE>& args,
                                  desc,
                                  outputs.*ptr,
                                  reference.get().*ptr,
-                                 10.0*ck::profiler::get_rtol<DataType>(),
-                                 10.0*ck::profiler::get_atol<DataType>());
+                                 ck::profiler::get_rtol<DataType>(),
+                                 ck::profiler::get_atol<DataType>());
                 });
 
             const bool instance_valid = report.get_errors().empty();
