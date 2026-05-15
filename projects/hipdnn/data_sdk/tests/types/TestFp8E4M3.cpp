@@ -274,8 +274,9 @@ TEST(TestFp8E4M3, RoundTripAllPatterns)
         const auto decoded = fp8_e4m3::from_bits(pattern);
         const auto f = static_cast<float>(decoded);
 
-        // NaN round-trip: 0x7F/0xFF decode to NaN; sign is preserved on re-encode
-        if(pattern == 0x7F || pattern == 0xFF)
+        // NaN patterns: low 7 bits all set (0x7F positive, 0xFF negative).
+        // Sign is preserved on re-encode.
+        if((pattern & 0x7F) == 0x7F)
         {
             EXPECT_TRUE(std::isnan(f))
                 << "Pattern 0x" << std::hex << bits << " should decode to NaN";
@@ -338,10 +339,10 @@ TEST(TestFp8E4M3, DualNanEncoding)
     EXPECT_EQ(vs.data, static_cast<uint8_t>(0x7F));
     EXPECT_TRUE(isnan(vs));
 
-    // Every bit pattern except 0x7F and 0xFF is not NaN.
+    // Every bit pattern except those with low 7 bits all set (0x7F, 0xFF) is not NaN.
     for(int bits = 0; bits <= 0xFF; ++bits)
     {
-        if(bits == 0x7F || bits == 0xFF)
+        if((bits & 0x7F) == 0x7F)
         {
             continue;
         }
