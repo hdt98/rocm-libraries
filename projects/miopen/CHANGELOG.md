@@ -4,6 +4,8 @@
 Full documentation for MIOpen is available [here](https://rocm.docs.amd.com/projects/MIOpen/en/latest/)
 
 ## MIOpen 3.5.2 for ROCm 7.14.0
+### Resolved Issues
+* [RNN] Fix RNN workspace tensor descriptor int overflow
 
 ## MIOpen 3.5.1 for ROCm 7.13.0
 ### Added
@@ -38,7 +40,6 @@ Full documentation for MIOpen is available [here](https://rocm.docs.amd.com/proj
 * Fixed pooling kernel runtime compilation failure.
 * Fixed gfx1151 inline assembly compilation errors in batchnorm kernels.
 * Fixed use-after-free in HIPOCProgram binary loading.
-* [RNN] Fix RNN workspace tensor descriptor int overflow
 
 ## MIOpen 3.5.1 for ROCm 7.12.0
 ### Added
