@@ -170,7 +170,7 @@ TEST_P(GPU_LSTM_LargeWorkspace_FP16, ForwardInferenceSucceedsWhenWorkspaceExceed
     const std::size_t raw_mem      = ws_size + x_bytes + y_bytes + w_size + 4 * h_bytes;
     const std::size_t headroom     = std::max<std::size_t>(1ULL << 30, raw_mem / 10);
     const std::size_t required_mem = std::bit_ceil(raw_mem + headroom);
-    const std::size_t device_mem = handle.GetGlobalMemorySize();
+    const std::size_t device_mem   = handle.GetGlobalMemorySize();
     if(device_mem < required_mem)
     {
         GTEST_SKIP() << "Insufficient device memory: need " << required_mem
