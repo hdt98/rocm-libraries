@@ -19,8 +19,8 @@
 #pragma clang diagnostic ignored "-Wno-unknown-warning-option"
 #pragma clang diagnostic ignored "-Wlifetime-safety-invalidation"
 using namespace ck::tensor_layout::convolution;
-static ck::index_t param_mask     = 0xffff;
-static ck::index_t instance_index = -1;
+static ck::index_t param_mask [[maybe_unused]] = 0xffff;
+static ck::index_t instance_index              = -1;
 // Load CSV data for 2D tests
 static std::vector<ck::utils::conv::ConvParam> Get2DTestCases()
 {
