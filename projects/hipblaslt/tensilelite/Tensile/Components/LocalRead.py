@@ -588,7 +588,7 @@ class LocalReadMFMA(LocalRead):
                 localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc, valuiIdx)))
                 destVgpr = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, valuiIdx), numVgpr)
 
-                # load read instrution
+                # load read instruction
                 paramList = []
 
                 offset_val = eIdx * stridePerRead
@@ -1488,7 +1488,7 @@ class LocalReadMFMA(LocalRead):
                             else:
                                 valufIdx += blockWidth if (not tP["isM"]) else (numVgpr if writer.states.asmCaps["HasSWMMAC_gfx1250"] else 1)
 
-                            # load read instrution
+                            # load read instruction
                             paramList = []
 
                             # gfx1250 LDS offset formula shared by XF32 and BF16/Half/FP8/etc paths.
