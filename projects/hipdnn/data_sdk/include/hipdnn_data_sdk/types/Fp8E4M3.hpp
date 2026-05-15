@@ -246,8 +246,8 @@ inline float fp8_e4m3_bits_to_float(uint8_t bits) noexcept
     // Uses std::copysign to preserve sign for round-trip via float_to_fp8_e4m3_bits
     if(absBits == FP8_E4M3_NAN)
     {
-        constexpr float nan = std::numeric_limits<float>::quiet_NaN();
-        return ((bits & FP8_E4M3_SIGN_MASK) != 0) ? std::copysign(nan, -1.0f) : nan;
+        constexpr float QUIET_NAN = std::numeric_limits<float>::quiet_NaN();
+        return ((bits & FP8_E4M3_SIGN_MASK) != 0) ? std::copysign(QUIET_NAN, -1.0f) : QUIET_NAN;
     }
     if(bits < FP8_E4M3_NAN)
     {
