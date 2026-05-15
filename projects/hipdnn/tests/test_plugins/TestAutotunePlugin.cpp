@@ -1,0 +1,253 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
+#include "TestPluginCommon.hpp"
+#include "TestPluginEngineIdMap.hpp"
+
+#include <hipdnn_flatbuffers_sdk/data_objects/knob_value_generated.h>
+#include <hipdnn_plugin_sdk/KnobFactory.hpp>
+
+#include <cstdint>
+#include <vector>
+
+// NOLINTNEXTLINE
+thread_local char
+    hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError[HIPDNN_PLUGIN_ERROR_STRING_MAX_LENGTH]
+    = "";
+
+class AutotunePlugin : public TestPluginBase
+{
+public:
+    const char* getPluginName() const override
+    {
+        return "test_AutotunePlugin";
+    }
+
+    const char* getPluginVersion() const override
+    {
+        return "1.0.0";
+    }
+
+    const char* getPluginApiVersion() const override
+    {
+        return apiVersionWithoutTweak();
+    }
+
+    int64_t getEngineId() const override
+    {
+        return hipdnn_tests::plugin_constants::engineId<AutotunePlugin>();
+    }
+
+    uint32_t getNumEngines() const override
+    {
+        return 1;
+    }
+
+    uint32_t getNumApplicableEngines() const override
+    {
+        return 1;
+    }
+
+    // Override to return knobs that support the autotune workflow
+    static hipdnnPluginStatus_t getEngineDetails(hipdnnEnginePluginHandle_t handle,
+                                                 [[maybe_unused]] int64_t engineId,
+                                                 const hipdnnPluginConstData_t* opGraph,
+                                                 hipdnnPluginConstData_t* engineDetails)
+    {
+        LOG_API_ENTRY("handle=" << static_cast<void*>(handle)
+                                << ", opGraph=" << static_cast<const void*>(opGraph)
+                                << ", engineDetails=" << static_cast<void*>(engineDetails));
+
+        return hipdnn_plugin_sdk::tryCatch([&, apiName = __func__]() {
+            hipdnn_plugin_sdk::throwIfNull(handle);
+            hipdnn_plugin_sdk::throwIfNull(opGraph);
+            hipdnn_plugin_sdk::throwIfNull(engineDetails);
+            hipdnn_plugin_sdk::throwIfNull(getInstance());
+
+            if(!getInstance()->supportsEngineOperations())
+            {
+                throw hipdnn_plugin_sdk::HipdnnPluginException(
+                    HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                    "No engines available - cannot get engine details");
+            }
+
+            flatbuffers::FlatBufferBuilder builder;
+
+            std::vector<flatbuffers::Offset<hipdnn_flatbuffers_sdk::data_objects::Knob>>
+                knobOffsets;
+
+            // global.benchmarking knob (int64, range 0-1) — required for EXHAUSTIVE priming
+            knobOffsets.push_back(hipdnn_plugin_sdk::KnobFactory::createIntKnob(
+                builder,
+                "global.benchmarking",
+                "Enable benchmarking mode for cache priming",
+                0, // default value
+                0, // min
+                1, // max
+                1, // step
+                {})); // no explicit valid values
+
+            // test.autotune_variant knob (int64) — for testing knob filtering/control
+            knobOffsets.push_back(hipdnn_plugin_sdk::KnobFactory::createIntKnob(
+                builder,
+                "test.autotune_variant",
+                "Test variant knob for autotune testing",
+                0, // default value
+                0, // min
+                3, // max
+                1, // step
+                {})); // no explicit valid values
+
+            auto knobsVector = builder.CreateVector(knobOffsets);
+            auto newEngineDetails = hipdnn_flatbuffers_sdk::data_objects::CreateEngineDetails(
+                builder, engineId, knobsVector);
+            builder.Finish(newEngineDetails);
+            auto serializedDetails = builder.Release();
+
+            auto* tempBuffer = new uint8_t[serializedDetails.size()];
+            std::memcpy(tempBuffer, serializedDetails.data(), serializedDetails.size());
+
+            engineDetails->ptr = tempBuffer;
+            engineDetails->size = serializedDetails.size();
+
+            LOG_API_SUCCESS(apiName, "engineDetails->ptr=" << engineDetails->ptr);
+        });
+    }
+};
+
+// Initialize plugin instance on load
+__attribute__((constructor)) static void initializePlugin()
+{
+    TestPluginBase::setInstance(std::make_unique<AutotunePlugin>());
+}
+
+// Custom API registration that overrides enginePluginGetEngineDetails
+extern "C" {
+hipdnnPluginStatus_t hipdnnPluginGetName(const char** name)
+{
+    return TestPluginBase::pluginGetName(name);
+}
+
+hipdnnPluginStatus_t hipdnnPluginGetVersion(const char** version)
+{
+    return TestPluginBase::pluginGetVersion(version);
+}
+
+hipdnnPluginStatus_t hipdnnPluginGetApiVersion(const char** version)
+{
+    return TestPluginBase::pluginGetApiVersion(version);
+}
+
+hipdnnPluginStatus_t hipdnnPluginGetType(hipdnnPluginType_t* type)
+{
+    return TestPluginBase::pluginGetType(type);
+}
+
+void hipdnnPluginGetLastErrorString(const char** errorStr)
+{
+    TestPluginBase::pluginGetLastErrorString(errorStr);
+}
+
+hipdnnPluginStatus_t hipdnnPluginSetLoggingCallback(hipdnnCallback_t callback)
+{
+    return TestPluginBase::pluginSetLoggingCallback(callback);
+}
+
+hipdnnPluginStatus_t hipdnnPluginSetLogLevel(hipdnnSeverity_t level)
+{
+    return TestPluginBase::pluginSetLogLevel(level);
+}
+
+hipdnnPluginStatus_t
+    hipdnnEnginePluginGetAllEngineIds(int64_t* engineIds, uint32_t maxEngines, uint32_t* numEngines)
+{
+    return TestPluginBase::enginePluginGetAllEngineIds(engineIds, maxEngines, numEngines);
+}
+
+hipdnnPluginStatus_t hipdnnEnginePluginCreate(hipdnnEnginePluginHandle_t* handle)
+{
+    return TestPluginBase::enginePluginCreate(handle);
+}
+
+hipdnnPluginStatus_t hipdnnEnginePluginDestroy(hipdnnEnginePluginHandle_t handle)
+{
+    return TestPluginBase::enginePluginDestroy(handle);
+}
+
+hipdnnPluginStatus_t hipdnnEnginePluginSetStream(hipdnnEnginePluginHandle_t handle,
+                                                 hipStream_t stream)
+{
+    return TestPluginBase::enginePluginSetStream(handle, stream);
+}
+
+hipdnnPluginStatus_t
+    hipdnnEnginePluginGetApplicableEngineIds(hipdnnEnginePluginHandle_t handle,
+                                             const hipdnnPluginConstData_t* opGraph,
+                                             int64_t* engineIds,
+                                             uint32_t maxEngines,
+                                             uint32_t* numEngines)
+{
+    return TestPluginBase::enginePluginGetApplicableEngineIds(
+        handle, opGraph, engineIds, maxEngines, numEngines);
+}
+
+// Override to use AutotunePlugin::getEngineDetails (returns knobs)
+hipdnnPluginStatus_t hipdnnEnginePluginGetEngineDetails(hipdnnEnginePluginHandle_t handle,
+                                                        int64_t engineId,
+                                                        const hipdnnPluginConstData_t* opGraph,
+                                                        hipdnnPluginConstData_t* engineDetails)
+{
+    return AutotunePlugin::getEngineDetails(handle, engineId, opGraph, engineDetails);
+}
+
+hipdnnPluginStatus_t hipdnnEnginePluginDestroyEngineDetails(hipdnnEnginePluginHandle_t handle,
+                                                            hipdnnPluginConstData_t* engineDetails)
+{
+    return TestPluginBase::enginePluginDestroyEngineDetails(handle, engineDetails);
+}
+
+hipdnnPluginStatus_t hipdnnEnginePluginGetWorkspaceSize(hipdnnEnginePluginHandle_t handle,
+                                                        const hipdnnPluginConstData_t* engineConfig,
+                                                        const hipdnnPluginConstData_t* opGraph,
+                                                        size_t* workspaceSize)
+{
+    return TestPluginBase::enginePluginGetWorkspaceSize(
+        handle, engineConfig, opGraph, workspaceSize);
+}
+
+hipdnnPluginStatus_t hipdnnEnginePluginGetWorkspaceSizeFromExecutionContext(
+    hipdnnEnginePluginHandle_t handle,
+    hipdnnEnginePluginExecutionContext_t executionContext,
+    size_t* workspaceSize)
+{
+    return TestPluginBase::enginePluginGetWorkspaceSize(handle, executionContext, workspaceSize);
+}
+
+hipdnnPluginStatus_t
+    hipdnnEnginePluginCreateExecutionContext(hipdnnEnginePluginHandle_t handle,
+                                             const hipdnnPluginConstData_t* engineConfig,
+                                             const hipdnnPluginConstData_t* opGraph,
+                                             hipdnnEnginePluginExecutionContext_t* executionContext)
+{
+    return TestPluginBase::enginePluginCreateExecutionContext(
+        handle, engineConfig, opGraph, executionContext);
+}
+
+hipdnnPluginStatus_t
+    hipdnnEnginePluginDestroyExecutionContext(hipdnnEnginePluginHandle_t handle,
+                                              hipdnnEnginePluginExecutionContext_t executionContext)
+{
+    return TestPluginBase::enginePluginDestroyExecutionContext(handle, executionContext);
+}
+
+hipdnnPluginStatus_t
+    hipdnnEnginePluginExecuteOpGraph(hipdnnEnginePluginHandle_t handle,
+                                     hipdnnEnginePluginExecutionContext_t executionContext,
+                                     void* workspace,
+                                     const hipdnnPluginDeviceBuffer_t* deviceBuffers,
+                                     uint32_t numDeviceBuffers)
+{
+    return TestPluginBase::enginePluginExecuteOpGraph(
+        handle, executionContext, workspace, deviceBuffers, numDeviceBuffers);
+}
+} // extern "C"

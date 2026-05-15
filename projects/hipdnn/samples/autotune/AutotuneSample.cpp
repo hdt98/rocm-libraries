@@ -7,7 +7,7 @@
 //
 // Run with --help for usage information.
 // Default mode uses compact tensors and SINGLE_SHOT for fast completion (<10s).
-// Use --full for larger dimensions and FIXED_AVERAGE timing.
+// Use --large for larger dimensions and FIXED_AVERAGE timing.
 
 #include <algorithm>
 #include <filesystem>
@@ -64,17 +64,16 @@ struct ConvGraphState
 /// Creates a convolution fprop graph, validates it, builds the operation graph,
 /// and allocates device tensors. Does NOT call build() (that is the simple path).
 /// For autotune, call add_*() + autotune() after this function.
-ConvGraphState buildConvGraph(hipdnnHandle_t handle, bool fullMode)
+ConvGraphState buildConvGraph(hipdnnHandle_t handle, bool largeMode)
 {
-    // Tensor dimensions: compact by default for fast completion, larger with --full
-    // for meaningful timing differentiation. Default matches ConvFprop sample dimensions
-    // (the minimum that MIOpen engines reliably support).
-    const int64_t n = fullMode ? 64 : 16;
-    const int64_t c = fullMode ? 32 : 16;
-    const int64_t h = fullMode ? 32 : 16;
-    const int64_t w = fullMode ? 32 : 16;
+    // Tensor dimensions: compact by default for fast completion, larger with --large
+    // for meaningful timing differentiation.
+    const int64_t n = largeMode ? 64 : 1;
+    const int64_t c = largeMode ? 32 : 4;
+    const int64_t h = largeMode ? 32 : 4;
+    const int64_t w = largeMode ? 32 : 4;
 
-    const int64_t k = fullMode ? 32 : 16;
+    const int64_t k = largeMode ? 32 : 4;
     // Filter channels must match input channels
     const int64_t r = 3;
     const int64_t s = 3;
@@ -138,11 +137,11 @@ ConvGraphState buildConvGraph(hipdnnHandle_t handle, bool fullMode)
 
 /// Simplest possible autotune flow:
 /// add_all_engines() -> autotune() -> execute()
-void demonstrateQuickAutotune(hipdnnHandle_t handle, bool fullMode)
+void demonstrateQuickAutotune(hipdnnHandle_t handle, bool largeMode)
 {
     std::cout << "\n=== Scenario 1: Quick Autotune ===\n";
 
-    auto state = buildConvGraph(handle, fullMode);
+    auto state = buildConvGraph(handle, largeMode);
 
     // Discover and add all available engines
     HIPDNN_FE_CHECK(state.graph->add_all_engines());
@@ -186,11 +185,11 @@ void demonstrateQuickAutotune(hipdnnHandle_t handle, bool fullMode)
 
 /// Uses EXHAUSTIVE mode and inspects the ranked results.
 /// Prints a table showing all engines with timing and status.
-void demonstrateExhaustiveAutotune(hipdnnHandle_t handle, bool fullMode)
+void demonstrateExhaustiveAutotune(hipdnnHandle_t handle, bool largeMode)
 {
     std::cout << "\n=== Scenario 2: Exhaustive Autotune ===\n";
 
-    auto state = buildConvGraph(handle, fullMode);
+    auto state = buildConvGraph(handle, largeMode);
 
     // Discover and add all available engines
     HIPDNN_FE_CHECK(state.graph->add_all_engines());
@@ -202,9 +201,9 @@ void demonstrateExhaustiveAutotune(hipdnnHandle_t handle, bool fullMode)
     // EXHAUSTIVE mode with SINGLE_SHOT for speed in default mode
     AutotuneConfig config;
     config.mode = TuneMode::EXHAUSTIVE;
-    config.strategy = fullMode ? AutotuneStrategy::FIXED_AVERAGE : AutotuneStrategy::SINGLE_SHOT;
-    config.warmupIterations = fullMode ? 3 : 1;
-    config.timedIterations = fullMode ? 10 : 1;
+    config.strategy = largeMode ? AutotuneStrategy::FIXED_AVERAGE : AutotuneStrategy::SINGLE_SHOT;
+    config.warmupIterations = largeMode ? 3 : 1;
+    config.timedIterations = largeMode ? 10 : 1;
     config.continueOnPrimingFailure = true;
 
     // Use the overload that populates results
@@ -255,11 +254,11 @@ void demonstrateExhaustiveAutotune(hipdnnHandle_t handle, bool fullMode)
 /// Demonstrates engine discovery and workspace-constrained autotuning.
 /// Inspects EngineConfigInfo entries, filters by workspace, then autotunes
 /// only the selected engines.
-void demonstrateFilteredAutotune(hipdnnHandle_t handle, bool fullMode)
+void demonstrateFilteredAutotune(hipdnnHandle_t handle, bool largeMode)
 {
     std::cout << "\n=== Scenario 3: Filtered Autotune (Workspace Constrained) ===\n";
 
-    auto state = buildConvGraph(handle, fullMode);
+    auto state = buildConvGraph(handle, largeMode);
 
     // Step 1: Discover available engines
     std::vector<EngineConfigInfo> configs;
@@ -321,13 +320,13 @@ void demonstrateFilteredAutotune(hipdnnHandle_t handle, bool fullMode)
 
 /// Autotunes and saves results to a JSON config file that can be reused via
 /// HIPDNN_ENGINE_OVERRIDE_FILE environment variable.
-void demonstrateSaveToConfigFile(hipdnnHandle_t handle, bool fullMode)
+void demonstrateSaveToConfigFile(hipdnnHandle_t handle, bool largeMode)
 {
     std::cout << "\n=== Scenario 4: Save Results to Config File ===\n";
 
     const std::filesystem::path configFile = "sample_autotune_results.json";
 
-    auto state = buildConvGraph(handle, fullMode);
+    auto state = buildConvGraph(handle, largeMode);
 
     // Discover and add all available engines
     HIPDNN_FE_CHECK(state.graph->add_all_engines());
@@ -364,7 +363,7 @@ void demonstrateSaveToConfigFile(hipdnnHandle_t handle, bool fullMode)
 struct AutotuneSampleConfig
 {
     int scenario = 0; // 0 = run all, 1-4 = specific scenario
-    bool fullMode = false;
+    bool largeMode = false;
 };
 
 AutotuneSampleConfig parseArgs(int argc, char* argv[])
@@ -379,7 +378,7 @@ AutotuneSampleConfig parseArgs(int argc, char* argv[])
         {
             std::cout << "Usage: " << argv[0] << " [OPTIONS]\n"
                       << "  --scenario=N  Run specific scenario (1-4, default=all)\n"
-                      << "  --full        Use realistic tensor dimensions and iterations\n"
+                      << "  --large       Use larger tensor dimensions and iterations\n"
                       << "  --verify-cpu  Accepted but ignored (compatibility with test harness)\n"
                       << "  --help, -h    Show this help\n";
             exit(EXIT_SUCCESS);
@@ -394,9 +393,9 @@ AutotuneSampleConfig parseArgs(int argc, char* argv[])
                 exit(EXIT_FAILURE);
             }
         }
-        else if(arg == "--full")
+        else if(arg == "--large")
         {
-            cfg.fullMode = true;
+            cfg.largeMode = true;
         }
         else if(arg == "--verify-cpu" || arg == "-vc")
         {
@@ -419,7 +418,7 @@ int main(int argc, char* argv[])
 {
     const auto config = parseArgs(argc, argv);
 
-    std::cout << "hipDNN Autotune Sample" << (config.fullMode ? " (full mode)" : " (fast mode)")
+    std::cout << "hipDNN Autotune Sample" << (config.largeMode ? " (large mode)" : " (fast mode)")
               << '\n';
 
     initializeFrontendLogging();
@@ -437,19 +436,19 @@ int main(int argc, char* argv[])
 
     if(config.scenario == 0 || config.scenario == 1)
     {
-        demonstrateQuickAutotune(handle, config.fullMode);
+        demonstrateQuickAutotune(handle, config.largeMode);
     }
     if(config.scenario == 0 || config.scenario == 2)
     {
-        demonstrateExhaustiveAutotune(handle, config.fullMode);
+        demonstrateExhaustiveAutotune(handle, config.largeMode);
     }
     if(config.scenario == 0 || config.scenario == 3)
     {
-        demonstrateFilteredAutotune(handle, config.fullMode);
+        demonstrateFilteredAutotune(handle, config.largeMode);
     }
     if(config.scenario == 0 || config.scenario == 4)
     {
-        demonstrateSaveToConfigFile(handle, config.fullMode);
+        demonstrateSaveToConfigFile(handle, config.largeMode);
     }
 
     HIPDNN_CHECK(hipdnnDestroy(handle));

@@ -114,4 +114,11 @@ inline const std::string& testIncompatibleVersionPluginPath()
         = getTestCustomFilepathForPlugin(TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME);
     return s_testIncompatibleVersionPluginPath;
 }
+
+inline const std::string& testAutotunePluginPath()
+{
+    static const std::string s_testAutotunePluginPath
+        = getTestCustomFilepathForPlugin(TEST_AUTOTUNE_PLUGIN_NAME);
+    return s_testAutotunePluginPath;
+}
 } // namespace hipdnn_tests::plugin_constants
