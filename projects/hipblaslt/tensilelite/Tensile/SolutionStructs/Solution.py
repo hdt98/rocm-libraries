@@ -2306,6 +2306,7 @@ class Solution(collections.abc.Mapping):
     # Auto search for DepthU starts here
     # Activates when DepthU == -1
     ########################################
+    wmmaV3 = isaInfoMap[isa].asmCaps["HasWMMA_V3"]
     resetStaggerUStride = state["StaggerUStride"]
     resetLocalReadVectorWidth = state["LocalReadVectorWidth"]
     resetLocalReadVectorWidthA = state["LocalReadVectorWidthA"]
@@ -2424,9 +2425,9 @@ class Solution(collections.abc.Mapping):
           return 0, 0, 0, 0, 0
         if state["EnableMatrixInstruction"]:
           # MI16x16xNx1 needs double padding to avoid bank conflict:
-          # gfx1250 doubles when readRegs == 2; other ISAs double when readRegs in {1, 4}.
+          # WMMA_V3 doubles when readRegs == 2; other ISAs double when readRegs in {1, 4}.
           if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-            if isa[:2] == (12, 5):
+            if wmmaV3:
               if readRegsA == 2: optPadA *= 2
               if readRegsB == 2: optPadB *= 2
             else:
@@ -2455,7 +2456,7 @@ class Solution(collections.abc.Mapping):
                 ldsPad = int(((16 * vw * numBytes + mt * numBytes * lrvw) % 128) // numBytes)
               if grvw * numBytes == 32 and ldsPad == 0:
                 ldsPad = int(16 // numBytes)
-              if isa[:2] == (12, 5):
+              if wmmaV3:
                 # MIWaveTile / MIWaveGroup are only populated for MFMA/WMMA
                 # kernels; reading them outside this guard breaks non-MI dtypes
                 # (e.g. FP64) where the keys are absent.
@@ -2547,7 +2548,7 @@ class Solution(collections.abc.Mapping):
           sub = tc[-1]   # "A" or "B"
           if not state["ProblemType"][f"MXBlock{sub}"]:
             return 0
-          if isa[:2] == (12, 5):
+          if wmmaV3:
             return get_mxs_mt_config(state["MatrixInstK"],
                                       state["ProblemType"][f"MXBlock{sub}"],
                                       state[f"VectorWidth{sub}"], "pad")
@@ -2583,7 +2584,7 @@ class Solution(collections.abc.Mapping):
 
       def calcMXSLdsBlockSizePerPad(tc: str, lrvw: int) -> int:
         LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
-        if isa[:2] == (12, 5):
+        if wmmaV3:
           if LdsBlockSizePerPad != -1:
             return LdsBlockSizePerPad
           subTc = tc[3]
@@ -2609,7 +2610,7 @@ class Solution(collections.abc.Mapping):
         mt = state["MacroTile0"] if ("A" in tc) else state["MacroTile1"]
         LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
         tmpBpe = getLdsBpe(tc)
-        multiple = 256 if isa[:2] == (12, 5) else 128
+        multiple = 256 if wmmaV3 else 128
         if LdsBlockSizePerPad == -1:
           if state["EnableMatrixInstruction"] and tmpBpe != 0.75:
             if state["UnrollMajorLDS%s"%tc]:
@@ -2619,7 +2620,7 @@ class Solution(collections.abc.Mapping):
             else:
               if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
                 LdsBlockSizePerPad = int(mt * tmpBpe * lrvw)
-                if isa[:2] == (12, 5):
+                if wmmaV3:
                   miWaveTileIdx = 0 if "A" in tc else 1
                   ldsType = state["ProblemType"]["DataType%s"%tc] if state["ConvertAfterDS"] else state["ProblemType"]["MacDataType%s"%tc]
                   miwt = state["MIWaveTile"][miWaveTileIdx]
@@ -3815,7 +3816,8 @@ class Solution(collections.abc.Mapping):
       else:
         state["VectorWidthB"] = 1
 
-    if isa[:2] == (12, 5):
+    wmmaV3 = isaInfoMap[isa].asmCaps["HasWMMA_V3"]
+    if wmmaV3:
       padPairs = [("A", True), ("B", True),
                   ("MXSA", bool(state["ProblemType"]["MXBlockA"])),
                   ("MXSB", bool(state["ProblemType"]["MXBlockB"]))]
@@ -4190,7 +4192,7 @@ class Solution(collections.abc.Mapping):
 
     # Half-wave configs need a +4-byte LDS base shift (see LdsPadding).
     halfBankShiftA = 0
-    if isa[:2] == (12, 5) and state.get("enableLDSTrA", False) \
+    if wmmaV3 and state.get("enableLDSTrA", False) \
        and auto_LdsPadA and auto_LdsBlockSizePerPadA:
       if state["ProblemType"]["MacDataTypeA"].numBytes() == 0.5:
         halfBankShiftA = get_fp4_mt_config(state["MacroTile0"], "shift",
@@ -4200,7 +4202,7 @@ class Solution(collections.abc.Mapping):
                           state["MIWaveTile"][0], state["MIWaveGroup"][0])
 
     halfBankShiftB = 0
-    if isa[:2] == (12, 5) and state.get("enableLDSTrB", False) \
+    if wmmaV3 and state.get("enableLDSTrB", False) \
        and auto_LdsPadB and auto_LdsBlockSizePerPadB:
       if state["ProblemType"]["MacDataTypeB"].numBytes() == 0.5:
         halfBankShiftB = get_fp4_mt_config(state["MacroTile1"], "shift",
