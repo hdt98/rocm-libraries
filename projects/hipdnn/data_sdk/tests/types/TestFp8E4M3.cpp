@@ -27,9 +27,21 @@ using namespace hipdnn_data_sdk::types;
 TEST(TestFp8E4M3, RoundTripExactValues)
 {
     // These values are exactly representable in fp8_e4m3 (OCP E4M3 format)
+    // clang-format off
     const std::vector<float> exactValues = {
-        0.0f,          1.0f,  -1.0f, 2.0f,  -2.0f, 4.0f,   -4.0f,
-        8.0f,          -8.0f, 0.5f,  -0.5f, 0.25f, -0.25f,
+        0.0f,
+        1.0f,
+        -1.0f,
+        2.0f,
+        -2.0f,
+        4.0f,
+        -4.0f,
+        8.0f,
+        -8.0f,
+        0.5f,
+        -0.5f,
+        0.25f,
+        -0.25f,
         448.0f, // MAX
         -448.0f, // LOWEST
         0.015625f, // MIN_NORMAL = 2^-6
@@ -37,6 +49,7 @@ TEST(TestFp8E4M3, RoundTripExactValues)
         0.001953125f, // denorm_min = 2^-9
         -0.001953125f,
     };
+    // clang-format on
 
     for(const float val : exactValues)
     {
