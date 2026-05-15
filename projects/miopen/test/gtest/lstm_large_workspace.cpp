@@ -8,6 +8,7 @@
 
 #include <hip/hip_runtime.h>
 
+#include <bit>
 #include <climits>
 #include <cstddef>
 #include <cstdint>
@@ -94,10 +95,6 @@ TEST_P(GPU_LSTM_LargeWorkspace_FP16, GetWorkspaceSizeOverflowsInt)
 
 TEST_P(GPU_LSTM_LargeWorkspace_FP16, ForwardInferenceSucceedsWhenWorkspaceExceedsInt)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Skipped on Windows: > 8 GB workspace exceeds some low-VRAM Windows runners";
-#endif
-
     auto&& handle = get_handle();
     LargeRnnConfig cfg;
 
@@ -165,6 +162,20 @@ TEST_P(GPU_LSTM_LargeWorkspace_FP16, ForwardInferenceSucceedsWhenWorkspaceExceed
               miopenStatusSuccess);
     ASSERT_EQ(miopenGetRNNHiddenTensorSize(&handle, rnn, cfg.seq_len, xDescs.data(), &h_bytes),
               miopenStatusSuccess);
+
+    // Add headroom over the raw tensor sum for runtime/library reservations,
+    // allocator fragmentation, and (on consumer cards) the display compositor.
+    // Use max(+1 GiB, +10%) to cover both the absolute and the proportional
+    // components, then round up to the next power of two.
+    const std::size_t raw_mem      = ws_size + x_bytes + y_bytes + w_size + 4 * h_bytes;
+    const std::size_t headroom     = std::max<std::size_t>(1ULL << 30, raw_mem / 10);
+    const std::size_t required_mem = std::bit_ceil(raw_mem + headroom);
+    const std::size_t device_mem = handle.GetGlobalMemorySize();
+    if(device_mem < required_mem)
+    {
+        GTEST_SKIP() << "Insufficient device memory: need " << required_mem
+                     << " bytes (rounded up to next power of 2), device has " << device_mem;
+    }
 
     Workspace x_buf{x_bytes};
     Workspace y_buf{y_bytes};
