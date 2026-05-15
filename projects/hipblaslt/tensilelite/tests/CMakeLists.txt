@@ -35,9 +35,9 @@ target_sources(tensilelite-tests
         "${CMAKE_CURRENT_SOURCE_DIR}/include/TestData.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/TestUtils.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RangeLibrary_test.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/MasterSolutionLibraryMapping_test.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MXScalePadding_test.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ResultComparison_test.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/DataInit_test.cpp"
 )
 
 target_include_directories(tensilelite-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -51,6 +51,17 @@ target_link_libraries(tensilelite-tests
         ${CMAKE_DL_LIBS}
         ${hipblaslt_msgpack_target}
 )
+
+# MasterSolutionLibraryMapping_test exercises TensileLite::LoadLibraryMapping,
+# which is only defined when MSGPACK is the active serialization format
+# (see tensilelite/src/Tensile.cpp). The test also writes msgpack mapping
+# files directly via <msgpack.hpp>, so it has no meaning in YAML builds.
+if(NOT HIPBLASLT_ENABLE_YAML)
+    target_sources(tensilelite-tests
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/MasterSolutionLibraryMapping_test.cpp"
+    )
+endif()
 
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
     target_sources(tensilelite-tests
