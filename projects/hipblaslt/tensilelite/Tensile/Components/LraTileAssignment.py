@@ -170,8 +170,6 @@ class LraTileAssignmentTransposedMFMA(LraTileAssignment):
         if kernel["ProblemType"]["Sparse"]:
           if (kernel["ProblemType"]["Sparse"] == 1 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 2 and  tP["isA"]):
             isSparseDenseMatrix = True
-          if tP["isM"]:
-            inputPerThread = inputPerThread // 4
         ldsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index
@@ -314,8 +312,6 @@ class LraTileAssignmentTransposedMFMAB8(LraTileAssignmentTransposedMFMA):
         if kernel["ProblemType"]["Sparse"]:
           if (kernel["ProblemType"]["Sparse"] == 1 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 2 and  tP["isA"]):
             isSparseDenseMatrix = True
-          elif tP["isM"]:
-            inputPerThread = inputPerThread // 4
         ldsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index
@@ -535,8 +531,6 @@ class LraTileAssignmentTransposedMFMAF4(LraTileAssignmentTransposedMFMA):
         #FIXME: tail loop with transposed load b128
         inputPerThread   = kernel[f"LocalReadVectorWidth{tc}"]
 
-        if kernel["ProblemType"]["Sparse"] and tP["isM"]:
-            inputPerThread = inputPerThread // 4
         ldsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index
@@ -642,8 +636,6 @@ class LraTileAssignmentTransposedMFMAF6(LraTileAssignmentTransposedMFMA):
         #FIXME: tail loop with transposed load b128
         inputPerThread   = kernel[f"LocalReadVectorWidth{tc}"]
 
-        if kernel["ProblemType"]["Sparse"] and tP["isM"]:
-            inputPerThread = inputPerThread // 4
         ldsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index
@@ -772,8 +764,6 @@ class LraTileAssignmentMFMA(LraTileAssignment):
         # use MIInputPerThread if lrvw < MIInputPerThread
         if isgfx950 and tP["bpeDS"] == 0.5 and lrvw < kernel["MIInputPerThread%s"%tc]:
             inputPerThread = kernel["MIInputPerThread%s"%tc]
-        if kernel["ProblemType"]["Sparse"] and tP["isM"]:
-            inputPerThread = inputPerThread // 4
         LdsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index
@@ -832,6 +822,8 @@ class LraTileAssignmentMFMA(LraTileAssignment):
           strideTile = 1 # DTV case. Actual stride will be applied later.
 
         strideK = inputPerThread if umlds else (mt + LdsPad) * inputPerThread
+        if (kernel["ProblemType"]["Sparse"] and tP["isM"]):
+            strideK //= 4 
         if enableLDSTr:
            if kernel["UseGeneralizedNLCOne%s"%tc] and perpStride > 1:
               strideK  = 8
