@@ -14,8 +14,7 @@
 enum struct TestMatrixType
 {
     MonotonicSequence   = 0,
-    Identity            = 1,
-    UniformDistribution = 2
+    UniformDistribution = 1
 };
 
 static constexpr auto matrix_type = TestMatrixType::UniformDistribution;
@@ -45,10 +44,6 @@ class TestLoadAndConvert : public ::testing::Test
             ck_tile::FillMonotonicSeq<float>{0.0, 0.1}(h_a_tmp);
             ck_tile::reference_unary_elementwise<float, XDataType, float>(
                 h_a_tmp, h_a, [](const auto& x) { return x; });
-        }
-        else if constexpr(matrix_type == TestMatrixType::Identity)
-        {
-            ck_tile::FillIdentity<XDataType>{M, N}(h_a);
         }
         else
         {

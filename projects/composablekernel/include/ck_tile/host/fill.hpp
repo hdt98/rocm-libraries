@@ -461,44 +461,6 @@ struct FillConstant
     }
 };
 
-template <typename T>
-struct FillIdentity
-{
-    std::size_t rows_{0};
-    std::size_t cols_{0};
-    T zero_{type_convert<T>(0)};
-    T one_{type_convert<T>(1)};
-
-    template <typename ForwardIter>
-    void operator()(ForwardIter first, ForwardIter last) const
-    {
-        if(rows_ == 0 || cols_ == 0 || first == last)
-            return;
-
-        const auto total = static_cast<std::size_t>(std::distance(first, last));
-        if(total < rows_ * cols_)
-        {
-            throw std::runtime_error("FillIdentity requires range size >= rows_ * cols_.");
-        }
-
-        std::fill(first, first + rows_ * cols_, zero_);
-
-        const auto min_dim = std::min(rows_, cols_);
-        for(std::size_t i = 0; i < min_dim; ++i)
-            *(first + i * cols_ + i) = one_;
-    }
-
-    template <typename ForwardRange>
-    auto operator()(ForwardRange&& range) const
-        -> std::void_t<decltype(std::declval<const FillIdentity&>()(
-            std::begin(std::forward<ForwardRange>(range)),
-            std::end(std::forward<ForwardRange>(range))))>
-    {
-        (*this)(std::begin(std::forward<ForwardRange>(range)),
-                std::end(std::forward<ForwardRange>(range)));
-    }
-};
-
 //----------------------------------------------------------------------------------------------
 /// @brief      Transforms given input to fit 2:4 structured sparsity pattern so
 ///             every subgroup of 4 elements contain at most 2 non-zero elements
