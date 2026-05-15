@@ -136,7 +136,11 @@ inline uint8_t float_to_fp8_e5m2_bits(float f, bool saturate = true) noexcept
         return static_cast<uint8_t>(sign);
     }
 
-    // Handle overflow: saturate to MAX or return Inf (E5M2 OCP supports infinity)
+    // Handle overflow: saturate to MAX or return Inf (E5M2 OCP supports infinity).
+    // Note the asymmetry vs E4M3: in OCP E5M2, biased_exp == MAX_BIASED_EXP (31) is
+    // reserved for Inf/NaN, so the highest valid normal biased_exp is 30 and the check
+    // must reject exp == 31 too (hence >=). In OCP E4M3, biased_exp == 15 is a valid
+    // normal exponent and the equivalent check there uses >.
     if(exp >= FP8_E5M2_MAX_BIASED_EXP)
     {
         if(saturate)

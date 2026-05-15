@@ -129,7 +129,11 @@ inline uint8_t float_to_fp8_e4m3_bits(float f, bool saturate = true) noexcept
         return static_cast<uint8_t>(sign);
     }
 
-    // Handle overflow: saturate to MAX or return NaN (E4M3 OCP has no infinity)
+    // Handle overflow: saturate to MAX or return NaN (E4M3 OCP has no infinity).
+    // Note the asymmetry vs E5M2: in OCP E4M3, biased_exp == MAX_BIASED_EXP (15) is a
+    // valid normal exponent (used by MAX = 448 at exp=15, mant=6), so only exp > 15
+    // overflows. In OCP E5M2, biased_exp == MAX_BIASED_EXP (31) is reserved for Inf/NaN,
+    // so the equivalent check there uses >=.
     if(exp > FP8_E4M3_MAX_BIASED_EXP)
     {
         if(saturate)
@@ -234,7 +238,7 @@ inline float fp8_e4m3_bits_to_float(uint8_t bits) noexcept
         32.0f,          36.0f,          40.0f,          44.0f,          48.0f,          52.0f,          56.0f,          60.0f,          // exp=12
         64.0f,          72.0f,          80.0f,          88.0f,          96.0f,          104.0f,         112.0f,         120.0f,         // exp=13
         128.0f,         144.0f,         160.0f,         176.0f,         192.0f,         208.0f,         224.0f,         240.0f,         // exp=14
-        256.0f,         288.0f,         320.0f,         352.0f,         384.0f,         416.0f,         448.0f,         0.0f,           // exp=15: mant=0..6 normal, mant=7 (0x7F) = NaN placeholder
+        256.0f,         288.0f,         320.0f,         352.0f,         384.0f,         416.0f,         448.0f,         std::numeric_limits<float>::quiet_NaN(), // exp=15: mant=0..6 normal, mant=7 (0x7F) = NaN; the early NaN check below guards this slot, so the value here is for self-documentation only
     };
     // clang-format on
     const uint8_t absBits = bits & FP8_E4M3_ABS_MASK;
