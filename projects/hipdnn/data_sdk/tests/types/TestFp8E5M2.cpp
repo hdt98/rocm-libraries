@@ -268,15 +268,14 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
         const auto decoded = fp8_e5m2::from_bits(pattern);
         const auto f = static_cast<float>(decoded);
 
-        // NaN patterns: OCP E5M2 NaN has exp=31 and mant != 0
+        // NaN patterns: OCP E5M2 NaN has exp=31 and mant != 0.
+        // Multiple input NaN encodings collapse to the canonical 0x7F/0xFF on re-encode,
+        // so the round-trip check is "still NaN" rather than bit-pattern equality.
         if(((pattern & 0x7C) == 0x7C) && ((pattern & 0x03) != 0))
         {
             EXPECT_TRUE(std::isnan(f))
-                << "NaN pattern 0x" << std::hex << bits << " should decode to float NaN";
-            // Re-encoded NaN is canonical 0x7F (positive) or 0xFF (negative); sign preserved.
-            const fp8_e5m2 reencoded(f);
-            EXPECT_TRUE(isnan(reencoded))
-                << "Re-encoded NaN for pattern 0x" << std::hex << bits << " should still be NaN";
+                << "Pattern 0x" << std::hex << bits << " should decode to NaN";
+            EXPECT_TRUE(isnan(fp8_e5m2(f)));
             continue;
         }
 
@@ -284,7 +283,7 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
         if((pattern & 0x7F) == 0x7C)
         {
             EXPECT_TRUE(std::isinf(f))
-                << "Inf pattern 0x" << std::hex << bits << " should decode to float Inf";
+                << "Pattern 0x" << std::hex << bits << " should decode to Inf";
             continue;
         }
 

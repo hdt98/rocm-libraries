@@ -280,8 +280,7 @@ TEST(TestFp8E4M3, RoundTripAllPatterns)
         {
             EXPECT_TRUE(std::isnan(f))
                 << "Pattern 0x" << std::hex << bits << " should decode to NaN";
-            EXPECT_EQ(fp8_e4m3(f).data, pattern)
-                << "NaN round-trip failed for 0x" << std::hex << bits;
+            EXPECT_EQ(fp8_e4m3(f).data, pattern);
             continue;
         }
 
