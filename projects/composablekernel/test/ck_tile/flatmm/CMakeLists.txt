@@ -39,11 +39,6 @@ if(GPU_TARGETS MATCHES "gfx95|gfx125")
     #      but produces numerically wrong results.
     #      Re-enable here AND in test_mx_flatmm_fp4fp4.cpp's typelist together
     #      once the kernel is fixed.
-    #
-    # Total instance count:
-    #   gfx950-only:                5*4 = 20
-    #   gfx1250-only:               (5 V1 + 3 TDM) * 4 = 32
-    #   multi-arch (gfx950;gfx1250): (5 + 5 + 3) * 4 = 52
     set(FLATMM_INSTANCE_FILES)
     foreach(PERSISTENT false)
         foreach(DATA_TYPE FP4xFP4 FP8xFP8 FP6xFP6 FP8xFP4 FP4xFP8)
