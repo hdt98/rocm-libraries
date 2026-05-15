@@ -58,8 +58,8 @@ constexpr int FP8_E4M3_MANT_BITS = 3;
 /// Number of exponent bits
 constexpr int FP8_E4M3_EXP_BITS = 4;
 
-/// Maximum exponent value (before bias)
-constexpr int FP8_E4M3_MAX_EXP = 15;
+/// Maximum biased exponent representable in EXP_BITS bits
+constexpr int FP8_E4M3_MAX_BIASED_EXP = (1 << FP8_E4M3_EXP_BITS) - 1;
 
 // ============================================================================
 // FP8 E4M3 Special Values (bit patterns)
@@ -130,7 +130,7 @@ inline uint8_t float_to_fp8_e4m3_bits(float f, bool saturate = true) noexcept
     }
 
     // Handle overflow: saturate to MAX or return NaN (E4M3 OCP has no infinity)
-    if(exp > FP8_E4M3_MAX_EXP)
+    if(exp > FP8_E4M3_MAX_BIASED_EXP)
     {
         if(saturate)
         {
@@ -183,7 +183,7 @@ inline uint8_t float_to_fp8_e4m3_bits(float f, bool saturate = true) noexcept
         {
             fp8Mant = 0;
             exp++;
-            if(exp > FP8_E4M3_MAX_EXP)
+            if(exp > FP8_E4M3_MAX_BIASED_EXP)
             {
                 if(saturate)
                 {
@@ -198,7 +198,7 @@ inline uint8_t float_to_fp8_e4m3_bits(float f, bool saturate = true) noexcept
     // which is the NaN encoding. Any finite float value that maps exactly to this
     // bit pattern must instead saturate to MAX (0x7E/0xFE), since 0x7F/0xFF
     // is reserved for NaN in OCP E4M3.
-    if(exp == FP8_E4M3_MAX_EXP && fp8Mant == FP8_E4M3_MANT_MASK)
+    if(exp == FP8_E4M3_MAX_BIASED_EXP && fp8Mant == FP8_E4M3_MANT_MASK)
     {
         if(saturate)
         {

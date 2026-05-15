@@ -58,8 +58,8 @@ constexpr int FP8_E5M2_MANT_BITS = 2;
 /// Number of exponent bits
 constexpr int FP8_E5M2_EXP_BITS = 5;
 
-/// Maximum exponent value (before bias)
-constexpr int FP8_E5M2_MAX_EXP = 31;
+/// Maximum biased exponent representable in EXP_BITS bits
+constexpr int FP8_E5M2_MAX_BIASED_EXP = (1 << FP8_E5M2_EXP_BITS) - 1;
 
 // ============================================================================
 // FP8 E5M2 Special Values (bit patterns)
@@ -137,7 +137,7 @@ inline uint8_t float_to_fp8_e5m2_bits(float f, bool saturate = true) noexcept
     }
 
     // Handle overflow: saturate to MAX or return Inf (E5M2 OCP supports infinity)
-    if(exp >= FP8_E5M2_MAX_EXP)
+    if(exp >= FP8_E5M2_MAX_BIASED_EXP)
     {
         if(saturate)
         {
@@ -190,7 +190,7 @@ inline uint8_t float_to_fp8_e5m2_bits(float f, bool saturate = true) noexcept
         {
             fp8Mant = 0;
             exp++;
-            if(exp >= FP8_E5M2_MAX_EXP)
+            if(exp >= FP8_E5M2_MAX_BIASED_EXP)
             {
                 if(saturate)
                 {
