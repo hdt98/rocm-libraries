@@ -328,7 +328,7 @@ def writeSolutionsAndKernels(
     errorTolerant: bool=False,
     generateSourcesAndExit: bool=False,
     compress: bool=True,
-    removeTemporaries: bool=True
+    removeTemporaries: bool=True,
 ):
     if globalParameters["PythonProfile"]:
         globalParameters["CpuThreads"] = 0
@@ -441,8 +441,11 @@ def writeSolutionsAndKernels(
                 cmdlineArchs,
             )
 
-    if removeTemporaries:
-        shutil.rmtree(buildTmpPath)
+    if removeTemporaries and not generateSourcesAndExit:
+        buildTmp = outputPath / "build_tmp"
+        if buildTmp.exists() and buildTmp.is_dir():
+            shutil.rmtree(buildTmp)
+
     return codeObjectFiles, numKernels
 
 
