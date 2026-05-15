@@ -1281,7 +1281,6 @@ struct impl::ext_vector<pk_fp6x16_t, 2>
 };
 
 // Used as AVecType / BVecType for the gfx1250 16x16x128 mx-scale wmma kernel
-// at K=128, MixPrec=true: kAInputSize = K / (kABKLane * PackedSize) = 128/(2*16) = 4.
 template <>
 struct impl::ext_vector<pk_fp6x16_t, 4>
 {
