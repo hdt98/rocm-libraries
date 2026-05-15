@@ -2038,7 +2038,7 @@ namespace TensileLite
                         auto* dataPtr  = static_cast<uint8_t*>(pristineA.cpuInput.valid.get())
                                          + b * dataBatchStrideBytes;
                         auto* scalePtr = gpuScaleBuf.data() + b * scaleBatchStrideBytes;
-                        generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                        generateMXInput(hipMxDataTypeForDataGenerator(tensorA.dataType()),
                                         hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                         dataPtr,
                                         scalePtr,
@@ -2141,7 +2141,7 @@ namespace TensileLite
                         auto* dataPtr  = static_cast<uint8_t*>(pristineB.cpuInput.valid.get())
                                          + b * dataBatchStrideBytes;
                         auto* scalePtr = gpuScaleBuf.data() + b * scaleBatchStrideBytes;
-                        generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                        generateMXInput(hipMxDataTypeForDataGenerator(tensorB.dataType()),
                                         hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                         dataPtr,
                                         scalePtr,
