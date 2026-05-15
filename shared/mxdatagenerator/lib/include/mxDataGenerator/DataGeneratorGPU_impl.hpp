@@ -49,6 +49,21 @@ namespace DGen
             }
         }
 
+        // hipLaunchKernelGGL takes `dim3` (uint32 components); if our
+        // computed gridDimX exceeds 2^32-1 the static_cast<unsigned> at the
+        // launch site silently truncates and the kernel covers only part of
+        // the work. Call this from every host-side launch site before the
+        // cast so we fail loudly instead. `what` is the caller name used in
+        // the error message.
+        inline void checkGridDimX(size_t gridDimX, char const* what)
+        {
+            if(gridDimX > static_cast<size_t>(std::numeric_limits<unsigned>::max()))
+                throw std::invalid_argument(
+                    std::string("DataGeneratorGPU::") + what
+                    + ": gridDim.x exceeds the 2^32-1 thread-block limit; "
+                      "split the launch or use a 2D grid");
+        }
+
 // Macros aren't namespaced even when defined inside a namespace block. This
 // detail name is `#undef`-ed at the bottom of this file so it doesn't leak
 // to includers; trailing underscore signals "private to this TU".
@@ -139,7 +154,10 @@ namespace DGen
             float          stdDev  = 1.0f;
             // `dim0` is the size of the fastest-varying dimension (row count
             // for column-major matrices). Used by RowIndex/ColIndex/Identity.
+            // `dim1` is the next dimension (column count). Used by Sequential
+            // to compute the same row-major linearisation the CPU does.
             uint64_t       dim0    = 0;
+            uint64_t       dim1    = 0;
         };
 
         inline DeviceInitConfig makeConfig(DataGeneratorOptions const& options,
@@ -149,6 +167,7 @@ namespace DGen
             cfg.minVal = static_cast<float>(options.min);
             cfg.maxVal = static_cast<float>(options.max);
             cfg.dim0   = sizes.empty() ? 0 : static_cast<uint64_t>(sizes[0]);
+            cfg.dim1   = sizes.size() < 2 ? 0 : static_cast<uint64_t>(sizes[1]);
 
             std::visit(
                 [&](auto const& mode) {
@@ -395,13 +414,29 @@ namespace DGen
             case DeviceInitMode::Identity:
                 return (row == col) ? 1.0f : 0.0f;
             case DeviceInitMode::Sequential:
-                return static_cast<float>(dataIdx);
+            {
+                // Match CPU `generate_data_sequential`: value at storage
+                // position (row, col) is `(row * cols + col) % 256`.
+                // `cfg.dim1` is plumbed for exactly this purpose; falls back
+                // to 1 for the (uncommon) 1-D case so dataIdx*1 still
+                // produces a sensible monotone sequence.
+                uint64_t const cols = cfg.dim1 ? cfg.dim1 : 1;
+                return static_cast<float>((row * cols + col) % 256u);
+            }
             case DeviceInitMode::RowIndex:
-                return static_cast<float>(row);
+                // Match CPU `generate_data_row_index`: row index modulo 256
+                // (CPU stores the value through `satConvertToType`, which
+                // wraps via the `% 256` it does first).
+                return static_cast<float>(row % 256u);
             case DeviceInitMode::ColIndex:
-                return static_cast<float>(col);
+                // Match CPU `generate_data_col_index`: col index modulo 256.
+                return static_cast<float>(col % 256u);
             case DeviceInitMode::Checkerboard:
-                return ((row ^ col) & 1ull) ? -1.0f : 1.0f;
+                // Match CPU `generate_data_checkerboard`: `(row + col) % 2`,
+                // 1.0 on the even-parity squares, 0.0 elsewhere. (The old
+                // GPU implementation used {-1, 1}, which produced a valid
+                // checkerboard but not the same one.)
+                return ((row + col) & 1ull) ? 0.0f : 1.0f;
             case DeviceInitMode::ScaledDiagonal:
                 return (row == col) ? static_cast<float>(row + 1) : 0.0f;
             case DeviceInitMode::TrigonometricFromFloat:
@@ -1054,13 +1089,7 @@ namespace DGen
         constexpr int kThreadsPerBlock = 256;
         size_t        gridDimX
             = (numBlocks + kThreadsPerBlock - 1) / kThreadsPerBlock;
-        // hipLaunchKernelGGL takes `dim3` (uint32 components); silently
-        // truncating gridDimX would launch too few blocks and corrupt the
-        // tail of the output. Catch it explicitly.
-        if(gridDimX > static_cast<size_t>(std::numeric_limits<unsigned>::max()))
-            throw std::invalid_argument(
-                "DataGeneratorGPU::generateInto: numBlocks exceeds the gridDim.x limit "
-                "(2^32-1 thread blocks); split the generate or use a 2D grid");
+        gpu_detail::checkGridDimX(gridDimX, "generateInto");
 
         if(devScale == nullptr && m_scaleBufferBytes == 0)
             throw std::invalid_argument(
@@ -1140,8 +1169,15 @@ namespace DGen
             throw std::runtime_error(
                 "DataGeneratorGPU::preSwizzleScalesGFX950Device: no scale buffer allocated");
 
-        size_t numRows    = scaleSizes[0];
-        size_t numCols    = scaleSizes[1];
+        size_t numRows = scaleSizes[0];
+        size_t numCols = scaleSizes[1];
+        // Mirror the host helper's `input.size() == product(sizes)` check.
+        // Without it a wrong (rows, cols) pair would still pass to the
+        // padder + kernel but read out of bounds from m_scaleDevice.
+        if(numRows * numCols != m_scaleBufferBytes)
+            throw std::invalid_argument(
+                "DataGeneratorGPU::preSwizzleScalesGFX950Device: "
+                "numRows * numCols does not match the current scale buffer size");
         size_t paddedRows = ((numRows + 31) / 32) * 32;
         size_t paddedCols = ((numCols + 7) / 8) * 8;
         size_t paddedSize = paddedRows * paddedCols;
@@ -1175,6 +1211,7 @@ namespace DGen
 
         constexpr int kThreadsPerBlock = 256;
         size_t        gridDimX = (paddedSize + kThreadsPerBlock - 1) / kThreadsPerBlock;
+        gpu_detail::checkGridDimX(gridDimX, "preSwizzleScalesGFX950Device");
 
         hipLaunchKernelGGL(gpu_detail::preSwizzleScalesKernel,
                            dim3(static_cast<unsigned>(gridDimX)),
@@ -1211,6 +1248,12 @@ namespace DGen
         if(m_scaleDevice == nullptr)
             throw std::runtime_error(
                 "DataGeneratorGPU::preSwizzleScalesGFX1250Device: no scale buffer allocated");
+        // Mirror the host helper's `input.size() == slowDim*fastDim` check
+        // so wrong dims don't translate into an OOB read of m_scaleDevice.
+        if(slowDim * fastDim != m_scaleBufferBytes)
+            throw std::invalid_argument(
+                "DataGeneratorGPU::preSwizzleScalesGFX1250Device: "
+                "slowDim * fastDim does not match the current scale buffer size");
 
         size_t const paddedFast = ((fastDim + dimk - 1) / dimk) * dimk;
         size_t const numTiles   = paddedFast / dimk;
@@ -1221,6 +1264,7 @@ namespace DGen
         constexpr int kThreadsPerBlock = 256;
         size_t        gridDimX
             = (paddedSize + kThreadsPerBlock - 1) / kThreadsPerBlock;
+        gpu_detail::checkGridDimX(gridDimX, "preSwizzleScalesGFX1250Device");
 
         hipLaunchKernelGGL(gpu_detail::preSwizzleScalesGFX1250Kernel,
                            dim3(static_cast<unsigned>(gridDimX)),

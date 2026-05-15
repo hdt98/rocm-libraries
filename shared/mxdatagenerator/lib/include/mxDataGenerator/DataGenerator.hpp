@@ -294,7 +294,7 @@ namespace DGen
         std::vector<uint8_t> getScaleBytes() const;
 
         // set rng seed
-        void setSeed(uint seed);
+        void setSeed(uint32_t seed);
 
         // get reference double vector.
         std::vector<double> getReferenceDouble() const; // Hopefully won't overflow to NaN/Inf
@@ -305,7 +305,7 @@ namespace DGen
     private:
         DataGeneratorOptions m_options;
 
-        uint                   m_seed = kDefaultSeed;
+        uint32_t               m_seed = kDefaultSeed;
         std::vector<Generator> m_gen;
         const int              m_num_threads = std::min(32, omp_get_max_threads());
 
@@ -463,7 +463,7 @@ namespace DGen
     }
 
     template <typename DTYPE>
-    inline void DataGenerator<DTYPE>::setSeed(uint seed)
+    inline void DataGenerator<DTYPE>::setSeed(uint32_t seed)
     {
         m_seed = seed;
     }

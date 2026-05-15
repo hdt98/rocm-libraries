@@ -452,10 +452,10 @@ TEST(DataGeneratorGPU, PreSwizzleScalesGFX1250DeviceUnalignedFastDimMatchesHost)
 // canonical 1.0-scale + literal-value encoding for these modes), but the
 // dequantised float output is the contract these modes promise.
 //
-// `Sequential` is intentionally NOT tested here: the CPU implementation
-// stores `(row*cols + col) % 256` while the GPU stores the column-major
-// linear index `row + col*dim0`. That divergence pre-dates this branch and
-// would be a behaviour change either way; left to a follow-up.
+// Coverage is deliberately broad here: every advertised deterministic
+// MXInitMethod has a matching test below, including a >256 case for
+// RowIndex (the value formula is `row % 256`, so divergences only show up
+// once a dim crosses 256).
 // -----------------------------------------------------------------------------
 namespace
 {
@@ -468,6 +468,12 @@ namespace
         DataGeneratorOptions opt;
         opt.blockScaling = 32;
         opt.initMode     = initMode;
+        // CPU defaults forceDenorm=true, which makes setOne write
+        // (scale=2^8=256, data=subnormal) instead of (scale=1, data=1).
+        // The GPU path derives a per-block scale from the actual data
+        // magnitudes and never produces that pair, so a literal CPU=GPU
+        // dequant comparison only makes sense with forceDenorm=false.
+        opt.forceDenorm  = false;
 
         DataGenerator<DType> cpu;
         cpu.setSeed(1);
@@ -511,4 +517,47 @@ TEST(DataGeneratorGPU, IdentityMatchesCPU)
     std::vector<index_t> const sizes     = {64, 64};
     std::vector<index_t> const strides   = {1, 64};
     expectCpuGpuReferenceFloatEq<DType>(Identity{}, sizes, strides, "Identity");
+}
+
+TEST(DataGeneratorGPU, SequentialMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(Sequential{}, sizes, strides, "Sequential");
+}
+
+TEST(DataGeneratorGPU, RowIndexMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(RowIndex{}, sizes, strides, "RowIndex");
+}
+
+// >256 case: catches a regression where the GPU formula drops the `% 256`
+// the CPU does. A 64x64 RowIndex/ColIndex test would silently pass since
+// every row index fits in [0, 256).
+TEST(DataGeneratorGPU, RowIndexLargeDimMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {512, 64};
+    std::vector<index_t> const strides   = {1, 512};
+    expectCpuGpuReferenceFloatEq<DType>(RowIndex{}, sizes, strides, "RowIndex(512x64)");
+}
+
+TEST(DataGeneratorGPU, ColIndexMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(ColIndex{}, sizes, strides, "ColIndex");
+}
+
+TEST(DataGeneratorGPU, CheckerboardMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(Checkerboard{}, sizes, strides, "Checkerboard");
 }
