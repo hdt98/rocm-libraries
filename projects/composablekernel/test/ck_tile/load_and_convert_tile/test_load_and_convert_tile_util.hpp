@@ -1,10 +1,13 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#pragma once
+
 #include <gtest/gtest.h>
 
 #include "ck_tile/host.hpp"
 #include "ck_tile/ops/common.hpp"
+#include "print_matrix.hpp"
 #include "kernel.hpp"
 
 // Enum struct specifying what kind of test matrix to use
