@@ -174,8 +174,6 @@ void EngineHeuristicDescriptor::finalize()
 
     // Query and serialize device properties for the device the handle's stream
     // is bound to.
-    // Callers that want deterministic device selection across threads must
-    // bind the handle to a non-default stream via hipdnnSetStream.
     int deviceId = 0;
     auto status = hipStreamGetDevice(handle->getStream(), &deviceId);
     if(status != hipSuccess)
