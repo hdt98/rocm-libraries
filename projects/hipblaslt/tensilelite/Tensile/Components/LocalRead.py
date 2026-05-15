@@ -560,7 +560,7 @@ class LocalReadMFMA(LocalRead):
     def localReadMX(self, writer, kernel, bufferIdx, iui, epsi, tP):
         tc      = tP["tensorChar"]
         mxTc    = tc[3]
-        imod    = Module("LocalReadMX%s_I%s" % (tP["tensorChar"],iui))
+        imod    = Module("LocalReadDo%s_I%s" % (tc,iui))
         pack    = Module("pack%s_I%s"%(tc,iui))
         packPre = Module("pack%s_I%s Pre"%(tc,iui))
 
