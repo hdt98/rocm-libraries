@@ -48,17 +48,58 @@ const auto TEST_PLUGIN_DIR
 const auto TEST_PLUGIN_PATH
     = (hipdnn_backend::platform_utilities::getCurrentModuleDirectory().parent_path()
        / TEST_PLUGIN_DIR / hipdnn_data_sdk::utilities::getLibraryName(TEST_PLUGIN1_NAME));
+
+class LibraryHandleGuard
+{
+public:
+    explicit LibraryHandleGuard(hipdnn_backend::platform_utilities::PluginLibHandle handle)
+        : _handle(handle)
+    {
+    }
+
+    ~LibraryHandleGuard()
+    {
+        if(_handle != nullptr)
+        {
+            hipdnn_backend::platform_utilities::closeLibrary(_handle);
+        }
+    }
+
+    LibraryHandleGuard(const LibraryHandleGuard&) = delete;
+    LibraryHandleGuard& operator=(const LibraryHandleGuard&) = delete;
+
+    hipdnn_backend::platform_utilities::PluginLibHandle get() const
+    {
+        return _handle;
+    }
+
+private:
+    hipdnn_backend::platform_utilities::PluginLibHandle _handle;
+};
 } // namespace
 
 TEST(TestPlatformUtils, OpenLibraryLoadsPluginAndGetsSymbol)
 {
-    auto handle = hipdnn_backend::platform_utilities::openLibrary(TEST_PLUGIN_PATH);
-    ASSERT_NE(handle, nullptr);
+    const LibraryHandleGuard library(
+        hipdnn_backend::platform_utilities::openLibrary(TEST_PLUGIN_PATH));
+    ASSERT_NE(library.get(), nullptr);
 
-    EXPECT_NE(hipdnn_backend::platform_utilities::getSymbol(handle, "hipdnnPluginGetName"),
+    EXPECT_NE(hipdnn_backend::platform_utilities::getSymbol(library.get(), "hipdnnPluginGetName"),
               nullptr);
+}
 
-    hipdnn_backend::platform_utilities::closeLibrary(handle);
+TEST(TestPlatformUtils, GetSymbolClearsStaleDlerrorBeforeLookup)
+{
+    const LibraryHandleGuard library(
+        hipdnn_backend::platform_utilities::openLibrary(TEST_PLUGIN_PATH));
+    ASSERT_NE(library.get(), nullptr);
+
+    EXPECT_EQ(
+        hipdnn_data_sdk::utilities::getSymbol(library.get(), "hipdnnMissingSymbolForDlerrorTest"),
+        nullptr);
+
+    EXPECT_NE(hipdnn_backend::platform_utilities::getSymbol(library.get(), "hipdnnPluginGetName"),
+              nullptr);
 }
 
 TEST(TestPlatformUtils, OpenLibraryThrowsHipdnnExceptionForMissingLibrary)
