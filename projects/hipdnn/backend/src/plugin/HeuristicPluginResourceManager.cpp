@@ -263,6 +263,7 @@ std::vector<HeuristicPolicyInfo> HeuristicPluginResourceManager::getHeuristicPol
             HeuristicPolicyInfo info;
             info.policyId = policyId;
             info.policyName = std::string(plugin->getPolicyName(policyId));
+            info.pluginName = std::string(plugin->name());
             info.pluginVersion = std::string(plugin->version());
             info.apiVersion = std::string(plugin->apiVersion());
             infos.push_back(info);
@@ -305,6 +306,7 @@ std::string HeuristicPluginResourceManager::toString() const
         {
             oss << " (" << info.policyName << ")";
         }
+        oss << ", Plugin: " << info.pluginName;
         oss << ", Plugin Version: " << info.pluginVersion;
         oss << ", API Version: " << info.apiVersion << "\n";
     }

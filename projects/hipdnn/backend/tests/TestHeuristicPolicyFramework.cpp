@@ -69,6 +69,7 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
     // Query first policy (two-call pattern)
     int64_t policyId = -1;
     size_t policyNameLen = 0;
+    size_t pluginNameLen = 0;
     size_t pluginVersionLen = 0;
     size_t apiVersionLen = 0;
 
@@ -79,6 +80,8 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
                                                              nullptr,
                                                              &policyNameLen,
                                                              nullptr,
+                                                             &pluginNameLen,
+                                                             nullptr,
                                                              &pluginVersionLen,
                                                              nullptr,
                                                              &apiVersionLen);
@@ -86,11 +89,13 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
     ASSERT_EQ(status, HIPDNN_STATUS_SUCCESS);
     EXPECT_NE(policyId, -1);
     EXPECT_GT(policyNameLen, 0u);
+    EXPECT_GT(pluginNameLen, 0u);
     EXPECT_GT(pluginVersionLen, 0u);
     EXPECT_GT(apiVersionLen, 0u);
 
     // Second call: retrieve strings
     std::vector<char> policyName(policyNameLen);
+    std::vector<char> pluginName(pluginNameLen);
     std::vector<char> pluginVersion(pluginVersionLen);
     std::vector<char> apiVersion(apiVersionLen);
 
@@ -99,6 +104,8 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
                                               &policyId,
                                               policyName.data(),
                                               &policyNameLen,
+                                              pluginName.data(),
+                                              &pluginNameLen,
                                               pluginVersion.data(),
                                               &pluginVersionLen,
                                               apiVersion.data(),
@@ -106,6 +113,7 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
 
     EXPECT_EQ(status, HIPDNN_STATUS_SUCCESS);
     EXPECT_GT(std::strlen(policyName.data()), 0u);
+    EXPECT_GT(std::strlen(pluginName.data()), 0u);
     EXPECT_GT(std::strlen(pluginVersion.data()), 0u);
     EXPECT_GT(std::strlen(apiVersion.data()), 0u);
 }
@@ -118,6 +126,7 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
     // Try to query beyond range
     int64_t policyId = -1;
     size_t policyNameLen = 0;
+    size_t pluginNameLen = 0;
     size_t pluginVersionLen = 0;
     size_t apiVersionLen = 0;
 
@@ -126,6 +135,8 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
                                                                    &policyId,
                                                                    nullptr,
                                                                    &policyNameLen,
+                                                                   nullptr,
+                                                                   &pluginNameLen,
                                                                    nullptr,
                                                                    &pluginVersionLen,
                                                                    nullptr,
@@ -187,8 +198,17 @@ TEST_F(TestHeuristicPolicyFramework, GetPolicyInfoWithNullLengthPointersFails)
     int64_t policyId = -1;
 
     // All length pointers are required (not nullptr)
-    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(
-        _handle, 0, &policyId, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(_handle,
+                                                                   0,
+                                                                   &policyId,
+                                                                   nullptr,
+                                                                   nullptr,
+                                                                   nullptr,
+                                                                   nullptr,
+                                                                   nullptr,
+                                                                   nullptr,
+                                                                   nullptr,
+                                                                   nullptr);
 
     EXPECT_NE(status, HIPDNN_STATUS_SUCCESS);
 }

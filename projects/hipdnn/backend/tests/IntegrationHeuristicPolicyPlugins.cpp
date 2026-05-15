@@ -359,6 +359,7 @@ TEST_F(IntegrationHeuristicPolicyPlugins, EnumerationMatchesResourceManager)
     {
         int64_t apiPolicyId = -1;
         size_t nameLen = 0;
+        size_t pluginNameLen = 0;
         size_t pluginVerLen = 0;
         size_t apiVerLen = 0;
 
@@ -367,6 +368,8 @@ TEST_F(IntegrationHeuristicPolicyPlugins, EnumerationMatchesResourceManager)
                                                    &apiPolicyId,
                                                    nullptr,
                                                    &nameLen,
+                                                   nullptr,
+                                                   &pluginNameLen,
                                                    nullptr,
                                                    &pluginVerLen,
                                                    nullptr,
