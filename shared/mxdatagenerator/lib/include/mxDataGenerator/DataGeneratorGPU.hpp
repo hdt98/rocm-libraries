@@ -36,6 +36,18 @@ namespace DGen
      * BoundedAlternatingSign, Unbounded, Identity, Ones, Zeros, Sequential,
      * RowIndex, ColIndex, Checkerboard, ScaledDiagonal,
      * TrigonometricFromFloat, NormalFromFloat.
+     *
+     * Notes on CPU/GPU parity for the deterministic modes (Identity, Ones,
+     * Zeros, Sequential, RowIndex, ColIndex, Checkerboard, ScaledDiagonal):
+     * CPU and GPU produce the same dequantised floats only when
+     * `DataGeneratorOptions::forceDenorm == false`. With `forceDenorm = true`
+     * (the CPU default), the CPU path encodes via a (subnormal-data,
+     * large-scale) pair while the GPU derives a per-block scale from data
+     * magnitudes; the resulting dequantised values match for `Ones` /
+     * `Identity` / `Zeros` but can disagree at quantisation-precision
+     * granularity for `Sequential` / `RowIndex` / `ColIndex`. Use
+     * `forceDenorm = false` if you depend on byte-equivalent dequant across
+     * backends.
      */
     template <typename DTYPE>
     class DataGeneratorGPU
