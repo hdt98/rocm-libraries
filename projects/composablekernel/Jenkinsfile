@@ -1249,7 +1249,8 @@ def getPytorchTestsCmds() {
     return [
         "pip install --upgrade pandas",
         "python3 /tmp/pytorch/tools/amd_build/build_amd.py",
-        "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python /tmp/pytorch/setup.py develop"
+        "cd /tmp/pytorch",
+        "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python setup.py develop"
     ]
 }
 def getAiterTestsCmds() {
