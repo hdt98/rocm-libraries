@@ -17,9 +17,8 @@ enum struct TestMatrixType
     UniformDistribution = 1
 };
 
-static constexpr auto matrix_type = TestMatrixType::UniformDistribution;
-
-#define PRINT_MATRICES 0
+static constexpr auto matrix_type    = TestMatrixType::UniformDistribution;
+static constexpr bool kPrintMatrices = false;
 
 template <typename Tuple>
 class TestLoadAndConvert : public ::testing::Test
@@ -85,13 +84,14 @@ class TestLoadAndConvert : public ::testing::Test
             h_a, h_a_ref, [](const auto& x) { return x; });
         bool pass = ck_tile::check_err(h_c, h_a_ref);
 
-#if PRINT_MATRICES
-        auto [width, precision] = matrix_type == TestMatrixType::MonotonicSequence
-                                      ? std::make_pair(3, 3)
-                                      : std::make_pair(2, 6);
-        print_matrix(h_a, "Matrix A", width, precision);
-        print_matrix(h_c, "Matrix C", width, precision);
-#endif
+        if constexpr(kPrintMatrices)
+        {
+            auto [width, precision] = matrix_type == TestMatrixType::MonotonicSequence
+                                          ? std::make_pair(3, 3)
+                                          : std::make_pair(2, 6);
+            print_matrix(h_a, "Matrix A", width, precision);
+            print_matrix(h_c, "Matrix C", width, precision);
+        }
 
         EXPECT_TRUE(pass);
     }
