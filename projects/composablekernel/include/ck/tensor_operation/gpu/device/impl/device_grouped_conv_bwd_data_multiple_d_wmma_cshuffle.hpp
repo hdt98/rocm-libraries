@@ -20,6 +20,11 @@
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/io.hpp"
 
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/description.hpp"
+#include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_data_multiple_d_wmma_cshuffle.hpp"
+#endif
+
 namespace ck {
 namespace tensor_operation {
 namespace device {
@@ -583,7 +588,10 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffle
         {
             return false;
         }
-
+        if(!is_xdl_wmma_k_supported<ADataType, KPerBlock>())
+        {
+            return false;
+        }
         const index_t ConvK = arg.b_g_k_c_xs_lengths_[1];
         const index_t ConvC = arg.b_g_k_c_xs_lengths_[2];
 
@@ -826,6 +834,24 @@ struct DeviceGroupedConvBwdDataMultipleD_Wmma_CShuffle
 
         return str.str();
     }
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    std::string GetInstanceString() const override
+    {
+        static_assert(ck_tile::reflect::HasInstanceTraits<DeviceOp>,
+                      "Specialization of instance_traits not found. Please check that a "
+                      "specialization exists in file "
+                      "ck_tile/builder/reflect/"
+                      "instance_traits_device_grouped_conv_bwd_data_multiple_d_wmma_cshuffle.hpp "
+                      "for the given template parameters.");
+        return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+
+    std::unique_ptr<ck_tile::reflect::Description> describe() const override
+    {
+        return std::make_unique<ck_tile::reflect::InstanceStringDescription>(GetInstanceString());
+    }
+#endif
 };
 
 } // namespace device

@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@
 #include "hipblaslt_random.hpp"
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
+#include "rocblaslt/check_numerics_matrix.hpp"
 #include "hipblaslt_internal.hpp"
 #include "rocblaslt/rocblaslt_mat_utils.hpp"
 #include "rocroller_host/rocroller_host.hpp"
@@ -662,13 +663,13 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
 
     ASSERT_TRUE(scale_mode_a_r == scale_mode_a); // validate
 
-    scale_mode_a = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3; // will not set anything
-    scale_mode_b = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3; // ditto
+    scale_mode_a = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+    scale_mode_b = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
 
     EXPECT_HIPBLAS_STATUS(
         hipblasLtMatmulDescSetAttribute(
             matmul, HIPBLASLT_MATMUL_DESC_A_SCALE_MODE, &scale_mode_a, sizeof(uint32_t)),
-        HIPBLAS_STATUS_INVALID_VALUE);
+        HIPBLAS_STATUS_SUCCESS);
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescGetAttribute(matmul,
                                                           HIPBLASLT_MATMUL_DESC_A_SCALE_MODE,
@@ -680,7 +681,7 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
     EXPECT_HIPBLAS_STATUS(
         hipblasLtMatmulDescSetAttribute(
             matmul, HIPBLASLT_MATMUL_DESC_B_SCALE_MODE, &scale_mode_b, sizeof(uint32_t)),
-        HIPBLAS_STATUS_INVALID_VALUE);
+        HIPBLAS_STATUS_SUCCESS);
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescGetAttribute(matmul,
                                                           HIPBLASLT_MATMUL_DESC_B_SCALE_MODE,
@@ -691,8 +692,8 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
 
     ASSERT_TRUE(
         scale_mode_a_r
-        == HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F); // validate, it's still the previous value as expected
-    ASSERT_TRUE(scale_mode_b_r == HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F); // ditto
+        == HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3); // validate round-trip
+    ASSERT_TRUE(scale_mode_b_r == HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3); // ditto
 
     hipStream_t stream;
     CHECK_HIP_ERROR(hipStreamCreate(&stream));
@@ -1030,6 +1031,7 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
     CHECK_HIP_ERROR(hipFree(d_scale_b));
     CHECK_HIP_ERROR(hipFree(d_scale_c));
     CHECK_HIP_ERROR(hipFree(d_scale_d));
+    CHECK_HIP_ERROR(hipFree(d_scale_e));
     CHECK_HIP_ERROR(hipFree(d_aux_buffer));
     CHECK_HIP_ERROR(hipFree(d_out_amax));
     CHECK_HIP_ERROR(hipFree(default_ptr));
@@ -1616,6 +1618,7 @@ void testing_aux_matmul_bad_ws_size(const Arguments& arg)
     CHECK_HIP_ERROR(hipFree(d_b));
     CHECK_HIP_ERROR(hipFree(d_c));
     CHECK_HIP_ERROR(hipFree(d_d));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceDestroy(pref));
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul));
     CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matA));
     CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matB));
@@ -1725,9 +1728,9 @@ void testing_aux_auxiliary_func(const Arguments& arg)
     ASSERT_TRUE(hip_datatype_to_string(HIP_R_8F_E5M2_FNUZ) == "bf8_fnuz_r");
     ASSERT_TRUE(hip_datatype_to_string(HIP_R_8F_E4M3) == "f8_r");
     ASSERT_TRUE(hip_datatype_to_string(HIP_R_8F_E5M2) == "bf8_r");
-    ASSERT_TRUE(hip_datatype_to_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT)) == "f6_r");
-    ASSERT_TRUE(hip_datatype_to_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT)) == "bf6_r");
-    ASSERT_TRUE(hip_datatype_to_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT)) == "f4_r");
+    ASSERT_TRUE(hip_datatype_to_string(static_cast<hipDataType>(HIP_R_6F_E2M3)) == "f6_r");
+    ASSERT_TRUE(hip_datatype_to_string(static_cast<hipDataType>(HIP_R_6F_E3M2)) == "bf6_r");
+    ASSERT_TRUE(hip_datatype_to_string(static_cast<hipDataType>(HIP_R_4F_E2M1)) == "f4_r");
 
     // Test hipblas_computetype_to_string
     hipblas_computetype_to_string(HIPBLAS_COMPUTE_16F);
@@ -1751,9 +1754,9 @@ void testing_aux_auxiliary_func(const Arguments& arg)
     ASSERT_TRUE(string_to_hip_datatype("f16_r") == HIP_R_16F);
     ASSERT_TRUE(string_to_hip_datatype("bf16_r") == HIP_R_16BF);
     ASSERT_TRUE(string_to_hip_datatype("i8_r") == HIP_R_8I);
-    ASSERT_TRUE(string_to_hip_datatype("f6_r") == static_cast<hipDataType>(HIP_R_6F_E2M3_EXT));
-    ASSERT_TRUE(string_to_hip_datatype("bf6_r") == static_cast<hipDataType>(HIP_R_6F_E3M2_EXT));
-    ASSERT_TRUE(string_to_hip_datatype("f4_r") == static_cast<hipDataType>(HIP_R_4F_E2M1_EXT));
+    ASSERT_TRUE(string_to_hip_datatype("f6_r") == static_cast<hipDataType>(HIP_R_6F_E2M3));
+    ASSERT_TRUE(string_to_hip_datatype("bf6_r") == static_cast<hipDataType>(HIP_R_6F_E3M2));
+    ASSERT_TRUE(string_to_hip_datatype("f4_r") == static_cast<hipDataType>(HIP_R_4F_E2M1));
     ASSERT_TRUE(string_to_hip_datatype("i32_r") == HIP_R_32I);
     ASSERT_TRUE(string_to_hip_datatype("") == HIPBLASLT_DATATYPE_INVALID);
 
@@ -1788,11 +1791,16 @@ void testing_aux_auxiliary_func(const Arguments& arg)
                 == HIPBLASLT_EPILOGUE_GELU_AUX);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_GELU_AUX_BIAS")
                 == HIPBLASLT_EPILOGUE_GELU_AUX_BIAS);
+    ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_RELU_AUX_BIAS")
+                == HIPBLASLT_EPILOGUE_RELU_AUX_BIAS);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_SIGMOID")
                 == HIPBLASLT_EPILOGUE_SIGMOID);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_DGELU") == HIPBLASLT_EPILOGUE_DGELU);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_DGELU_BGRAD")
                 == HIPBLASLT_EPILOGUE_DGELU_BGRAD);
+    ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_DRELU") == HIPBLASLT_EPILOGUE_DRELU);
+    ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_DRELU_BGRAD")
+                == HIPBLASLT_EPILOGUE_DRELU_BGRAD);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_BGRADA") == HIPBLASLT_EPILOGUE_BGRADA);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_BGRADB") == HIPBLASLT_EPILOGUE_BGRADB);
     ASSERT_TRUE(string_to_epilogue_type("HIPBLASLT_EPILOGUE_SWISH_EXT")
@@ -1832,8 +1840,11 @@ void testing_aux_auxiliary_func(const Arguments& arg)
     ASSERT_TRUE(hipblaslt_isnan(arg_hipblaslt_bf8_fnuz));
 
     hipblaslt_f8 arg_hipblaslt_f8;
-    arg_hipblaslt_f8.__x = 0x80;
+    arg_hipblaslt_f8.__x = 0x7f;
     ASSERT_TRUE(hipblaslt_isnan(arg_hipblaslt_f8));
+    arg_hipblaslt_f8.__x = 0x80;
+    ASSERT_FALSE(hipblaslt_isnan(arg_hipblaslt_f8));
+    ASSERT_TRUE(arg_hipblaslt_f8.is_zero());
 
     hipblaslt_bf8 arg_hipblaslt_bf8;
     arg_hipblaslt_bf8.__x = 0x7d;
@@ -1848,52 +1859,136 @@ void testing_aux_auxiliary_func(const Arguments& arg)
 
 void testing_aux_float8_func(const Arguments& arg)
 {
-    // Test hipblaslt_float8
-    _Float16          f16 = 2.0;
-    hipblaslt_f8_fnuz f8_fnuz_data(f16);
-    ASSERT_TRUE(f16 == static_cast<_Float16>(f8_fnuz_data));
-    f8_fnuz_data.__x = 0x00;
-    ASSERT_TRUE(f8_fnuz_data.is_zero());
-    f8_fnuz_data.__x = 0x80;
-    ASSERT_TRUE(f8_fnuz_data.is_inf());
-    hipblaslt_f8_fnuz f8_fnuz_data_copy;
-    f8_fnuz_data_copy = f8_fnuz_data;
-    ASSERT_TRUE(f8_fnuz_data_copy.__x == f8_fnuz_data.__x);
+    _Float16 f16 = 2.0;
 
-    // Test hipblaslt_f8
-    hipblaslt_f8 f8_data(f16);
-    ASSERT_TRUE(f16 == static_cast<_Float16>(f8_data));
-    f8_data.__x = 0x00;
-    ASSERT_TRUE(f8_data.is_zero());
-    f8_data.__x = 0x80;
-    ASSERT_TRUE(f8_data.is_inf());
-    hipblaslt_f8 f8_data_copy;
-    f8_data_copy = f8_data;
-    ASSERT_TRUE(f8_data_copy.__x == f8_data.__x);
+    // hipblaslt_f8_fnuz (FNUZ E4M3): zero only 0x00; 0x80 is NaN (is_inf matches for legacy API).
+    {
+        hipblaslt_f8_fnuz v(f16);
+        ASSERT_TRUE(f16 == static_cast<_Float16>(v));
 
-    // Test hipblaslt_bf8_fnuz
-    hipblaslt_bf8_fnuz bf8_fnuz_data(f16);
-    ASSERT_TRUE(f16 == static_cast<_Float16>(bf8_fnuz_data));
-    bf8_fnuz_data.__x = 0x00;
-    ASSERT_TRUE(bf8_fnuz_data.is_zero());
-    bf8_fnuz_data.__x = 0x80;
-    ASSERT_TRUE(bf8_fnuz_data.is_inf());
-    hipblaslt_bf8_fnuz bf8_fnuz_data_copy;
-    bf8_fnuz_data_copy = bf8_fnuz_data;
-    ASSERT_TRUE(bf8_fnuz_data_copy.__x == bf8_fnuz_data.__x);
+        v.__x = 0x00;
+        ASSERT_TRUE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
 
-    // Test hipblaslt_bf8
-    hipblaslt_bf8 bf8_data(f16);
-    ASSERT_TRUE(f16 == static_cast<_Float16>(bf8_data));
-    bf8_data.__x = 0x00;
-    ASSERT_TRUE(bf8_data.is_zero());
-    bf8_data.__x = 0xff;
-    ASSERT_TRUE(bf8_data.is_nan());
-    bf8_data.__x = 0xfc;
-    ASSERT_TRUE(bf8_data.is_inf());
-    hipblaslt_bf8 bf8_data_copy;
-    bf8_data_copy = bf8_data;
-    ASSERT_TRUE(bf8_data_copy.__x == bf8_data.__x);
+        v.__x = 0x80;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_TRUE(v.is_nan());
+        ASSERT_TRUE(v.is_inf());
+        ASSERT_TRUE(hipblaslt_isnan(v));
+
+        v.__x = 0x38;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        hipblaslt_f8_fnuz c;
+        c = v;
+        ASSERT_TRUE(c.__x == v.__x);
+    }
+
+    // hipblaslt_f8 (OCP E4M3): ±0 = 0x00/0x80; canonical NaN = 0x7f/0xff; no Inf.
+    {
+        hipblaslt_f8 v(f16);
+        ASSERT_TRUE(f16 == static_cast<_Float16>(v));
+
+        v.__x = 0x00;
+        ASSERT_TRUE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        v.__x = 0x80;
+        ASSERT_TRUE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        v.__x = 0x7f;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_TRUE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+        ASSERT_TRUE(hipblaslt_isnan(v));
+
+        v.__x = 0xff;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_TRUE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        v.__x = 0x2a;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        hipblaslt_f8 c = v;
+        ASSERT_TRUE(c.__x == v.__x);
+    }
+
+    // hipblaslt_bf8_fnuz (FNUZ E5M2): same sentinel pattern as f8_fnuz.
+    {
+        hipblaslt_bf8_fnuz v(f16);
+        ASSERT_TRUE(f16 == static_cast<_Float16>(v));
+
+        v.__x = 0x00;
+        ASSERT_TRUE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        v.__x = 0x80;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_TRUE(v.is_nan());
+        ASSERT_TRUE(v.is_inf());
+        ASSERT_TRUE(hipblaslt_isnan(v));
+
+        v.__x = 0x14;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        hipblaslt_bf8_fnuz c = v;
+        ASSERT_TRUE(c.__x == v.__x);
+    }
+
+    // hipblaslt_bf8 (OCP E5M2): ±0; Inf 0x7c/0xfc; NaN when exp=max and mantissa non-zero.
+    {
+        hipblaslt_bf8 v(f16);
+        ASSERT_TRUE(f16 == static_cast<_Float16>(v));
+
+        v.__x = 0x00;
+        ASSERT_TRUE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        v.__x = 0x80;
+        ASSERT_TRUE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        v.__x = 0x7c;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_TRUE(v.is_inf());
+
+        v.__x = 0xfc;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_TRUE(v.is_inf());
+
+        for(int b : {0x7d, 0x7e, 0x7f, 0xfd, 0xfe, 0xff})
+        {
+            v.__x = static_cast<decltype(v.__x)>(b);
+            ASSERT_FALSE(v.is_zero());
+            ASSERT_TRUE(v.is_nan());
+            ASSERT_FALSE(v.is_inf());
+            ASSERT_TRUE(hipblaslt_isnan(v));
+        }
+
+        v.__x = 0x08;
+        ASSERT_FALSE(v.is_zero());
+        ASSERT_FALSE(v.is_nan());
+        ASSERT_FALSE(v.is_inf());
+
+        hipblaslt_bf8 c = v;
+        ASSERT_TRUE(c.__x == v.__x);
+    }
 
     // namespace std functions
     // Test hipblaslt_f8_fnuz sin function
@@ -2740,11 +2835,11 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E4M3)} == "R_8F_E4M3");
     ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E5M2)} == "R_8F_E5M2");
     ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8I)} == "R_8I");
-    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT))}
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E2M3))}
                 == "R_6F_E2M3");
-    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT))}
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E3M2))}
                 == "R_6F_E3M2");
-    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT))}
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_4F_E2M1))}
                 == "R_4F_E2M1");
     ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(999))}
                 == "Invalid");
@@ -2761,16 +2856,16 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2)} == "bf8_r");
     ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2_FNUZ)} == "bf8_r");
     ASSERT_TRUE(
-        std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT))}
+        std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E2M3))}
         == "f6_r");
     ASSERT_TRUE(
-        std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT))}
+        std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E3M2))}
         == "bf6_r");
     ASSERT_TRUE(
-        std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT))}
+        std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1))}
         == "f4_r");
     ASSERT_TRUE(std::string_view{
-                    hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT + 1))}
+                    hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1 + 1))}
                 == "invalid");
 
     // Test rocblaslt_compute_type_to_string
@@ -2920,6 +3015,8 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
                 == "EPILOGUE_GELU");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DGELU)}
                 == "EPILOGUE_DGELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DRELU)}
+                == "EPILOGUE_DRELU");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_BIAS)}
                 == "EPILOGUE_GELU_BIAS");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_AUX)}
@@ -2931,9 +3028,11 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DGELU_BGRAD)}
                 == "EPILOGUE_DGELU_BGRAD");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BGRADA)}
-                == "EPILOGUE_DGELU_BGRADA");
+                == "EPILOGUE_BGRADA");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BGRADB)}
-                == "EPILOGUE_DGELU_BGRADB");
+                == "EPILOGUE_BGRADB");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DRELU_BGRAD)}
+                == "EPILOGUE_DRELU_BGRAD");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_EXT)}
                 == "EPILOGUE_SWISH_EXT");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT)}
@@ -3195,6 +3294,29 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(desc_result5.find("epilogueAuxDataType") == std::string::npos);
     ASSERT_TRUE(desc_result5.front() == '[' && desc_result5.back() == ']');
 
+    // Test case 6: Epilogue extension without aux_type
+    _rocblaslt_matmul_desc desc5;
+    desc5.compute_type = rocblaslt_compute_i32;
+    desc5.scale_type   = HIP_R_32I;
+    desc5.op_A         = HIPBLAS_OP_N;
+    desc5.op_B         = HIPBLAS_OP_N;
+    desc5.epilogue     = ROCBLASLT_EPILOGUE_DRELU_BGRAD;
+    desc5.bias         = nullptr;
+    desc5.bias_type    = HIPBLASLT_DATATYPE_INVALID;
+    desc5.aux_type     = HIPBLASLT_DATATYPE_INVALID; // Invalid aux type
+    desc5.e            = reinterpret_cast<void*>(0x55555555);
+    desc5.lde          = 64;
+
+    std::string desc_result5 = rocblaslt_matmul_desc_to_string(&desc5);
+    ASSERT_TRUE(!desc_result5.empty());
+    ASSERT_TRUE(desc_result5.find("computeType=COMPUTE_32I") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogue=EPILOGUE_DRELU_BGRAD") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogueAuxLd=64") != std::string::npos);
+    // Should NOT contain epilogueAuxDataType since aux_type is invalid
+    ASSERT_TRUE(desc_result5.find("epilogueAuxDataType") == std::string::npos);
+    ASSERT_TRUE(desc_result5.front() == '[' && desc_result5.back() == ']');
+
     // Test different data types
     _rocblaslt_matmul_desc desc6;
     desc6.compute_type = rocblaslt_compute_f32_fast_bf16;
@@ -3271,6 +3393,8 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_GELU_AUX_BIAS) == true);
     ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DGELU) == true);
     ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DGELU_BGRAD) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DRELU) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DRELU_BGRAD) == true);
     ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_SWISH_EXT) == true);
     ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT) == true);
     ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_CLAMP_EXT) == true);
@@ -4347,7 +4471,7 @@ void testing_aux_hipblaslt_ostream_func(const Arguments& arg)
     bool                   gradient = false;
     rocblaslt_compute_type compute_type;
     rocblaslt_handle       roc_handle = (rocblaslt_handle)handle;
-
+    hipblasLtBatchMode_t batchMode = HIPBLASLT_BATCH_MODE_STRIDED;
     rocblaslt_status isValid = rocblaslt_matmul_valid_args(matmul_descr,
                                                            A,
                                                            B,
@@ -4445,7 +4569,8 @@ void testing_aux_hipblaslt_ostream_func(const Arguments& arg)
                                         stream, // stream
                                         roc_handle->Synchronizer,
                                         arg.swizzle_a, // swizzleA
-                                        arg.swizzle_b}; // swizzleB
+                                        arg.swizzle_b,
+                                        batchMode}; // swizzleB
 
     const hipblasLtMatmulAlgo_t* hip_algo = &heuristicResult[0].algo;
     const rocblaslt_matmul_algo* roc_algo = (const rocblaslt_matmul_algo*)hip_algo;
@@ -4500,4 +4625,568 @@ void testing_aux_handle_func(const Arguments& arg)
         EXPECT_EQ(bytes_copied, sizeof(test_value));
         EXPECT_EQ(retrieved_value, test_value);
     }
+}
+
+void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
+{
+    hipblasLtHandle_t handle;
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
+
+    hipblasLtMatmulDesc_t matmul;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
+
+    hipblasOperation_t opA     = HIPBLAS_OP_T;
+    hipblasOperation_t opB     = HIPBLAS_OP_N;
+    int64_t            m       = 1;
+    int64_t            n       = 1;
+    int64_t            k       = 1;
+    float              alpha_v = arg.alpha;
+    void*              alpha   = &alpha_v;
+    float              beta_v  = arg.beta;
+    void*              beta    = &beta_v;
+    int64_t            lda     = 1;
+    int64_t            ldb     = 1;
+    int64_t            ldc     = 1;
+    int64_t            ldd     = 1;
+    int64_t            lde     = 1;
+
+    hipStream_t stream;
+    CHECK_HIP_ERROR(hipStreamCreate(&stream));
+    hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matA, arg.a_type, m, k, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matB, arg.a_type, k, n, k));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matC, arg.a_type, m, n, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matD, arg.a_type, m, n, m));
+    hipDataType a_type, b_type, c_type, d_type;
+
+    const int                        request_solutions = 1;
+    hipblasLtMatmulHeuristicResult_t heuristicResult[request_solutions];
+    int                              returnedAlgoCount  = 0;
+    size_t                           max_workspace_size = 128 * 1024 * 1024;
+    hipblasLtMatmulPreference_t      pref;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
+    CHECK_HIPBLASLT_ERROR(
+        hipblasLtMatmulPreferenceSetAttribute(pref,
+                                              HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                              &max_workspace_size,
+                                              sizeof(max_workspace_size)));
+
+    void* d_workspace;
+    if(max_workspace_size > 0)
+        CHECK_HIP_ERROR(hipMalloc(&d_workspace, max_workspace_size));
+
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulAlgoGetHeuristic(handle,
+                                                          matmul,
+                                                          matA,
+                                                          matB,
+                                                          matC,
+                                                          matD,
+                                                          pref,
+                                                          request_solutions,
+                                                          heuristicResult,
+                                                          &returnedAlgoCount));
+
+    CHECK_SOLUTION_FOUND(returnedAlgoCount);
+    rocblaslt_matmul_desc matmul_descr = (rocblaslt_matmul_desc)matmul;
+    int64_t               batch_count  = 1;
+    void *                A, *B, *C, *D, *E, *d_alphaVec; // device
+    CHECK_HIP_ERROR(hipMalloc(&A, m * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&B, n * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&C, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&D, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&E, m * n * batch_count * sizeof(int64_t)));
+
+    int64_t                batch_stride_a = 0;
+    int64_t                batch_stride_b = 0;
+    int64_t                batch_stride_c = 0;
+    int64_t                batch_stride_d = 0;
+    int64_t                batch_stride_e = 0;
+    bool                   strided_batch  = true;
+    bool                   grouped_gemm   = true;
+    void*                  bias           = nullptr;
+    hipDataType            bias_type;
+    void*                  scaleAlphaVec = nullptr;
+    hipDataType            aux_type;
+    bool                   gradient = false;
+    rocblaslt_compute_type compute_type;
+    rocblaslt_handle       roc_handle = (rocblaslt_handle)handle;
+    hipblasLtBatchMode_t batchMode = HIPBLASLT_BATCH_MODE_STRIDED;
+    rocblaslt_status isValid = rocblaslt_matmul_valid_args(matmul_descr,
+                                                           A,
+                                                           B,
+                                                           C,
+                                                           D,
+                                                           (rocblaslt_matrix_layout)matA,
+                                                           (rocblaslt_matrix_layout)matB,
+                                                           (rocblaslt_matrix_layout)matC,
+                                                           (rocblaslt_matrix_layout)matD,
+                                                           alpha,
+                                                           beta,
+                                                           m,
+                                                           n,
+                                                           k,
+                                                           a_type,
+                                                           lda,
+                                                           batch_stride_a,
+                                                           b_type,
+                                                           ldb,
+                                                           batch_stride_b,
+                                                           c_type,
+                                                           ldc,
+                                                           batch_stride_c,
+                                                           d_type,
+                                                           ldd,
+                                                           batch_stride_d,
+                                                           lde,
+                                                           batch_stride_e,
+                                                           bias,
+                                                           bias_type,
+                                                           scaleAlphaVec,
+                                                           E,
+                                                           aux_type,
+                                                           gradient,
+                                                           compute_type,
+                                                           false,
+                                                           false);
+
+    ASSERT_TRUE(isValid == rocblaslt_status_continue);
+
+    RocblasltContractionProblem problem{opA,
+                                        opB,
+                                        m,
+                                        n,
+                                        k,
+                                        alpha,
+                                        a_type,
+                                        A, // A
+                                        nullptr,
+                                        lda, // arg.lda
+                                        batch_stride_a,
+                                        b_type,
+                                        B, // B
+                                        nullptr,
+                                        ldb, // arg.ldb
+                                        batch_stride_b,
+                                        beta,
+                                        c_type,
+                                        C, // C
+                                        nullptr,
+                                        ldc, // arg.ldc
+                                        batch_stride_c,
+                                        d_type,
+                                        D, // D
+                                        nullptr,
+                                        ldd, // arg.ldc
+                                        batch_stride_d,
+                                        E, // E
+                                        nullptr,
+                                        lde, //arg.lde
+                                        batch_stride_e,
+                                        batch_count,
+                                        strided_batch,
+                                        grouped_gemm,
+                                        gradient,
+                                        matmul_descr->compute_type,
+                                        HIPBLASLT_DATATYPE_INVALID,
+                                        bias,
+                                        matmul_descr->scaleA,
+                                        matmul_descr->scaleB,
+                                        matmul_descr->scaleC,
+                                        matmul_descr->scaleD,
+                                        matmul_descr->scaleE,
+                                        scaleAlphaVec,
+                                        matmul_descr->scaleAType,
+                                        matmul_descr->scaleBType,
+                                        arg.bias_type,
+                                        arg.aux_type,
+                                        matmul_descr->epilogue,
+                                        matmul_descr->amaxD,
+                                        nullptr,
+                                        max_workspace_size, // workspaceSize
+                                        HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, // act0
+                                        HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, // act1
+                                        stream, // stream
+                                        roc_handle->Synchronizer,
+                                        arg.swizzle_a, // swizzleA
+                                        arg.swizzle_b,
+                                        batchMode}; // swizzleB
+
+    const hipblasLtMatmulAlgo_t* hip_algo = &heuristicResult[0].algo;
+    const rocblaslt_matmul_algo* roc_algo = (const rocblaslt_matmul_algo*)hip_algo;
+
+    ASSERT_TRUE(runRocRollerContractionProblem(roc_handle, nullptr, problem)
+                != rocblaslt_status_success);
+    ASSERT_TRUE(runRocRollerContractionProblem(roc_handle, roc_algo, problem)
+                != rocblaslt_status_success);
+
+    hipblasLtMatmulAlgo_t* hip_algo2 = &heuristicResult[0].algo;
+    rocblaslt_matmul_algo* roc_algo2 = (rocblaslt_matmul_algo*)hip_algo;
+    ASSERT_TRUE(isRocRollerSolutionSupported(roc_handle, problem, roc_algo2, &max_workspace_size)
+                != rocblaslt_status_success);
+
+    // Free GPU memory allocations
+    CHECK_HIP_ERROR(hipFree(A));
+    CHECK_HIP_ERROR(hipFree(B));
+    CHECK_HIP_ERROR(hipFree(C));
+    CHECK_HIP_ERROR(hipFree(D));
+    CHECK_HIP_ERROR(hipFree(E));
+
+    // Free workspace
+    CHECK_HIP_ERROR(hipFree(d_workspace));
+
+    // Destroy preference object
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceDestroy(pref));
+
+    // Destroy handles
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matA));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matB));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matC));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matD));
+    CHECK_HIPBLASLT_ERROR(hipblasLtDestroy(handle));
+    CHECK_HIP_ERROR(hipStreamDestroy(stream));
+}
+
+// Coverage for the post-GEMM HIPBLASLT_CHECK_NUMERICS scanner: env-var parsing,
+// public drain API, and the happy-path NaN detection round-trip.
+void testing_aux_check_numerics_func(const Arguments& arg)
+{
+    // setenv/unsetenv are not thread-safe; serialize the body so concurrent
+    // RUN_TEST_ON_THREADS_STREAMS threads can't interleave env mutations with
+    // hipblasLtCreate() reads of those vars.
+    static std::mutex           env_mutex;
+    std::lock_guard<std::mutex> env_lock(env_mutex);
+
+    auto reset_env = []() {
+        unsetenv("HIPBLASLT_CHECK_NUMERICS");
+        unsetenv("HIPBLASLT_CHECK_NUMERICS_SCAN_EVERY");
+        unsetenv("HIPBLASLT_CHECK_NUMERICS_SCAN_FROM");
+        unsetenv("HIPBLASLT_CHECK_NUMERICS_SCAN_UNTIL");
+    };
+    auto with_env = [](std::initializer_list<std::pair<const char*, const char*>> env,
+                       auto                                                       inspect) {
+        for(auto& kv : env)
+            setenv(kv.first, kv.second, 1);
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        inspect((rocblaslt_handle)h);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    };
+
+    reset_env();
+
+    EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(nullptr, nullptr),
+                          HIPBLAS_STATUS_NOT_INITIALIZED);
+
+    // Default handle (env unset): scanning disabled, drain returns 0.
+    {
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        rocblaslt_handle rh = (rocblaslt_handle)h;
+        ASSERT_TRUE(rh->check_numerics == hipblaslt_check_numerics_mode_no_check);
+        ASSERT_TRUE(rh->check_numerics_flag == nullptr);
+        uint32_t out = 99;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, 0u);
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, nullptr), HIPBLAS_STATUS_SUCCESS);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    }
+
+    // HIPBLASLT_CHECK_NUMERICS string/numeric forms.
+    auto check_mode = [&](const char* val, hipblaslt_check_numerics_mode expected) {
+        reset_env();
+        setenv("HIPBLASLT_CHECK_NUMERICS", val, 1);
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_TRUE(((rocblaslt_handle)h)->check_numerics == expected);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    };
+    for(const char* v : {"0", "none", "off", "OFF", "", "   ", "garbage", "4", "8"})
+        check_mode(v, hipblaslt_check_numerics_mode_no_check);
+    for(const char* v : {"1", "info", "INFO"})
+        check_mode(v, hipblaslt_check_numerics_mode_info);
+    for(const char* v : {"2", "Warn", "  warn  "})
+        check_mode(v, hipblaslt_check_numerics_mode_warn);
+
+    // SCAN_EVERY parsing: valid values, plus 0/negative/garbage -> 1.
+    reset_env();
+    with_env({{"HIPBLASLT_CHECK_NUMERICS", "1"}, {"HIPBLASLT_CHECK_NUMERICS_SCAN_EVERY", "5"}},
+             [](rocblaslt_handle rh) { ASSERT_EQ(rh->check_numerics_scan_every, 5u); });
+    for(const char* v : {"0", "-3", "abc"})
+    {
+        reset_env();
+        with_env({{"HIPBLASLT_CHECK_NUMERICS", "1"}, {"HIPBLASLT_CHECK_NUMERICS_SCAN_EVERY", v}},
+                 [](rocblaslt_handle rh) { ASSERT_EQ(rh->check_numerics_scan_every, 1u); });
+    }
+
+    // SCAN_FROM / SCAN_UNTIL: valid window, inverted resets to defaults.
+    reset_env();
+    with_env({{"HIPBLASLT_CHECK_NUMERICS", "2"},
+              {"HIPBLASLT_CHECK_NUMERICS_SCAN_FROM", "10"},
+              {"HIPBLASLT_CHECK_NUMERICS_SCAN_UNTIL", "20"}},
+             [](rocblaslt_handle rh) {
+                 ASSERT_EQ(rh->check_numerics_scan_from, 10u);
+                 ASSERT_EQ(rh->check_numerics_scan_until, 20u);
+             });
+    reset_env();
+    with_env({{"HIPBLASLT_CHECK_NUMERICS", "2"},
+              {"HIPBLASLT_CHECK_NUMERICS_SCAN_FROM", "600"},
+              {"HIPBLASLT_CHECK_NUMERICS_SCAN_UNTIL", "500"}},
+             [](rocblaslt_handle rh) {
+                 ASSERT_EQ(rh->check_numerics_scan_from, 1u);
+                 ASSERT_EQ(rh->check_numerics_scan_until, ~uint32_t(0));
+             });
+
+    // Happy path: enable scanning, write NaN, scan_D, drain returns call_id 1.
+    reset_env();
+    setenv("HIPBLASLT_CHECK_NUMERICS", "1", 1);
+    {
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        rocblaslt_handle rh = (rocblaslt_handle)h;
+        ASSERT_TRUE(rh->check_numerics_flag != nullptr);
+
+        constexpr int64_t M = 4, N = 4;
+        float*            d_buf = nullptr;
+        ASSERT_EQ(hipMalloc(&d_buf, M * N * sizeof(float)), hipSuccess);
+        std::vector<float> h_buf(M * N, std::numeric_limits<float>::quiet_NaN());
+        ASSERT_EQ(hipMemcpy(d_buf, h_buf.data(),
+                            M * N * sizeof(float), hipMemcpyHostToDevice),
+                  hipSuccess);
+
+        const uint32_t call_id = hipblaslt_check_numerics_begin_call(rh);
+        ASSERT_EQ(call_id, 1u);
+        ASSERT_TRUE(hipblaslt_check_numerics_scan_D(rh, nullptr, call_id,
+                                                    M, N, 1, HIP_R_32F,
+                                                    d_buf, M, M * N, false)
+                    == rocblaslt_status_success);
+
+        uint32_t out = 0;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, 1u);
+        // Second drain after reset: no NaN.
+        out = 99;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, 0u);
+
+        ASSERT_EQ(hipFree(d_buf), hipSuccess);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    }
+
+    // Per-dtype dispatch coverage: every arm of the type switch in
+    // hipblaslt_check_numerics_output_D gets a 4x4 NaN-prefilled buffer and
+    // we assert the device flag captures call_id 1. Catches a regression in
+    // any single dtype's template instantiation that the f32 happy path
+    // above would miss.
+    auto scan_one_with_nan
+        = [](hipDataType dt, const void* host_buf, size_t elem_size, uint32_t expected_drain) {
+              reset_env();
+              setenv("HIPBLASLT_CHECK_NUMERICS", "1", 1);
+              hipblasLtHandle_t h = nullptr;
+              EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+              rocblaslt_handle  rh = (rocblaslt_handle)h;
+              constexpr int64_t M = 4, N = 4;
+              void*             d_buf = nullptr;
+              ASSERT_EQ(hipMalloc(&d_buf, M * N * elem_size), hipSuccess);
+              ASSERT_EQ(
+                  hipMemcpy(d_buf, host_buf, M * N * elem_size, hipMemcpyHostToDevice),
+                  hipSuccess);
+              const uint32_t call_id = hipblaslt_check_numerics_begin_call(rh);
+              ASSERT_EQ(call_id, 1u);
+              ASSERT_TRUE(hipblaslt_check_numerics_scan_D(
+                              rh, nullptr, call_id, M, N, 1, dt, d_buf, M, M * N, false)
+                          == rocblaslt_status_success);
+              uint32_t out = 0;
+              EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out),
+                                    HIPBLAS_STATUS_SUCCESS);
+              ASSERT_EQ(out, expected_drain);
+              ASSERT_EQ(hipFree(d_buf), hipSuccess);
+              EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+          };
+
+    {
+        std::vector<double> b(16, std::numeric_limits<double>::quiet_NaN());
+        scan_one_with_nan(HIP_R_64F, b.data(), sizeof(double), 1u);
+    }
+    {
+        std::vector<hipblasLtHalf> b(16, static_cast<hipblasLtHalf>(NAN));
+        scan_one_with_nan(HIP_R_16F, b.data(), sizeof(hipblasLtHalf), 1u);
+    }
+    {
+        // f32 quiet NaN truncates to bf16 0x7FC0 (exp=0xFF, mantissa nonzero) -- still NaN.
+        std::vector<hip_bfloat16> b(16,
+                                    hip_bfloat16(std::numeric_limits<float>::quiet_NaN()));
+        scan_one_with_nan(HIP_R_16BF, b.data(), sizeof(hip_bfloat16), 1u);
+    }
+    {
+        // FNUZ NaN bit pattern (all f8/bf8 fnuz: 0x80).
+        hipblaslt_f8_fnuz nv;
+        nv.__x = 0x80;
+        std::vector<hipblaslt_f8_fnuz> b(16, nv);
+        scan_one_with_nan(HIP_R_8F_E4M3_FNUZ, b.data(), sizeof(hipblaslt_f8_fnuz), 1u);
+    }
+    {
+        hipblaslt_bf8_fnuz nv;
+        nv.__x = 0x80;
+        std::vector<hipblaslt_bf8_fnuz> b(16, nv);
+        scan_one_with_nan(HIP_R_8F_E5M2_FNUZ, b.data(), sizeof(hipblaslt_bf8_fnuz), 1u);
+    }
+    {
+        // OCP E4M3 canonical NaN: 0x7f.
+        hipblaslt_f8 nv;
+        nv.__x = 0x7f;
+        std::vector<hipblaslt_f8> b(16, nv);
+        scan_one_with_nan(HIP_R_8F_E4M3, b.data(), sizeof(hipblaslt_f8), 1u);
+    }
+    {
+        // OCP E5M2 NaN: any of 0x7d/0x7e/0x7f (exp=11111, mant!=0). Use 0x7d
+        // to match hipblaslt_isnan coverage above.
+        hipblaslt_bf8 nv;
+        nv.__x = 0x7d;
+        std::vector<hipblaslt_bf8> b(16, nv);
+        scan_one_with_nan(HIP_R_8F_E5M2, b.data(), sizeof(hipblaslt_bf8), 1u);
+    }
+
+    // Default-arm silent skip: integer dtypes hit the dispatcher's `default`
+    // and must return success without touching the flag.
+    {
+        reset_env();
+        setenv("HIPBLASLT_CHECK_NUMERICS", "1", 1);
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        rocblaslt_handle  rh = (rocblaslt_handle)h;
+        constexpr int64_t M = 4, N = 4;
+        // Any non-zero pattern; integer arms must NOT inspect it.
+        std::vector<int8_t> h_buf(M * N, static_cast<int8_t>(0xFF));
+        int8_t*             d_buf = nullptr;
+        ASSERT_EQ(hipMalloc(&d_buf, M * N * sizeof(int8_t)), hipSuccess);
+        ASSERT_EQ(
+            hipMemcpy(d_buf, h_buf.data(), M * N * sizeof(int8_t), hipMemcpyHostToDevice),
+            hipSuccess);
+        const uint32_t call_id = hipblaslt_check_numerics_begin_call(rh);
+        ASSERT_TRUE(hipblaslt_check_numerics_scan_D(rh, nullptr, call_id, M, N, 1, HIP_R_8I,
+                                                    d_buf, M, M * N, false)
+                    == rocblaslt_status_success);
+        uint32_t out = 99;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, 0u); // never tripped
+        ASSERT_EQ(hipFree(d_buf), hipSuccess);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    }
+
+    // STOP_ON_FIRST: env parses; the sticky short_circuit fires after the
+    // first NaN; re-drain returns the same call_id (sticky doesn't reset
+    // the device flag).
+    {
+        reset_env();
+        setenv("HIPBLASLT_CHECK_NUMERICS", "1", 1);
+        setenv("HIPBLASLT_CHECK_NUMERICS_STOP_ON_FIRST", "1", 1);
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        rocblaslt_handle rh = (rocblaslt_handle)h;
+        ASSERT_TRUE(rh->check_numerics_stop_on_first);
+        ASSERT_FALSE(rh->check_numerics_short_circuit.load());
+
+        constexpr int64_t M = 4, N = 4;
+        float*            d_buf = nullptr;
+        ASSERT_EQ(hipMalloc(&d_buf, M * N * sizeof(float)), hipSuccess);
+        std::vector<float> h_buf(M * N, std::numeric_limits<float>::quiet_NaN());
+        ASSERT_EQ(hipMemcpy(d_buf, h_buf.data(), M * N * sizeof(float),
+                            hipMemcpyHostToDevice),
+                  hipSuccess);
+
+        const uint32_t cid = hipblaslt_check_numerics_begin_call(rh);
+        ASSERT_TRUE(hipblaslt_check_numerics_scan_D(rh, nullptr, cid, M, N, 1, HIP_R_32F,
+                                                    d_buf, M, M * N, false)
+                    == rocblaslt_status_success);
+        uint32_t out = 0;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, cid);
+        // After the sticky drain, short_circuit is set so further scans bail.
+        ASSERT_TRUE(rh->check_numerics_short_circuit.load());
+        const uint32_t cid2 = hipblaslt_check_numerics_begin_call(rh);
+        ASSERT_TRUE(hipblaslt_check_numerics_scan_D(rh, nullptr, cid2, M, N, 1, HIP_R_32F,
+                                                    d_buf, M, M * N, false)
+                    == rocblaslt_status_success);
+        // Re-drain returns the same id (device flag was not memset).
+        out = 0;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, cid);
+
+        ASSERT_EQ(hipFree(d_buf), hipSuccess);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    }
+
+    // SCAN_EVERY runtime: every=3 means scan_D only runs the kernel when
+    // call_id % 3 == 0. With 5 calls, only call_id 3 inspects the buffer,
+    // so drain returns 3.
+    {
+        reset_env();
+        setenv("HIPBLASLT_CHECK_NUMERICS", "1", 1);
+        setenv("HIPBLASLT_CHECK_NUMERICS_SCAN_EVERY", "3", 1);
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        rocblaslt_handle rh = (rocblaslt_handle)h;
+        ASSERT_EQ(rh->check_numerics_scan_every, 3u);
+
+        constexpr int64_t M = 4, N = 4;
+        float*            d_buf = nullptr;
+        ASSERT_EQ(hipMalloc(&d_buf, M * N * sizeof(float)), hipSuccess);
+        std::vector<float> h_buf(M * N, std::numeric_limits<float>::quiet_NaN());
+        ASSERT_EQ(hipMemcpy(d_buf, h_buf.data(), M * N * sizeof(float),
+                            hipMemcpyHostToDevice),
+                  hipSuccess);
+
+        for(int i = 0; i < 5; ++i)
+        {
+            const uint32_t cid = hipblaslt_check_numerics_begin_call(rh);
+            ASSERT_TRUE(hipblaslt_check_numerics_scan_D(rh, nullptr, cid, M, N, 1, HIP_R_32F,
+                                                        d_buf, M, M * N, false)
+                        == rocblaslt_status_success);
+        }
+        uint32_t out = 0;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, 3u);
+
+        ASSERT_EQ(hipFree(d_buf), hipSuccess);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    }
+
+    // SCAN_FROM/SCAN_UNTIL window: gates calls outside [from, until]. With
+    // from=3, until=4 and 5 NaN-bearing calls, drain returns 3 (the first
+    // in-window call).
+    {
+        reset_env();
+        setenv("HIPBLASLT_CHECK_NUMERICS", "1", 1);
+        setenv("HIPBLASLT_CHECK_NUMERICS_SCAN_FROM", "3", 1);
+        setenv("HIPBLASLT_CHECK_NUMERICS_SCAN_UNTIL", "4", 1);
+        hipblasLtHandle_t h = nullptr;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCreate(&h), HIPBLAS_STATUS_SUCCESS);
+        rocblaslt_handle rh = (rocblaslt_handle)h;
+        ASSERT_EQ(rh->check_numerics_scan_from, 3u);
+        ASSERT_EQ(rh->check_numerics_scan_until, 4u);
+
+        constexpr int64_t M = 4, N = 4;
+        float*            d_buf = nullptr;
+        ASSERT_EQ(hipMalloc(&d_buf, M * N * sizeof(float)), hipSuccess);
+        std::vector<float> h_buf(M * N, std::numeric_limits<float>::quiet_NaN());
+        ASSERT_EQ(hipMemcpy(d_buf, h_buf.data(), M * N * sizeof(float),
+                            hipMemcpyHostToDevice),
+                  hipSuccess);
+
+        for(int i = 0; i < 5; ++i)
+        {
+            const uint32_t cid = hipblaslt_check_numerics_begin_call(rh);
+            ASSERT_TRUE(hipblaslt_check_numerics_scan_D(rh, nullptr, cid, M, N, 1, HIP_R_32F,
+                                                        d_buf, M, M * N, false)
+                        == rocblaslt_status_success);
+        }
+        uint32_t out = 0;
+        EXPECT_HIPBLAS_STATUS(hipblasLtCheckNumericsDrain(h, &out), HIPBLAS_STATUS_SUCCESS);
+        ASSERT_EQ(out, 3u);
+
+        ASSERT_EQ(hipFree(d_buf), hipSuccess);
+        EXPECT_HIPBLAS_STATUS(hipblasLtDestroy(h), HIPBLAS_STATUS_SUCCESS);
+    }
+
 }

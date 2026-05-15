@@ -27,11 +27,17 @@
 #pragma once
 
 #include <algorithm>
+#include <sstream>
 #include <string>
 #include <vector>
 
+#include <Tensile/PredicateDebugger.hpp>
 #include <Tensile/Properties.hpp>
 #include <Tensile/Utils.hpp>
+
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
 
 namespace TensileLite
 {
@@ -95,8 +101,7 @@ namespace TensileLite
             virtual bool debugEval(Object const& obj, std::ostream& stream) const
             {
                 bool rv = (*this)(obj);
-                stream << this->type() << " {" << std::endl;
-                stream << "}: " << rv << std::endl;
+                PredicateDebugger::printRow(stream, rv, this->type(), "always true");
                 return rv;
             }
         };
@@ -123,8 +128,7 @@ namespace TensileLite
             virtual bool debugEval(Object const& obj, std::ostream& stream) const
             {
                 bool rv = (*this)(obj);
-                stream << this->type() << " {" << std::endl;
-                stream << "}: " << rv << std::endl;
+                PredicateDebugger::printRow(stream, rv, this->type(), "always false");
                 return rv;
             }
         };
@@ -155,24 +159,26 @@ namespace TensileLite
                 return "And";
             }
 
-            virtual bool operator()(Object const& obj) const
+            virtual bool operator()(Object const& obj) const override
             {
                 return std::all_of(
-                    value.begin(), value.end(), [&obj](std::shared_ptr<Predicate<Object>> pred) {
+                    value.begin(), value.end(), [&obj](const auto& pred) {
                         return (*pred)(obj);
                     });
             }
 
-            virtual bool debugEval(Object const& obj, std::ostream& stream) const
+            virtual bool debugEval(Object const& obj, std::ostream& stream) const override
             {
                 bool rv = (*this)(obj);
-                stream << this->type() << " {" << std::endl;
+                std::ostringstream details;
+                details << "(" << value.size() << " predicates)";
+                PredicateDebugger::printRow(stream, rv, "And", details.str());
+                PredicateDebugger::pushIndent();
                 for(auto const& term : value)
                 {
-                    if (!(*term)(obj))
-                        term->debugEval(obj, stream);
+                    term->debugEval(obj, stream);
                 }
-                stream << "}: " << rv << std::endl;
+                PredicateDebugger::popIndent();
                 return rv;
             }
         };
@@ -203,24 +209,26 @@ namespace TensileLite
                 return "Or";
             }
 
-            virtual bool operator()(Object const& obj) const
+            virtual bool operator()(Object const& obj) const override
             {
                 return std::any_of(
-                    value.begin(), value.end(), [&obj](std::shared_ptr<Predicate<Object>> pred) {
+                    value.begin(), value.end(), [&obj](const auto& pred) {
                         return (*pred)(obj);
                     });
             }
 
-            virtual bool debugEval(Object const& obj, std::ostream& stream) const
+            virtual bool debugEval(Object const& obj, std::ostream& stream) const override
             {
                 bool rv = (*this)(obj);
-                stream << this->type() << " {" << std::endl;
+                std::ostringstream details;
+                details << "(" << value.size() << " predicates)";
+                PredicateDebugger::printRow(stream, rv, "Or", details.str());
+                PredicateDebugger::pushIndent();
                 for(auto const& term : value)
                 {
-                    if (!(*term)(obj))
-                        term->debugEval(obj, stream);
+                    term->debugEval(obj, stream);
                 }
-                stream << "}: " << rv << std::endl;
+                PredicateDebugger::popIndent();
                 return rv;
             }
         };
@@ -246,17 +254,18 @@ namespace TensileLite
                 return "Not";
             }
 
-            virtual bool operator()(Object const& obj) const
+            virtual bool operator()(Object const& obj) const override
             {
                 return !(*value)(obj);
             }
 
-            virtual bool debugEval(Object const& obj, std::ostream& stream) const
+            virtual bool debugEval(Object const& obj, std::ostream& stream) const override
             {
                 bool rv = (*this)(obj);
-                stream << this->type() << " {" << std::endl;
+                PredicateDebugger::printRow(stream, rv, "Not", "negates following predicate");
+                PredicateDebugger::pushIndent();
                 value->debugEval(obj, stream);
-                stream << "}: " << rv << std::endl;
+                PredicateDebugger::popIndent();
                 return rv;
             }
         };
@@ -304,7 +313,6 @@ namespace TensileLite
             virtual bool debugEval(Object const& obj, std::ostream& stream) const override
             {
                 bool rv = (*this)(obj);
-                stream << this->type() << " {" << std::endl;
                 auto const* sc = dynamic_cast<Subclass const*>(&obj);
                 if(sc)
                 {
@@ -312,10 +320,9 @@ namespace TensileLite
                 }
                 else
                 {
-                    stream << "no match. actual type: " << typeid(obj).hash_code() << ", expected "
-                           << typeid(Subclass).hash_code() << std::endl;
+                    PredicateDebugger::printRow(
+                        stream, false, this->type(), "type mismatch (dynamic_cast failed)");
                 }
-                stream << "}: " << rv << std::endl;
                 return rv;
             }
         };
@@ -325,3 +332,5 @@ namespace TensileLite
  */
     } // namespace Predicates
 } // namespace TensileLite
+
+TENSILE_HIDDEN_END

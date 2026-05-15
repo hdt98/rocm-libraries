@@ -17,6 +17,10 @@
 #include "ck_tile/host/joinable_thread.hpp"
 #include "ck_tile/host/ranges.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck_tile {
 
 template <typename Range>
@@ -597,6 +601,8 @@ struct HostTensor
 
     typename Data::size_type size() const { return mData.size(); }
 
+    bool empty() const { return mData.empty(); }
+
     T max() const { return *std::max_element(mData.begin(), mData.end()); }
 
     // return a slice of this tensor
@@ -663,13 +669,13 @@ struct HostTensor
             if constexpr(std::is_same_v<T, bf16_t> || std::is_same_v<T, fp16_t> ||
                          std::is_same_v<T, fp8_t> || std::is_same_v<T, bf8_t>)
             {
-                os << type_convert<float>(mData[idx]) << " #### ";
+                os << type_convert<float>(mData[idx]);
             }
             else if constexpr(std::is_same_v<T, ck_tile::pk_int4_t>)
             {
                 auto unpacked = pk_int4_t_to_int8x2_t(mData[idx]);
                 os << "pk(" << static_cast<int>(unpacked[0]) << ", "
-                   << static_cast<int>(unpacked[1]) << ") #### ";
+                   << static_cast<int>(unpacked[1]) << ")";
             }
             else if constexpr(std::is_same_v<T, int8_t>)
             {
@@ -859,3 +865,4 @@ auto get_default_stride(std::size_t row,
         return stride;
 }
 } // namespace ck_tile
+#pragma clang diagnostic pop

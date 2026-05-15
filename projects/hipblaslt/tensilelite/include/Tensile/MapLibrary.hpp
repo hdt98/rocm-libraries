@@ -31,6 +31,10 @@
 #include <Tensile/SolutionLibrary.hpp>
 #include <Tensile/PropertyMatching.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace TensileLite
 {
     /**
@@ -81,22 +85,19 @@ namespace TensileLite
             bool debug = Debug::Instance().printPropertyEvaluation();
             if(debug)
             {
-                std::cout << type() << " Searching for " << key;
-
                 if(iter == map.end())
                 {
-                    std::cout << " (not found).  Available keys:" << std::endl;
+                    std::cout << "[ProblemMap] No match for: " << key << std::endl;
+                    std::cout << "             Available problem types:" << std::endl;
                     for(auto const& pair : map)
                     {
-                        std::cout << "  " << pair.first << std::endl;
+                        std::cout << "               - " << pair.first << std::endl;
                     }
                 }
                 else
                 {
-                    std::cout << " found " << iter->second->description();
+                    std::cout << "[ProblemMap] Matched: " << key << std::endl;
                 }
-
-                std::cout << std::endl;
             }
 
             if(iter == map.end())
@@ -225,3 +226,5 @@ namespace TensileLite
         }
     };
 } // namespace TensileLite
+
+TENSILE_HIDDEN_END

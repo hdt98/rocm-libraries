@@ -52,7 +52,7 @@ struct TensorStruct
     {
     }
 
-    TensorStruct(const TensorStruct&) = delete;
+    TensorStruct(const TensorStruct&)            = delete;
     TensorStruct& operator=(const TensorStruct&) = delete;
 
     ~TensorStruct() = default;
@@ -293,6 +293,11 @@ protected:
                 miopenStatusSuccess);
 
             VerifyResults(handle);
+        }
+
+        for(auto& solution : solutions)
+        {
+            ASSERT_EQ(miopenDestroySolution(solution), miopenStatusSuccess);
         }
     }
 

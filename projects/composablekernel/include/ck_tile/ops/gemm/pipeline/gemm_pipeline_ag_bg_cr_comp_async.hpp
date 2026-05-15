@@ -44,15 +44,20 @@ struct BaseGemmPipelineAgBgCrCompAsync
     CK_TILE_HOST_DEVICE static auto
     TailHandler(const RunFunction& run_func, bool has_hot_loop, TailNumber tail_number)
     {
+        // Use amd_wave_read_first_lane to avoid higher resource usage.
+        // It forces to store these values in SGPR.
+        // Compiler cannot deduce if one path is used for all threads
+        const bool has_hot_loop_first_lane      = amd_wave_read_first_lane(has_hot_loop);
+        const TailNumber tail_number_first_lane = amd_wave_read_first_lane(tail_number);
         // Handle all the valid cases.
-        if(has_hot_loop)
+        if(has_hot_loop_first_lane)
         {
-            if(tail_number == TailNumber::Three)
+            if(tail_number_first_lane == TailNumber::Three)
             {
                 return run_func(bool_constant<true>{},
                                 integral_constant<TailNumber, TailNumber::Three>{});
             }
-            else if(tail_number == TailNumber::Two)
+            else if(tail_number_first_lane == TailNumber::Two)
             {
                 return run_func(bool_constant<true>{},
                                 integral_constant<TailNumber, TailNumber::Two>{});
@@ -60,12 +65,12 @@ struct BaseGemmPipelineAgBgCrCompAsync
         }
         else
         {
-            if(tail_number == TailNumber::Three)
+            if(tail_number_first_lane == TailNumber::Three)
             {
                 return run_func(bool_constant<false>{},
                                 integral_constant<TailNumber, TailNumber::Three>{});
             }
-            else if(tail_number == TailNumber::Two)
+            else if(tail_number_first_lane == TailNumber::Two)
             {
                 return run_func(bool_constant<false>{},
                                 integral_constant<TailNumber, TailNumber::Two>{});
@@ -84,6 +89,8 @@ struct BaseGemmPipelineAgBgCrCompAsync
             "Invalid TailNumber: Only TailNumber::Three and TailNumber::Two are supported");
 #endif
     }
+
+    CK_TILE_HOST static constexpr auto GetName() { return "COMPUTE_ASYNC"; }
 };
 
 /**
@@ -92,7 +99,7 @@ struct BaseGemmPipelineAgBgCrCompAsync
  * This pipeline introduces asynchronous load from global memory to LDS,
  * skipping the intermediate loading into pipeline registers.
  */
-template <typename Problem, typename Policy = GemmPipelineAgBgCrCompAsyncDefaultPolicy>
+template <typename Problem, typename Policy = GemmPipelineAgBgCrCompAsyncDefaultPolicy<>>
 struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Problem>
 {
     using Base             = BaseGemmPipelineAgBgCrCompAsync<Problem>;
@@ -133,6 +140,8 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
     static constexpr index_t MPerBlock = BlockGemmShape::kM;
     static constexpr index_t NPerBlock = BlockGemmShape::kN;
     static constexpr index_t KPerBlock = BlockGemmShape::kK;
+
+    static constexpr bool Async = true;
 
     template <bool IsWave32Host = false>
     static constexpr index_t GetVectorSizeA()
@@ -253,8 +262,6 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
             using BDramBlockWindowTmp =
                 remove_cvref_t<std::tuple_element_t<number<0>{}, BsDramBlockWindowTmp>>;
             // TODO currently fused elementwise are not supported
-            ignore = a_element_func;
-            ignore = b_element_func;
             static_assert(std::is_same_v<remove_cvref_t<decltype(a_element_func)>,
                                          element_wise::PassThrough>);
             static_assert(std::is_same_v<remove_cvref_t<decltype(b_element_func)>,
@@ -423,12 +430,15 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
             block_sync_lds();
             // read A(2), B(2) from DRAM to LDS window(0)
             // and advance the DRAM windows
-            Base::GlobalPrefetchAsync(
-                a_copy_lds_window0, a_tile_windows[number<0>{}], a_dram_tile_window_step);
-            Base::GlobalPrefetchAsync(
-                b_copy_lds_window0, b_tile_windows[number<0>{}], b_dram_tile_window_step);
+            if constexpr((!HasHotLoop && (TailNum == TailNumber::Three)) || HasHotLoop)
+            {
+                Base::GlobalPrefetchAsync(
+                    a_copy_lds_window0, a_tile_windows[number<0>{}], a_dram_tile_window_step);
+                Base::GlobalPrefetchAsync(
+                    b_copy_lds_window0, b_tile_windows[number<0>{}], b_dram_tile_window_step);
+            }
 
-            if(HasHotLoop)
+            if constexpr(HasHotLoop)
             {
                 // we have had 3 global prefetches so far, indexed (0, 1, 2).
                 index_t i_global_read = amd_wave_read_first_lane(3);
@@ -529,13 +539,16 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
         }
     };
 
-    template <typename ADramBlockWindowTmp,
-              typename BDramBlockWindowTmp,
+    template <typename AsDramBlockWindowTmp,
+              typename BsDramBlockWindowTmp,
               typename AElementFunction,
-              typename BElementFunction>
-    CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
+              typename BElementFunction,
+              typename std::enable_if_t<is_detected<is_tuple, AsDramBlockWindowTmp>::value &&
+                                            is_detected<is_tuple, BsDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
+    CK_TILE_DEVICE auto operator()(const AsDramBlockWindowTmp& a_dram_block_window_tmp,
                                    const AElementFunction& a_element_func,
-                                   const BDramBlockWindowTmp& b_dram_block_window_tmp,
+                                   const BsDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const BElementFunction& b_element_func,
                                    index_t num_loop,
                                    void* p_smem) const
@@ -556,7 +569,67 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
     }
 
     public:
-    template <typename ADramBlockWindowTmp, typename BDramBlockWindowTmp>
+    template <typename AsDramBlockWindowTmp,
+              typename BsDramBlockWindowTmp,
+              typename std::enable_if_t<is_detected<is_tuple, AsDramBlockWindowTmp>::value &&
+                                            is_detected<is_tuple, BsDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
+    CK_TILE_DEVICE auto operator()(const AsDramBlockWindowTmp& a_dram_block_window_tmp,
+                                   const BsDramBlockWindowTmp& b_dram_block_window_tmp,
+                                   const index_t num_loop,
+                                   void* __restrict__ p_smem) const
+    {
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+
+        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                element_wise::PassThrough{},
+                b_dram_block_window_tmp,
+                element_wise::PassThrough{},
+                num_loop,
+                p_smem);
+        };
+
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
+    }
+
+    template <typename ADramBlockWindowTmp,
+              typename BDramBlockWindowTmp,
+              typename AElementFunction,
+              typename BElementFunction,
+              typename std::enable_if_t<!is_detected<is_tuple, ADramBlockWindowTmp>::value &&
+                                            !is_detected<is_tuple, BDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
+    CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
+                                   const AElementFunction& a_element_func,
+                                   const BDramBlockWindowTmp& b_dram_block_window_tmp,
+                                   const BElementFunction& b_element_func,
+                                   index_t num_loop,
+                                   void* p_smem) const
+    {
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+        const auto RunPipeline  = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                ck_tile::make_tuple(a_dram_block_window_tmp),
+                a_element_func,
+                ck_tile::make_tuple(b_dram_block_window_tmp),
+                b_element_func,
+                num_loop,
+                p_smem);
+        };
+
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
+    }
+
+    public:
+    template <typename ADramBlockWindowTmp,
+              typename BDramBlockWindowTmp,
+              typename std::enable_if_t<!is_detected<is_tuple, ADramBlockWindowTmp>::value &&
+                                            !is_detected<is_tuple, BDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
     CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
                                    const BDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const index_t num_loop,
@@ -567,15 +640,27 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
 
         const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
             return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
-                a_dram_block_window_tmp,
-                [](const ADataType& a) { return a; },
-                b_dram_block_window_tmp,
-                [](const BDataType& b) { return b; },
+                ck_tile::make_tuple(a_dram_block_window_tmp),
+                element_wise::PassThrough{},
+                ck_tile::make_tuple(b_dram_block_window_tmp),
+                element_wise::PassThrough{},
                 num_loop,
                 p_smem);
         };
 
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
+    }
+
+    [[nodiscard]] CK_TILE_HOST static const std::string GetName()
+    {
+        // clang-format off
+        constexpr index_t WaveNumM = BlockGemmShape::BlockWarps::at(I0{});
+        constexpr index_t WaveNumN = BlockGemmShape::BlockWarps::at(I1{});
+        return concat('_', "pipeline_AgBgCrCompAsync", 
+                      concat('x', MPerBlock, NPerBlock, KPerBlock),  BlockSize,
+                      concat('x', WaveNumM, WaveNumN),
+                      concat('x', kPadM, kPadN, kPadK));
+        // clang-format on
     }
 };
 } // namespace ck_tile

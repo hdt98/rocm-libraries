@@ -29,10 +29,16 @@
 #include <Tensile/AMDGPU.hpp>
 #include <Tensile/ContractionProblem.hpp>
 #include <Tensile/ContractionSolution.hpp>
+#include <Tensile/PredicateDebugger.hpp>
 #include <Tensile/Predicates.hpp>
 #include <Tensile/Task.hpp>
 
+#include <sstream>
 #include <vector>
+
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
 
 namespace TensileLite
 {
@@ -97,12 +103,13 @@ namespace TensileLite
                                            * static_cast<uint64_t>(numWorkGroups.y)
                                            * static_cast<uint64_t>(numWorkGroups.z);
                         bool rv = (workItems <= std::numeric_limits<uint32_t>::max());
-                        stream << "LaunchLimits " << rv << " (workItems = " << workItems << ")";
+                        std::ostringstream details;
+                        details << "workItems=" << workItems << " <= max=" << std::numeric_limits<uint32_t>::max();
+                        PredicateDebugger::printRow(stream, rv, this->type(), details.str());
                         return rv;
                     }
 
-                    stream << "Launch limits for stream-k kernels handled by grid predictor";
-
+                    PredicateDebugger::printRow(stream, true, this->type(), "stream-k handled by grid predictor");
                     return true;
                 }
             };
@@ -189,3 +196,5 @@ namespace TensileLite
  */
     } // namespace Predicates
 } // namespace TensileLite
+
+TENSILE_HIDDEN_END

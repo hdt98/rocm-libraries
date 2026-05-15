@@ -139,6 +139,7 @@ install_packages( )
   local library_dependencies_centos_7=( "epel-release" "make" "cmake3" "gcc-c++" "rpm-build" )
   local library_dependencies_centos_8=( "epel-release" "make" "cmake3" "gcc-c++" "rpm-build" )
   local library_dependencies_centos_9=( "epel-release" "make" "cmake3" "gcc-c++" "rpm-build" )
+  local library_dependencies_centos_10=( "epel-release" "make" "cmake" "gcc-c++" "rpm-build" )
   local library_dependencies_fedora=( "make" "cmake" "gcc-c++" "libcxx-devel" "rpm-build" "numactl-libs" )
   local library_dependencies_sles=( "make" "cmake" "gcc-c++" "rpm-build" "pkg-config" "dpkg" )
 
@@ -146,6 +147,7 @@ install_packages( )
   local client_dependencies_centos_7=( "devtoolset-7-gcc-gfortran" )
   local client_dependencies_centos_8=( "gcc-gfortran" )
   local client_dependencies_centos_9=( "gcc-gfortran" )
+  local client_dependencies_centos_10=( "gcc-gfortran" )
   local client_dependencies_fedora=( "gcc-gfortran" )
   local client_dependencies_sles=( "gcc-fortran" )
 
@@ -156,6 +158,7 @@ install_packages( )
       library_dependencies_centos_7+=( "numactl-libs" )
       library_dependencies_centos_8+=( "numactl-libs" )
       library_dependencies_centos_9+=( "numactl-libs" )
+      library_dependencies_centos_10+=( "numactl-libs" )
     fi
   fi
 
@@ -182,7 +185,13 @@ install_packages( )
 #     yum -y update brings *all* installed packages up to date
 #     without seeking user approval
 #     elevate_if_not_root yum -y update
-      if [[ "${MAJORVERSION}" == 9 ]]; then
+      if [[ "${MAJORVERSION}" -ge 10 ]]; then
+        install_yum_packages "${library_dependencies_centos_10[@]}"
+
+        if [[ "${build_clients}" == true ]]; then
+          install_yum_packages "${client_dependencies_centos_10[@]}"
+        fi
+      elif [[ "${MAJORVERSION}" == 9 ]]; then
         install_yum_packages "${library_dependencies_centos_9[@]}"
 
         if [[ "${build_clients}" == true ]]; then
@@ -279,6 +288,7 @@ rocm_path=/opt/rocm
 build_relocatable=false
 build_address_sanitizer=false
 compiler=${CXX}
+c_compiler=${CC}
 
 # #################################################
 # Parameter parsing
@@ -343,6 +353,7 @@ while true; do
     --address-sanitizer)
         build_address_sanitizer=true
         compiler=amdclang++
+        c_compiler=amdclang
         shift ;;
     --matrices-dir)
         matrices_dir=${2}
@@ -373,6 +384,7 @@ done
 # or through using --compiler option. This is important so that googletest and hipsparse are built with the same
 # compiler to ensure settings like position independent code is consistent when linking.
 CXX=${compiler}
+CC=${c_compiler}
 
 if [[ "${build_relocatable}" == true ]]; then
     if ! [ -z ${ROCM_PATH+x} ]; then
@@ -431,7 +443,11 @@ cmake_executable=cmake
 
 case "${ID}" in
   centos|rhel|almalinux|rocky|ol)
-  cmake_executable=cmake3
+  if [[ "${MAJORVERSION}" -ge 10 ]]; then
+    cmake_executable=cmake
+  else
+    cmake_executable=cmake3
+  fi
   ;;
 esac
 
@@ -503,7 +519,7 @@ pushd .
 
   # clients
   if [[ "${build_clients}" == true ]]; then
-    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON"
+    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DBUILD_CLIENTS_BENCHMARKS=ON"
     #
     # Add matrices_dir if exists.
     #
@@ -514,7 +530,7 @@ pushd .
 
   # clients only
   if [[ "${build_clients_only}" == true ]]; then
-    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_ONLY=ON -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON"
+    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_ONLY=ON -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DBUILD_CLIENTS_BENCHMARKS=ON"
     #
     # Add matrices_dir if exists.
     #
@@ -539,7 +555,7 @@ pushd .
 
   # Build library
   if [[ "${build_relocatable}" == true ]]; then
-    CXX=${compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} \
+    CXX=${compiler} CC=${c_compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} \
       -DCMAKE_INSTALL_PREFIX="${install_prefix}" \
       -DCMAKE_SHARED_LINKER_FLAGS="${rocm_rpath}" \
       -DCMAKE_PREFIX_PATH="${rocm_path} ${rocm_path}/hip" \
@@ -548,7 +564,7 @@ pushd .
       -DROCM_DISABLE_LDCONFIG=ON \
       -DROCM_PATH="${rocm_path}" ../..
   else
-    CXX=${compiler} ${cmake_executable} -DCMAKE_EXE_LINKER_FLAGS=" ${cmake_build_static_options}" ${cmake_common_options} ${cmake_client_options} -DCMAKE_INSTALL_PREFIX=hipsparse-install -DROCM_PATH=${rocm_path} ../..
+    CXX=${compiler} CC=${c_compiler} ${cmake_executable} -DCMAKE_EXE_LINKER_FLAGS=" ${cmake_build_static_options}" ${cmake_common_options} ${cmake_client_options} -DCMAKE_INSTALL_PREFIX=hipsparse-install -DROCM_PATH=${rocm_path} ../..
   fi
 
   check_exit_code "$?"

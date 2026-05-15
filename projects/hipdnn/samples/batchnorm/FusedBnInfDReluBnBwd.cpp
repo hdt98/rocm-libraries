@@ -11,6 +11,7 @@
 #include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_frontend.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
+#include <hipdnn_test_sdk/utilities/TensorDiff.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 
@@ -30,7 +31,7 @@ bool SampleRunner::operator()(const TensorLayout& layout)
               << (config.cpuValidation ? " (with CPU validation)" : "") << "...\n";
 
     int64_t n = 1; // Batch size
-    int64_t c = 3; // Channels
+    int64_t c = 16; // Channels
     int64_t h = 14; // Height
     int64_t w = 14; // Width
 
@@ -56,7 +57,6 @@ bool SampleRunner::operator()(const TensorLayout& layout)
     auto bnY
         = graph->batchnorm_inference(x, savedMean, savedInvVariance, scale, bias, bnInfAttributes);
     bnY->set_name("bn_y");
-    bnY->set_data_type(inputType);
 
     // Step 2: Activation Backward (ReLU backward)
     auto activBwdAttributes = graph::PointwiseAttributes();
@@ -65,7 +65,6 @@ bool SampleRunner::operator()(const TensorLayout& layout)
 
     auto dxDrelu = graph->pointwise(bnY, dy, activBwdAttributes);
     dxDrelu->set_name("dx_drelu");
-    dxDrelu->set_data_type(inputType);
 
     // Step 3: Batchnorm Backward
     auto bnBwdAttributes = graph::BatchnormBackwardAttributes();
@@ -84,7 +83,7 @@ bool SampleRunner::operator()(const TensorLayout& layout)
     dbias->set_data_type(intermediateType);
     dbias->set_output(true);
 
-    HIPDNN_FE_CHECK(graph->build(handle));
+    HIPDNN_FE_CHECK_SKIPPABLE(graph->build(handle));
     std::cout << "Graph build successful.\n";
 
     // Create tensors for execution
@@ -160,7 +159,12 @@ bool SampleRunner::operator()(const TensorLayout& layout)
         cpuVariantPack[dbias->get_uid()] = dbiasRefTensor.memory().hostData();
 
         // Execute on CPU using graph executor
-        auto serializedGraph = graph->buildFlatbufferOperationGraph();
+        auto [serializedGraph, serErr] = graph->to_binary();
+        if(serErr.is_bad())
+        {
+            std::cerr << "Failed to serialize graph: " << serErr.get_message() << std::endl;
+            return false;
+        }
         hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor cpuExecutor;
         cpuExecutor.execute(serializedGraph.data(), serializedGraph.size(), cpuVariantPack);
 
@@ -169,36 +173,50 @@ bool SampleRunner::operator()(const TensorLayout& layout)
         // Issue is due to the reference not splitting the input / output datatypes.
         const auto inputTol = 4e-2f;
 
-        auto dxValidator = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<InputType>(
-            static_cast<InputType>(inputTol), static_cast<InputType>(inputTol));
+        auto dxValidator
+            = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<InputType>(inputTol, inputTol);
         auto dscaleDbiasValidator
-            = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<IntermediateType>(
-                static_cast<IntermediateType>(inputTol), static_cast<IntermediateType>(inputTol));
-
-        bool dxValid = dxValidator.allClose(dxRefTensor, dxTensor);
-        bool dscaleValid = dscaleDbiasValidator.allClose(dscaleRefTensor, dscaleTensor);
-        bool dbiasValid = dscaleDbiasValidator.allClose(dbiasRefTensor, dbiasTensor);
+            = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<IntermediateType>(inputTol,
+                                                                                     inputTol);
 
         std::cout << "CPU reference validation:\n";
-        std::cout << "  dx: " << (dxValid ? "successful" : "failed") << "\n";
-        std::cout << "  dscale: " << (dscaleValid ? "successful" : "failed") << "\n";
-        std::cout << "  dbias: " << (dbiasValid ? "successful" : "failed") << "\n";
+        bool dxValid = hipdnn_test_sdk::utilities::validateAndReport<InputType>(
+            std::cout, "dx", dxValidator, dxRefTensor, dxTensor, inputTol, inputTol);
+        bool dscaleValid
+            = hipdnn_test_sdk::utilities::validateAndReport<IntermediateType>(std::cout,
+                                                                              "dscale",
+                                                                              dscaleDbiasValidator,
+                                                                              dscaleRefTensor,
+                                                                              dscaleTensor,
+                                                                              inputTol,
+                                                                              inputTol);
+        bool dbiasValid
+            = hipdnn_test_sdk::utilities::validateAndReport<IntermediateType>(std::cout,
+                                                                              "dbias",
+                                                                              dscaleDbiasValidator,
+                                                                              dbiasRefTensor,
+                                                                              dbiasTensor,
+                                                                              inputTol,
+                                                                              inputTol);
 
         validationPassed = dxValid && dscaleValid && dbiasValid;
     }
 
-    std::cout << "First 10 dx values: ";
-    for(int i = 0; i < 10; ++i)
+    auto printCount = std::min<int64_t>(10, n * c * h * w);
+    auto perChannelPrintCount = std::min<int64_t>(10, c);
+
+    std::cout << "First " << printCount << " dx values: ";
+    for(int64_t i = 0; i < printCount; ++i)
     {
         std::cout << static_cast<InputType>(dxHostPtr[i]) << " ";
     }
-    std::cout << "\nFirst 10 dscale values: ";
-    for(int i = 0; i < 10; ++i)
+    std::cout << "\nFirst " << perChannelPrintCount << " dscale values: ";
+    for(int64_t i = 0; i < perChannelPrintCount; ++i)
     {
         std::cout << static_cast<IntermediateType>(dscaleHostPtr[i]) << " ";
     }
-    std::cout << "\nFirst 10 dbias values: ";
-    for(int i = 0; i < 10; ++i)
+    std::cout << "\nFirst " << perChannelPrintCount << " dbias values: ";
+    for(int64_t i = 0; i < perChannelPrintCount; ++i)
     {
         std::cout << static_cast<IntermediateType>(dbiasHostPtr[i]) << " ";
     }
@@ -212,15 +230,10 @@ int main(int argc, char* argv[])
 {
     auto config = parseCommandLineArgs(argc, argv);
 
-    initializeFrontendLogging();
+    auto [handle, handleError] = createHipdnnHandle();
+    HIPDNN_FE_CHECK(handleError);
 
-    auto backend = hipdnnBackend();
-    hipdnnHandle_t handle;
-    HIPDNN_CHECK(backend->create(&handle));
-
-    bool allPassed = run(SampleRunner{handle, config});
-
-    HIPDNN_CHECK(backend->destroy(handle));
+    bool allPassed = run(SampleRunner{*handle, config});
 
     if(allPassed)
     {

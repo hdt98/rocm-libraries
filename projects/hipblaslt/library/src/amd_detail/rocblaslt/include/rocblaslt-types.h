@@ -33,6 +33,9 @@
 #define _ROCBLASLT_TYPES_H_
 
 #include <hip/hip_bfloat16.h>
+#ifdef __cplusplus
+#include <array>
+#endif
 #ifndef LEGACY_HIPBLAS_DIRECT
 #include <hipblas-common/hipblas-common.h>
 #else
@@ -176,6 +179,8 @@ typedef enum rocblaslt_epilogue_
     ROCBLASLT_EPILOGUE_GELU_BIAS          = 36,
     ROCBLASLT_EPILOGUE_RELU_AUX           = 130,
     ROCBLASLT_EPILOGUE_RELU_AUX_BIAS      = 134,
+    ROCBLASLT_EPILOGUE_DRELU              = 136,
+    ROCBLASLT_EPILOGUE_DRELU_BGRAD        = 152,
     ROCBLASLT_EPILOGUE_GELU_AUX           = 160,
     ROCBLASLT_EPILOGUE_GELU_AUX_BIAS      = 164,
     ROCBLASLT_EPILOGUE_DGELU              = 192,
@@ -267,8 +272,22 @@ typedef enum rocblaslt_status_
     rocblaslt_status_not_initialized         = 10, /**< descriptor has not been initialized. */
     rocblaslt_status_type_mismatch           = 11, /**< index types do not match. */
     rocblaslt_status_requires_sorted_storage = 12, /**< sorted storage required. */
-    rocblaslt_status_continue                = 13 /**< nothing preventing function to proceed. */
+    rocblaslt_status_continue                = 13  /**< nothing preventing function to proceed. */
 } rocblaslt_status;
+
+/*! \ingroup types_module
+ *  \brief Bitmask controlling the post-GEMM NaN-check feature.
+ *
+ *  Set the env var \c HIPBLASLT_CHECK_NUMERICS to one of these values to
+ *  enable scanning of every \c hipblasLtMatmul output (D) for NaN. The env
+ *  var also accepts case-insensitive words: "none"/"off", "info", "warn".
+ */
+typedef enum hipblaslt_check_numerics_mode_
+{
+    hipblaslt_check_numerics_mode_no_check = 0, /**< feature disabled (default). */
+    hipblaslt_check_numerics_mode_info     = 1, /**< always print check results. */
+    hipblaslt_check_numerics_mode_warn     = 2, /**< print only when NaN is found. */
+} hipblaslt_check_numerics_mode;
 
 /*! \ingroup types_module
  *  \brief Specify the compute precision modes of the matrix
@@ -323,7 +342,8 @@ typedef enum rocblaslt_matrix_layout_attribute_
     ROCBLASLT_MATRIX_LAYOUT_ROWS  = 4,
     ROCBLASLT_MATRIX_LAYOUT_COLS  = 5,
     ROCBLASLT_MATRIX_LAYOUT_LD    = 6,
-    ROCBLASLT_MATRIX_LAYOUT_MAX   = 7
+    ROCBLASLT_MATRIX_LAYOUT_BATCH_MODE = 7,
+    ROCBLASLT_MATRIX_LAYOUT_MAX   = 8
 } rocblaslt_matrix_layout_attribute;
 
 typedef enum
@@ -466,6 +486,11 @@ struct RocblasltContractionProblem
         Scalar,
         Vector,
         Block_32_UE8M0,
+        Block_16_UE8M0,
+        Block_32_UE4M3,
+        Block_16_UE4M3,
+        Block_32_UE5M3,
+        Block_16_UE5M3,
         Block_32_UE8M0_32_8_EXT,
     };
 
@@ -481,6 +506,12 @@ struct RocblasltContractionProblem
     size_t k;
 
     const void* alpha;
+    // When certain features (e.g., scaleAlphaVec) require overriding alpha to a constant 1.0,
+    // we must ensure the backing storage outlives the scope that constructs the problem.
+    // ASAN caught a stack-use-after-return where alpha pointed to a stack-local buffer.
+    // This owned buffer is used to hold such overridden alpha values.
+    // NOTE: sized to 16 bytes to hold any supported scalar type representation.
+    std::array<int8_t, 16> alpha_owned = {0};
 
     hipDataType        a_type;
     const void*        A;
@@ -549,6 +580,7 @@ struct RocblasltContractionProblem
     void*       Synchronizer;
     bool        swizzleA;
     bool        swizzleB;
+    hipblasLtBatchMode_t batchMode;    
 
     // gemm_ex
     // gemm_strided_batched_ex
@@ -609,7 +641,8 @@ struct RocblasltContractionProblem
                                 hipStream_t            stream,
                                 void*                  Synchronizer,
                                 bool                   swizzleA,
-                                bool                   swizzleB);
+                                bool                   swizzleB,
+                                hipblasLtBatchMode_t   batchMode);
 };
 
 namespace rocblaslt

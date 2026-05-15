@@ -81,7 +81,8 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
                                                    int StrideE,
                                                    int n_warmup,
                                                    int n_iter,
-                                                   uint64_t rotating = 0)
+                                                   uint64_t rotating  = 0,
+                                                   int instance_index = -1)
 {
     bool pass = true;
 
@@ -167,8 +168,8 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
     case 1:
         a0_m_k.GenerateTensorValue(GeneratorTensor_2<A0DataType>{-2, 2});
         b0_k_n.GenerateTensorValue(GeneratorTensor_2<B0DataType>{-2, 2});
-        a1_m_k.GenerateTensorValue(GeneratorTensor_3<A1DataType>{0, 1.0});
-        b1_k_n.GenerateTensorValue(GeneratorTensor_3<B1DataType>{0, 1.0});
+        a1_m_k.GenerateTensorValue(GeneratorTensor_2<A1DataType>{-2, 2});
+        b1_k_n.GenerateTensorValue(GeneratorTensor_2<B1DataType>{-2, 2});
         break;
     default:
         a0_m_k.GenerateTensorValue(GeneratorTensor_3<A0DataType>{-0.5, 0.5});
@@ -284,9 +285,15 @@ bool profile_gemm_blockscale_weightpreshuffle_impl(int do_verification,
     float best_gb_per_sec = 0;
 
     // profile device GEMM instances
-    for(auto& op_ptr : op_ptrs)
+    for(size_t i = 0; i < op_ptrs.size(); i++)
     {
-        int NPerXdl = op_ptr->GetPreShuffleParameters();
+        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
+        {
+            // skip test if instance_index is specified
+            continue;
+        }
+        auto& op_ptr = op_ptrs[i];
+        int NPerXdl  = op_ptr->GetPreShuffleParameters();
 
         auto argument_ptr = op_ptr->MakeArgumentPointer(
             static_cast<A0DataType*>(a0_device_buf.GetDeviceBuffer()),

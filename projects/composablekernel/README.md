@@ -124,6 +124,21 @@ Docker images are available on [DockerHub](https://hub.docker.com/r/rocm/composa
     ../script/cmake-ck-dev.sh .. gfx90a -DCMAKE_BUILD_TYPE=Release
     ```
 
+    **Fast iteration builds:**
+
+    For faster CMake configuration during development (~5s vs ~150s), use the `--minimal` flag to disable
+    building device instances, profiler, examples, tutorials, and tests:
+
+    ```bash
+    ../script/cmake-ck-dev.sh --minimal .. gfx90a
+    ```
+
+    You can also specify a custom preset:
+
+    ```bash
+    ../script/cmake-ck-dev.sh --preset=dev-minimal .. gfx90a
+    ```
+
 5. Build the entire CK library:
 
     ```bash
@@ -136,6 +151,22 @@ Docker images are available on [DockerHub](https://hub.docker.com/r/rocm/composa
     make -j install
     ```
     **[See Note on -j](#notes)**
+
+### Building for Windows
+
+Install TheRock and run CMake configure as
+
+```bash
+    cmake                                                                                      \
+    -D CMAKE_PREFIX_PATH="C:/dist/TheRock"                                                     \
+    -D CMAKE_CXX_COMPILER="C:/dist/TheRock/bin/hipcc.exe"                                      \
+    -D CMAKE_BUILD_TYPE=Release                                                                \
+    -D GPU_TARGETS="gfx1151"                                                                   \
+    -G Ninja                                                                                   \
+    ..
+```
+
+Use Ninja to build either the whole library or individual targets.
 
 ## Optional post-install steps
 

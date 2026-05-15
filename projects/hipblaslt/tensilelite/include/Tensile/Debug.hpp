@@ -29,11 +29,15 @@
 #include <cstdlib>
 #include <set>
 #include <string>
+#include <Tensile/Macros.hpp>
+
 #ifdef Tensile_ENABLE_MARKER
 #include <roctracer/roctx.h>
 #endif
 
 #include <Tensile/Singleton.hpp>
+
+TENSILE_HIDDEN_BEGIN
 
 namespace TensileLite
 {
@@ -47,6 +51,7 @@ namespace TensileLite
     public:
         bool printPropertyEvaluation() const;
         bool printPredicateEvaluation() const;
+        bool printPredicateEvaluationVerbose() const;
         bool printDeviceSelection() const;
         bool printCodeObjectInfo() const;
         bool printKernelArguments() const;
@@ -145,3 +150,5 @@ namespace TensileLite
         Debug();
     };
 } // namespace TensileLite
+
+TENSILE_HIDDEN_END

@@ -11,6 +11,10 @@
 #include "ck_tile/core/utility/magic_div.hpp"
 #include "ck_tile/core/utility/print.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck_tile {
 
 enum struct coord_transform_enum
@@ -189,23 +193,34 @@ struct pad : public base_transform<1, 1>
                       "wrong! inconsistent # of dimension");
 
         idx_low(number<0>{}) = idx_up[number<0>{}] - left_pad_length_;
+#if defined(__gfx125__) && CK_TILE_WORKAROUND_SWDEV_XXXXXX_GFX1250_NEG_OFFSET_ISSUE
+        idx_low(number<0>{}) = max(idx_low(number<0>{}), 0);
+#endif
     }
 
     template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
-    CK_TILE_HOST_DEVICE static void update_lower_index(LowIdxDiff& idx_diff_low,
-                                                       const UpIdxDiff& idx_diff_up,
-                                                       LowIdx& idx_low,
-                                                       const UpIdx&)
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                [[maybe_unused]] const UpIdxDiff& idx_diff_up,
+                                                LowIdx& idx_low,
+                                                [[maybe_unused]] const UpIdx& idx_up) const
     {
         static_assert(LowIdxDiff::size() == 1 && UpIdxDiff::size() == 1 && LowIdx::size() == 1 &&
                           UpIdx::size() == 1,
                       "wrong! inconsistent # of dimension");
 
+#if defined(__gfx125__) && CK_TILE_WORKAROUND_SWDEV_XXXXXX_GFX1250_NEG_OFFSET_ISSUE
+        const auto idx_low_old = idx_low;
+
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+#else
         constexpr auto I0 = number<0>{};
 
         idx_diff_low[I0] = idx_diff_up[I0];
 
         idx_low += idx_diff_low;
+#endif
     }
 
     CK_TILE_HOST_DEVICE static constexpr bool
@@ -277,23 +292,33 @@ struct left_pad
                       "wrong! inconsistent # of dimension");
 
         idx_low(number<0>{}) = idx_up[number<0>{}] - left_pad_length_;
+#if defined(__gfx125__) && CK_TILE_WORKAROUND_SWDEV_XXXXXX_GFX1250_NEG_OFFSET_ISSUE
+        idx_low(number<0>{}) = max(idx_low(number<0>{}), 0);
+#endif
     }
 
     template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
-    CK_TILE_HOST_DEVICE static void update_lower_index(LowIdxDiff& idx_diff_low,
-                                                       const UpIdxDiff& idx_diff_up,
-                                                       LowIdx& idx_low,
-                                                       const UpIdx&)
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                [[maybe_unused]] const UpIdxDiff& idx_diff_up,
+                                                LowIdx& idx_low,
+                                                [[maybe_unused]] const UpIdx& idx_up) const
     {
         static_assert(LowIdxDiff::size() == 1 && UpIdxDiff::size() == 1 && LowIdx::size() == 1 &&
                           UpIdx::size() == 1,
                       "wrong! inconsistent # of dimension");
+#if defined(__gfx125__) && CK_TILE_WORKAROUND_SWDEV_XXXXXX_GFX1250_NEG_OFFSET_ISSUE
+        const auto idx_low_old = idx_low;
 
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+#else
         constexpr auto I0 = number<0>{};
 
         idx_diff_low[I0] = idx_diff_up[I0];
 
         idx_low += idx_diff_low;
+#endif
     }
 
     CK_TILE_HOST_DEVICE static constexpr bool
@@ -564,7 +589,7 @@ struct merge_v2_magic_division : public base_transform<LowLengths::size(), 1>
     using UpperIndex = multi_index<1>;
 
     using UpLengths =
-        decltype(make_tuple(container_reduce(LowLengths{}, multiplies{}, number<1>{})));
+        decltype(make_tuple(container_reduce(LowLengths{}, multiplies<>{}, number<1>{})));
 
     using LowLengthsMagicDivisor = decltype(generate_tuple(
         lambda_merge_generate_MagicDivision_calculate_magic_divisor<LowLengths>{},
@@ -584,7 +609,7 @@ struct merge_v2_magic_division : public base_transform<LowLengths::size(), 1>
           low_lengths_magic_divisor_{generate_tuple(
               [&](auto i) { return magic_division::calculate_magic_numbers(low_lengths[i]); },
               number<NDimLow>{})},
-          up_lengths_{make_tuple(container_reduce(low_lengths, multiplies{}, I1))}
+          up_lengths_{make_tuple(container_reduce(low_lengths, multiplies<>{}, I1))}
     {
         static_assert(LowerIndex::size() == NDimLow, "wrong!");
     }
@@ -707,10 +732,10 @@ struct merge_v3_division_mod : public base_transform<LowLengths::size(), 1>
     using UpperIndex = multi_index<1>;
 
     using LowLengthsScan =
-        decltype(container_reverse_exclusive_scan(LowLengths{}, multiplies{}, number<1>{}));
+        decltype(container_reverse_exclusive_scan(LowLengths{}, multiplies<>{}, number<1>{}));
 
     using UpLengths =
-        decltype(make_tuple(container_reduce(LowLengths{}, multiplies{}, number<1>{})));
+        decltype(make_tuple(container_reduce(LowLengths{}, multiplies<>{}, number<1>{})));
 
     LowLengths low_lengths_;
     LowLengthsScan low_lengths_scan_;
@@ -721,8 +746,8 @@ struct merge_v3_division_mod : public base_transform<LowLengths::size(), 1>
     CK_TILE_HOST_DEVICE constexpr merge_v3_division_mod(const LowLengths& low_lengths)
         : low_lengths_{low_lengths},
           low_lengths_scan_{
-              container_reverse_exclusive_scan(low_lengths, multiplies{}, number<1>{})},
-          up_lengths_{make_tuple(container_reduce(low_lengths, multiplies{}, number<1>{}))}
+              container_reverse_exclusive_scan(low_lengths, multiplies<>{}, number<1>{})},
+          up_lengths_{make_tuple(container_reduce(low_lengths, multiplies<>{}, number<1>{}))}
     {
         static_assert(LowerIndex::size() == NDimLow, "wrong!");
     }
@@ -832,7 +857,7 @@ struct unmerge : public base_transform<1, UpLengths::size()>
     using UpperIndex = multi_index<NDimUp>;
 
     using UpLengthsScan =
-        decltype(container_reverse_exclusive_scan(UpLengths{}, multiplies{}, number<1>{}));
+        decltype(container_reverse_exclusive_scan(UpLengths{}, multiplies<>{}, number<1>{}));
 
     UpLengths up_lengths_;
     UpLengthsScan up_lengths_scan_;
@@ -841,7 +866,8 @@ struct unmerge : public base_transform<1, UpLengths::size()>
 
     CK_TILE_HOST_DEVICE constexpr unmerge(const UpLengths& up_lengths)
         : up_lengths_{up_lengths},
-          up_lengths_scan_{container_reverse_exclusive_scan(up_lengths, multiplies{}, number<1>{})}
+          up_lengths_scan_{
+              container_reverse_exclusive_scan(up_lengths, multiplies<>{}, number<1>{})}
     {
     }
 
@@ -1294,7 +1320,7 @@ CK_TILE_HOST_DEVICE static void print(const modulo<Modulus, UpLength>& m)
 }
 
 // 2D XOR, NOTE: "xor" is a keyword
-template <typename LowLengths>
+template <typename LowLengths, bool ApplyModulo = true>
 struct xor_t : public base_transform<2, 2>
 {
     static constexpr auto type_enum = coord_transform_enum::xor_t;
@@ -1326,8 +1352,15 @@ struct xor_t : public base_transform<2, 2>
 
         idx_low(number<0>{}) = idx_up[number<0>{}];
 
-        idx_low(number<1>{}) =
-            idx_up[number<1>{}] ^ (idx_up[number<0>{}] % up_lengths_[number<1>{}]);
+        if constexpr(ApplyModulo)
+        {
+            idx_low(number<1>{}) =
+                idx_up[number<1>{}] ^ (idx_up[number<0>{}] % up_lengths_[number<1>{}]);
+        }
+        else
+        {
+            idx_low(number<1>{}) = idx_up[number<1>{}] ^ (idx_up[number<0>{}]);
+        }
     }
 
     template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
@@ -1378,8 +1411,8 @@ struct xor_t : public base_transform<2, 2>
     }
 };
 
-template <typename LowLengths>
-CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths>& x)
+template <typename LowLengths, bool ApplyModulo = true>
+CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths, ApplyModulo>& x)
 {
     printf("xor_t{");
     printf("up_lengths_: ");
@@ -1733,10 +1766,10 @@ CK_TILE_HOST_DEVICE constexpr auto make_modulo_transform(const Modulus& modulus,
     return modulo<Modulus, UpLength>{modulus, up_length};
 }
 
-template <typename LowLengths>
+template <typename LowLengths, bool ApplyModulo = true>
 CK_TILE_HOST_DEVICE constexpr auto make_xor_transform(const LowLengths& low_lengths)
 {
-    return xor_t<LowLengths>{low_lengths};
+    return xor_t<LowLengths, ApplyModulo>{low_lengths};
 }
 
 template <typename LowLength, typename OffsetLength>
@@ -1775,3 +1808,4 @@ make_indexing_transform_with_adaptor(const UpLength& up_lengths, const IndexingA
 }
 
 } // namespace ck_tile
+#pragma clang diagnostic pop

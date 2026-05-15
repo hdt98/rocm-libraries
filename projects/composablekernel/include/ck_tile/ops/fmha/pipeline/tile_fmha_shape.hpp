@@ -42,9 +42,9 @@ struct TileFmhaShape
     using Gemm1WarpTile   = remove_cvref_t<Gemm1WarpTile_>;
 
     static constexpr index_t NumGemm0Warps =
-        reduce_on_sequence(Gemm0BlockWarps{}, multiplies{}, number<1>{});
+        reduce_on_sequence(Gemm0BlockWarps{}, multiplies<>{}, number<1>{});
     static constexpr index_t NumGemm1Warps =
-        reduce_on_sequence(Gemm1BlockWarps{}, multiplies{}, number<1>{});
+        reduce_on_sequence(Gemm1BlockWarps{}, multiplies<>{}, number<1>{});
     static_assert(NumGemm1Warps % NumGemm0Warps == 0);
 
     static constexpr index_t NumWarps = max(NumGemm0Warps, NumGemm1Warps);
@@ -57,7 +57,7 @@ struct TileFmhaShape
     static constexpr index_t kQKHeaddim =
         BlockTile::at(number<5>{}); // total length of K0, used for pipeline that need load Q at
                                     // once (or repeately load Q as a whole tile)
-    static_assert(kQKHeaddim % kK0 == 0, "kQKHeaddim should be divisible by kK0");
+    static_assert(kQKHeaddim % kK0 == 0, "kQKHeaddim must be divisible by kK0!");
 
     static constexpr index_t kSubQKHeaddim = ceil_to_qualified_tile_length<kQKHeaddim>();
 
@@ -95,10 +95,10 @@ struct TileFmhaBwdShape
     using Gemm4WarpTile   = remove_cvref_t<Gemm4WarpTile_>;
 
     static constexpr index_t NumWarps =
-        reduce_on_sequence(Gemm0BlockWarps{}, multiplies{}, number<1>{});
+        reduce_on_sequence(Gemm0BlockWarps{}, multiplies<>{}, number<1>{});
 
-    static_assert(NumWarps == reduce_on_sequence(Gemm1BlockWarps{}, multiplies{}, number<1>{}) &&
-                  NumWarps == reduce_on_sequence(Gemm4BlockWarps{}, multiplies{}, number<1>{}));
+    static_assert(NumWarps == reduce_on_sequence(Gemm1BlockWarps{}, multiplies<>{}, number<1>{}) &&
+                  NumWarps == reduce_on_sequence(Gemm4BlockWarps{}, multiplies<>{}, number<1>{}));
 
     static constexpr index_t kM0 = BlockTile::at(number<0>{}); // tile size along q seqlen
     static constexpr index_t kN0 = BlockTile::at(number<1>{}); // tile size along k seqlen

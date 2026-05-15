@@ -31,6 +31,7 @@
 
 #include "rocblaslt.h"
 //#include "rocblaslt_ostream.hpp"
+#include <atomic>
 #include <fstream>
 #include <hip/hip_runtime_api.h>
 #include <iostream>
@@ -38,7 +39,7 @@
 
 struct _rocblaslt_attribute
 {
-    _rocblaslt_attribute(){};
+    _rocblaslt_attribute() {};
 
     ~_rocblaslt_attribute();
 
@@ -81,7 +82,7 @@ struct _rocblaslt_handle
     // constructor
     _rocblaslt_handle();
     // destructor
-    ~_rocblaslt_handle() = default;
+    ~_rocblaslt_handle();
 
     // device id
     int device;
@@ -100,6 +101,24 @@ struct _rocblaslt_handle
     void* rocroller_handle = nullptr;
     int   useRocRoller     = -1;
 #endif
+
+    // HIPBLASLT_CHECK_NUMERICS state. Read once in the ctor; opt-in via env.
+    // See check_numerics_matrix.hpp for the scanner protocol.
+    hipblaslt_check_numerics_mode check_numerics = hipblaslt_check_numerics_mode_no_check;
+
+    // 4-byte device slot; scanner does atomicCAS(0, call_id) so the slot
+    // holds the FIRST matmul's call_id whose D contained a NaN.
+    uint32_t*             check_numerics_flag       = nullptr;
+    // Host-mapped alias of the flag under STOP_ON_FIRST (null otherwise).
+    uint32_t*             check_numerics_flag_host  = nullptr;
+    // Per-matmul counter; 1-indexed so 0 stays the "no NaN" sentinel.
+    std::atomic<uint32_t> check_numerics_call_id{0};
+    uint32_t              check_numerics_scan_every = 1u;
+    uint32_t              check_numerics_scan_from  = 1u;
+    uint32_t              check_numerics_scan_until = ~uint32_t(0);
+    bool                  check_numerics_stop_on_first = false;
+    // Sticky bypass for scan_D once any caller observes a NaN.
+    std::atomic<bool>     check_numerics_short_circuit{false};
 };
 
 /********************************************************************************
@@ -127,6 +146,8 @@ struct _rocblaslt_matrix_layout
     int32_t          batch_count  = 1;
     int64_t          batch_stride = 0;
     hipblasLtOrder_t order        = HIPBLASLT_ORDER_COL;
+    // Batch Mode
+    hipblasLtBatchMode_t batch_mode = HIPBLASLT_BATCH_MODE_STRIDED;    
 };
 
 /********************************************************************************
@@ -138,9 +159,9 @@ struct _rocblaslt_matrix_layout
 struct _rocblaslt_matmul_desc
 {
     // constructor
-    _rocblaslt_matmul_desc(){};
+    _rocblaslt_matmul_desc() {};
     // destructor
-    ~_rocblaslt_matmul_desc(){};
+    ~_rocblaslt_matmul_desc() {};
 
     // operation applied to the matrix A
     hipblasOperation_t op_A = HIPBLAS_OP_N;
@@ -167,19 +188,15 @@ struct _rocblaslt_matmul_desc
     //
     rocblaslt_compute_type compute_type;
     rocblaslt_compute_type compute_type_original;
-    hipDataType            compute_input_typeA;
-    hipDataType            compute_input_typeB;
-    hipDataType            scale_type = HIPBLASLT_DATATYPE_INVALID;
+    hipDataType            compute_input_typeA = HIPBLASLT_DATATYPE_INVALID;
+    hipDataType            compute_input_typeB = HIPBLASLT_DATATYPE_INVALID;
+    hipDataType            scale_type          = HIPBLASLT_DATATYPE_INVALID;
 
     RocblasltContractionProblem::ScalingFormat scaleAType
         = RocblasltContractionProblem::ScalingFormat::None;
     RocblasltContractionProblem::ScalingFormat scaleBType
         = RocblasltContractionProblem::ScalingFormat::None;
 
-    uint32_t scaleABlockRowSize = 0;
-    uint32_t scaleABlockColSize = 0;
-    uint32_t scaleBBlockRowSize = 0;
-    uint32_t scaleBBlockColSize = 0;
     float act0 = 0.f;
     float act1 = 0.f;
 
@@ -198,10 +215,6 @@ struct _rocblaslt_matmul_desc
         this->scaleE                = src.scaleE;
         this->scaleAType            = src.scaleAType;
         this->scaleBType            = src.scaleBType;
-        this->scaleABlockRowSize    = src.scaleABlockRowSize;
-        this->scaleABlockColSize    = src.scaleABlockColSize;
-        this->scaleBBlockRowSize    = src.scaleBBlockRowSize;
-        this->scaleBBlockColSize    = src.scaleBBlockColSize;
         this->pointermode           = src.pointermode;
         this->amaxD                 = src.amaxD;
         this->bias_type             = src.bias_type;
@@ -228,9 +241,9 @@ struct _rocblaslt_matmul_desc
 struct _rocblaslt_matmul_preference
 {
     // constructor
-    _rocblaslt_matmul_preference(){};
+    _rocblaslt_matmul_preference() {};
     // destructor
-    ~_rocblaslt_matmul_preference(){};
+    ~_rocblaslt_matmul_preference() {};
     //
     uint32_t search_mode         = 0;
     uint64_t max_workspace_bytes = 0;

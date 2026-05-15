@@ -15,6 +15,10 @@
 
 #include <hip/hip_runtime.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck_tile {
 
 /// @brief The Grouped GEMM kernel host arguments.
@@ -213,7 +217,7 @@ struct QuantGroupedGemmKernel
         int occupancy;
         HIP_CHECK_ERROR(
             hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel_func, kBlockSize, 0));
-        const int grid_size = get_available_compute_units(s) * occupancy;
+        const int grid_size = get_available_compute_units(s) * max(occupancy, 1);
         return dim3(grid_size, 1, 1);
     }
 
@@ -337,7 +341,6 @@ struct QuantGroupedGemmKernel
         }
         else
         {
-
             if constexpr(UsePersistentKernel)
             {
                 RunGemmWithPipelineSelection(a_ptr,
@@ -387,8 +390,8 @@ struct QuantGroupedGemmKernel
             Base::MakeABlockWindow(a_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_m);
         const auto& b_block_window =
             Base::MakeBBlockWindow(b_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_n);
-        const auto& bq_block_window =
-            Base::MakeBQBlockWindow(bq_ptr, kargs, block_idx_m, block_idx_n);
+        const auto& bq_block_window = Base::MakeBQBlockWindow(
+            bq_ptr, kargs, splitk_batch_offset.bq_group_offset, block_idx_m, block_idx_n);
 
         const index_t num_loop = __builtin_amdgcn_readfirstlane(
             TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
@@ -453,8 +456,8 @@ struct QuantGroupedGemmKernel
             Base::MakeBBlockWindow(b_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_n);
         const auto& aq_block_window =
             Base::MakeAQBlockWindow(aq_ptr, kargs, block_idx_m, block_idx_n);
-        const auto& bq_block_window =
-            Base::MakeBQBlockWindow(bq_ptr, kargs, block_idx_m, block_idx_n);
+        const auto& bq_block_window = Base::MakeBQBlockWindow(
+            bq_ptr, kargs, splitk_batch_offset.bq_group_offset, block_idx_m, block_idx_n);
 
         // Get hot-loop and tail configuration
         const index_t num_loop = __builtin_amdgcn_readfirstlane(
@@ -634,6 +637,7 @@ struct QuantGroupedGemmKernel
                 const auto block_idx_2d = OffsetTile1DPartitioner::GetOffsetedTileIndex(
                     0, kargs.M, kargs.N, (block_id - block_start) % grid_size_2d);
                 Run(kargs, block_idx_2d, (block_id - block_start) / grid_size_2d);
+                block_sync_lds();
                 block_id = block_id + grid_size; // advance to next block
                 // NOTE: this check is redundant but helps the compiler avoid spilling some VGPR
                 if(block_id >= cum_grid_size)
@@ -646,3 +650,4 @@ struct QuantGroupedGemmKernel
 };
 
 } // namespace ck_tile
+#pragma clang diagnostic pop

@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <hipdnn_data_sdk/flatbuffer_utilities/NodeWrapper.hpp>
 #include <hipdnn_data_sdk/utilities/Constants.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/NodeWrapper.hpp>
 #include <hipdnn_frontend/Graph.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
@@ -18,20 +18,42 @@ namespace hipdnn_sdk_test_utils
 struct BatchnormFwdTensorBundle : public hipdnn_test_sdk::utilities::GraphTensorBundle
 {
     BatchnormFwdTensorBundle(
-        const hipdnn_plugin_sdk::INodeWrapper& node,
-        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        const hipdnn_flatbuffers_sdk::flatbuffer_utilities::INodeWrapper& node,
+        const std::unordered_map<int64_t,
+                                 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
             tensorMap,
         unsigned int seed)
         : hipdnn_test_sdk::utilities::GraphTensorBundle(tensorMap)
     {
-        const auto& attributes
-            = node.attributesAs<hipdnn_data_sdk::data_objects::BatchnormInferenceAttributes>();
+        const auto& attributes = node.attributesAs<
+            hipdnn_flatbuffers_sdk::data_objects::BatchnormInferenceAttributes>();
 
         randomizeTensor(attributes.x_tensor_uid(), 0.0f, 1.0f, seed);
         randomizeTensor(attributes.scale_tensor_uid(), 0.0f, 1.0f, seed);
         randomizeTensor(attributes.bias_tensor_uid(), 0.0f, 1.0f, seed);
         randomizeTensor(attributes.mean_tensor_uid(), 0.0f, 1.0f, seed);
-        randomizeTensor(attributes.inv_variance_tensor_uid(), 0.1f, 1.0f, seed);
+        randomizeTensor(attributes.inv_variance_tensor_uid(), 1.0f, 3.0f, seed);
+    }
+};
+
+struct BatchnormFwdWithVarianceTensorBundle : public hipdnn_test_sdk::utilities::GraphTensorBundle
+{
+    BatchnormFwdWithVarianceTensorBundle(
+        const hipdnn_flatbuffers_sdk::flatbuffer_utilities::INodeWrapper& node,
+        const std::unordered_map<int64_t,
+                                 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
+            tensorMap,
+        unsigned int seed)
+        : hipdnn_test_sdk::utilities::GraphTensorBundle(tensorMap)
+    {
+        const auto& attributes = node.attributesAs<
+            hipdnn_flatbuffers_sdk::data_objects::BatchnormInferenceAttributesVarianceExt>();
+
+        randomizeTensor(attributes.x_tensor_uid(), 0.0f, 1.0f, seed);
+        randomizeTensor(attributes.scale_tensor_uid(), 0.0f, 1.0f, seed);
+        randomizeTensor(attributes.bias_tensor_uid(), 0.0f, 1.0f, seed);
+        randomizeTensor(attributes.mean_tensor_uid(), 0.0f, 1.0f, seed);
+        randomizeTensor(attributes.variance_tensor_uid(), 0.1f, 1.0f, seed);
     }
 };
 

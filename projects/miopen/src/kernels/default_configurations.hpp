@@ -104,12 +104,12 @@
 #define MIO_BN_GFX110X 0
 #endif
 
-#ifndef MIO_BN_GFX120X
-#define MIO_BN_GFX120X 0
-#endif
-
 #ifndef MIO_BN_GFX115X
 #define MIO_BN_GFX115X 0
+#endif
+
+#ifndef MIO_BN_GFX120X
+#define MIO_BN_GFX120X 0
 #endif
 
 #ifndef MIO_BN_VARIANT
@@ -126,6 +126,10 @@
 
 #ifndef MIO_BN_VECTORIZE
 #define MIO_BN_VECTORIZE 0
+#endif
+
+#ifndef MIO_BN_VEC_SIZE
+#define MIO_BN_VEC_SIZE 1
 #endif
 
 #ifndef MIO_BN_STASH_METHOD
@@ -148,16 +152,18 @@
 #define MIO_BN_LDS_SIZE 256
 #endif
 
-#ifndef MIO_BN_NGRPS
-#define MIO_BN_NGRPS 1
-#endif
-
 #ifndef MIO_BN_C
 #define MIO_BN_C 1
 #endif
 
 #ifndef MIO_BN_N
 #define MIO_BN_N 1
+#endif
+
+#ifndef MIO_BN_N_ELEMENTS
+#define MIO_BN_N_ELEMENTS MIO_BN_N
+// This is determined as such in the heuristics that select the kernels
+// (src/include/miopen/batchnorm/common_spatial.hpp: DefaultConfigSpatialMultiple)
 #endif
 
 #ifndef MIO_BN_NHW

@@ -28,7 +28,7 @@ The CPU Graph Executor is a reference implementation system designed to execute 
 
 The CPU Graph Executor follows a modular architecture pattern with clear separation of concerns:
 
-![CPU Graph Executor Architecture](./images/CPU_reference_graph_executor_high_level_arch.png)
+![CPU Graph Executor Architecture](../images/CPU_reference_graph_executor_high_level_arch.png)
 
 ## Architecture Components
 
@@ -132,7 +132,7 @@ Runtime Registration Process:
 ## Execution Flow
 
 The complete execution flow from graph input to results:
-![CPU Graph Executor Execution Flow](./images/hipdnn_cpu_graph_execution_flow.png)
+![CPU Graph Executor Execution Flow](../images/hipdnn_cpu_graph_execution_flow.png)
 
 ## Supported Operations
 
@@ -141,7 +141,7 @@ The CPU Reference Implementation supports a comprehensive set of deep learning o
 - **Convolution**: Forward pass, data gradients, and weight gradients
 - **Pointwise**: Unary and binary element-wise operations (activations, arithmetic)
 
-For a complete list of supported operations, datatypes, and layouts, please refer to the [CPU Reference Implementation Operation Support](./OperationSupport-ReferenceImpl.md) document.
+For a complete list of supported operations, datatypes, and layouts, please refer to the [CPU Reference Implementation Operation Support](../OperationSupport-ReferenceImpl.md) document.
 
 ## Extension Guidelines
 

@@ -27,6 +27,11 @@
 
 #include "ck/tensor_operation/gpu/grid/block_to_ctile_map.hpp"
 
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/description.hpp"
+#include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_data_multiple_d_xdl_cshuffle.hpp"
+#endif
+
 namespace ck {
 namespace tensor_operation {
 namespace device {
@@ -80,7 +85,7 @@ template <typename GridwiseGemm,
           bool CTranspose>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_grouped_conv_bwd_data_multiple_d_xdl_cshuffle(
         const ABDataType* __restrict__ p_a_grid,
@@ -124,7 +129,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         const long_index_t e_n_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_n.GetEPtrOffset(n_idx));
 
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
+        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
 
         DsPointer p_ds_grid_grp;
 
@@ -318,12 +323,28 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
             ? 1
             : 32;
 
-    using DeviceOp = DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1;
-    GET_NXDL_PER_WAVE_IMPL
-    static constexpr auto NXdlPerWave64 = GetNXdlPerWave<true>();
-    static constexpr auto NXdlPerWave32 = GetNXdlPerWave<false>();
-
-    static constexpr index_t NumDTensor          = DsDataType::Size();
+    using DeviceOp                         = DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1;
+    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               true>();
+    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               false>();
+    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
+    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
+    static constexpr index_t NumDTensor    = DsDataType::Size();
     static constexpr GemmSpecialization GemmSpec = GemmSpecialization::MNKPadding;
     static constexpr bool IsSplitKSupported =
         (CDEBlockTransferScalarPerVector_NPerBlock % 2 == 0 || sizeof(EDataType) % 4 == 0) &&
@@ -439,53 +460,55 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
     }
 
 // GridwiseGemm
-#define CK_GRIDWISE_GEMM_BWD_DATA_MULTIPLE_D_TEMPLATE_PARAMETERS                                \
-    ABDataType, ABDataType, AComputeType, AccDataType, CShuffleDataType, DsDataType, EDataType, \
-        AElementwiseOp, BElementwiseOp, CDEElementwiseOp, NumGemmKPrefetchStage, BlockSize,     \
-        MPerBlock, NPerBlock, KPerBlock, AK1, BK1, MPerXDL, NPerXDL, MXdlPerWave, NXdlPerWave_, \
-        ABlockTransferThreadClusterLengths_AK0_M_AK1, ABlockTransferThreadClusterArrangeOrder,  \
-        ABlockTransferSrcAccessOrder, ABlockTransferSrcVectorDim,                               \
-        ABlockTransferSrcScalarPerVector, ABlockTransferDstScalarPerVector_AK1, false,          \
-        ABlockLdsExtraM, BBlockTransferThreadClusterLengths_BK0_N_BK1,                          \
-        BBlockTransferThreadClusterArrangeOrder, BBlockTransferSrcAccessOrder,                  \
-        BBlockTransferSrcVectorDim, BBlockTransferSrcScalarPerVector,                           \
-        BBlockTransferDstScalarPerVector_BK1, false, BBlockLdsExtraN,                           \
-        CShuffleMXdlPerWavePerShuffle, CShuffleNXdlPerWavePerShuffle,                           \
-        CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,                       \
+#define CK_GRIDWISE_GEMM_BWD_DATA_MULTIPLE_D_TEMPLATE_PARAMETERS                                 \
+    ABDataType, ABDataType, AComputeType, AccDataType, CShuffleDataType, DsDataType, EDataType,  \
+        AElementwiseOp, BElementwiseOp, CDEElementwiseOp, NumGemmKPrefetchStage, BlockSize,      \
+        MPerBlock, NPerBlock, KPerBlock, AK1, BK1, WarpTileConfig::At(0), WarpTileConfig::At(1), \
+        WarpTileConfig::At(2), WarpTileConfig::At(3),                                            \
+        ABlockTransferThreadClusterLengths_AK0_M_AK1, ABlockTransferThreadClusterArrangeOrder,   \
+        ABlockTransferSrcAccessOrder, ABlockTransferSrcVectorDim,                                \
+        ABlockTransferSrcScalarPerVector, ABlockTransferDstScalarPerVector_AK1, false,           \
+        ABlockLdsExtraM, BBlockTransferThreadClusterLengths_BK0_N_BK1,                           \
+        BBlockTransferThreadClusterArrangeOrder, BBlockTransferSrcAccessOrder,                   \
+        BBlockTransferSrcVectorDim, BBlockTransferSrcScalarPerVector,                            \
+        BBlockTransferDstScalarPerVector_BK1, false, BBlockLdsExtraN, WarpTileConfig::At(4),     \
+        WarpTileConfig::At(5), CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, \
         CDEBlockTransferScalarPerVector_NPerBlock, LoopSched, PipelineVersion::v1, BComputeType
 
-#define CK_GRIDWISE_GEMM_BWD_DATA_CTRANSPOSE_TEMPLATE_PARAMETERS                                \
-    ABDataType, ABDataType, AComputeType, AccDataType, CShuffleDataType, DsDataType, EDataType, \
-        BElementwiseOp, AElementwiseOp, CDEElementwiseOp, NumGemmKPrefetchStage, BlockSize,     \
-        NPerBlock, MPerBlock, KPerBlock, BK1, AK1, NPerXDL, MPerXDL, NXdlPerWave_, MXdlPerWave, \
-        BBlockTransferThreadClusterLengths_BK0_N_BK1, BBlockTransferThreadClusterArrangeOrder,  \
-        BBlockTransferSrcAccessOrder, BBlockTransferSrcVectorDim,                               \
-        BBlockTransferSrcScalarPerVector, BBlockTransferDstScalarPerVector_BK1, false,          \
-        BBlockLdsExtraN, ABlockTransferThreadClusterLengths_AK0_M_AK1,                          \
-        ABlockTransferThreadClusterArrangeOrder, ABlockTransferSrcAccessOrder,                  \
-        ABlockTransferSrcVectorDim, ABlockTransferSrcScalarPerVector,                           \
-        ABlockTransferDstScalarPerVector_AK1, false, ABlockLdsExtraM,                           \
-        CShuffleMXdlPerWavePerShuffle, CShuffleNXdlPerWavePerShuffle,                           \
-        CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,                       \
+#define CK_GRIDWISE_GEMM_BWD_DATA_CTRANSPOSE_TEMPLATE_PARAMETERS                                 \
+    ABDataType, ABDataType, AComputeType, AccDataType, CShuffleDataType, DsDataType, EDataType,  \
+        BElementwiseOp, AElementwiseOp, CDEElementwiseOp, NumGemmKPrefetchStage, BlockSize,      \
+        NPerBlock, MPerBlock, KPerBlock, BK1, AK1, WarpTileConfig::At(1), WarpTileConfig::At(0), \
+        WarpTileConfig::At(3), WarpTileConfig::At(2),                                            \
+        BBlockTransferThreadClusterLengths_BK0_N_BK1, BBlockTransferThreadClusterArrangeOrder,   \
+        BBlockTransferSrcAccessOrder, BBlockTransferSrcVectorDim,                                \
+        BBlockTransferSrcScalarPerVector, BBlockTransferDstScalarPerVector_BK1, false,           \
+        BBlockLdsExtraN, ABlockTransferThreadClusterLengths_AK0_M_AK1,                           \
+        ABlockTransferThreadClusterArrangeOrder, ABlockTransferSrcAccessOrder,                   \
+        ABlockTransferSrcVectorDim, ABlockTransferSrcScalarPerVector,                            \
+        ABlockTransferDstScalarPerVector_AK1, false, ABlockLdsExtraM, WarpTileConfig::At(5),     \
+        WarpTileConfig::At(4), CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, \
         CDEBlockTransferScalarPerVector_NPerBlock, LoopSched, PipelineVersion::v1, BComputeType
 
-    template <index_t NXdlPerWave_>
+    template <typename WarpTileConfig>
     using GridwiseGemmBase = GridwiseGemmMultipleD_xdl_cshuffle<
         CK_GRIDWISE_GEMM_BWD_DATA_MULTIPLE_D_TEMPLATE_PARAMETERS>;
-    template <index_t NXdlPerWave_>
+    template <typename WarpTileConfig>
     using GridwiseGemmCTransposeBase = GridwiseGemmMultipleD_xdl_cshuffle<
         CK_GRIDWISE_GEMM_BWD_DATA_CTRANSPOSE_TEMPLATE_PARAMETERS>;
 #undef CK_GRIDWISE_GEMM_BWD_DATA_MULTIPLE_D_TEMPLATE_PARAMETERS
 #undef CK_GRIDWISE_GEMM_BWD_DATA_CTRANSPOSE_TEMPLATE_PARAMETERS
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
+    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
+    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     using GridwiseGemmCTranspose64 =
         std::conditional_t<CTranspose,
-                           GridwiseGemmCTransposeBase<math::max(NXdlPerWave64, 1)>,
+                           GridwiseGemmCTransposeBase<decltype(WarpTileConfig64)>,
                            GridwiseGemm64>;
     using GridwiseGemmCTranspose32 =
-        std::conditional_t<CTranspose, GridwiseGemmCTransposeBase<NXdlPerWave32>, GridwiseGemm32>;
+        std::conditional_t<CTranspose,
+                           GridwiseGemmCTransposeBase<decltype(WarpTileConfig32)>,
+                           GridwiseGemm32>;
 
     template <typename EGridDesc_M_N>
     static auto
@@ -1220,26 +1243,50 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                             has_main_loop,
                             no_main_loop,
                             CTranspose>;
-
-                        return launch_and_time_kernel_with_preprocess(
-                            stream_config,
-                            clear_workspace,
-                            kernel,
-                            dim3(gdx, gdy, gdz),
-                            dim3(BlockSize),
-                            0,
-                            p_b_grid,
-                            p_a_grid,
-                            arg.p_ds_grid_,
-                            p_e_grid,
-                            gemm_kernel_args,
-                            gemms_count_for_set,
-                            arg.b_element_op_,
-                            arg.a_element_op_,
-                            arg.cde_element_op_,
-                            arg.compute_ptr_offset_of_batch_,
-                            arg.compute_ptr_offset_of_n_,
-                            arg.k_batch_);
+                        if(stream_config.flush_cache)
+                        {
+                            return launch_and_time_kernel_with_preprocess_flush_cache(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(gdx, gdy, gdz),
+                                dim3(BlockSize),
+                                0,
+                                p_b_grid,
+                                p_a_grid,
+                                arg.p_ds_grid_,
+                                p_e_grid,
+                                gemm_kernel_args,
+                                gemms_count_for_set,
+                                arg.b_element_op_,
+                                arg.a_element_op_,
+                                arg.cde_element_op_,
+                                arg.compute_ptr_offset_of_batch_,
+                                arg.compute_ptr_offset_of_n_,
+                                arg.k_batch_);
+                        }
+                        else
+                        {
+                            return launch_and_time_kernel_with_preprocess(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(gdx, gdy, gdz),
+                                dim3(BlockSize),
+                                0,
+                                p_b_grid,
+                                p_a_grid,
+                                arg.p_ds_grid_,
+                                p_e_grid,
+                                gemm_kernel_args,
+                                gemms_count_for_set,
+                                arg.b_element_op_,
+                                arg.a_element_op_,
+                                arg.cde_element_op_,
+                                arg.compute_ptr_offset_of_batch_,
+                                arg.compute_ptr_offset_of_n_,
+                                arg.k_batch_);
+                        }
                     }
                     else
                     {
@@ -1259,26 +1306,50 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                             has_main_loop,
                             no_main_loop,
                             CTranspose>;
-
-                        return launch_and_time_kernel_with_preprocess(
-                            stream_config,
-                            clear_workspace,
-                            kernel,
-                            dim3(gdx, gdy, gdz),
-                            dim3(BlockSize),
-                            0,
-                            p_a_grid,
-                            p_b_grid,
-                            arg.p_ds_grid_,
-                            p_e_grid,
-                            gemm_kernel_args,
-                            gemms_count_for_set,
-                            arg.a_element_op_,
-                            arg.b_element_op_,
-                            arg.cde_element_op_,
-                            arg.compute_ptr_offset_of_batch_,
-                            arg.compute_ptr_offset_of_n_,
-                            arg.k_batch_);
+                        if(stream_config.flush_cache)
+                        {
+                            return launch_and_time_kernel_with_preprocess_flush_cache(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(gdx, gdy, gdz),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                arg.p_ds_grid_,
+                                p_e_grid,
+                                gemm_kernel_args,
+                                gemms_count_for_set,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.cde_element_op_,
+                                arg.compute_ptr_offset_of_batch_,
+                                arg.compute_ptr_offset_of_n_,
+                                arg.k_batch_);
+                        }
+                        else
+                        {
+                            return launch_and_time_kernel_with_preprocess(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(gdx, gdy, gdz),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                arg.p_ds_grid_,
+                                p_e_grid,
+                                gemm_kernel_args,
+                                gemms_count_for_set,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.cde_element_op_,
+                                arg.compute_ptr_offset_of_batch_,
+                                arg.compute_ptr_offset_of_n_,
+                                arg.k_batch_);
+                        }
                     }
                 };
                 if(has_loop_in_all_gemm)
@@ -1493,7 +1564,20 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
         {
             return false;
         }
-        if(!ck::is_xdl_wmma_supported<AComputeType, BComputeType, MPerXDL, NPerXDL>())
+        if(!ck::is_xdl_wmma_supported<AComputeType,
+                                      BComputeType,
+                                      MPerXDL,
+                                      NPerXDL,
+                                      WarpTileConfig32.At(0),
+                                      WarpTileConfig32.At(1)>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<AComputeType, KPerBlock>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<BComputeType, KPerBlock>())
         {
             return false;
         }
@@ -1698,6 +1782,10 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                         valid = false;
                     }
                 }
+                else
+                {
+                    valid = false;
+                }
             }
             else
             {
@@ -1715,6 +1803,10 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                     {
                         valid = false;
                     }
+                }
+                else
+                {
+                    valid = false;
                 }
             }
             if(!valid)
@@ -1934,6 +2026,24 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                 "The argument pointer is not an object of "
                 "DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1::Argument structure!");
     }
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    std::string GetInstanceString() const override
+    {
+        static_assert(ck_tile::reflect::HasInstanceTraits<DeviceOp>,
+                      "Specialization of instance_traits not found. Please check that a "
+                      "specialization exists in file "
+                      "ck_tile/builder/reflect/"
+                      "instance_traits_device_grouped_conv_bwd_data_multiple_d_xdl_cshuffle.hpp "
+                      "for the given template parameters.");
+        return ck_tile::reflect::instance_string<DeviceOp>();
+    }
+
+    std::unique_ptr<ck_tile::reflect::Description> describe() const override
+    {
+        return std::make_unique<ck_tile::reflect::InstanceStringDescription>(GetInstanceString());
+    }
+#endif
 };
 
 } // namespace device

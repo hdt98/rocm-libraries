@@ -1,8 +1,9 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-target_sources(tensilelite-client
+target_sources(tensilelite-client-common
     PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/ProgramOptions.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/TypedId.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MetaResultReporter.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMonitorListener.hpp"

@@ -19,6 +19,7 @@
 // THE SOFTWARE.
 
 #include "../../shared/accuracy_test.h"
+#include "../../shared/fft_enums.h"
 #include "../../shared/params_gen.h"
 #include "../hipfft_params.h"
 #include <algorithm>
@@ -80,7 +81,9 @@ std::vector<fft_params> param_generator_multi_gpu(const std::optional<SplitType>
     // to multiple GPUs
     std::vector<fft_params> params_single;
 
-    for(auto run_callbacks : {false, true})
+    // legacy callbacks need -fgpu-rdc, but that causes build
+    // nondeterminism in kpack
+    for(auto run_callbacks : {false, /*true*/})
     {
         auto params = param_generator_complex(test_prob,
                                               multi_gpu_sizes,
@@ -187,8 +190,8 @@ std::vector<fft_params> param_generator_multi_gpu(const std::optional<SplitType>
                 }
 
                 p_dist.mp_lib = mp_lib;
-                p_dist.distribute_input(localDeviceCount, input_grid);
-                p_dist.distribute_output(localDeviceCount, output_grid);
+                p_dist.distribute_field<fft_io::fft_io_in>(localDeviceCount, input_grid);
+                p_dist.distribute_field<fft_io::fft_io_out>(localDeviceCount, output_grid);
 
                 // "placement" flag is meaningless if exactly one of
                 // input+output is a field.  So just add those cases if

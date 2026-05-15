@@ -18,6 +18,9 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 namespace ck {
 
 template <typename GridwiseGemm,
@@ -273,7 +276,10 @@ struct DeviceGemmMultipleDLayernorm_Wmma_CShuffleV3
         ComputeTypeA,
         ComputeTypeB,
         PermuteA,
-        PermuteB>;
+        PermuteB,
+        false,
+        false,
+        true>;
 
     // Welford 2nd part kernel
     template <typename DoPads, index_t MPerTile, index_t NPerTile>
@@ -698,6 +704,28 @@ struct DeviceGemmMultipleDLayernorm_Wmma_CShuffleV3
             return false;
         }
 
+        if(ck::is_gfx12_supported() &&
+           !GridwiseGemmWelford::CheckValidityAWaveTransfer(arg.MRaw_, arg.KRaw_))
+        {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Wave Transfer not applicable for matrix A" << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
+            return false;
+        }
+
+        if(ck::is_gfx12_supported() &&
+           !GridwiseGemmWelford::CheckValidityBWaveTransfer(arg.NRaw_, arg.KRaw_))
+        {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Wave Transfer not applicable for matrix B" << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
+            return false;
+        }
+
         typename GridwiseGemmWelford::Argument gemm_arg{
             std::array<const void*, 1>{arg.p_a_grid_},
             std::array<const void*, 1>{arg.p_b_grid_},
@@ -894,3 +922,4 @@ struct DeviceGemmMultipleDLayernorm_Wmma_CShuffleV3
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+#pragma clang diagnostic pop

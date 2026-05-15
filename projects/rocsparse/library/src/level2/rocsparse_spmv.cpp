@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@
 #include "rocsparse_sellmv.hpp"
 #include "rocsparse_spmv.hpp"
 
+// LCOV_EXCL_START
 template <>
 const char* rocsparse::enum_utils::to_string(rocsparse_spmv_alg value_)
 {
@@ -56,9 +57,7 @@ const char* rocsparse::enum_utils::to_string(rocsparse_spmv_alg value_)
         CASE(rocsparse_spmv_alg_sell);
 #undef CASE
     }
-    // LCOV_EXCL_START
     THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-    // LCOV_EXCL_STOP
 }
 
 template <>
@@ -74,10 +73,9 @@ const char* rocsparse::enum_utils::to_string(rocsparse_spmv_stage value_)
         CASE(rocsparse_spmv_stage_compute);
 #undef CASE
     }
-    // LCOV_EXCL_START
     THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-    // LCOV_EXCL_STOP
 }
+// LCOV_EXCL_STOP
 
 template <>
 bool rocsparse::enum_utils::is_invalid(rocsparse_spmv_stage value_)
@@ -272,6 +270,11 @@ rocsparse_status rocsparse::spmv_alg2csrmv_alg(rocsparse_spmv_alg    spmv_alg,
     }
 
     case rocsparse_spmv_alg_default:
+    {
+        target = rocsparse::csrmv_alg_default;
+        return rocsparse_status_success;
+    }
+
     case rocsparse_spmv_alg_csr_adaptive:
     {
         target = rocsparse::csrmv_alg_adaptive;

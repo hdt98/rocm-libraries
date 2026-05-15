@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -101,7 +101,7 @@ struct DeviceScanParams
 template<bool Deterministic, typename Config = rocprim::default_config, typename... Args>
 constexpr hipError_t invoke_inclusive_scan(Args&&... args)
 {
-    if(Deterministic)
+    if constexpr(Deterministic)
     {
         return rocprim::deterministic_inclusive_scan<Config>(std::forward<Args>(args)...);
     }
@@ -114,7 +114,7 @@ constexpr hipError_t invoke_inclusive_scan(Args&&... args)
 template<bool Deterministic, typename Config = rocprim::default_config, typename... Args>
 constexpr hipError_t invoke_exclusive_scan(Args&&... args)
 {
-    if(Deterministic)
+    if constexpr(Deterministic)
     {
         return rocprim::deterministic_exclusive_scan<Config>(std::forward<Args>(args)...);
     }
@@ -310,13 +310,7 @@ TYPED_TEST(RocprimDeviceScanTests, LookBackScan)
 
     hipStream_t stream = hipStreamDefault;
 
-    rocprim::detail::target_arch target_arch;
-    HIP_CHECK(rocprim::detail::host_target_arch(stream, target_arch));
-
-    rocprim::detail::gpu target_gpu;
-    HIP_CHECK(rocprim::detail::host_target_gpu(stream, target_gpu));
-
-    const rocprim::detail::target current_target(target_arch, target_gpu);
+    const rocprim::detail::target current_target(stream);
 
     const auto params = rocprim::detail::get_config<Selector>(Config{}, current_target);
 
@@ -564,13 +558,7 @@ TYPED_TEST(RocprimDeviceScanTests, LookBackScanGetCompleteValue)
 
     hipStream_t stream = hipStreamDefault;
 
-    rocprim::detail::target_arch target_arch;
-    HIP_CHECK(rocprim::detail::host_target_arch(stream, target_arch));
-
-    rocprim::detail::gpu target_gpu;
-    HIP_CHECK(rocprim::detail::host_target_gpu(stream, target_gpu));
-
-    const rocprim::detail::target current_target(target_arch, target_gpu);
+    const rocprim::detail::target current_target(stream);
 
     const auto params = rocprim::detail::get_config<Selector>(Config{}, current_target);
 
@@ -1294,6 +1282,10 @@ void testLargeIndicesInclusiveScan()
 
 TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScan)
 {
+#if defined(__SANITIZE_ADDRESS__)
+    GTEST_SKIP() << "Skip LargeIndices test under ASan";
+#endif
+
 #if HAS_VALGRIND_H
     //Disable large tests to reduce valgrind run time
     if(RUNNING_ON_VALGRIND)
@@ -1304,6 +1296,10 @@ TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScan)
 
 TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScanWithGraphs)
 {
+#if defined(__SANITIZE_ADDRESS__)
+    GTEST_SKIP() << "Skip LargeIndices test under ASan";
+#endif
+
 #if HAS_VALGRIND_H
     //Disable large tests to reduce valgrind run time
     if(RUNNING_ON_VALGRIND)
@@ -1314,6 +1310,10 @@ TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScanWithGraphs)
 
 TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScanWithInitialValue)
 {
+#if defined(__SANITIZE_ADDRESS__)
+    GTEST_SKIP() << "Skip LargeIndices test under ASan";
+#endif
+
 #if HAS_VALGRIND_H
     //Disable large tests to reduce valgrind run time
     if(RUNNING_ON_VALGRIND)
@@ -1324,6 +1324,10 @@ TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScanWithInitialValue)
 
 TEST(RocprimDeviceScanTests, LargeIndicesInclusiveScanWithInitialValueAndGraphs)
 {
+#if defined(__SANITIZE_ADDRESS__)
+    GTEST_SKIP() << "Skip LargeIndices test under ASan";
+#endif
+
 #if HAS_VALGRIND_H
     //Disable large tests to reduce valgrind run time
     if(RUNNING_ON_VALGRIND)
@@ -1414,6 +1418,10 @@ void testLargeIndicesExclusiveScan()
 
 TEST(RocprimDeviceScanTests, LargeIndicesExclusiveScan)
 {
+#if defined(__SANITIZE_ADDRESS__)
+    GTEST_SKIP() << "Skip LargeIndices test under ASan";
+#endif
+
 #if HAS_VALGRIND_H
     //Disable large tests to reduce valgrind run time
     if(RUNNING_ON_VALGRIND)
@@ -1424,6 +1432,10 @@ TEST(RocprimDeviceScanTests, LargeIndicesExclusiveScan)
 
 TEST(RocprimDeviceScanTests, LargeIndicesExclusiveScanWithGraphs)
 {
+#if defined(__SANITIZE_ADDRESS__)
+    GTEST_SKIP() << "Skip LargeIndices test under ASan";
+#endif
+
 #if HAS_VALGRIND_H
     //Disable large tests to reduce valgrind run time
     if(RUNNING_ON_VALGRIND)

@@ -127,6 +127,9 @@ namespace
     constexpr auto tensile_datatype<int8_t> = rocisa::DataType::Int8;
 
     template <>
+    constexpr auto tensile_datatype<int32_t> = rocisa::DataType::Int32;    
+
+    template <>
     constexpr auto tensile_datatype<__half> = rocisa::DataType::Half;
 
     template <>
@@ -174,6 +177,8 @@ namespace
             return rocisa::DataType::BFloat16;
         case HIP_R_8I:
             return rocisa::DataType::Int8;
+        case HIP_R_32I:
+            return rocisa::DataType::Int32;            
 #if HIP_FP8_TYPE_OCP
         case HIP_R_8F_E4M3:
             return rocisa::DataType::Float8;
@@ -291,7 +296,7 @@ namespace
         TensileLite::TensorDescriptor scaleAlphaVec{"scaleAlphaVec"};
 
         // The ContractionProblemGemm
-        TensileLite::ContractionProblemGemm tensileProblem{a,
+        TensileLite::ContractionProblemGemm tensileProblem(a,
                                                        b,
                                                        c,
                                                        d,
@@ -305,9 +310,10 @@ namespace
                                                        freeIndex,
                                                        batchIndex,
                                                        boundIndex,
-                                                       *prob.beta,
-                                                       prob.workspaceSize};
-        tensileProblem.setComputeInputType(Tensile_Ti);
+                                                       static_cast<double>(*prob.beta),
+                                                       prob.workspaceSize);
+        tensileProblem.setComputeInputTypeA(Tensile_Ti);
+        tensileProblem.setComputeInputTypeB(Tensile_Ti);
         tensileProblem.setAlphaType(Tensile_Tc);
         tensileProblem.setBetaType(Tensile_Tc);
 
@@ -337,7 +343,8 @@ namespace
         // Add problem predicates for CEqualsD
         tensileProblem.setCEqualsD(prob.C == prob.D);
 
-        tensileProblem.setSparse(prob.sparseA ? 1 : 2);
+        // Workaround: metadata layout
+        tensileProblem.setSparse(prob.sparseA ? 1 : 2, 0);
 
         // set Actvation
         tensileProblem.setActivationType(TensileLite::ActivationType::All);
@@ -862,7 +869,7 @@ rocsparselt_status runContractionProblem(const RocsparseltContractionProblem<Ti,
 
         auto& adapter = get_library_and_adapter(&library, &deviceProp, prob.handle->device);
 
-        hardware = TensileLite::hip::GetDevice(*deviceProp);
+        hardware = TensileLite::hip::GetDevice(prob.handle->device);
 
         if(!config_max_id || configs == nullptr)
         {
@@ -1004,8 +1011,9 @@ rocsparselt_status getBestSolutions(const RocsparseltContractionProblem<Ti, To, 
         return rocsparselt_status_invalid_pointer;
     }
 
-    hardware          = TensileLite::hip::GetDevice(*deviceProp);
+    hardware          = TensileLite::hip::GetDevice(prob.handle->device);
     auto tensile_prob = ConstructTensileProblem(prob);
+
     // auto handle = prob.handle;
     auto solutions = library->findTopSolutions(tensile_prob, *hardware, requestConfigs);
 
@@ -1055,7 +1063,7 @@ rocsparselt_status getBestSolutions(const RocsparseltContractionProblem<Ti, To, 
         configs[i].max_workspace_bytes = solution->requiredWorkspaceSize(tensile_prob, *hardware);
         configs[i].use_bias            = tensile_prob.useBias();
         configs[i].use_scale_alpha_vec = tensile_prob.useScaleAlphaVec();
-        configs[i].synchronizer_bytes  = std::ceil(solution->requiredSynchronizerSize(tensile_prob, *hardware) / 16) * 16; // align 16
+        configs[i].synchronizer_bytes  = std::ceil(solution->requiredSynchronizerSize(tensile_prob, *hardware) ? 16 * 409600 * sizeof(int) : 0);
     }
     return rocsparselt_status_success;
 }
@@ -1098,6 +1106,7 @@ GENERATE_DEFINITIONS(hip_bfloat16, hip_bfloat16, float)
 GENERATE_DEFINITIONS(int8_t, int8_t, float)
 GENERATE_DEFINITIONS(int8_t, __half, float)
 GENERATE_DEFINITIONS(int8_t, hip_bfloat16, float)
+GENERATE_DEFINITIONS(int8_t, int32_t, float)
 GENERATE_DEFINITIONS(__hip_fp8_e4m3, float, float)
 GENERATE_DEFINITIONS(__hip_fp8_e5m2, float, float)
 

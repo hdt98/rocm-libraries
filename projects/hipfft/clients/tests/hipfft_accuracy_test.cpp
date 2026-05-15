@@ -1,4 +1,4 @@
-// Copyright (C) 2022 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2022 - 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -71,8 +71,6 @@ static user_mp_launch_command get_mp_launch_command()
     }
     return ret;
 }
-
-extern last_cpu_fft_cache last_cpu_fft_data;
 
 // clang-format off
 // tokens of tests found to be symptomatic
@@ -147,13 +145,23 @@ TEST_P(accuracy_test, vs_fftw)
         {
             fft_vs_reference(params, do_round_trip);
         }
-        catch(HOSTBUF_MEM_USAGE& e)
+        catch(const std::bad_alloc&)
         {
             // explicitly clear cache
-            last_cpu_fft_data = last_cpu_fft_cache();
+            reference_fft_data_t::clear_cache();
+            GTEST_SKIP() << "host memory allocation failure";
+        }
+        catch(const HOSTBUF_MEM_USAGE& e)
+        {
+            // explicitly clear cache
+            reference_fft_data_t::clear_cache();
             GTEST_SKIP() << e.what();
         }
-        catch(ROCFFT_SKIP& e)
+        catch(const DEVICEBUF_MEM_USAGE& e)
+        {
+            GTEST_SKIP() << e.what();
+        }
+        catch(const ROCFFT_SKIP& e)
         {
             GTEST_SKIP() << e.what();
         }
@@ -161,7 +169,7 @@ TEST_P(accuracy_test, vs_fftw)
         {
             GTEST_SKIP() << "Unimplemented exception: " << e.what();
         }
-        catch(ROCFFT_FAIL& e)
+        catch(const ROCFFT_FAIL& e)
         {
             GTEST_FAIL() << e.what();
         }

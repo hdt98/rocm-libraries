@@ -23,7 +23,7 @@ extern "C" {
 
 /**
  * @defgroup EnginePluginFunctions Engine Plugin API Functions
- * @brief Functions that each engine plugin must implement.
+ * @brief Required and optional functions that engine plugins may implement.
  * @{
  */
 
@@ -34,16 +34,19 @@ extern "C" {
  *                        have a size of at least `max_engines`.
  * @param[in] max_engines The maximum number of engine IDs that can be stored in the `engine_ids` array.
  * @param[out] num_engines A pointer to a variable where the total number of available engines will be stored.
- *                         This value may exceed `max_engines` if more engines are available than the array can
- *                         accommodate.
+ *                         When `max_engines` is zero, `num_engines` must be upated with the total number of engines
+ *                         the plugin can return. When `max_engines` is non-zero, `num_engines` is set to the number of
+ *                         engines stored in the `engine_ids` array.
  *
  * @return A value of type `hipdnnPluginStatus_t` indicating the status of the operation.
  *
  * @note The caller is responsible for ensuring that the `engine_ids` array is large enough to hold up to
  *       `max_engines` IDs. If the number of available engines exceeds `max_engines`, only the first
- *       `max_engines` IDs will be returned, and the total count will be stored in `num_engines`.
- *       The function can be called with `max_engines = 0` (in this case, `engine_ids` may be `NULL`)
- *       to retrieve the total count of available engines without returning their IDs.
+ *       `max_engines` IDs will be returned, and `num_engines` is set to the number of engines stored in
+ *       the `engine_ids` array.
+ * @note This function will be called with `max_engines = 0` (in this case, `engine_ids` may be `NULL`)
+ *       to retrieve the total count of available engines without returning their IDs. In this situation
+ *       the plugin must set `num_engines` to the total number of engines available in the plugin.
  */
 HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnEnginePluginGetAllEngineIds(
     int64_t* engine_ids, uint32_t max_engines, uint32_t* num_engines);
@@ -203,6 +206,62 @@ HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnEnginePluginDestroyExecutionContext(
         hipdnnEnginePluginHandle_t handle, hipdnnEnginePluginExecutionContext_t execution_context);
+
+/**
+ * @brief Serializes an execution context into plugin-owned opaque bytes.
+ *
+ * @param[in] handle The engine plugin handle.
+ * @param[in] execution_context The execution context to serialize.
+ * @param[in,out] serialized_context A pointer to a structure where the plugin-specific serialized execution
+ *                                  context bytes will be stored.
+ *
+ * @return A value of type `hipdnnPluginStatus_t` indicating the status of the operation.
+ *
+ * @note This function is optional. Plugins that do not export it do not support compiled execution plan
+ *       serialization.
+ * @note The serialized bytes are plugin-specific and are treated as opaque by hipDNN.
+ * @note The plugin owns the returned buffer. hipDNN must release it by calling
+ *       hipdnnEnginePluginDestroySerializedExecutionContext().
+ */
+HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
+    hipdnnEnginePluginSerializeExecutionContext(
+        hipdnnEnginePluginHandle_t handle,
+        hipdnnEnginePluginExecutionContext_t execution_context,
+        hipdnnPluginConstData_t* serialized_context);
+
+/**
+ * @brief Destroys plugin-owned serialized execution context bytes.
+ *
+ * @param[in] handle The engine plugin handle.
+ * @param[in,out] serialized_context A pointer to the serialized execution context bytes returned by
+ *                                  hipdnnEnginePluginSerializeExecutionContext().
+ *
+ * @return A value of type `hipdnnPluginStatus_t` indicating the status of the operation.
+ *
+ * @note This function is optional. Plugins that export hipdnnEnginePluginSerializeExecutionContext must also
+ *       export this function.
+ */
+HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
+    hipdnnEnginePluginDestroySerializedExecutionContext(
+        hipdnnEnginePluginHandle_t handle, hipdnnPluginConstData_t* serialized_context);
+
+/**
+ * @brief Creates an execution context from plugin-specific serialized bytes.
+ *
+ * @param[in] handle The engine plugin handle.
+ * @param[in] serialized_context A pointer to the plugin-specific serialized execution context bytes.
+ * @param[out] execution_context A pointer to a variable where the created execution context will be stored.
+ *
+ * @return A value of type `hipdnnPluginStatus_t` indicating the status of the operation.
+ *
+ * @note This function is optional. Plugins that export hipdnnEnginePluginSerializeExecutionContext must also
+ *       export this function.
+ */
+HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
+    hipdnnEnginePluginCreateExecutionContextFromSerialized(
+        hipdnnEnginePluginHandle_t handle,
+        const hipdnnPluginConstData_t* serialized_context,
+        hipdnnEnginePluginExecutionContext_t* execution_context);
 
 /**
  * @brief Retrieves the required workspace size for a given execution context.

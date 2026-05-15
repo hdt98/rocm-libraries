@@ -3,31 +3,46 @@
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
+#include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_frontend/Graph.hpp>
 #include <hipdnn_frontend/attributes/ConvolutionFpropAttributes.hpp>
 #include <hipdnn_frontend/attributes/PointwiseAttributes.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
+#include <hipdnn_test_sdk/utilities/MockEngineConfig.hpp>
 #include <hipdnn_test_sdk/utilities/MockGraph.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <miopen/miopen.h>
 
-#include "HipdnnEnginePluginHandle.hpp"
+#include "HipdnnMiopenHandle.hpp"
 #include "engines/plans/MiopenConvFwdBiasActivPlanBuilder.hpp"
 #include "tests/common/ActivationCommon.hpp"
 #include "tests/common/ConvolutionCommon.hpp"
+#include "tests/common/TestWorkarounds.hpp"
 
+#include <memory>
 #include <unordered_map>
 
-using namespace miopen_legacy_plugin;
-using namespace hipdnn_plugin_sdk;
+using namespace miopen_plugin;
+using namespace hipdnn_flatbuffers_sdk::flatbuffer_utilities;
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_data_sdk::utilities;
+using namespace hipdnn_frontend::graph;
 
 class TestMiopenConvFwdBiasActivPlanBuilder : public ::testing::Test
 {
 protected:
+    void SetUp() override
+    {
+        SKIP_IF_NO_DEVICES();
+        // No #6979 SKIP here: every TEST_F in this fixture exercises non-CBA
+        // graphs or mocks, so isApplicable returns false regardless of whether
+        // the device has a CBA solver. The skip belongs in the GPU fixture
+        // below where buildPlan is actually invoked on a CBA graph.
+        _dummyHandle = std::make_unique<HipdnnMiopenHandle>();
+    }
+
     MiopenConvFwdBiasActivPlanBuilder _planBuilder;
-    HipdnnEnginePluginHandle _dummyHandle;
+    std::unique_ptr<HipdnnMiopenHandle> _dummyHandle;
 };
 
 enum class TypeKey
@@ -112,13 +127,11 @@ class TestGpuMiopenConvFwdBiasActivPlanBuilder
 protected:
     void SetUp() override
     {
-        namespace graph = hipdnn_frontend::graph;
-
         // Re-enable in Windows once CK is supported
         SKIP_IF_WINDOWS();
 
         SKIP_IF_NO_DEVICES();
-        ASSERT_EQ(miopenCreate(&_handle.miopenHandle), miopenStatusSuccess);
+        _handle = std::make_unique<HipdnnMiopenHandle>();
 
         auto param = GetParam();
         auto& convTestCase = param.convTestCase;
@@ -138,22 +151,22 @@ protected:
         _graphObj.set_io_data_type(param.defaultDataType);
 
         auto xTensorAttrObj
-            = graph::makeTensorAttributes("x",
-                                          param.dataTypes[TypeKey::X],
-                                          convTestCase.xDims,
-                                          generateStrides(convTestCase.xDims, layout.strideOrder));
-        auto xTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(xTensorAttrObj));
+            = makeTensorAttributes("x",
+                                   param.dataTypes[TypeKey::X],
+                                   convTestCase.xDims,
+                                   generateStrides(convTestCase.xDims, layout.strideOrder));
+        auto xTensorAttr = std::make_shared<TensorAttributes>(std::move(xTensorAttrObj));
         xTensorAttr->set_is_virtual(isVirtual(TypeKey::X));
 
-        auto wTensorAttrObj = graph::makeTensorAttributes(
-            "w",
-            param.dataTypes[TypeKey::W],
-            convTestCase.wDims,
-            generateStrides(convTestCase.wDims, param.layout.strideOrder));
-        auto wTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(wTensorAttrObj));
+        auto wTensorAttrObj
+            = makeTensorAttributes("w",
+                                   param.dataTypes[TypeKey::W],
+                                   convTestCase.wDims,
+                                   generateStrides(convTestCase.wDims, param.layout.strideOrder));
+        auto wTensorAttr = std::make_shared<TensorAttributes>(std::move(wTensorAttrObj));
         wTensorAttr->set_is_virtual(isVirtual(TypeKey::W));
 
-        graph::ConvFpropAttributes convAttrs;
+        ConvFpropAttributes convAttrs;
         convAttrs.set_pre_padding(convTestCase.convPrePadding);
         convAttrs.set_post_padding(convTestCase.convPostPadding);
         convAttrs.set_stride(convTestCase.convStride);
@@ -165,21 +178,20 @@ protected:
         yConvTensorAttr->set_dim(convTestCase.yDims);
         yConvTensorAttr->set_stride(generateStrides(convTestCase.yDims, layout.strideOrder));
         yConvTensorAttr->set_is_virtual(isVirtual(TypeKey::Y_CONV));
-        std::shared_ptr<graph::TensorAttributes> yBiasTensorAttr;
+        std::shared_ptr<TensorAttributes> yBiasTensorAttr;
         if(param.op == FusedOp::CBA)
         {
             const auto biasDims = getDerivedShape(convTestCase.yDims);
 
             auto biasTensorAttrObj
-                = graph::makeTensorAttributes("bias",
-                                              param.dataTypes[TypeKey::BIAS],
-                                              biasDims,
-                                              generateStrides(biasDims, layout.strideOrder));
-            auto biasTensorAttr
-                = std::make_shared<graph::TensorAttributes>(std::move(biasTensorAttrObj));
+                = makeTensorAttributes("bias",
+                                       param.dataTypes[TypeKey::BIAS],
+                                       biasDims,
+                                       generateStrides(biasDims, layout.strideOrder));
+            auto biasTensorAttr = std::make_shared<TensorAttributes>(std::move(biasTensorAttrObj));
             biasTensorAttr->set_is_virtual(isVirtual(TypeKey::BIAS));
 
-            graph::PointwiseAttributes biasAttrs;
+            PointwiseAttributes biasAttrs;
             biasAttrs.set_name("bias");
             biasAttrs.set_mode(hipdnn_frontend::PointwiseMode::ADD);
             biasAttrs.set_compute_data_type(param.dataTypes[TypeKey::BIAS_COMPUTE]);
@@ -192,7 +204,7 @@ protected:
             yBiasTensorAttr->set_is_virtual(isVirtual(TypeKey::Y_BIAS));
         }
 
-        graph::PointwiseAttributes activAttrs;
+        PointwiseAttributes activAttrs;
         activAttrs.set_name("activation_forward");
         activAttrs.set_mode(static_cast<hipdnn_frontend::PointwiseMode>(activTestCase.mode));
         activAttrs.set_compute_data_type(param.dataTypes[TypeKey::ACTIV_COMPUTE]);
@@ -235,18 +247,10 @@ protected:
         _isApplicable = param.isApplicable;
     }
 
-    void TearDown() override
-    {
-        if(_handle.miopenHandle != nullptr)
-        {
-            EXPECT_EQ(miopenDestroy(_handle.miopenHandle), miopenStatusSuccess);
-        }
-    }
-
     MiopenConvFwdBiasActivPlanBuilder _planBuilder;
-    HipdnnEnginePluginHandle _handle;
+    std::unique_ptr<HipdnnMiopenHandle> _handle;
 
-    hipdnn_frontend::graph::Graph _graphObj;
+    Graph _graphObj;
     bool _isApplicable;
 };
 
@@ -262,7 +266,7 @@ test_conv_common::ConvTestCase validConvTestCase5d()
 
 test_activation_common::ActivTestCase validActivTestCase()
 {
-    return {hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD,
+    return {hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD,
             0.0,
             std::nullopt,
             std::nullopt,
@@ -513,7 +517,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               validConvTestCase4d(),
               TensorLayout::NCHW,
               test_activation_common::ActivTestCase{
-                  hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD, std::nullopt, 0.0},
+                  hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD, std::nullopt, 0.0},
               hipdnn_frontend::DataType::FLOAT,
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
@@ -523,7 +527,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               validConvTestCase4d(),
               TensorLayout::NCHW,
               test_activation_common::ActivTestCase{
-                  hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD, 0.0, 1.0},
+                  hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD, 0.0, 1.0},
               hipdnn_frontend::DataType::FLOAT,
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
@@ -533,7 +537,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               validConvTestCase4d(),
               TensorLayout::NCHW,
               test_activation_common::ActivTestCase{
-                  hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD,
+                  hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD,
                   std::nullopt,
                   std::nullopt,
                   1.0},
@@ -546,7 +550,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               validConvTestCase4d(),
               TensorLayout::NCHW,
               test_activation_common::ActivTestCase{
-                  hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD, std::nullopt, 0.0},
+                  hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD, std::nullopt, 0.0},
               hipdnn_frontend::DataType::FLOAT,
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
@@ -556,7 +560,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               validConvTestCase4d(),
               TensorLayout::NCHW,
               test_activation_common::ActivTestCase{
-                  hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD, 0.0, 1.0},
+                  hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD, 0.0, 1.0},
               hipdnn_frontend::DataType::FLOAT,
               {},
               {TypeKey::Y_CONV, TypeKey::Y_BIAS},
@@ -566,7 +570,7 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
               validConvTestCase4d(),
               TensorLayout::NCHW,
               test_activation_common::ActivTestCase{
-                  hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD,
+                  hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD,
                   std::nullopt,
                   std::nullopt,
                   1.0},
@@ -582,17 +586,29 @@ std::vector<ConvolutionBiasActivationTestParam> testParams()
 
 TEST_P(TestGpuMiopenConvFwdBiasActivPlanBuilder, IsApplicableGetWorkspaceSizeAndBuildPlan)
 {
-    auto graphBuffer = _graphObj.buildFlatbufferOperationGraph();
+    auto [graphBuffer, serErr] = _graphObj.to_binary();
+    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
     auto graph = GraphWrapper(graphBuffer.data(), graphBuffer.size());
+    MockEngineConfig mockEngineConfig;
 
-    EXPECT_EQ(_planBuilder.isApplicable(_handle, graph), _isApplicable);
+    // Per ROCm/rocm-libraries#6979: when this case expects an applicable engine
+    // but the device's MIOpen has no CBA solver, skip rather than fail.
+    // Negative cases (`_isApplicable == false`) intentionally proceed: their
+    // rejection assertion passes either way.
+    if(_isApplicable)
+    {
+        SKIP_IF_NO_APPLICABLE_CBA_ENGINE(*_handle, _planBuilder, graph);
+    }
+
+    EXPECT_EQ(_planBuilder.isApplicable(*_handle, graph), _isApplicable);
 
     if(_isApplicable)
     {
-        EXPECT_NO_THROW(_planBuilder.getWorkspaceSize(_handle, graph));
+        HipdnnMiopenSettings settings;
+        EXPECT_NO_THROW(_planBuilder.getMaxWorkspaceSize(*_handle, graph, settings));
 
-        HipdnnEnginePluginExecutionContext ctx;
-        ASSERT_NO_THROW(_planBuilder.buildPlan(_handle, graph, ctx));
+        HipdnnMiopenContext ctx;
+        ASSERT_NO_THROW(_planBuilder.buildPlan(*_handle, graph, mockEngineConfig, ctx));
         EXPECT_TRUE(ctx.hasValidPlan());
     }
 }
@@ -605,37 +621,42 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, IsApplicableReturnsFalseForUnsuppo
 {
     {
         auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
-        hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+        hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                         builder.GetSize());
 
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, graph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, graph);
         EXPECT_FALSE(applicable);
     }
     {
         auto builder = hipdnn_test_sdk::utilities::createValidBatchnormBwdGraph();
-        hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+        hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                         builder.GetSize());
 
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, graph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, graph);
         EXPECT_FALSE(applicable);
     }
     {
         auto builder = hipdnn_test_sdk::utilities::createValidConvFwdGraph();
-        hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+        hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                         builder.GetSize());
 
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, graph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, graph);
         EXPECT_FALSE(applicable);
     }
     {
         auto builder = hipdnn_test_sdk::utilities::createValidConvBwdGraph();
-        hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+        hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                         builder.GetSize());
 
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, graph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, graph);
         EXPECT_FALSE(applicable);
     }
     {
         auto builder = hipdnn_test_sdk::utilities::createValidConvWrwGraph();
-        hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+        hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                         builder.GetSize());
 
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, graph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, graph);
         EXPECT_FALSE(applicable);
     }
 }
@@ -645,13 +666,13 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, IsApplicableReturnsFalseForWrongNo
     {
         MockGraph mockGraph;
         EXPECT_CALL(mockGraph, nodeCount()).WillRepeatedly(::testing::Return(1));
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, mockGraph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, mockGraph);
         EXPECT_FALSE(applicable);
     }
     {
         MockGraph mockGraph;
         EXPECT_CALL(mockGraph, nodeCount()).WillRepeatedly(::testing::Return(4));
-        bool applicable = _planBuilder.isApplicable(_dummyHandle, mockGraph);
+        bool applicable = _planBuilder.isApplicable(*_dummyHandle, mockGraph);
         EXPECT_FALSE(applicable);
     }
 }
@@ -662,14 +683,16 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, GetWorkspaceSizeThrowsForWrongNode
         MockGraph mockGraph;
         EXPECT_CALL(mockGraph, nodeCount()).WillRepeatedly(::testing::Return(1));
 
-        EXPECT_THROW(_planBuilder.getWorkspaceSize(_dummyHandle, mockGraph),
+        HipdnnMiopenSettings settings;
+        EXPECT_THROW(_planBuilder.getMaxWorkspaceSize(*_dummyHandle, mockGraph, settings),
                      hipdnn_plugin_sdk::HipdnnPluginException);
     }
     {
         MockGraph mockGraph;
         EXPECT_CALL(mockGraph, nodeCount()).WillRepeatedly(::testing::Return(4));
 
-        EXPECT_THROW(_planBuilder.getWorkspaceSize(_dummyHandle, mockGraph),
+        HipdnnMiopenSettings settings;
+        EXPECT_THROW(_planBuilder.getMaxWorkspaceSize(*_dummyHandle, mockGraph, settings),
                      hipdnn_plugin_sdk::HipdnnPluginException);
     }
 }
@@ -677,29 +700,33 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, GetWorkspaceSizeThrowsForWrongNode
 TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, GetWorkspaceSizeThrowsForUnsupportedGraph)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                     builder.GetSize());
 
-    EXPECT_THROW(_planBuilder.getWorkspaceSize(_dummyHandle, graph),
+    HipdnnMiopenSettings settings;
+    EXPECT_THROW(_planBuilder.getMaxWorkspaceSize(*_dummyHandle, graph, settings),
                  hipdnn_plugin_sdk::HipdnnPluginException);
 }
 
 TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, BuildPlanThrowsForWrongNodeCountGraph)
 {
+    MockEngineConfig mockConfig;
+
     {
         MockGraph mockGraph;
         EXPECT_CALL(mockGraph, nodeCount()).WillRepeatedly(::testing::Return(1));
-        HipdnnEnginePluginExecutionContext ctx;
+        HipdnnMiopenContext ctx;
 
-        EXPECT_THROW(_planBuilder.buildPlan(_dummyHandle, mockGraph, ctx),
+        EXPECT_THROW(_planBuilder.buildPlan(*_dummyHandle, mockGraph, mockConfig, ctx),
                      hipdnn_plugin_sdk::HipdnnPluginException);
         EXPECT_FALSE(ctx.hasValidPlan());
     }
     {
         MockGraph mockGraph;
         EXPECT_CALL(mockGraph, nodeCount()).WillRepeatedly(::testing::Return(4));
-        HipdnnEnginePluginExecutionContext ctx;
+        HipdnnMiopenContext ctx;
 
-        EXPECT_THROW(_planBuilder.buildPlan(_dummyHandle, mockGraph, ctx),
+        EXPECT_THROW(_planBuilder.buildPlan(*_dummyHandle, mockGraph, mockConfig, ctx),
                      hipdnn_plugin_sdk::HipdnnPluginException);
         EXPECT_FALSE(ctx.hasValidPlan());
     }
@@ -708,10 +735,12 @@ TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, BuildPlanThrowsForWrongNodeCountGr
 TEST_F(TestMiopenConvFwdBiasActivPlanBuilder, BuildPlanThrowsForUnsupportedGraph)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
-    HipdnnEnginePluginExecutionContext ctx;
+    hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                                     builder.GetSize());
+    HipdnnMiopenContext ctx;
+    MockEngineConfig mockConfig;
 
-    EXPECT_THROW(_planBuilder.buildPlan(_dummyHandle, graph, ctx),
+    EXPECT_THROW(_planBuilder.buildPlan(*_dummyHandle, graph, mockConfig, ctx),
                  hipdnn_plugin_sdk::HipdnnPluginException);
     EXPECT_FALSE(ctx.hasValidPlan());
 }

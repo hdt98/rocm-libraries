@@ -80,25 +80,50 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
         const long_index_t e_batch_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx));
 
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
+        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
 
-        DispatchSplitKHack<GridwiseGemm,
-                           AGridDesc_AK0_M_K1,
-                           BGridDesc_BK0_N_K1,
-                           CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
-                           HasMainKBlockLoop,
-                           CGlobalMemoryDataOperation,
-                           TailNum>(karg.p_a_grid + a_batch_offset + split_k_offset_a,
-                                    karg.p_b_grid + b_batch_offset + split_k_offset_b,
-                                    karg.p_c_grid + e_batch_offset,
-                                    p_shared,
-                                    karg,
-                                    a_grid_desc_ak0_m_ak1,
-                                    b_grid_desc_bk0_n_bk1,
-                                    c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                    k_idx * num_k_per_block,
-                                    gridDim.y,
-                                    split_k_offset_hack);
+        if constexpr(GridwiseGemm::DirectLoadEnabled)
+        {
+#if defined(__gfx950__)
+            DispatchSplitKHack<GridwiseGemm,
+                               AGridDesc_AK0_M_K1,
+                               BGridDesc_BK0_N_K1,
+                               CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
+                               HasMainKBlockLoop,
+                               CGlobalMemoryDataOperation,
+                               TailNum>(karg.p_a_grid + a_batch_offset + split_k_offset_a,
+                                        karg.p_b_grid + b_batch_offset + split_k_offset_b,
+                                        karg.p_c_grid + e_batch_offset,
+                                        p_shared,
+                                        karg,
+                                        a_grid_desc_ak0_m_ak1,
+                                        b_grid_desc_bk0_n_bk1,
+                                        c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                        k_idx * num_k_per_block,
+                                        gridDim.y,
+                                        split_k_offset_hack);
+#endif
+        }
+        else
+        {
+            DispatchSplitKHack<GridwiseGemm,
+                               AGridDesc_AK0_M_K1,
+                               BGridDesc_BK0_N_K1,
+                               CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
+                               HasMainKBlockLoop,
+                               CGlobalMemoryDataOperation,
+                               TailNum>(karg.p_a_grid + a_batch_offset + split_k_offset_a,
+                                        karg.p_b_grid + b_batch_offset + split_k_offset_b,
+                                        karg.p_c_grid + e_batch_offset,
+                                        p_shared,
+                                        karg,
+                                        a_grid_desc_ak0_m_ak1,
+                                        b_grid_desc_bk0_n_bk1,
+                                        c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                        k_idx * num_k_per_block,
+                                        gridDim.y,
+                                        split_k_offset_hack);
+        }
     }
 #else
     ignore = karg;
@@ -236,7 +261,9 @@ template <ck::index_t NDimSpatial,
           BlockGemmPipelineScheduler BlkGemmPipeSched = BlockGemmPipelineScheduler::Intrawave,
           BlockGemmPipelineVersion BlkGemmPipelineVer = BlockGemmPipelineVersion::v1,
           typename ComputeTypeA                       = InDataType,
-          typename ComputeTypeB                       = ComputeTypeA>
+          typename ComputeTypeB                       = ComputeTypeA,
+          bool DirectLoad                             = false,
+          index_t NumGroupsToMerge                    = 1>
 struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
     : public DeviceGroupedConvBwdWeight<NDimSpatial,
                                         InLayout,
@@ -255,14 +282,30 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
     static_assert(is_same_v<WeiElementwiseOperation, element_wise::PassThrough>);
     static_assert(is_same_v<OutElementwiseOperation, element_wise::PassThrough>);
 
-    using DeviceOp = DeviceGroupedConvBwdWeight_Xdl_CShuffleV3;
-    GET_NXDL_PER_WAVE_IMPL
-    static constexpr auto NXdlPerWave64 = GetNXdlPerWave<true>();
-    static constexpr auto NXdlPerWave32 = GetNXdlPerWave<false>();
-
-    using ADataType = OutDataType;
-    using BDataType = InDataType;
-    using CDataType = WeiDataType;
+    using DeviceOp                         = DeviceGroupedConvBwdWeight_Xdl_CShuffleV3;
+    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               true>();
+    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MXdlPerWave,
+                                                               CShuffleMXdlPerWavePerShuffle,
+                                                               CShuffleNXdlPerWavePerShuffle,
+                                                               false>();
+    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
+    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
+    using ADataType                        = OutDataType;
+    using BDataType                        = InDataType;
+    using CDataType                        = WeiDataType;
 
     using AElementwiseOperation = OutElementwiseOperation;
     using BElementwiseOperation = InElementwiseOperation;
@@ -287,7 +330,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
                                        NPerBlock,
                                        K1Number,
                                        K0PerBlock / K1Number,
-                                       1 /*NumGroupsToMerge*/,
+                                       NumGroupsToMerge,
                                        ConvBackwardWeightSpecialization>{};
 
     template <ck::index_t NDim, typename ck::enable_if<NDim == 1, bool>::type = false>
@@ -371,10 +414,31 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
     using BGridDesc_K0_N_K1 = remove_cvref_t<decltype(ABCGridDescs{}[I1])>;
     using CGridDesc_M_N     = remove_cvref_t<decltype(ABCGridDescs{}[I2])>;
 
-    template <index_t NXdlPerWave_>
+    // Disable vector load = 4. It is not supported for Direct Load. Align to 2 in such case.
+    static constexpr index_t ABlockTransferSrcScalarPerVectorAligned =
+        ABlockTransferSrcScalarPerVector * sizeof(ADataType) == 8
+            ? 4 / sizeof(ADataType)
+            : ABlockTransferSrcScalarPerVector;
+    static constexpr index_t BBlockTransferSrcScalarPerVectorAligned =
+        BBlockTransferSrcScalarPerVector * sizeof(BDataType) == 8
+            ? 4 / sizeof(BDataType)
+            : BBlockTransferSrcScalarPerVector;
+
+    static constexpr bool ALdsScalarLoadToVgpr =
+        (DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 ? true : false);
+    static constexpr bool BLdsScalarLoadToVgpr =
+        (DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 ? true : false);
+
+    // Note: Direct load use layout to create proper block and mmtile descriptor
+    // TODO: Fix and verify RC layout for not direct load (currently it returns wrong results)
+    template <typename WarpTileConfig>
     using GridwiseGemmBase = GridwiseGemm_xdl_cshuffle_conv_v3<
-        tensor_layout::gemm::RowMajor,
-        tensor_layout::gemm::ColumnMajor,
+        std::conditional_t<DirectLoad,
+                           tensor_layout::gemm::ColumnMajor,
+                           tensor_layout::gemm::RowMajor>,
+        std::conditional_t<DirectLoad,
+                           tensor_layout::gemm::RowMajor,
+                           tensor_layout::gemm::ColumnMajor>,
         tensor_layout::gemm::RowMajor,
         ADataType,
         BDataType,
@@ -391,15 +455,15 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         K0PerBlock,
         K1,
         K1,
-        MPerXDL,
-        NPerXDL,
-        MXdlPerWave,
-        NXdlPerWave_,
+        WarpTileConfig::At(0),
+        WarpTileConfig::At(1),
+        WarpTileConfig::At(2),
+        WarpTileConfig::At(3),
         ABlockTransferThreadClusterLengths_K0_M_K1,
         ABlockTransferThreadClusterArrangeOrder,
         ABlockTransferSrcAccessOrder,
         ABlockTransferSrcVectorDim,
-        ABlockTransferSrcScalarPerVector,
+        DirectLoad ? ABlockTransferSrcScalarPerVectorAligned : ABlockTransferSrcScalarPerVector,
         ABlockTransferDstScalarPerVector_K1,
         false,
         ABlockLdsAddExtraM,
@@ -407,20 +471,23 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         BBlockTransferThreadClusterArrangeOrder,
         BBlockTransferSrcAccessOrder,
         BBlockTransferSrcVectorDim,
-        BBlockTransferSrcScalarPerVector,
+        DirectLoad ? BBlockTransferSrcScalarPerVectorAligned : BBlockTransferSrcScalarPerVector,
         BBlockTransferDstScalarPerVector_K1,
         false,
         BBlockLdsAddExtraN,
-        CShuffleMXdlPerWavePerShuffle,
-        CShuffleNXdlPerWavePerShuffle,
+        WarpTileConfig::At(4),
+        WarpTileConfig::At(5),
         CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CBlockTransferScalarPerVector_NWaveNPerXdl,
         BlkGemmPipeSched,
         BlkGemmPipelineVer,
         ComputeTypeA,
-        ComputeTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
+        ComputeTypeB,
+        DirectLoad,
+        ALdsScalarLoadToVgpr,
+        BLdsScalarLoadToVgpr>;
+    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
+    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     // Argument
     using CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock =
@@ -556,7 +623,6 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
                       end(a_g_n_k_wos_lengths),
                       begin(output_spatial_lengths_));
 
-#if !DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
             if(split_k < 0)
             {
                 ck::index_t gemmM, gemmN, gemmK;
@@ -570,8 +636,11 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
 
                 // Ensure that k_batch_ does not exceed the maximum value
                 // for the GEMM pipeline.
-                const auto k_batch_max = static_cast<index_t>((gemmK - 1) / K0PerBlock);
+                const auto k_batch_max = math::integer_divide_ceil(gemmK, K0PerBlock);
                 k_batch_               = std::max(std::min(k_batch_, k_batch_max), 1);
+
+                // Cap k_batch_ to 128 to avoid accuracy issues
+                k_batch_ = std::min(k_batch_, 128);
 
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
@@ -582,10 +651,10 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
                 }
             }
             else
-#endif
             {
                 k_batch_ = split_k;
             }
+            k_batch_ = clamp_gemm_k_batch(k_batch_);
 
             // Create descriptors first (with hack flags temporarily set to false)
             // so we can check if element space sizes match product of dimensions
@@ -653,15 +722,16 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             if(split_k_offset_hack_)
                 split_k_stride_b_ /= k_batch_;
 
-            // A/B/C Batch Stride
-            compute_ptr_offset_of_batch_.BatchStrideA_ = a_g_n_k_wos_strides[0];
-            compute_ptr_offset_of_batch_.BatchStrideB_ = b_g_n_c_wis_strides[0];
+            // A/B/C Batch Stride (multiply by NumGroupsToMerge for group merging)
+            compute_ptr_offset_of_batch_.BatchStrideA_ = a_g_n_k_wos_strides[0] * NumGroupsToMerge;
+            compute_ptr_offset_of_batch_.BatchStrideB_ = b_g_n_c_wis_strides[0] * NumGroupsToMerge;
             compute_ptr_offset_of_batch_.BatchStrideC_ =
                 Conv_K_ * Conv_C_ *
                 std::accumulate(begin(filter_spatial_lengths_),
                                 end(filter_spatial_lengths_),
                                 index_t{1},
-                                std::multiplies<>{});
+                                std::multiplies<>{}) *
+                NumGroupsToMerge;
             const index_t GemmM = a_grid_desc_k0_m_k1_.GetLength(I1);
             const index_t GemmN = b_grid_desc_k0_n_k1_.GetLength(I1);
 
@@ -743,7 +813,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
 
             index_t gdx, gdy, gdz;
             std::tie(gdx, gdy, gdz) = GridwiseGemm::CalculateGridSize(
-                gemm_arg.M, gemm_arg.N, gemm_arg.KBatch, arg.Conv_G_);
+                gemm_arg.M, gemm_arg.N, gemm_arg.KBatch, arg.Conv_G_ / NumGroupsToMerge);
 
             float ave_time = 0;
 
@@ -765,29 +835,14 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             const auto Run = [&](const auto& kernel) {
                 if(stream_config.flush_cache)
                 {
-                    typename GridwiseGemm::Argument gemm_arg_ = gemm_arg;
-                    ck::utility::RotatingMemWrapper<typename GridwiseGemm::Argument> rotating_mem(
-                        gemm_arg_,
-                        stream_config.rotating_count,
-                        gemm_arg_.M * gemm_arg_.K * sizeof(ADataType),
-                        gemm_arg_.K * gemm_arg_.N * sizeof(BDataType));
-                    rotating_mem.Print();
-
-                    auto run_flush_cache = [&]() {
-                        // flush icache
-                        ck::utility::flush_icache();
-                        // rotating mem
-                        rotating_mem.Next();
-                        clear_workspace();
-                    };
-                    ave_time += ck::utility::launch_and_time_kernel_with_preprocess<false>(
+                    ave_time += launch_and_time_kernel_with_preprocess_flush_cache(
                         stream_config,
-                        run_flush_cache,
+                        clear_workspace,
                         kernel,
                         dim3(gdx, gdy, gdz),
                         dim3(BlockSize),
                         0,
-                        gemm_arg_,
+                        gemm_arg,
                         arg.a_grid_desc_k0_m_k1_,
                         arg.b_grid_desc_k0_n_k1_,
                         arg.c_grid_desc_mblock_mperblock_nblock_nperblock_,
@@ -1360,12 +1415,29 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-#if DISABLE_SPLIT_K_AUTODEDUCE_FOR_ONE_STAGE_KERNELS
-        if(arg.k_batch_ < 0)
+        // check device
+        if constexpr(DirectLoad)
         {
-            return false;
+            if(get_device_name() != "gfx950")
+            {
+                return false;
+            }
         }
-#endif
+
+        // Check that NumGroupsToMerge divides Conv_G evenly
+        if constexpr(NumGroupsToMerge > 1)
+        {
+            if(arg.Conv_G_ % NumGroupsToMerge != 0)
+            {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Unsupported! Conv_G_ % NumGroupsToMerge != 0: Conv_G_="
+                              << arg.Conv_G_ << ", NumGroupsToMerge=" << NumGroupsToMerge
+                              << std::endl;
+                }
+                return false;
+            }
+        }
 
         const index_t GemmM = arg.a_grid_desc_k0_m_k1_.GetLength(I1);
         const index_t GemmN = arg.b_grid_desc_k0_n_k1_.GetLength(I1);
@@ -1432,7 +1504,20 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             }
         }
 
-        if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
+        if(!ck::is_xdl_wmma_supported<ComputeTypeA,
+                                      ComputeTypeB,
+                                      MPerXDL,
+                                      NPerXDL,
+                                      WarpTileConfig32.At(0),
+                                      WarpTileConfig32.At(1)>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<ComputeTypeA, K0PerBlock, K1>())
+        {
+            return false;
+        }
+        if(!is_xdl_wmma_k_supported<ComputeTypeB, K0PerBlock, K1>())
         {
             return false;
         }
@@ -1617,8 +1702,17 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         auto str = std::stringstream();
 
         // clang-format off
-        str << "DeviceGroupedConvBwdWeight_Xdl_CShuffleV3"
-            << "<"
+        str << "DeviceGroupedConvBwdWeight_Xdl_CShuffleV3";
+
+        if constexpr(DirectLoad) {
+            str << "_DirectLoad";
+        }
+        
+        if constexpr(NumGroupsToMerge > 1) {
+            str << "_MergedGroups";
+        }
+
+        str << "<"
             << BlockSize << ", "
             << MPerBlock << ", "
             << NPerBlock << ", "
@@ -1633,8 +1727,10 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             << BBlockTransferDstScalarPerVector_K1 << ", "
             << CShuffleMXdlPerWavePerShuffle << ", "
             << CShuffleNXdlPerWavePerShuffle << ", "
-            << CBlockTransferScalarPerVector_NWaveNPerXdl
-            << ">";
+            << CBlockTransferScalarPerVector_NWaveNPerXdl;
+            if constexpr(NumGroupsToMerge > 1) 
+                str << ", " << NumGroupsToMerge;
+            str << ">";
         // clang-format on
 
         return str.str();

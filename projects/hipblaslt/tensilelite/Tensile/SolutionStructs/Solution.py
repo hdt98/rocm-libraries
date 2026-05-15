@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@
 
 import collections
 import math
+import sys
 
 from enum import Enum
 from typing import List, Dict, Literal
@@ -39,12 +40,183 @@ from Tensile.Common import assignParameterWithDefault, IsaInfo, \
 from Tensile.Common.DataType import DataType
 from Tensile.Common.GlobalParameters import defaultSolution, \
                                             defaultInternalSupportParams
+from Tensile.Common.ValidParameters import validParameters
 from Tensile.SolutionStructs.Naming import getSolutionNameFull
 from Tensile.SolutionStructs.Problem import ProblemType
 from Tensile.Toolchain.Component import Assembler
 from Tensile.Components.CustomSchedule import hasCustomSchedule
 
+from ..Component import TensorDataMover
+from ..Components.TensorDataMover import TensorDataMoverLoad
 from .Utilities import reject, roundupRatio, pvar
+
+def _getExpectedTypes(validParams):
+  """Build a map from parameter name to the set of allowed Python types.
+
+  Uses the validParameters registry as the source of truth.  For each
+  parameter whose allowed-value list is not the sentinel ``-1``, we
+  collect the concrete ``type()`` of every allowed value.  Because
+  Python ``bool`` is a subclass of ``int``, we use ``type()`` (not
+  ``isinstance``) so that ``bool`` and ``int`` are kept distinct.
+
+  Returns:
+      dict[str, set[type]]: e.g. {"UseCustomMainLoopSchedule": {int},
+                                   "BufferLoad": {bool}, ...}
+  """
+  typeMap = {}
+  for name, allowedValues in validParams.items():
+    if allowedValues == -1:
+      continue
+    if isinstance(allowedValues, list) and len(allowedValues) > 0:
+      typeMap[name] = set(type(v) for v in allowedValues)
+  return typeMap
+
+# Pre-compute once at import time so the per-Solution cost is a dict lookup.
+_expectedParamTypes = _getExpectedTypes(validParameters)
+
+# Parameters to skip during type validation because YAML serialization
+# inherently produces a different type (e.g. [9, 0, 10] -> list) and the
+# conversion to the canonical type happens downstream in the pipeline.
+_skipTypeCheck = {"ISA"}
+
+
+# Module-level collector that accumulates type mismatches across all Solution
+# instances during a build.  Key is (param_name, actual_type_name,
+# expected_type_str); value is a dict with 'count', 'values' (set of unique
+# repr(value)), and 'files' (set of source file paths).
+_typeMismatchCollector = {}
+
+
+def resetTypeMismatchCollector():
+  """Clear the module-level type mismatch collector.
+
+  Call this before a new build pass or in test setUp to ensure a clean
+  slate.  Safe to call even when the collector is already empty.
+
+  Uses dict.clear() so that any existing references to
+  ``_typeMismatchCollector`` (e.g. in tests) see the same empty dict.
+  """
+  _typeMismatchCollector.clear()
+
+
+def getTypeMismatchCollector():
+  """Return a copy of the current collector state.
+
+  Used by worker processes to return their collected mismatch data to the
+  main process after parallel YAML parsing.
+  """
+  return {k: {"count": v["count"], "values": set(v["values"]), "files": set(v["files"])}
+          for k, v in _typeMismatchCollector.items()}
+
+
+def mergeTypeMismatchCollector(data):
+  """Merge mismatch data returned from a worker process into the main collector.
+
+  Args:
+      data: A dict in the same format as ``_typeMismatchCollector``, as
+            returned by ``getTypeMismatchCollector()`` in a worker process.
+  """
+  for key, entry in data.items():
+    if key not in _typeMismatchCollector:
+      _typeMismatchCollector[key] = {"count": 0, "values": set(), "files": set()}
+    _typeMismatchCollector[key]["count"] += entry["count"]
+    _typeMismatchCollector[key]["values"] |= entry["values"]
+    _typeMismatchCollector[key]["files"] |= entry["files"]
+
+
+def validateParameterTypes(state, srcFile=""):
+  """Validate that every solution parameter has the correct Python type.
+
+  Compares each value in *state* against the types implied by
+  ``validParameters``.  A ``bool`` where ``int`` is expected (or vice
+  versa) is the most common error -- YAML ``false``/``true`` vs ``0``/``1``
+  are different Python types and produce different msgpack wire types,
+  which causes ``std::bad_cast`` at C++ deserialization time.
+
+  Instead of raising on the first mismatch, mismatches are collected into
+  the module-level ``_typeMismatchCollector`` dict.  Call
+  ``printTypeMismatchSummary()`` at the end of the build to emit a
+  consolidated warning.
+
+  Args:
+      state: The solution state dict (parameter name -> value).
+      srcFile: The YAML source file path, included in warning messages.
+  """
+  for key, value in state.items():
+    if key not in _expectedParamTypes or key in _skipTypeCheck:
+      continue
+    expectedTypes = _expectedParamTypes[key]
+    actualType = type(value)
+    # Use type() not isinstance() so that bool and int are distinguished
+    if actualType not in expectedTypes:
+      expectedStr = " or ".join(sorted(t.__name__ for t in expectedTypes))
+      collectorKey = (key, actualType.__name__, expectedStr)
+      if collectorKey not in _typeMismatchCollector:
+        _typeMismatchCollector[collectorKey] = {
+          "count": 0,
+          "values": set(),
+          "files": set(),
+        }
+      entry = _typeMismatchCollector[collectorKey]
+      entry["count"] += 1
+      entry["values"].add(repr(value))
+      if srcFile:
+        entry["files"].add(srcFile)
+
+
+def printTypeMismatchSummary(numFiles=0):
+  """Print a summary of all collected type mismatches.
+
+  If no mismatches have been collected, prints a confirmation message
+  showing how many files were checked cleanly, and returns 0.  Otherwise
+  it emits a WARNING block with one line per unique (parameter,
+  actual_type) combination showing the count, observed values, and
+  expected type.
+
+  Args:
+      numFiles: Total number of YAML logic files that were checked.
+
+  Returns:
+      int: The total number of individual mismatches (0 if clean).
+  """
+  if not _typeMismatchCollector:
+    if numFiles > 0:
+      print(f"Checked {numFiles} YAML logic files - no type mismatches found.", flush=True)
+    return 0
+
+  totalCount = sum(e["count"] for e in _typeMismatchCollector.values())
+  allFiles = set()
+  for e in _typeMismatchCollector.values():
+    allFiles |= e["files"]
+
+  lines = []
+  lines.append("")
+  lines.append("===========================================================")
+  lines.append(
+    f"WARNING: YAML parameter type mismatches detected "
+    f"({totalCount} total across {len(allFiles)} files):"
+  )
+  lines.append("===========================================================")
+
+  # Sort by parameter name for stable output
+  for (paramName, actualType, expectedStr), entry in sorted(
+    _typeMismatchCollector.items(), key=lambda kv: kv[0][0]
+  ):
+    valuesStr = ", ".join(sorted(entry["values"]))
+    lines.append(
+      f"  {paramName}: found {actualType} in {entry['count']} solutions "
+      f"(values: {valuesStr}) - expected {expectedStr}"
+    )
+
+  lines.append("-----------------------------------------------------------")
+  lines.append("  This will cause std::bad_cast at runtime because msgpack")
+  lines.append("  serializes bool and int as different wire types.")
+  lines.append("  Fix these to prevent future build failures.")
+  lines.append("===========================================================")
+
+  print("\n".join(lines), flush=True)
+  return totalCount
+
 
 class Fbs(Enum):
   Free=0     # Expect to be free dimension
@@ -149,6 +321,8 @@ def isExtractableIndex(ks, index, tc='x'):
 # Solution
 ################################################################################
 class Solution(collections.abc.Mapping):
+  MAX_NUM_DS_LOAD_VGPRS: int = 4
+  MAX_NUM_DS_LOAD_BYTES: int = 4 * MAX_NUM_DS_LOAD_VGPRS
 
   ########################################   # need to be sure PSRR is passing to all fxns
   def __init__(
@@ -187,6 +361,11 @@ class Solution(collections.abc.Mapping):
     # Assign solution state from config, filling missing from the defaultSolution
     for key in defaultSolution:
       assignParameterWithDefault(self._state, key, config, defaultSolution)
+
+    # Validate parameter types against the validParameters registry.
+    # Catches bool-vs-int mismatches (YAML false vs 0) that would cause
+    # std::bad_cast at C++ msgpack deserialization time.
+    validateParameterTypes(self._state, srcFile=srcName)
 
     if 'ISA' not in self._state:
       if 'ISA' in config:
@@ -263,7 +442,7 @@ class Solution(collections.abc.Mapping):
         outputVectorWidth, RegsPerOut = 4, 1
     elif isaInfoMap[isa].asmCaps['HasWMMA_V1']:
         outputVectorWidth, RegsPerOut = 1, 1
-    elif isaInfoMap[isa].asmCaps['HasWMMA_V2']:
+    elif isaInfoMap[isa].asmCaps['HasWMMA_V2'] or isaInfoMap[isa].asmCaps['HasWMMA_V3']:
         outputVectorWidth, RegsPerOut = 8, 1
     else:
       print("WARNING: unexpect code flow")
@@ -281,6 +460,25 @@ class Solution(collections.abc.Mapping):
     state["AssignedProblemIndependentDerivedParameters"] = False
     if "Valid" not in state:
       state["Valid"] = True
+
+    # SIA=4 means "use StinkyTofu with full optimization". Remap to SIA=0 so all
+    # existing scheduling logic is unaffected, and record the opt level separately.
+    if state["ScheduleIterAlg"] == 4:
+      import rocisa
+      if not rocisa.hasStinkyTofuBackend():
+        reject(state, printRejectionReason,
+               "ScheduleIterAlg=4 requires the StinkyTofu backend, but rocisa was built without it")
+        return
+      if not rocisa.isSupportedByStinkyTofu(state["ISA"]):
+        supported = rocisa.getRegisteredArchKeys()
+        reject(state, printRejectionReason,
+               f"ScheduleIterAlg=4 is not supported for {state['ISA']}: no StinkyTofu backend for this architecture. "
+               f"Supported: {supported}")
+        return
+      state["ScheduleIterAlg"] = 0
+      state["_StinkyTofuOptLevel"] = 3
+    else:
+      state["_StinkyTofuOptLevel"] = 0
 
     if (not state["ProblemType"]["StridedBatched"]) and (not state["ProblemType"]['Batched']):
       reject(state, printRejectionReason, "General Batched GEMM only support Batched Problem")
@@ -341,6 +539,9 @@ class Solution(collections.abc.Mapping):
       state["LocalSplitU"] = 1 if state["WaveSplitK"] else state["WorkGroup"][2]
       state["NumWaveSplitK"]  = state["WorkGroup"][2] if state["WaveSplitK"] else 1
 
+      state["MIWaveGroup"] = [state["SubGroup0"] // state["WavefrontSize"],  state["SubGroup1"]]
+
+
     if "SubGroup0" in state and "SubGroup1" in state and "LocalSplitU" in state and "NumWaveSplitK" in state:
       state["NumThreads"] = state["SubGroup0"] * state["SubGroup1"] * state["LocalSplitU"] * state["NumWaveSplitK"]
       if (state["NumThreads"] % state['WavefrontSize']) != 0:
@@ -368,13 +569,36 @@ class Solution(collections.abc.Mapping):
       reject(state, "WaveSplitK currently only support dot2 kernel.")
       return
 
+    # workaround for MX
+    # set ASEM=minASEMforMX for not TLUA or not TLUB
+    # so far, kernel code can support 16, but host code cannot hanlde it
+    # TODO: enable 16 (or less)
+    # TODO: enable less than 256 for Subtile
+    minASEMforMX = 32 if not state["UseSubtileImpl"] else 256
+    if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) and \
+       ((not state["ProblemType"]["TLUA"]) or (not state["ProblemType"]["TLUB"])):
+      if state["AssertSummationElementMultiple"] % minASEMforMX != 0:
+        state["AssertSummationElementMultiple"] = minASEMforMX
+
     # tail loop optimization
     state["tailLoopOptA"] = True
     state["tailLoopOptB"] = True
+    if state["ProblemType"]["MXBlockA"]:
+      state["tailLoopOptMXSA"] = True
+    if state["ProblemType"]["MXBlockB"]:
+      state["tailLoopOptMXSB"] = True
 
     # Use nonDTL loads in DTL tail loop
     state["NonDTLTailLoopA"] = False
     state["NonDTLTailLoopB"] = False
+    if state["ProblemType"]["MXBlockA"]:
+      state["NonDTLTailLoopMXSA"] = False
+    if state["ProblemType"]["MXBlockB"]:
+      state["NonDTLTailLoopMXSB"] = False
+
+    # Initialize DTLA, DTLB for tailLoopOpt/NonDTLTailLoop and initial calcLdsBlockSizePerPad() call
+    state["DirectToLdsA"] = state["DirectToLds"] == 1 or state["DirectToLds"] == 2
+    state["DirectToLdsB"] = state["DirectToLds"] == 1 or state["DirectToLds"] == 3
 
     bpeA = state["ProblemType"]["DataTypeA"].numBytes()
     bpeB = state["ProblemType"]["DataTypeB"].numBytes()
@@ -384,21 +608,50 @@ class Solution(collections.abc.Mapping):
     # a partial 32b read is required to read the last few elements of a row/col of A/B
     # i.e. ASEM * BPE % 4 != 0. In this case dword/dwordx4 DTL load will
     # zero out the entire partial 32b read and cause accuracy issues.
-    # For TLU = 0 we check AF{0,1}EM instead of ASEM.
-    if (aemA * bpeA) % 4 != 0 or not state["BufferLoad"]:
-      state["NonDTLTailLoopA"] = True
-    if (aemB * bpeB) % 4 != 0 or not state["BufferLoad"]:
-      state["NonDTLTailLoopB"] = True
+    # TLU case, we check AF{0,1}EM instead of ASEM.
+    # TLU + ShiftPtr case, we can use wider global read for TailLoop. Enable Tailloop opt for DTL
+    # (ShiftPtr is default and not set to state["EdgeType"] yet here)
+    # MX case, force enable NonDTLTailLoopA/B
+    if ((aemA * bpeA) % 4 != 0 or not state["BufferLoad"]) or state["ProblemType"]["MXBlockA"]:
+      if (not state["ProblemType"]["TLUA"]) and state["DirectToLdsA"] and not state["DirectToVgprA"]:
+        state["NonDTLTailLoopA"] = True
+        state["tailLoopOptA"] = False
+        if state["ProblemType"]["MXBlockA"]:
+          state["NonDTLTailLoopMXSA"] = True
+          state["tailLoopOptMXSA"] = False
+    if ((aemB * bpeB) % 4 != 0 or not state["BufferLoad"]) or state["ProblemType"]["MXBlockB"]:
+      if (not state["ProblemType"]["TLUB"]) and state["DirectToLdsB"] and not state["DirectToVgprB"]:
+        state["NonDTLTailLoopB"] = True
+        state["tailLoopOptB"] = False
+        if state["ProblemType"]["MXBlockB"]:
+          state["NonDTLTailLoopMXSB"] = True
+          state["tailLoopOptMXSB"] = False
 
     if (state["ISA"] != (9, 4, 2) and state["ISA"] != (9, 5, 0)) or \
        (state["ProblemType"]["Sparse"]) or \
        (state["UseDotInstruction"]):
       state["tailLoopOptA"] = False
       state["tailLoopOptB"] = False
-    if (state["DirectToVgprA"]):
+      if state["ProblemType"]["MXBlockA"]:
+        state["tailLoopOptMXSA"] = False
+      if state["ProblemType"]["MXBlockB"]:
+        state["tailLoopOptMXSB"] = False
+    if (not state["ProblemType"]["TLUA"]) and (state["DirectToVgprA"]):
       state["tailLoopOptA"] = False
-    if (state["DirectToVgprB"]):
+    if (not state["ProblemType"]["TLUB"]) and (state["DirectToVgprB"]):
       state["tailLoopOptB"] = False
+    if state["ProblemType"]["MXBlockA"] and state["DirectToVgprMXSA"]:
+      state["tailLoopOptMXSA"] = False
+    if state["ProblemType"]["MXBlockB"] and state["DirectToVgprMXSB"]:
+      state["tailLoopOptMXSB"] = False
+
+    # so far, disable tailLoopOpt in MX case
+    # TODO: enable tailLoopOpt for MX
+    if state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
+      state["tailLoopOptA"] = False
+      state["tailLoopOptB"] = False
+      state["tailLoopOptMXSA"] = False
+      state["tailLoopOptMXSB"] = False
 
     # reorder globalread instructions if dtv and TN cases. (along coalesced dim)
     if state["ScheduleIterAlg"] == 3:
@@ -412,9 +665,99 @@ class Solution(collections.abc.Mapping):
       state["reorderGRInstForDTVA"] = False
       state["reorderGRInstForDTVB"] = False
 
-    state["UsePLRPack"] = False
-    state["SwapGlobalReadOrder"] = False
+    # F32XEmulation related initialization
+    state["UseDot2F32XEmulation"] = False
+    state["UseMFMAF32XEmulation"] = False
+    state["UseDirect32XEmulation"] = False # directly local read into temporary vgpr
+    #ignore the F32 xDL MathOp by default.
+    #enable F32 xDL MathOp only when the input type is f32.
+    if state["UseF32XEmulation"]:
+      state["UseF32XEmulation"] = True
+      state["UseDirect32XEmulation"] = True
+      state["UseDirect32XEmulationInterleaveTreg"] = False # True: enable conventional T reg allocation
+      # select conversion logic for X3
+      # (1) UseMFMAF32XEmulation = True
+      # (2) UseDot2F32XEmulation = True (set (1) to False)
+      # (3) cvt + sub  (set both (1) and (2) False)
+      isa = state["ISA"]
+      if isaInfoMap[isa].asmCaps.get("HasMFMA", False):
+        state["UseMFMAF32XEmulation"] = True # MFMA version for gfx950 etc.
+
     state["MfmaInitCVgprs"] = False
+    # Only enable UseSubtileImpl on gfx950; ignore user request on other ISAs.
+    isgfx950 = state["ISA"] == IsaVersion(9,5,0)
+    state["UseSubtileImpl"] = state["UseSubtileImpl"] and isgfx950
+
+    if isgfx950 and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) and not state["UseSubtileImpl"]:
+        reject(state, printRejectionReason, "gfx950 MX requires UseSubtileImpl")
+
+    if state["UseSubtileImpl"]:
+      state["VectorWidthA"] = 1
+      state["VectorWidthB"] = 1
+      state["SourceSwap"] = False
+      # Force BufferStore=1: UseSubtileImpl optimized storeD path is only implemented
+      # for buffer stores for now.
+      state["BufferStore"] = 1
+      # Not currently implemented in subtile implementation
+      state["Use64bShadowLimit"] = False
+      state["Use64bShadowLimitMX"] = False
+
+      # DepthU should be multiple of 2 * MIK. DepthU=-1 case, set DepthU=2*MIK*LSU
+      duUnit = 2 * state["MatrixInstK"] * state["LocalSplitU"]
+      if state["DepthU"] == -1:
+        state["DepthU"] = duUnit
+      if state["DepthU"] % duUnit != 0:
+        reject(state, printRejectionReason, "UseSubtileImpl=1 support only DepthU multiple of 2 * MatrixInstK * LocalSplitU")
+
+      for tc in ('A', 'B'):
+        dtype = state["ProblemType"][f"DataType{tc}"]
+        tlu = state["ProblemType"].get(f"TLU{tc}", False)
+        if tlu:
+          if dtype.isBFloat16() or dtype.isHalf():
+            state[f"_ABTilePair{tc}"] = "AB_B16_TLU1"
+          else:
+            reject(state, printRejectionReason, f"No TLU=1 subtile geometry for dtype {dtype}")
+            return
+        elif dtype.isBFloat16() or dtype.isHalf():
+          state[f"_ABTilePair{tc}"] = "AB_B16"
+        elif dtype.is8bitFloat():
+          state[f"_ABTilePair{tc}"] = "AB_B8"
+        elif dtype.is6bitFloat() or dtype.isFloat4():
+          state[f"_ABTilePair{tc}"] = "AB_B4"
+        else:
+          reject(state, printRejectionReason, f"No subtile geometry for dtype {dtype}")
+          return
+
+      bytesLoaded = state["NumThreads"] * 16
+      if state["ProblemType"]["MXBlockA"]:
+        numBytesMXSA = (state["DepthU"] // state["ProblemType"]["MXBlockA"]) * state["MacroTile0"]
+        if bytesLoaded < numBytesMXSA:
+          reject(state, printRejectionReason, "Unable to load MXSA scales using one load per wave")
+      if state["ProblemType"]["MXBlockB"]:
+        numBytesMXSB = (state["DepthU"] // state["ProblemType"]["MXBlockB"]) * state["MacroTile1"]
+        if bytesLoaded < numBytesMXSB:
+          reject(state, printRejectionReason, "Unable to load MXSB scales using one load per wave")
+
+      for tc in ("MXSA", "MXSB"):
+        if state["ProblemType"]["MXBlock" + tc[-1]]:
+          for field in ("LSC", "LSP", "NumLoadsCoalesced", "NumLoadsPerpendicular", "NumTotalPackedLoads"):
+            state["%s%s" % (field, tc)] = 0
+
+      if state["PrefetchGlobalRead"] not in [0, 2]:
+        reject(state, printRejectionReason,
+               "UseSubtileImpl=1 requires PrefetchGlobalRead 0 or 2, got %d" % state["PrefetchGlobalRead"])
+      if not (state["MatrixInstM"] == 16 and state["MatrixInstN"] == 16):
+        reject(state, printRejectionReason, "UseSubtileImpl=1 requires MatrixInst 16x16")
+      if state["ScheduleIterAlg"] == 1 or state["ScheduleIterAlg"] == 2:
+        reject(state, printRejectionReason, "UseSubtileImpl=1 does not support ScheduleIterAlg")
+      if state["StreamK"] == 0:
+        reject(state, printRejectionReason, "UseSubtileImpl=1 supports StreamK only (no support for GSU)")
+
+    # TODO: Support other LdsBlockSizePerPadMXSA/B for gfx1250.
+    if state["ISA"] == (12, 5, 0):
+      if ((state["LdsBlockSizePerPadMXSA"] > 0) or (state["LdsBlockSizePerPadMXSB"] > 0 )):
+        reject(state, "LdsBlockSizePerPadMXSA/LdsBlockSizePerPadMXSB support -1 and 0 for gfx1250")
+        return
 
     # done
     state["AssignedProblemIndependentDerivedParameters"] = True
@@ -430,7 +773,8 @@ class Solution(collections.abc.Mapping):
   @staticmethod
   def setGlobalReadVectorWidth(state, tc, totalVectors, grvw, printRejectionReason: bool):
     validDepthU = True
-    if grvw not in [1,2,4,8,16,32]:
+    # Skip GRVW range check for subtile impl: scale uses serial*loadWidth DTL addressing, not standard GRVW chunks
+    if grvw not in [1,2,4,8,16,32] and not state["UseSubtileImpl"]:
       validDepthU = False
     if totalVectors % state["NumThreads"] != 0:
       reject(None, printRejectionReason, "totalVectors%s %u %% NumThreads %u != 0" \
@@ -609,13 +953,17 @@ class Solution(collections.abc.Mapping):
   # determine can we use DirectToVgpr
   @staticmethod
   def isDirectToVgprDoable(state, tc, printRejectionReason: bool, isaInfoMap: Dict[str, IsaInfo]):
-    numBytes = state["ProblemType"]["DataType"].numBytes()
+    numBytes = state["ProblemType"]["MacDataType%s"%tc].numBytes()
     numBytesGR = state["ProblemType"]["DataType%s"%tc].numBytes()
     isSwizzle = state["ProblemType"]["SwizzleTensor%s"%tc]
 
     # With MatrixInstruction only
     if not state["EnableMatrixInstruction"] :
       reject(state, printRejectionReason, "DirectToVgpr is for MatrixInstruction only")
+      return False
+
+    if state["LocalReadVectorWidth%s" % tc] < state["MIInputPerThread"]:
+      reject(state, "LocalReadVectorWidth < MIInputPerThread %d" % state["MIInputPerThread"])
       return False
 
     # disable the following combinations for initial implementation
@@ -627,7 +975,7 @@ class Solution(collections.abc.Mapping):
     if state["DirectToVgprA"] and state["DirectToVgprB"]:
       # change the following parameter values
       state["PrefetchGlobalRead"] = 1
-      state["ExpandPointerSwap"] = 0
+      state["ExpandPointerSwap"] = False
       state["1LDSBuffer"] = 0
       state["PrefetchLocalRead"] = 0
       # So far, DTVA + DTVB does not perform well (waitcnt is not ideal).
@@ -638,7 +986,7 @@ class Solution(collections.abc.Mapping):
         return False
 
     # DTV + input type conversion
-    if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["DataType"]:
+    if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["MacDataType%s"%tc]:
       if not state["ConvertAfterDS"]:
         reject(state, printRejectionReason, "DirectToVgpr%s + input conversion + ConvertAfterDS=False not supported"%(tc))
         return False
@@ -654,8 +1002,8 @@ class Solution(collections.abc.Mapping):
       return False
 
     # Does not work with TLU = False and CGEMM/DGEMM/DGEMM (not supported)
-    if (not state["ProblemType"]["TLU%c"%tc]) and (state["ProblemType"]["DataType"].isDouble() or \
-        state["ProblemType"]["DataType"].isComplex()):
+    if (not state["ProblemType"]["TLU%c"%tc]) and (state["ProblemType"]["MacDataType%s"%tc].isDouble() or \
+        state["ProblemType"]["MacDataType%s"%tc].isComplex()):
       reject(state, printRejectionReason, "DirectToVgpr%c does not supports TLU%c = False + S/C/D/ZGEMM"%(tc, tc))
       return False
 
@@ -714,8 +1062,8 @@ class Solution(collections.abc.Mapping):
 
     # TLU=False or enableGLTr case, need GlobalReadVectorWidth == LocalReadVectorWidth
     if ((not state["ProblemType"]["TLU%c"%tc]) or state["enableGLTr%c"%tc]) and \
-       state["GlobalReadVectorWidth%c"%tc] != state["LocalReadVectorWidth"]:
-      reject(state, printRejectionReason, "DirectToVgpr%c does not supports TLU=False GlobalReadVectorWidth%c(%u) != LocalReadVectorWidth(%u)"%(tc, tc, state["GlobalReadVectorWidth%c"%tc], state["LocalReadVectorWidth"]))
+       state["GlobalReadVectorWidth%c"%tc] != state["LocalReadVectorWidth%s"%tc]:
+      reject(state, printRejectionReason, "DirectToVgpr%c does not supports TLU=False GlobalReadVectorWidth%c(%u) != LocalReadVectorWidth(%u)"%(tc, tc, state["GlobalReadVectorWidth%c"%tc], state["LocalReadVectorWidth%s"%tc]))
       return False
 
     # Does not work with SIA<3
@@ -738,10 +1086,10 @@ class Solution(collections.abc.Mapping):
       reject(state, printRejectionReason, "DirectToVgpr%c does not supports UnrollLoopSwapGlobalReadOrder"%(tc))
       return False
 
-    # does not work with PGR2 + EPS
-    if state["PrefetchGlobalRead"] == 2 and state["ExpandPointerSwap"]:
+    # does not work with PGR>=2 + EPS
+    if state["PrefetchGlobalRead"] >= 2 and state["ExpandPointerSwap"]:
       # force EPS=0 and continue
-      state["ExpandPointerSwap"] = 0
+      state["ExpandPointerSwap"] = False
 
     # does not work with Sparse
     if state["ProblemType"]["Sparse"]:
@@ -777,8 +1125,10 @@ class Solution(collections.abc.Mapping):
   # determine can we use DirectToLds
   @staticmethod
   def isDirectToLdsDoable(state, tc, isaInfoMap, printRejectionReason: bool):
-    numBytes = state["ProblemType"]["DataType"].numBytes()
     isa = state["ISA"]
+
+    if state["UseSubtileImpl"]:
+      return True
 
     # x4 support for directToLds
     canDTLx4 = isaInfoMap[isa].asmCaps["HasDirectToLdsx4"]
@@ -792,15 +1142,11 @@ class Solution(collections.abc.Mapping):
     #TN
     # use for all precisions with TransposeLDS=1
 
-    numBytesAB = state["ProblemType"]["DataType%s"%tc].numBytes()
+    if tc in ["MXSA", "MXSB"]:
+      numBytesAB = 1
+    else:
+      numBytesAB = state["ProblemType"]["DataType%s"%tc].numBytes()
     numBytesPerLoad = state["GlobalReadVectorWidth%s"%tc] * numBytesAB
-
-    MT = state["MacroTile0"] if tc == 'A' else state["MacroTile1"]
-
-    if (MT & (MT-1)) != 0 and not state["UseGeneralizedNLCOne%s"%tc]: # Check of MT not power of 2
-      # so far, numBytesAB<=4 case, TLU=False only (continue with False)
-      if (numBytesAB <= 4) and state["ProblemType"]["TLU%c"%tc]:
-        return False
 
     # x2 DTL is not supported
     if numBytesPerLoad == 8:
@@ -815,6 +1161,17 @@ class Solution(collections.abc.Mapping):
       reject(state, printRejectionReason, "DirectToLds not supported for loads less than 32bits")
       return False
 
+    if tc in ["MXSA", "MXSB"]:
+      # MXSA/B case, check numBytesPerLoad only
+      return True
+
+    MT = state["MacroTile0"] if tc == 'A' else state["MacroTile1"]
+
+    if (MT & (MT-1)) != 0 and not state["UseGeneralizedNLCOne%s"%tc]: # Check of MT not power of 2
+      # so far, numBytesAB<=4 case, TLU=False only (continue with False)
+      if (numBytesAB <= 4) and state["ProblemType"]["TLU%c"%tc]:
+        return False
+
     # so far MFMA only (TODO: enable non MFMA case)
     if not state["EnableMatrixInstruction"]:
       reject(state, printRejectionReason, "DirectToLds is for MatrixInstruction only for now (tentative)")
@@ -823,8 +1180,8 @@ class Solution(collections.abc.Mapping):
     # ToDo: Review def of lrvw and this check
     # DTL + LocalReadVectorWidth > MIInputPerThread does not work
     # Need support for TailLoop
-    if not state["ProblemType"]["Sparse"] and not(state["ProblemType"]["DataType"].is8bitFloat() and (state["MatrixInstK"] == 64 or state["MatrixInstK"] == 128)):
-      if state["LocalReadVectorWidth"] > state["MIInputPerThread"]:
+    if not state["ProblemType"]["Sparse"] and not(state["ProblemType"]["MacDataType%s"%tc].is8bitFloat() and (state["MatrixInstK"] == 64 or state["MatrixInstK"] == 128)):
+      if state["LocalReadVectorWidth%s"%tc] > state["MIInputPerThread"]:
         reject(state, printRejectionReason, "DirectToLds does not work with LocalReadVectorWidth > MIInputPerThread")
         return False
 
@@ -846,8 +1203,8 @@ class Solution(collections.abc.Mapping):
       if state["LSC%c"%tc] * state["LSP%c"%tc] * numBytesAB != state["WavefrontSize"] * state["GlobalReadVectorWidth%c"%tc] * numBytesAB:
         reject(state, printRejectionReason, "can't use DirectToLds for LSC%c and LSP%c * bpe!= WavefrontSize * GlobalReadVectorWidth%c * bpe%c > 4"%(tc, tc, tc, tc))
         return False
-      if state["WaveSeparateGlobalRead%c" % tc] == 2 and state["TransposeLDS"] != 2:
-        reject(state, printRejectionReason, "can't use DirectToLds for WSGR%s = 2 and TLDS != 2"%(tc))
+      if state["WaveSeparateGlobalRead%c" % tc] == 2:
+        reject(state, printRejectionReason, "can't use DirectToLds for WSGR%s = 2"%(tc))
         return False
     elif not state["UseGeneralizedNLCOne%s"%tc]:
       if state["LSC%c"%tc] * state["LSP%c"%tc] * numBytesAB != state["NumThreads"] * state["GlobalReadVectorWidth%c"%tc] * numBytesAB:
@@ -855,18 +1212,18 @@ class Solution(collections.abc.Mapping):
         return False
 
     # so far, DirectToLds does not work with LRVW=2
-    if state["LocalReadVectorWidth"] == 2:
+    if state["LocalReadVectorWidth%s"%tc] == 2:
       reject(state, printRejectionReason, "can't use DirectToLds for LocalReadVectorWidth == 2")
       return False
 
     # Does not work with (NumLoadsCoalesced>1 and UseInstOffsetForGRO) + DGEMM
-    if state["ProblemType"]["DataType"].isDouble() and \
+    if state["ProblemType"]["MacDataType%s"%tc].isDouble() and \
       (state["NumLoadsCoalesced%c"%tc] > 1 and state["UseInstOffsetForGRO"]):
       reject(state, printRejectionReason, "DirectToLds%c does not supports NumLoadsCoalesced%c > 1 and UseInstOffsetForGRO for dgemm"%(tc, tc))
       return False
 
     # Does not work with NumLoadsCoalesced>1 + ZGEMM
-    if state["ProblemType"]["DataType"].isDoubleComplex() and state["NumLoadsCoalesced%c"%tc] > 1:
+    if state["ProblemType"]["MacDataType%s"%tc].isDoubleComplex() and state["NumLoadsCoalesced%c"%tc] > 1:
       reject(state, printRejectionReason, "DirectToLds%c does not supports NumLoadsCoalesced%c > 1 for zgemm"%(tc, tc))
       return False
 
@@ -874,19 +1231,19 @@ class Solution(collections.abc.Mapping):
     # bpe > bpr case, Lower and upper 4 bytes elements are stored separately.
     # if TLU=False and DepthU//NumLoadsCoalesced is smaller than lower block size (8 elements),
     # current offset swap logic does not work
-    if (not state["ProblemType"]["TLU%c"%tc]) and state["ProblemType"]["DataType"].numRegisters() > 1 and \
+    if (not state["ProblemType"]["TLU%c"%tc]) and state["ProblemType"]["MacDataType%s"%tc].numRegisters() > 1 and \
        state["_DepthU%s"%tc] // state["NumLoadsCoalesced%c"%tc] < 8:
       reject(state, printRejectionReason, "DirectToLds%c does not work with TLU=False and bpe > bpr and DepthU//NumLoadsCoalesced%c < 8"%(tc, tc))
       return False
 
     # TODO: Currently DTL with input types of different size is not support. There are functional issues
     # This needs to be fixed.
-    if state["ProblemType"]["DataType%s"%tc].numBytes() != state["ProblemType"]["DataType"].numBytes():
+    if state["ProblemType"]["DataType%s"%tc].numBytes() != state["ProblemType"]["MacDataType%s"%tc].numBytes():
       reject(state, printRejectionReason, "DirectToLds%s with conversion to different sized data types is not supported"%tc)
       return False
 
     # DTL + input type conversion
-    if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["DataType"]:
+    if state["ProblemType"]["DataType%s"%tc] != state["ProblemType"]["MacDataType%s"%tc]:
       if not state["ConvertAfterDS"]:
         reject(state, printRejectionReason, "DirectToLds%s + input conversion + ConvertAfterDS=False not supported"%(tc))
         return False
@@ -921,6 +1278,9 @@ class Solution(collections.abc.Mapping):
   ):
     isa = tuple(state["ISA"])
 
+    if state["WavefrontSize"] == -1:
+      state["WavefrontSize"] = 32 if isaInfoMap[isa].archCaps["HasWave32"] else 64
+
     if state["MaxLDS"] == -1:
       state["MaxLDS"] = isaInfoMap[isa].archCaps["DeviceLDS"]
 
@@ -929,8 +1289,6 @@ class Solution(collections.abc.Mapping):
     # the keys "EnableF32XdlMathOp" and "F32XdlMathOp".
     state["EnableF32XdlMathOp"] = False
     state["UseF32XEmulation"] = False # enable emulation for missing hardware support
-    state["UseDot2F32XEmulation"] = False
-    state["UseDirect32XEmulation"] = False # directly local read into temporary vgpr
     #ignore the F32 xDL MathOp by default.
     #enable F32 xDL MathOp only when the input type is f32.
     if "F32XdlMathOp" in state["ProblemType"] \
@@ -939,19 +1297,13 @@ class Solution(collections.abc.Mapping):
       state["EnableF32XdlMathOp"] = True
       if isaInfoMap[isa].archCaps["HasF32XEmulation"]:
         state["UseF32XEmulation"] = True
-        state["UseDirect32XEmulation"] = True
+
 
     # initial info to be exported for solution prediction
     state["CUOccupancy"]            = -1
     state["MathClocksUnrolledLoop"] = 0
 
     Solution.assignProblemIndependentDerivedParameters(state, printRejectionReason, isaInfoMap)
-
-    if state["UseDirect32XEmulation"] == True:
-      #   Turn off Direct32X for the following kernels:
-      #   Cijk_Ailk_Bjlk_S_MX_B_Bias_HA_S_SAV_UserArgs_MT16x16x512_MI16x16x1
-      if (state["MacroTile0"] == 16 and state["MacroTile1"] == 16 and state["DepthU"] == 512):
-        state["UseDirect32XEmulation"] = False
 
     if "AssignedDerivedParameters" in state:
       if state["AssignedDerivedParameters"]:
@@ -964,9 +1316,13 @@ class Solution(collections.abc.Mapping):
         #del state[s]
 
     # Force update _GlobalAccumulation
-    computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
+    computeBytes = int(state["ProblemType"]["ComputeDataType"].numBytes())
     state["_GlobalAccumulation"] = None
     computeName  = state["ProblemType"]["ComputeDataType"].toName()
+    if state["UseDotInstruction"] and state["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
+      # dot2 kernel does not support MBSK
+      state["GlobalSplitUAlgorithm"] = 'MultipleBuffer'
+      state["MbskPrefetchMethod"] = 0
     if state["StreamK"] > 0 and state["StreamKAtomic"] == 0:
       # StreamK Workspace size
       state["_GlobalAccumulation"] = 'PartialsBuffer'
@@ -991,9 +1347,11 @@ class Solution(collections.abc.Mapping):
       return
 
     if state["StreamK"] != 0:
+      #state["AssertSummationElementMultiple"] = 1 # Cannot keep ASEM with Stream-K
       state["GlobalSplitU"] = 0 # Cannot enable both Stream-K and GSU
       state["InternalSupportParams"]["SupportUserGSU"] = False # Disable UserGSU for Stream-K
       state["GlobalSplitUAlgorithm"] = "MultipleBuffer" # Set default Algorithm
+      state["AdaptiveGemmGSUA"] = 0 # Disable AdaptiveGemmGSUA for Stream-K
       if not state["EnableMatrixInstruction"]:
         reject(state, printRejectionReason, "Stream-K requires MatrixInstruction")
       # if state["PersistentKernel"]:
@@ -1025,7 +1383,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKFixupTreeReduction"] = 0
       state["DebugStreamK"] = 0
 
-    computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
+    computeBytes = int(state["ProblemType"]["ComputeDataType"].numBytes())
     state["_WorkspaceSizePerElemC"] = computeBytes
     state["_WorkspaceSizePerElemBias"] = 0
     if state["ProblemType"]["UseBias"] and state["ProblemType"]["Gradient"]:
@@ -1059,14 +1417,13 @@ class Solution(collections.abc.Mapping):
       if not (isaInfoMap[isa].asmCaps["HasMFMA"] or isaInfoMap[isa].asmCaps["HasWMMA"]):
         reject(state, printRejectionReason, f"isa {isa} doesn't support matrix instruction")
         return
-      if not (state["ProblemType"]["DataType"].isSingle() \
-              or state["ProblemType"]["DataType"].isDouble() \
-              or state["ProblemType"]["DataType"].isBFloat16() \
-              or state["ProblemType"]["DataType"].isHalf() \
-              or state["ProblemType"]["DataType"].isComplex() \
-              or state["ProblemType"]["DataType"].is8bitFloat() \
-              or state["ProblemType"]["DataType"].isInt8()):
-        reject(state, printRejectionReason, "didn't support Matrix Instruction with type %s" % str(state["ProblemType"]["DataType"]))
+      key = state["ProblemType"]["MacDataTypeA"].toChar() + state["ProblemType"]["MacDataTypeB"].toChar()
+      if key not in ("SS", "XX", "DD", "BB", "HH", "CC", "ZZ", "I8I8", \
+                     "F8F8", "F8B8", "B8B8", "B8F8", \
+                     "F8NF8N", "F8NB8N", "B8NB8N", "B8NF8N", \
+                     "F8F6", "F6F8", "F8F4", "F4F8","B8F6", "F6B8", "B8F4", "F4B8", "F8B6", "B6F8","B8B6", "B6B8",\
+                     "F6F6", "B6B6", "F6B6", "B6F6","B6F4", "F4B6", "F6F4", "F4F6", "F4F4"):
+        reject(state, printRejectionReason, "didn't support Matrix Instruction with type %s" % key)
         return
       if (not isaInfoMap[isa].asmCaps["HasMFMA"] and isaInfoMap[isa].asmCaps["HasWMMA"] and (state["WavefrontSize"] == 64)):
          print2("!! Warning: WMMA only well tune on WGP mode, wave size = 32")
@@ -1081,19 +1438,29 @@ class Solution(collections.abc.Mapping):
       if not state["MIWaveTile"] or len(state["MIWaveTile"]) != 2:
         reject(state, printRejectionReason, "invalid MIWaveTile")
         return
+      if state["UseSubtileImpl"] and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+        if state["MIWaveTile"][0] % 2 != 0 or state["MIWaveTile"][1] % 2 != 0:
+          reject(state, printRejectionReason,
+                 "UseSubtileImpl=1 with MX datatype requires even MIWaveTile, got [%d, %d]"
+                 % (state["MIWaveTile"][0], state["MIWaveTile"][1]))
+          return
       if isaInfoMap[isa].asmCaps["HasMFMA"]:
         if not state["ProblemType"]["HighPrecisionAccumulate"] \
            and state["ProblemType"]["DataType"].numRegisters() < 1 \
-           and state["ProblemType"]["DataTypeA"].numRegisters() <= state["ProblemType"]["DataType"].numRegisters() \
-           and state["ProblemType"]["DataTypeB"].numRegisters() <= state["ProblemType"]["DataType"].numRegisters():
+           and state["ProblemType"]["DataTypeA"].numRegisters() <= state["ProblemType"]["MacDataTypeA"].numRegisters() \
+           and state["ProblemType"]["DataTypeB"].numRegisters() <= state["ProblemType"]["MacDataTypeB"].numRegisters():
           reject(state, printRejectionReason, "Matrix instructions for half, bf16 (or i8) types are natively accumulated" + \
            " in fp32 (or i32) precision. Please add the following config:" + \
            "\n - HighPrecisionAccumulate: True")
           return
+      #FIXME: remove this section?
       if isaInfoMap[isa].asmCaps["HasWMMA"]:
-        if state["ProblemType"]["DataType"].numRegisters() >=1:
-          reject(state, printRejectionReason, "WMMA only support half, bf16 and i8 type")
+        if state["ProblemType"]["DataType"].numRegisters() > 2:
+          reject(state, printRejectionReason, "WMMA only support f32, half, bf16 and i8 type")
           return
+      if state["ProblemType"]["DataType"].isDouble() and not (isaInfoMap[isa].asmCaps["HasMFMA_f64"] or isaInfoMap[isa].asmCaps["HasWMMA_V3_f64"]):
+        reject(state, printRejectionReason, f"isa {isa} doesn't support matrix instruction with type f64")
+        return
       if state["InterleaveAlpha"]:
         reject(state, printRejectionReason, "Matrix instruction doesn't support InterleaveAlpha")
         return
@@ -1111,8 +1478,8 @@ class Solution(collections.abc.Mapping):
         if not isaInfoMap[isa].archCaps["HasF32XEmulation"]:
           reject(state, printRejectionReason, "Missing emulation for F32X")
           return
-        if state["ScheduleIterAlg"] != 3:
-          reject(state, printRejectionReason, "F32X Emulation only supported with Schedule Iter Alg == 3")
+        if state["ScheduleIterAlg"] not in (1, 3):
+          reject(state, printRejectionReason, "F32X Emulation only supported with Schedule Iter Alg == (1 or 3)")
           return
         if tuple(state["MatrixInstruction"])[:3] in ((16, 16, 8), (16, 16, 16), (32, 32, 4)):
           reject(state, printRejectionReason, "tf32 emulation currently only supports mfma MI 16x16x32 and 32x32x16")
@@ -1199,13 +1566,13 @@ class Solution(collections.abc.Mapping):
       state["NonTemporalMetadata"] = state["NonTemporal"]
 
     # Init vars early since there are early-exit return statements below
-    # Initialize DTLA, DTLB for initial calcLdsBlockSizePerPad() call
-    state["DirectToLdsA"] = state["DirectToLds"] == 1 or state["DirectToLds"] == 2
-    state["DirectToLdsB"] = state["DirectToLds"] == 1 or state["DirectToLds"] == 3
     # tentative init for UseGeneralizedNLCOneA/B
-    # set True for DTL 
+    # set True for DTL
     state["UseGeneralizedNLCOneA"] = state["DirectToLdsA"]
     state["UseGeneralizedNLCOneB"] = state["DirectToLdsB"]
+
+    state["UseGeneralizedNLCOneMXSA"] = False
+    state["UseGeneralizedNLCOneMXSB"] = False
 
     state["LocalWriteUseSgprA"] = False
     state["LocalWriteUseSgprB"] = False
@@ -1223,12 +1590,6 @@ class Solution(collections.abc.Mapping):
       if state["WorkGroupMappingXCC"] == -1:
         if state["StreamK"] == 0:
           reject(state, printRejectionReason, "Can only use auto WGM with StreamK.")
-          return False
-        if state["NonTemporalA"] >= 4:
-          reject(state, printRejectionReason, "Cannot use auto WGM with NTA.")
-          return False
-        if state["NonTemporalB"] >= 4:
-          reject(state, printRejectionReason, "Cannot use auto WGM with NTB.")
           return False
 
     problemType = state["ProblemType"]
@@ -1282,14 +1643,18 @@ class Solution(collections.abc.Mapping):
     packedC0 = len(state["PackedC0IdxChars"])>1
     packedC1 = len(state["PackedC1IdxChars"])>1
 
+    # MX scale layout + transport are validated by the MXLoadInst /
+    # MXScaleFormat derivation below (search for "MX scale layout & transport
+    # derivation").
+
     bufferLoad = state["BufferLoad"] and state["KernelLanguage"] == "Assembly"
     if not bufferLoad:
-      state["DirectToLds"] = False
+      state["DirectToLds"] = 0
       state["DirectToLdsA"] = False
       state["DirectToLdsB"] = False
       state["_UseSgprForGRO"] = False
-      if state["PrefetchGlobalRead"] == 2:
-        reject(state, printRejectionReason, "BufferLoad=0 does not support PrefetchGlobalRead=2")
+      if state["PrefetchGlobalRead"] >= 2:
+        reject(state, printRejectionReason, "BufferLoad=0 does not support PrefetchGlobalRead>=2")
         return
 
       if problemType["UseBias"]:
@@ -1299,9 +1664,9 @@ class Solution(collections.abc.Mapping):
     #These modes only work under certain conditions, apply them here:
     #  - The "NoLoad" loop is only generated if PrefetchGlobalRead>0
     #  - And Suppress does not work if GSU>1 for some reason
-    if state["SuppressNoLoadLoop"] == 1:
+    if state["SuppressNoLoadLoop"]:
       if not (bufferLoad and state["PrefetchGlobalRead"] == 1 and (state["GlobalSplitU"]==1 or state["GlobalSplitU"]==-1)):
-        state["SuppressNoLoadLoop"] = 0
+        state["SuppressNoLoadLoop"] = False
 
     #print("PackedC0IdxChars", state["PackedC0IdxChars"])
     #print("PackedC1IdxChars", state["PackedC1IdxChars"])
@@ -1343,9 +1708,161 @@ class Solution(collections.abc.Mapping):
         state["UnrollMajorLDSA"] = False
         state["UnrollMajorLDSB"] = False
 
+    def findSparseVectorWidth(steps, optVW):
+      if steps == 0:
+        return optVW
+      optVW_new = max(optVW // 2, 1)
+      if optVW_new == 1:
+        return optVW
+      else:
+        return findSparseVectorWidth(steps-1, optVW_new)
+
     if state["VectorWidthA"] == -1:
       if state["EnableMatrixInstruction"]:
-        regPerElem = state["ProblemType"]["DataType"].numRegisters()
+        regPerElem = state["ProblemType"]["MacDataTypeA"].numRegisters()
+        optVW = int(4 // regPerElem)
+        while 1:
+          if state["MIWaveTile"][0] % optVW == 0:
+            state["VectorWidthA"] = optVW
+            break
+          else:
+            optVW //= 2
+        if state["ProblemType"]["Sparse"]:
+          # sparse gfx1250: Currently disable autoVectorWidthA. VectorWidthA still can be set manually in yaml file.
+          # if isaInfoMap[isa].asmCaps["HasSWMMAC_gfx1250"] and state["ProblemType"]["Sparse"] == 1:
+          #   state["VectorWidthA"] = max(findSparseVectorWidth(2, state["VectorWidthA"]), 1)
+          # else:
+          state["VectorWidthA"] = 1
+      else:
+        state["VectorWidthA"] = 1
+
+    if state["VectorWidthB"] == -1:
+      if state["EnableMatrixInstruction"]:
+        regPerElem = state["ProblemType"]["MacDataTypeB"].numRegisters()
+        optVW = int(4 // regPerElem)
+        while 1:
+          if state["MIWaveTile"][1] % optVW == 0:
+            state["VectorWidthB"] = optVW
+            break
+          else:
+            optVW //= 2
+        if state["ProblemType"]["Sparse"]:
+          # sparse gfx1250: Currently disable autoVectorWidthB. VectorWidthB still can be set manually in yaml file.
+          # if isaInfoMap[isa].asmCaps["HasSWMMAC_gfx1250"] and state["ProblemType"]["Sparse"] == 2:
+          #   state["VectorWidthB"] = max(findSparseVectorWidth(2, state["VectorWidthB"]), 1)
+          # else:
+          state["VectorWidthB"] = 1
+      else:
+        state["VectorWidthB"] = 1
+
+    def isLDSTrEnabled(asmCaps: Dict, hasLDSTrans: bool, unrollMajorLDS: bool, dtv: bool, numBytes: int):
+      if unrollMajorLDS:
+        return False
+
+      if not hasLDSTrans:
+        return False
+
+      if numBytes == 0.5:
+        return asmCaps["HasLDSTrB64B4"]
+      elif numBytes == 0.75:
+        return asmCaps["HasLDSTrB96B6"]
+      elif numBytes == 1:
+        return asmCaps["HasLDSTrB64B8"]
+      elif numBytes == 2:
+        return asmCaps["HasLDSTrB64B16"] or asmCaps["HasLDSTrB128B16"]
+      return False
+
+    numBytesA = state["ProblemType"]["MacDataTypeA"].numBytes()
+    numBytesB = state["ProblemType"]["MacDataTypeB"].numBytes()
+    isa = tuple(state["ISA"])
+    # state["enableLDSTrA"] = state["LDSTrInst"] and isaInfoMap[isa].asmCaps["HasLDSTr"] and numBytes == 2 \
+    #         and not state["UnrollMajorLDSA"] and not state["DirectToVgprA"]
+    # state["enableLDSTrB"] = state["LDSTrInst"] and isaInfoMap[isa].asmCaps["HasLDSTr"] and numBytes == 2 \
+    #         and not state["UnrollMajorLDSB"] and not state["DirectToVgprB"]
+    # TODO- Is it possible for devices with asmCaps["HasLDSTr"], we automatically use it when UnrollMajorLDS=0
+    #       Supporting manually transpose load when having "HasLDSTr" is not worthy.
+    state["enableLDSTrA"] = isLDSTrEnabled(isaInfoMap[isa].asmCaps, state["LDSTrInst"], state["UnrollMajorLDSA"], state["DirectToVgprA"], numBytesA)
+    state["enableLDSTrMXSA"] = False
+    state["enableLDSTrB"] = isLDSTrEnabled(isaInfoMap[isa].asmCaps, state["LDSTrInst"], state["UnrollMajorLDSB"], state["DirectToVgprB"], numBytesB)
+    state["enableLDSTrMXSB"] = False
+
+    # This reject kernels in 950 logic yaml, temporarily comment it out.
+    # finalLDSTrInst = state["enableLDSTrA"] or state["enableLDSTrB"]
+    # if state["LDSTrInst"] != finalLDSTrInst:
+    #   # This means LDSTrInst=True, but none of A/B can be enabled (False)
+    #   reject(state, printRejectionReason, "LDSTrInst is True but none of A/B can be enabled")
+    #   return
+
+    state["enableGLTrA"] = state["DirectToVgprA"] and state["ProblemType"]["TLUA"] \
+      and ((numBytesA == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
+        or (numBytesA == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
+      )
+    state["enableGLTrB"] = state["DirectToVgprB"] and state["ProblemType"]["TLUB"] \
+      and ((numBytesB == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
+        or (numBytesB == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
+      )
+	  
+    if state["enableLDSTrA"] or state["enableGLTrA"]:
+      state["VectorWidthA"] = 1
+
+    if state["enableLDSTrB"] or state["enableGLTrB"]:
+      state["VectorWidthB"] = 1
+
+    if state["ScheduleIterAlg"] == 2:
+      state["ExpandPointerSwap"] = True
+      print2("\nSet SIA=2, force ExpandPointerSwap=1")
+
+    if state["ExpandPointerSwap"]:
+      # Pointer swap only used if PGR==1 or (PGR>1 and double/double complex) - so set ExpandPointerSwap=0 here
+      # So far, EPS=1 and PGR>1 works only with double/double complex.
+      #if not (bufferLoad and state["PrefetchGlobalRead"] == 1):
+      if not (bufferLoad and ( state["PrefetchGlobalRead"] == 1 \
+              or (state["PrefetchGlobalRead"] > 1 and \
+                  (state["ProblemType"]["DataType"].isDouble() or state["ProblemType"]["DataType"].isDoubleComplex()))
+              or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))):
+        state["ExpandPointerSwap"] = False
+
+    #################################################################
+    # ForceUnrollSubIter requirements
+    # - Needs PGR > 0, double buffer
+    # - MIWaveTile must be even and larger than 2
+    # - TLU{A,B} cases only supported if using LdsTR or if VPerm not needed (size{A,B} >= 4)
+    # - Not supported for mixed precision cases currently
+    # - For non-CMS F32X kernels, SubIter is disabled after CMS check because
+    #   the default scheduler's sub-tiling conflicts with F32X pack code.
+    TLUA = state["ProblemType"]["TLUA"]
+    TLUB = state["ProblemType"]["TLUB"]
+    def _canEnableSubIter():
+      sizeDataTypeA = state["ProblemType"]["DataTypeA"].numBytes()
+      sizeDataTypeB = state["ProblemType"]["DataTypeB"].numBytes()
+      sizeDataType = state["ProblemType"]["DataType"].numBytes()
+      return (
+        state["EnableMatrixInstruction"] and not state["ExpandPointerSwap"]
+        and state["DepthU"] == state["MatrixInstK"] and state["PrefetchGlobalRead"] and not state["1LDSBuffer"]
+        and (state["MIWaveTile"][0] > 2  and state["MIWaveTile"][1] > 2)
+        and (state["MIWaveTile"][0] % 2 == 0 and state["MIWaveTile"][1] % 2 == 0)
+        and (sizeDataTypeA == sizeDataType) and (sizeDataTypeB == sizeDataType)
+        and ((TLUA == False or state["enableLDSTrA"] or sizeDataTypeA >= 4) and (TLUB == False or state["enableLDSTrB"] or sizeDataTypeB >= 4) )
+        and (not state["ProblemType"]["Sparse"] or state["TransposeLDSMetadata"])
+        and not state["TDMInst"]
+      )
+
+    def _applySubIterSetting(enable):
+      if enable:
+        state["ForceUnrollSubIter"] = True
+        state["numSubTiles"] = 2
+      else:
+        state["ForceUnrollSubIter"] = False
+        state["numSubTiles"] = 1
+
+    _applySubIterSetting(_canEnableSubIter())
+    if state["ForceUnrollSubIter"]:
+      state["ClusterLocalRead"] = 1
+      state["TailloopInNll"] = False
+
+    if state["VectorWidthA"] == -1:
+      if state["EnableMatrixInstruction"]:
+        regPerElem = state["ProblemType"]["MacDataTypeA"].numRegisters()
         optVW = int(4 // regPerElem)
         while 1:
           if state["MIWaveTile"][0] % optVW == 0:
@@ -1357,10 +1874,23 @@ class Solution(collections.abc.Mapping):
           state["VectorWidthA"] = 1
       else:
         state["VectorWidthA"] = 1
+    # VW adjustment for F32XEmu + TLU + SubIter
+    # -> this logic does not work. Reject the kernel so far.
+    if state["UseF32XEmulation"]:
+      if TLUA and state["numSubTiles"] > 1 and state["MIWaveTile"][0] % (state["VectorWidthA"] * state["numSubTiles"]) != 0:
+        # reject(state, printRejectionReason, "F32XEmulation + SubTiles requires MIWaveTile[0](%u) is multiple of VectorWidthA(%u) * 2"%(state["MIWaveTile"][0], state["VectorWidthA"]))
+        # return
+        # Many existing kernels are rejected with this condition.
+        # So far, continue with VectorWidthA //=state["numSubTiles"]
+        while state["MIWaveTile"][0] % (state["VectorWidthA"] * state["numSubTiles"]) != 0:
+          state["VectorWidthA"] //= state["numSubTiles"]
+        if state["SourceSwap"] and state["StoreVectorWidth"] > state["VectorWidthA"]:
+          # need to adjust StoreVectorWidth in SourceSwap case
+          state["StoreVectorWidth"] = state["VectorWidthA"]
 
     if state["VectorWidthB"] == -1:
       if state["EnableMatrixInstruction"]:
-        regPerElem = state["ProblemType"]["DataType"].numRegisters()
+        regPerElem = state["ProblemType"]["MacDataTypeB"].numRegisters()
         optVW = int(4 // regPerElem)
         while 1:
           if state["MIWaveTile"][1] % optVW == 0:
@@ -1372,31 +1902,24 @@ class Solution(collections.abc.Mapping):
           state["VectorWidthB"] = 1
       else:
         state["VectorWidthB"] = 1
+    # VW adjustment for F32XEmu + TLU + SubIter
+    # -> this logic does not work. Reject the kernel so far.
+    if state["UseF32XEmulation"]:
+      if TLUB and state["numSubTiles"] > 1 and state["MIWaveTile"][1] % (state["VectorWidthB"] * state["numSubTiles"]) != 0:
+        # reject(state, printRejectionReason, "F32XEmulation + SubTiles requires MIWaveTile[1](%u) is multiple of VectorWidthB(%u) * 2"%(state["MIWaveTile"][1],state["VectorWidthB"]))
+        # return
+        # Many existing kernels are rejected with this condition.
+        # So far, continue with VectorWidthB //=state["numSubTiles"]
+        while state["MIWaveTile"][1] % (state["VectorWidthB"] * state["numSubTiles"]) != 0:
+          state["VectorWidthB"] //= state["numSubTiles"]
 
-    if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
-      state["VectorWidthMetadata"] = state["VectorWidthA"] if state["ProblemType"]["Sparse"] == 1 else state["VectorWidthB"]
+    if state["ProblemType"]["Sparse"]:
+      if not state["DirectToVgprSparseMetadata"]:
+        state["VectorWidthMetadata"] = state["VectorWidthA"] if state["ProblemType"]["Sparse"] == 1 else state["VectorWidthB"]
+      # ON/OFF the sourceswap according to the sparse type automatically
+      state["SourceSwap"] = False if state["ProblemType"]["Sparse"] == 1 else True
 
-    numBytes = state["ProblemType"]["DataType"].numBytes()
-    isa = tuple(state["ISA"])
-    state["enableLDSTrA"] = state["LDSTrInst"] and isaInfoMap[isa].asmCaps["HasLDSTr"] and numBytes == 2 \
-            and not state["UnrollMajorLDSA"] and not state["DirectToVgprA"]
-    state["enableLDSTrB"] = state["LDSTrInst"] and isaInfoMap[isa].asmCaps["HasLDSTr"] and numBytes == 2 \
-            and not state["UnrollMajorLDSB"] and not state["DirectToVgprB"]
-
-    state["enableGLTrA"] = state["DirectToVgprA"] and state["ProblemType"]["TLUA"] \
-      and ((numBytes == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
-        or (numBytes == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
-      )
-    state["enableGLTrB"] = state["DirectToVgprB"] and state["ProblemType"]["TLUB"] \
-      and ((numBytes == 1 and isaInfoMap[isa].asmCaps["HasGLTr8B64"]) \
-        or (numBytes == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
-      )
-
-    if state["enableLDSTrA"] or state["enableGLTrA"]:
-      state["VectorWidthA"] = 1
-
-    if state["enableLDSTrB"] or state["enableGLTrB"]:
-      state["VectorWidthB"] = 1
+    # The real value of "1LDSBuffer" will be determined later (when it is -1), not here
 
     # if state["EnableMatrixInstruction"] and not state["SourceSwap"] and (state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1):
     #   reject(state, printRejectionReason, "not implement VectorWidth without SourceSwap")
@@ -1414,6 +1937,42 @@ class Solution(collections.abc.Mapping):
       # not supported with multiple summations, bug is maybe something with
       # how stagger iteration is wrapped when unroll loop exits
       state["StaggerU"] = 0
+
+    if state["ProblemType"]["MXBlockA"]:
+      state["DirectToVgprMXSA"] = state["DirectToVgprA"]
+      state["ThreadTileMXSA"] = state["ThreadTileA"]
+      state["SubGroupMXSA"] = state["SubGroupA"]
+      state["MacroTileMXSA"] = state["MacroTileA"]
+      state["WaveSeparateGlobalReadMXSA"] = state["WaveSeparateGlobalReadA"]
+      state["NumLoadsCoalescedMXSA"] = state["NumLoadsCoalescedA"]
+      Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
+      state["DirectToLdsMXSA"] = state["DirectToLdsA"]
+      state["LocalWriteUseSgprMXSA"] = state["DirectToLdsMXSA"]
+      state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
+      state["VectorWidthMXSA"] = state["VectorWidthA"]
+      state["MIWaveTileMXSA"] = state["MIWaveTileA"]
+      state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
+
+    if state["ProblemType"]["MXBlockB"]:
+      state["DirectToVgprMXSB"] = state["DirectToVgprB"]
+      state["ThreadTileMXSB"] = state["ThreadTileB"]
+      state["SubGroupMXSB"] = state["SubGroupB"]
+      state["MacroTileMXSB"] = state["MacroTileB"]
+      state["WaveSeparateGlobalReadMXSB"] = state["WaveSeparateGlobalReadB"]
+      state["NumLoadsCoalescedMXSB"] = state["NumLoadsCoalescedB"]
+      Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
+      state["DirectToLdsMXSB"] = state["DirectToLdsB"]
+      state["LocalWriteUseSgprMXSB"] = state["DirectToLdsMXSB"]
+      state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
+      state["VectorWidthMXSB"] = state["VectorWidthB"]
+      state["MIWaveTileMXSB"] = state["MIWaveTileB"]
+      state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
+
+    if state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
+      if state["ProblemType"]["MXBlockA"]:
+        state["LocalReadVectorWidthMXS"] = state["MIInputPerThreadMXSA"]
+      elif state["ProblemType"]["MXBlockB"]:
+        state["LocalReadVectorWidthMXS"] = state["MIInputPerThreadMXSB"]
 
     # Some restrictions for half:
     if state["KernelLanguage"] == "Assembly" \
@@ -1437,16 +1996,118 @@ class Solution(collections.abc.Mapping):
           and (state["ProblemType"]["DataTypeA"].isSingle() and state["ProblemType"]["DataTypeB"].isSingle()):
           reject(state, printRejectionReason, "ConvertAfterDS doesn't support SS_BSS type")
           return
-      
+
     # Complex datatype restrictions.
     if state["ProblemType"]["DataType"].isComplex():
-      if state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1:
-        reject(state, printRejectionReason, "Complex datatype kernel does not support GSU yet.")
-        return
-      if state["MIArchVgpr"]:
-        reject(state, printRejectionReason, "Complex datatype kernel does not support MIArchVgpr yet.")
+      if state["MIArchVgpr"] and state["StreamK"] != 0:
+        reject(state, printRejectionReason, "Complex datatype kernel does not support StreamK with MIArchVgpr yet.")
         return
 
+
+    if state["TDMInst"]:
+      if not isaInfoMap[isa].asmCaps["HasTDM"]:
+        reject(state, printRejectionReason, "This arch does not support TDM")
+        return
+
+    # --- MX scale layout & transport derivation -------------------------------
+    # MXLoadInst selects the load transport for A/MXSA + B/MXSB:
+    #   "TDM"        -> tensor_load_to_lds (requires HasTDM cap)
+    #   "BufferLoad" -> buffer_load_*
+    #   "GlobalLoad" -> reserved; rejected here for now
+    # MXScaleFormat selects the in-device MX scale layout:
+    #   "NoSwizzle"       -> plain row/column layout (buffer_load consumable)
+    #   "InMemorySwizzle" -> swizzled in device memory (TDM-populated)
+    #   "HostPreSwizzle"  -> pre-swizzled by the host (gfx950 subtile)
+    # Both parameters accept the sentinel "Auto" (the default) which triggers
+    # conditional defaulting below. The two are linked by a small set of
+    # compatibility rules enforced below.
+    hasMXBlock     = bool(state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"])
+    hasMxSwizCap   = bool(isaInfoMap[isa].archCaps.get("HasMXScaleSwizzle", False))
+    isGfx950       = state["ISA"] == (9, 5, 0)
+
+    # MXLoadInst default: TDM iff TDMInst != 0; otherwise BufferLoad.
+    if state["MXLoadInst"] == "Auto":
+      state["MXLoadInst"] = "TDM" if state["TDMInst"] != 0 else "BufferLoad"
+
+    # GlobalLoad is reserved for a future flat/global_load MX path.
+    if state["MXLoadInst"] == "GlobalLoad":
+      reject(state, printRejectionReason, "MXLoadInst=GlobalLoad not implemented yet")
+      return
+
+    # Transport-vs-cap.
+    if state["MXLoadInst"] == "TDM" and not isaInfoMap[isa].asmCaps["HasTDM"]:
+      reject(state, printRejectionReason, "MXLoadInst=TDM requires asmCaps.HasTDM")
+      return
+
+    # TDMInst must agree with MXLoadInst so downstream enableTDMA/B is consistent.
+    # When MXLoadInst=TDM and TDMInst=0, promote TDMInst to 3 (A and B), which
+    # honors the "both-or-none" invariant on TDMInst. Disagreements are rejected.
+    if state["MXLoadInst"] == "TDM" and state["TDMInst"] == 0:
+      state["TDMInst"] = 3
+    elif state["MXLoadInst"] != "TDM" and state["TDMInst"] != 0:
+      reject(state, printRejectionReason,
+             "MXLoadInst=%s is incompatible with TDMInst=%d" % (state["MXLoadInst"], state["TDMInst"]))
+      return
+
+    # MXScaleFormat default:
+    #   MXLoadInst=TDM            -> InMemorySwizzle
+    #   MX on gfx950 + BufferLoad -> HostPreSwizzle (gfx950's only swizzling mode)
+    #   otherwise                 -> NoSwizzle (canonical)
+    if state["MXScaleFormat"] == "Auto":
+      if state["MXLoadInst"] == "TDM":
+        state["MXScaleFormat"] = "InMemorySwizzle"
+      elif hasMXBlock and isGfx950:
+        state["MXScaleFormat"] = "HostPreSwizzle"
+      else:
+        state["MXScaleFormat"] = "NoSwizzle"
+
+    # Cap guard: any swizzled format requires HasMXScaleSwizzle.
+    if state["MXScaleFormat"] in ("InMemorySwizzle", "HostPreSwizzle") and not hasMxSwizCap:
+      reject(state, printRejectionReason,
+             "MXScaleFormat=%s requires archCaps.HasMXScaleSwizzle" % state["MXScaleFormat"])
+      return
+
+    # Format-vs-transport. These compatibility rules apply only when MX scales
+    # are present; without MX scales MXScaleFormat is a don't-care.
+    if hasMXBlock:
+      if state["MXScaleFormat"] == "InMemorySwizzle" and state["MXLoadInst"] != "TDM":
+        reject(state, printRejectionReason,
+               "MXScaleFormat=InMemorySwizzle requires MXLoadInst=TDM "
+               "(in-memory MX scale swizzling is not supported with %s)" % state["MXLoadInst"])
+        return
+      if state["MXScaleFormat"] == "HostPreSwizzle" and state["MXLoadInst"] != "BufferLoad":
+        reject(state, printRejectionReason,
+               "MXScaleFormat=HostPreSwizzle requires MXLoadInst=BufferLoad")
+        return
+      if state["MXScaleFormat"] == "HostPreSwizzle" and not isGfx950:
+        reject(state, printRejectionReason,
+               "MXScaleFormat=HostPreSwizzle is only implemented on the gfx950 host pipeline")
+        return
+      if state["MXLoadInst"] == "TDM" and state["MXScaleFormat"] != "InMemorySwizzle":
+        reject(state, printRejectionReason,
+               "MXLoadInst=TDM currently always produces MXScaleFormat=InMemorySwizzle "
+               "(got %s)" % state["MXScaleFormat"])
+        return
+      # gfx1250 MX layout requires TDMInst, except for the StreamK-only
+      # BufferLoad + NoSwizzle path which has been validated end-to-end.
+      # StreamK!=0 also implies GSU is forced to 0 (see line ~1378), so this
+      # also excludes the unvalidated GSU-only NoSwizzle path. This reject
+      # subsumes the prior standalone "NoSwizzle requires StreamK" check.
+      if state["ISA"] == (12, 5, 0) and not state["TDMInst"] and state["StreamK"] == 0:
+        reject(state, printRejectionReason,
+               "MX layout requires TDMInst on gfx1250 (TDMInst=0 is only "
+               "permitted with StreamK; the non-StreamK NoSwizzle path is "
+               "not yet supported)")
+        return
+    # --------------------------------------------------------------------------
+
+    tdmInst: int = state["TDMInst"]
+    state["enableTDMA"] = bool(tdmInst & 0x01)
+    state["enableTDMB"] = bool(tdmInst & 0x02)
+
+    if tdmInst not in (0, 3):
+      reject(state, printRejectionReason, "Currently TDMA and TDMB must be enabled simultaneously")
+      return
 
     # DepthU == -1?
     if state["DepthU"] == -1:
@@ -1458,6 +2119,8 @@ class Solution(collections.abc.Mapping):
     for key, value in state.items():
       if isinstance(value, int) and value < 0:
         backupValues.append([key, value])
+    # Skip this check for subtile impl?
+    # TODO: Add this check back
     while True:
       for backup in backupValues:
         state[backup[0]] = backup[1]
@@ -1484,36 +2147,81 @@ class Solution(collections.abc.Mapping):
     if "ValidDepthU" in state:
       del state["ValidDepthU"]
 
-    #################################################################
-    # ForceUnrollSubIter requirements
-    # - Needs PGR > 0, double buffer
-    # - MIWaveTile must be even and larger than 2
-    # - TLU{A,B} cases only supported if using LdsTR or if VPerm not needed (size{A,B} >= 4)
-    #
-    # - Not supported for mixed precision cases currently
-    sizeDataTypeA = state["ProblemType"]["DataTypeA"].numBytes()
-    sizeDataTypeB = state["ProblemType"]["DataTypeB"].numBytes()
-    sizeDataType = state["ProblemType"]["DataType"].numBytes()
-    TLUA = state["ProblemType"]["TLUA"]
-    TLUB = state["ProblemType"]["TLUB"]
-    if (
-      state["EnableMatrixInstruction"] and not state["ExpandPointerSwap"] and
-      state["DepthU"] == state["MatrixInstK"] and state["PrefetchGlobalRead"] and not state["1LDSBuffer"]
-      and (state["MIWaveTile"][0] > 2  and state["MIWaveTile"][1] > 2)
-      and (state["MIWaveTile"][0] % 2 == 0 and state["MIWaveTile"][1] % 2 == 0)
-      and (sizeDataTypeA == sizeDataType) and (sizeDataTypeB == sizeDataType)
-      and ((TLUA == False or state["enableLDSTrA"] or sizeDataTypeA >= 4) and (TLUB == False or state["enableLDSTrB"] or sizeDataTypeB >= 4) )
-    ):
-      state["ForceUnrollSubIter"] = True
-      state["numSubTiles"] = 2
-      state["PrefetchLocalRead"] = 0 if state["ClusterLocalRead"] == 0 else state["PrefetchLocalRead"]
-    else:
-      state["ForceUnrollSubIter"] = False
-      state["numSubTiles"] = 1
+    if state["UseDirect32XEmulation"] == True:
+      #   Turn off Direct32X for the following kernels:
+      #   Cijk_Ailk_Bjlk_S_MX_B_Bias_HA_S_SAV_UserArgs_MT16x16x512_MI16x16x1
+      if (state["MacroTile0"] == 16 and state["MacroTile1"] == 16 and state["DepthU"] == 512):
+        state["UseDirect32XEmulation"] = False
 
+    # backup UsePLRPack from yaml before calling hasCustomSchedule
+    backup_UsePLRPack = state["UsePLRPack"]
     # Check if CMS is available for this solution
-    hasCMS,_ = hasCustomSchedule(state)
-    state["UseCustomMainLoopSchedule"] = hasCMS
+    if state["UseCustomMainLoopSchedule"] in [-1, 1]:
+      # initialize CMS related config parameters (for CMS only)
+      state["SwapGlobalReadOrder"] = 0
+      state["UsePLRPack"] = 0
+
+      hasCMS,_ = hasCustomSchedule(state)
+      if state["UseCustomMainLoopSchedule"] == 1 and not hasCMS:
+        reject(state, printRejectionReason, "UseCustomMainLoopSchedule=1 but CMS is not supported")
+      state["UseCustomMainLoopSchedule"] = 1 if hasCMS else 0
+      # reject CMS + TailloopInNll
+      if state["TailloopInNll"] and state["UseCustomMainLoopSchedule"] == 1:
+        reject(state, printRejectionReason, "UseCustomMainLoopSchedule=1 is incompatible with TailloopInNll=True")
+        return
+    # UseSubtileImpl has its own main loop scheduler; CMS is not compatible.
+    if state["UseSubtileImpl"] and state["UseCustomMainLoopSchedule"] == 1:
+        reject(state, printRejectionReason, "UseCustomMainLoopSchedule=1 is incompatible with UseSubtileImpl")
+
+    # additional setting for non CMS
+    if state["UseCustomMainLoopSchedule"] == 0:
+      # Non-CMS, non-MFMA F32X (e.g. gfx1250 WMMA): disable SubIter because
+      # the default scheduler's sub-tiling conflicts with F32X pack code's
+      # destructive in-place VGPR conversion.
+      # MFMA-based XF32 (gfx950) and CMS kernels are exempt.
+      if state["UseF32XEmulation"] and not state["UseMFMAF32XEmulation"] and state["ForceUnrollSubIter"]:
+        _applySubIterSetting(False)
+      if state["UseMFMAF32XEmulation"]:
+        state["MfmaInitCVgprs"] = True
+      # usePLRPack check
+      # adjust setting only for non CMS (keep original setting for CMS)
+      if backup_UsePLRPack:
+        state["UsePLRPack"] = 1
+        # MatrixInstruction only
+        if not state["EnableMatrixInstruction"]:
+          state["UsePLRPack"] = 0
+        # F32X emulation only
+        if not state["UseF32XEmulation"]:
+          state["UsePLRPack"] = 0
+        # SIA3 only
+        if state["ScheduleIterAlg"] != 3:
+          state["UsePLRPack"] = 0
+        # enable UsePLRPack for SubIter only
+        if not state["ForceUnrollSubIter"]:
+          state["UsePLRPack"] = 0
+        # DirectToLds (both A and B) only
+        if state["DirectToLds"] != 1:
+          state["UsePLRPack"] = 0
+        # PGR and PLR should be non 0
+        if state["PrefetchGlobalRead"] == 0 or state["PrefetchLocalRead"] == 0:
+          state["UsePLRPack"] = 0
+
+    # disable SwapGlobalReadOrder if grmode(normal/DTL/DTV) is different between A and B
+    # GRA and GRB need to be equivalent to swap the order
+    # keep original setting in CMS case
+    def getGrMode(tc):
+      grmode = 0
+      if state["DirectToLds%s"%tc]:
+        grmode = 1
+      elif state["DirectToVgpr%s"%tc]:
+        grmode = 2
+      return grmode
+    if state["UseCustomMainLoopSchedule"] == 0:
+      if getGrMode("A") != getGrMode("B"):
+        state["SwapGlobalReadOrder"] = 0
+      # SwapGlobalReadOrder does not work with UnrollLoopSwapGlobalReadOrder
+      if state["UnrollLoopSwapGlobalReadOrder"]:
+        state["SwapGlobalReadOrder"] = 0
 
     # 0: Normal mode. Hardware applies all of the normal data dependency checks
     # 1: Full expert mode (not suppoeted yet). Disable hardware checks against: VA_VDST, VA_SDST, VA_SSRC, VA_VCC, VM_VSRC and SA_SDST.
@@ -1564,6 +2272,50 @@ class Solution(collections.abc.Mapping):
 
     state["ExpertSchedulingMode"] = evaluateExpertSchedulingMode()
 
+    # Some restrictions for float4 and 6bitFloat:
+    # TODO: remove this if edge and tail are supported for fp4/fp6/bf6
+    isFloat4 = state["ProblemType"]["DataTypeA"].isFloat4() or state["ProblemType"]["DataTypeB"].isFloat4()
+    isFloat6 = state["ProblemType"]["DataTypeA"].is6bitFloat() or state["ProblemType"]["DataTypeB"].is6bitFloat()
+    if isa[:2] == (12, 5) and state["KernelLanguage"] == "Assembly" and (isFloat4 or isFloat6):
+      if state["ProblemType"]["MacDataTypeA"].isFloat4() or state["ProblemType"]["MacDataTypeB"].isFloat4():
+        if not state["enableLDSTrA"] and not state["UnrollMajorLDSA"]:
+          reject(state, printRejectionReason, "Currently FP4 requires LDSTrInst == True for UnrolledMajorLDSA == False")
+          return
+
+        if not state["enableLDSTrB"] and not state["UnrollMajorLDSB"]:
+          reject(state, printRejectionReason, "Currently FP4 requires LDSTrInst == True for UnrolledMajorLDSB == False")
+          return
+
+        # Currently we only support fp4 edge with AssertFree0(1)ElementMultiple = 2.
+        # TODO: Enalbe edge with arbitrary number
+        state["AssertFree0ElementMultiple"] = 2
+        state["AssertFree1ElementMultiple"] = 2
+
+        # Currently we only support fp4 tail-loop with AssertSummationElementMultiple = 8.
+        # TODO: Enalbe tail-loop with arbitrary number
+        state["AssertSummationElementMultiple"] = 8
+
+      if state["ProblemType"]["MacDataTypeA"].is6bitFloat() or state["ProblemType"]["MacDataTypeB"].is6bitFloat():
+        state["AssertFree0ElementMultiple"] = 1
+        state["AssertFree1ElementMultiple"] = 1
+        state["AssertSummationElementMultiple"] = 16
+        if not state["ProblemType"]["TransposeA"]:
+          state["AssertFree0ElementMultiple"] = 16
+        if state["ProblemType"]["TransposeB"]:
+          state["AssertFree1ElementMultiple"] = 16
+
+    state["AssertSummationElementMultiple"] = max(state["ProblemType"]["MXBlockA"], state["AssertSummationElementMultiple"])
+    state["AssertSummationElementMultiple"] = max(state["ProblemType"]["MXBlockB"], state["AssertSummationElementMultiple"])
+
+    # We have the real "1LDSBuffer" value now, so we have to test the rejection condition here
+    # TODO-
+    #  On gfx1250, i8, f8, it seem working for 1LDSBuffer=0 "BUT EPS=0", haven't checked for other archs/types, so we still reject by 1LDSBuffer only
+    # if (state["enableLDSTrA"] or state["enableLDSTrB"]) and (not state["1LDSBuffer"] and state["ExpandPointerSwap"]):
+    if (state["enableLDSTrA"] or state["enableLDSTrB"]) and (not state["1LDSBuffer"] and state["ExpandPointerSwap"]):
+      reject(state, printRejectionReason, "Current LDSTrInst implementation does not support 1LDSBuffer=0")
+      return
+
+  @staticmethod
   def depthUIteration(
       state,
       index,
@@ -1583,6 +2335,8 @@ class Solution(collections.abc.Mapping):
     ########################################
     resetStaggerUStride = state["StaggerUStride"]
     resetLocalReadVectorWidth = state["LocalReadVectorWidth"]
+    resetLocalReadVectorWidthA = state["LocalReadVectorWidthA"]
+    resetLocalReadVectorWidthB = state["LocalReadVectorWidthB"]
     resetGlobalReadVectorWidthA = state["GlobalReadVectorWidthA"]
     resetGlobalReadVectorWidthB = state["GlobalReadVectorWidthB"]
 
@@ -1590,6 +2344,8 @@ class Solution(collections.abc.Mapping):
       userDepthU = depthuList[index[0]]
       state["StaggerUStride"] = resetStaggerUStride
       state["LocalReadVectorWidth"] = resetLocalReadVectorWidth
+      state["LocalReadVectorWidthA"] = resetLocalReadVectorWidthA
+      state["LocalReadVectorWidthB"] = resetLocalReadVectorWidthB
       state["GlobalReadVectorWidthA"] = resetGlobalReadVectorWidthA
       state["GlobalReadVectorWidthB"] =  resetGlobalReadVectorWidthB
       state["Valid"] = True
@@ -1607,7 +2363,11 @@ class Solution(collections.abc.Mapping):
           depthUM = depthUA if state["DirectToVgprSparseMetadata"] else depthUA // 4
       state["_DepthU"] = state["DepthU"]# internal
       state["_DepthUA"] = depthUA# internal
+      if state["ProblemType"]["MXBlockA"]:
+        state["_DepthUMXSA"] = depthUA // state["ProblemType"]["MXBlockA"]
       state["_DepthUB"] = depthUB# internal
+      if state["ProblemType"]["MXBlockB"]:
+        state["_DepthUMXSB"] = depthUB // state["ProblemType"]["MXBlockB"]
       state["_DepthUMetadata"] = depthUM# internal
 
       Solution.checkAndAssignWaveSeparateGlobalRead(state, 'A', printRejectionReason)
@@ -1621,7 +2381,7 @@ class Solution(collections.abc.Mapping):
             Solution.checkAndAssignWaveSeparateGlobalRead(state, 'Metadata', printRejectionReason)
 
       # Set up stagger shift:
-      bpeAB = int(4*state["ProblemType"]["DataType"].numRegisters())
+      bpeAB = state["ProblemType"]["DataType"].numBytes()
       # (1<<staggerStrideShift) is number of loop iterations to traverse the stride
       if state["StaggerU"] == 0:
         state["StaggerUMapping"] = 0
@@ -1633,12 +2393,19 @@ class Solution(collections.abc.Mapping):
 
       state["_staggerStrideShift"] = (int)(math.ceil(math.log(state["StaggerUStride"] / (state["DepthU"] * bpeAB), 2)))
 
-      def calcLdsPad(lrvw: int, isaInfoMap: Dict[str, IsaInfo]) -> int:
+      def calcLdsPad(isaInfoMap: Dict[str, IsaInfo]) -> int:
+        isMX = state["ProblemType"].get("MXBlockA", 0) != 0 or state["ProblemType"].get("MXBlockB", 0) != 0
+        numBytesA = state["ProblemType"]["MacDataTypeA"].numBytes()
+        numBytesB = state["ProblemType"]["MacDataTypeB"].numBytes()
+        lrvwA = state["LocalReadVectorWidthA"]
+        lrvwB = state["LocalReadVectorWidthB"]
         ldsPadA = state["LdsPadA"]
         ldsPadB = state["LdsPadB"]
         ldsPadM = state["LdsPadMetadata"]
-        optPadA = optPadB = lrvw
-        readRegsA = readRegsB = lrvw * state["ProblemType"]["DataType"].numBytes() // 4
+        optPadA = lrvwA
+        optPadB = lrvwB
+        readRegsA = int(lrvwA * state["ProblemType"]["MacDataTypeA"].numBytes() // 4)
+        readRegsB = int(lrvwB * state["ProblemType"]["MacDataTypeB"].numBytes() // 4)
         if state["ProblemType"]["Sparse"]:
           if state["ProblemType"]["Sparse"] == 2:
             optPadB //= 2
@@ -1646,9 +2413,12 @@ class Solution(collections.abc.Mapping):
           else:
             optPadA //= 2
             readRegsA //= 2
-        if (not isaInfoMap[isa].asmCaps['HasWMMA']) and (readRegsA > 4 or readRegsB > 4):
-          reject(state, "LocalReadVectorWidth results in attemping to read LDS larger than b128, reject")
-          return ldsPadA, ldsPadB, ldsPadM
+        if (not isaInfoMap[isa].asmCaps['HasWMMA']) and (readRegsA > 6 or readRegsB > 6):
+          reject(state, "LocalReadVectorWidth results in attemping to read LDS larger than b192, reject")
+          return ldsPadA, ldsPadB, ldsPadM, 0, 0
+        # SubtileImpl does not need LDS padding.
+        if state["UseSubtileImpl"]:
+          return 0, 0, 0, 0, 0
         if state["EnableMatrixInstruction"]:
           # for readRegs = 1 or 4, we need to double pad for MI16x16xNx1 to avoid bank conflict.
           if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
@@ -1657,49 +2427,69 @@ class Solution(collections.abc.Mapping):
             if readRegsB == 4 or readRegsB == 1:
               optPadB *= 2
         if ldsPadA == -1:
-          if not state["UnrollMajorLDSA"]:
-            if state["EnableMatrixInstruction"]:
-              ldsPadA = 0
-              if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-                ldsPadA = ((16 * state["VectorWidthA"] * state["ProblemType"]["DataType"].numBytes() + state["MacroTile0"] * state["ProblemType"]["DataType"].numBytes() * state["LocalReadVectorWidth"]) % 128) // state["ProblemType"]["DataType"].numBytes()
-              if state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataType"].numBytes() == 32 and ldsPadA == 0:
-                ldsPadA = 16 // state["ProblemType"]["DataType"].numBytes()
-              if state["DirectToLdsA"]:
-                # TODO: Check if there are cases which benefit from padding, currently set to zero by default
-                ldsPadA = state["MatrixInstM"] if state["enableLDSTrA"] else 0
-            else: # mac instruction
-              if state["ProblemType"]["TLUA"]:
-                ldsPadA = 0
-              else:
-                ldsPadA = state["VectorWidthA"]
+          if isMX and (state["ProblemType"]["DataTypeA"].is6bitFloat() or state["ProblemType"]["DataTypeA"].isFloat4()):
+            ldsPadA = 0
           else:
-            if state["DirectToLdsA"]:
-              ldsPadA = max(lrvw, optPadA) if not state["ProblemType"]["TLUA"] else 0
+            if not state["UnrollMajorLDSA"]:
+              if state["EnableMatrixInstruction"]:
+                ldsPadA = 0
+                if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
+                  ldsPadA = int(((16 * state["VectorWidthA"] * numBytesA + state["MacroTile0"] * numBytesA * lrvwA) % 128) // numBytesA)
+                if state["GlobalReadVectorWidthA"] * numBytesA == 32 and ldsPadA == 0:
+                  ldsPadA = int(16 // numBytesA)
+                if state["DirectToLdsA"]:
+                  # TODO: Check if there are cases which benefit from padding, currently set to zero by default
+                  ldsPadA = state["MatrixInstM"] if state["enableLDSTrA"] else 0
+              else: # mac instruction
+                if state["ProblemType"]["TLUA"]:
+                  ldsPadA = 0
+                else:
+                  ldsPadA = state["VectorWidthA"]
             else:
-              ldsPadA = max(state["GlobalReadVectorWidthA"],optPadA)
+              if state["DirectToLdsA"]:
+                if not state["ProblemType"]["TLUA"]:
+                  bpeA = state["ProblemType"]["DataTypeA"].numBytes()
+                  LdsStride = state["VectorWidthA"] * bpeA * state["DepthU"]
+                  MinLdsBlockSizePerPadA = (state[f"GlobalReadVectorWidthA"] * bpeA) * state["WavefrontSize"]
+                  isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadA
+                  ldsPadA = state["MatrixInstK"] if bpeA == 2 and not isM0PadEnough else 2 * lrvwA
+                else:
+                  ldsPadA = 0
+              else:
+                ldsPadA = max(state["GlobalReadVectorWidthA"],optPadA)
           assert(ldsPadA >= 0)
 
         if ldsPadB == -1:
-          if not state["UnrollMajorLDSB"]:
-            if state["EnableMatrixInstruction"]:
-              ldsPadB = 0
-              if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-                ldsPadB = ((16 * state["VectorWidthB"] * state["ProblemType"]["DataType"].numBytes() + state["MacroTile1"] * state["ProblemType"]["DataType"].numBytes() * state["LocalReadVectorWidth"]) % 128) // state["ProblemType"]["DataType"].numBytes()
-              if state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataType"].numBytes() == 32 and ldsPadB == 0:
-                ldsPadB = 16 // state["ProblemType"]["DataType"].numBytes()
-              if state["DirectToLdsB"]:
-                # TODO: Check if there are cases which benefit from padding, currently set to zero by default
-                ldsPadB = state["MatrixInstM"] if state["enableLDSTrB"] else 0
-            else:
-              if state["ProblemType"]["TLUB"]:
-                ldsPadB = 0
-              else:
-                ldsPadB = state["VectorWidthB"]
+          if isMX and (state["ProblemType"]["DataTypeB"].is6bitFloat() or state["ProblemType"]["DataTypeB"].isFloat4()):
+            ldsPadB = 0
           else:
-            if state["DirectToLdsB"]:
-              ldsPadB = max(lrvw, optPadB) if not state["ProblemType"]["TLUB"] else 0
+            if not state["UnrollMajorLDSB"]:
+              if state["EnableMatrixInstruction"]:
+                ldsPadB = 0
+                if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
+                  ldsPadB = int(((16 * state["VectorWidthB"] * numBytesB + state["MacroTile1"] * numBytesB * lrvwB) % 128) // numBytesB)
+                if state["GlobalReadVectorWidthB"] * numBytesB == 32 and ldsPadB == 0:
+                  ldsPadB = int(16 // numBytesB)
+                if state["DirectToLdsB"]:
+                  # TODO: Check if there are cases which benefit from padding, currently set to zero by default
+                  ldsPadB = state["MatrixInstM"] if state["enableLDSTrB"] else 0
+              else: # mac instruction
+                if state["ProblemType"]["TLUB"]:
+                  ldsPadB = 0
+                else:
+                  ldsPadB = state["VectorWidthB"]
             else:
-              ldsPadB = max(state["GlobalReadVectorWidthB"],optPadB)
+              if state["DirectToLdsB"]:
+                if not state["ProblemType"]["TLUB"]:
+                  bpeB = state["ProblemType"]["DataTypeB"].numBytes()
+                  LdsStride = state["VectorWidthB"] * bpeB * state["DepthU"]
+                  MinLdsBlockSizePerPadB = (state[f"GlobalReadVectorWidthB"] * bpeB) * state["WavefrontSize"]
+                  isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadB
+                  ldsPadB = state["MatrixInstK"] if bpeB == 2 and not isM0PadEnough else 2 * lrvwB
+                else:
+                  ldsPadB = 0
+              else:
+                ldsPadB = max(state["GlobalReadVectorWidthB"],optPadB)
           assert(ldsPadB >= 0)
 
         if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
@@ -1740,102 +2530,116 @@ class Solution(collections.abc.Mapping):
         if state["DirectToVgprB"]:
           ldsPadB = 0
 
-        return ldsPadA, ldsPadB, ldsPadM
+        ldsPadMXSA = 4 * 2 if (state["LdsPadMXSA"] == -1) else state["LdsPadMXSA"]
+        ldsPadMXSB = 4 * 2 if (state["LdsPadMXSB"] == -1) else state["LdsPadMXSB"]
 
-      def calcLdsBlockSizePerPad(lrvw: int) -> int:
-        LdsBlockSizePerPadA = state["LdsBlockSizePerPadA"]
-        LdsBlockSizePerPadB = state["LdsBlockSizePerPadB"]
-        tmpBpe = state["ProblemType"]["DataTypeA"].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["DataType"].numBytes()
-        if LdsBlockSizePerPadA == -1:
-          if state["EnableMatrixInstruction"]:
-            if state["UnrollMajorLDSA"]:
-              LdsBlockSizePerPadA = roundUpToNearestMultiple(state["_DepthUA"] * tmpBpe, 128)
-              if state["_DepthUA"] * tmpBpe * state["VectorWidthA"] > 128:
-                LdsBlockSizePerPadA = roundUpToNearestMultiple(state["_DepthUA"] * tmpBpe * state["VectorWidthA"], 128)
+        if state["TDMInst"]:
+          pads = {"A": ldsPadA * state["ProblemType"]["MacDataTypeA"].numBytes(), "B": ldsPadB * state["ProblemType"]["MacDataTypeB"].numBytes(), "MXSA": ldsPadMXSA, "MXSB": ldsPadMXSB}
+          for tc, val in pads.items():
+            if val == 0: continue
+            if TensorDataMoverLoad.calPadAmount(val) > 127:
+              reject(state, printRejectionReason, f"pad_amount=(ldsPad//4-1)={pad_amount} should be smaller than or equal to 127 for ldsPad{tc}={val}")
+
+        return ldsPadA, ldsPadB, ldsPadM, ldsPadMXSA, ldsPadMXSB
+
+      def checkLdsBlockSizePerPadForTDM(ldsBlockSizePerPadA: int, ldsBlockSizePerPadB: int, ldsBlockSizePerPadMXSA: int, ldsBlockSizePerPadMXSB: int):
+        if state["TDMInst"]:
+          pads = {"A": ldsBlockSizePerPadA, "B": ldsBlockSizePerPadB, "MXSA": ldsBlockSizePerPadMXSA, "MXSB": ldsBlockSizePerPadMXSB}
+          for tc, val in pads.items():
+            if val == 0: continue
+            pad_interval = TensorDataMoverLoad.calPadInterval(val)
+            if pad_interval > 7:
+              reject(state, printRejectionReason, f"pad_interval=(log2(LdsBlockSizePerPad//4)-1)={pad_interval} should be smaller than or equal to 7 for ldsBlockSizePerPad{tc}={val}")
+
+      def calcMXSLdsBlockSizePerPad(tc: str, lrvw: int) -> int:
+        LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
+        bpe = 1 # MX scale size
+        multiple = 256 if isa[:2] == (12, 5) else 128
+        if LdsBlockSizePerPad == -1:
+          vw = state["VectorWidthA"] if "A" in tc else state["VectorWidthB"]
+          if state["ISA"] == (12, 5, 0):
+            LdsBlockSizePerPad = 0
+          else:
+            LdsBlockSizePerPad = roundUpToNearestMultiple(int(state["_DepthU%s"%tc] * bpe * vw), multiple)
+        return LdsBlockSizePerPad
+
+      def getLdsBpe(tc: str) -> float:
+        return state["ProblemType"]["DataType%s"%tc].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["MacDataType%s"%tc].numBytes()
+
+      def calcLdsBlockSizePerPad(tc: str, lrvw: int) -> int:
+        if "MXS" in tc:
+          return calcMXSLdsBlockSizePerPad(tc, lrvw)
+        mt = state["MacroTile0"] if ("A" in tc) else state["MacroTile1"]
+        LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
+        tmpBpe = getLdsBpe(tc)
+        multiple = 256 if isa[:2] == (12, 5) else 128
+        if LdsBlockSizePerPad == -1:
+          if state["EnableMatrixInstruction"] and tmpBpe != 0.75:
+            if state["UnrollMajorLDS%s"%tc]:
+              LdsBlockSizePerPad = roundUpToNearestMultiple(int(state["_DepthU%s"%tc] * tmpBpe), multiple)
+              if state["_DepthU%s"%tc] * tmpBpe * state["VectorWidth%s"%tc] > multiple:
+                LdsBlockSizePerPad = roundUpToNearestMultiple(int(state["_DepthU%s"%tc] * tmpBpe * state["VectorWidth%s"%tc]), multiple)
             else:
               if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-                LdsBlockSizePerPadA = state["MacroTile0"] * tmpBpe * lrvw
+                LdsBlockSizePerPad = int(mt * tmpBpe * lrvw)
               else:
-                LdsBlockSizePerPadA = 0
+                LdsBlockSizePerPad = 0
           else:
-            LdsBlockSizePerPadA = 0
-        tmpBpe = state["ProblemType"]["DataTypeB"].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["DataType"].numBytes()
-        if LdsBlockSizePerPadB == -1:
-          if state["EnableMatrixInstruction"]:
-            if state["UnrollMajorLDSB"]:
-              LdsBlockSizePerPadB = roundUpToNearestMultiple(state["_DepthUB"] * tmpBpe, 128)
-              if state["_DepthUB"] * tmpBpe * state["VectorWidthB"] > 128:
-                LdsBlockSizePerPadB = roundUpToNearestMultiple(state["_DepthUB"] * tmpBpe * state["VectorWidthB"], 128)
-            else:
-              if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-                LdsBlockSizePerPadB = state["MacroTile1"] * tmpBpe * lrvw
-              else:
-                LdsBlockSizePerPadB = 0
-          else:
-            LdsBlockSizePerPadB = 0
+            LdsBlockSizePerPad = 0
 
-        # set LdsBlockSizePerPadA,B=0 for DirectToVgpr
-        if state["DirectToVgprA"]:
-          LdsBlockSizePerPadA = 0
-        if state["DirectToVgprB"]:
-          LdsBlockSizePerPadB = 0
+        # set LdsBlockSizePerPad,B=0 for DirectToVgpr
+        if state["DirectToVgpr%s"%tc]:
+          LdsBlockSizePerPad = 0
 
-        if state["DirectToLdsA"]:
-          bpeA = state["ProblemType"]["DataTypeA"].numBytes()
+        if state["DirectToLds%s"%tc]:
+          bpeA = state["ProblemType"]["DataType%s"%tc].numBytes()
           # For DTL lds padding must be a multiple of the instruction load size (in bytes)
-          MinLdsBlockSizePerPadA = (state[f"GlobalReadVectorWidthA"] * bpeA) * state["WavefrontSize"]
-          if state["UseGeneralizedNLCOneA"]:
-            LdsBlockSizePerPadA = MinLdsBlockSizePerPadA
+          # Also, LBSPP must be less than or equal to GRVW*bpe*NumThreads (cannot handle LBSPP larger than m0 inc value)
+          MinLdsBlockSizePerPad = int((state[f"GlobalReadVectorWidth%s"%tc] * bpeA) * state["WavefrontSize"])
+          MaxLdsBlockSizePerPad = int((state[f"GlobalReadVectorWidth%s"%tc] * bpeA) * state["NumThreads"])
+          if state["UseGeneralizedNLCOne%s"%tc]:
+            LdsBlockSizePerPad = MinLdsBlockSizePerPad
           else:
-            LdsBlockSizePerPadA = max(LdsBlockSizePerPadA, MinLdsBlockSizePerPadA)
-            LdsBlockSizePerPadA = roundUpToNearestMultiple(LdsBlockSizePerPadA, MinLdsBlockSizePerPadA)
+            LdsBlockSizePerPad = max(LdsBlockSizePerPad, MinLdsBlockSizePerPad)
+            LdsBlockSizePerPad = min(LdsBlockSizePerPad, MaxLdsBlockSizePerPad)
+            LdsBlockSizePerPad = roundUpToNearestMultiple(LdsBlockSizePerPad, MinLdsBlockSizePerPad)
 
-        if state["DirectToLdsB"]:
-          bpeB = state["ProblemType"]["DataTypeB"].numBytes()
-          # For DTL lds padding must be a multiple of the instruction load size (in bytes)
-          MinLdsBlockSizePerPadB = (state[f"GlobalReadVectorWidthB"] * bpeB) * state["WavefrontSize"]
-          if state["UseGeneralizedNLCOneB"]:
-            LdsBlockSizePerPadB = MinLdsBlockSizePerPadB
-          else:
-            LdsBlockSizePerPadB = max(LdsBlockSizePerPadB, MinLdsBlockSizePerPadB)
-            LdsBlockSizePerPadB = roundUpToNearestMultiple(LdsBlockSizePerPadB, MinLdsBlockSizePerPadB)
+        return int(LdsBlockSizePerPad)
 
-        return LdsBlockSizePerPadA, LdsBlockSizePerPadB
 
-      def calcLdsNumBytes(ldsPadA: int, LdsBlockSizePerPadA: int, ldsPadB: int, LdsBlockSizePerPadB: int) -> int:
-        bpeA = state["ProblemType"]["DataTypeA"].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["DataType"].numBytes()
-        bpeB = state["ProblemType"]["DataTypeB"].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["DataType"].numBytes()
-        ldsAlign = int(64 / state["ProblemType"]["DataType"].numRegisters())
+      def calcLdsNumBytesAB(mxTc: str, ldsPad: int, LdsBlockSizePerPad: int):
+        tc = mxTc.replace("MXS", "")
+        if ("MXS" in mxTc) and (state["ProblemType"]["MXBlock%s"%tc] == 0):
+          return (0, 0)
+        if state["DirectToVgpr%s"%mxTc]:
+          return (0, 0)
 
-        if state["UnrollMajorLDSA"]:
-          ldsNumBytesA = (state["_DepthUA"] + ldsPadA) * state["MacroTileA"] * bpeA
+        bpe = state["ProblemType"]["DataType%s"%tc].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["MacDataType%s"%tc].numBytes()
+        bpe = 1 if ("MXS" in mxTc) else bpe
+        ldsAlign = int(64 / state["ProblemType"]["MacDataType%s"%tc].numRegisters())
+        ldsAlign = 64 if state["ProblemType"]["MacDataType%s"%tc].is6bitFloat() else ldsAlign
+
+        if state["UnrollMajorLDS%s"%mxTc]:
+          ldsNumBytes = int((state["_DepthU%s"%mxTc] + ldsPad) * state["MacroTile%s"%mxTc] * bpe)
         else:
-          ldsNumBytesA = state["_DepthUA"] * (state["MacroTileA"] + ldsPadA) * bpeA
-        padInterval = LdsBlockSizePerPadA
+          ldsNumBytes = int(state["_DepthU%s"%mxTc] * (state["MacroTile%s"%mxTc] + ldsPad) * bpe)
+        padInterval = LdsBlockSizePerPad
 
         if padInterval != 0:
-          ldsNumBytesA = int((state["_DepthUA"] * state["MacroTileA"] * bpeA) / padInterval * (padInterval + ldsPadA * bpeA))
-        ldsNumBytesAlignedA = roundUpToNearestMultiple(ldsNumBytesA, ldsAlign)
-        # DirectToVgpr case, set 0 to lds related variables
-        if state["DirectToVgprA"]:
-          ldsNumBytesA = 0
-          ldsNumBytesAlignedA = 0
+          ldsNumBytes = int((state["_DepthU%s"%mxTc] * state["MacroTile%s"%mxTc] * bpe) / padInterval * (padInterval + ldsPad * bpe))
+        ldsNumBytesAligned = roundUpToNearestMultiple(ldsNumBytes, ldsAlign)
 
-        if state["UnrollMajorLDSB"]:
-          ldsNumBytesB = (state["_DepthUB"] + ldsPadB) * state["MacroTileB"] * bpeB
-        else:
-          ldsNumBytesB = state["_DepthUB"] * (state["MacroTileB"] + ldsPadB) * bpeB
-        padInterval = LdsBlockSizePerPadB
-        if padInterval != 0:
-          ldsNumBytesB = int((state["_DepthUB"] * state["MacroTileB"] * bpeB) / padInterval * (padInterval + ldsPadB * bpeB))
-        ldsNumBytesAlignedB = roundUpToNearestMultiple(ldsNumBytesB, ldsAlign)
+        if state["DirectToVgpr%s"%mxTc]:
+          ldsNumBytes = 0
+          ldsNumBytesAligned = 0
 
-        # DirectToVgpr case, set 0 to lds related variables
-        if state["DirectToVgprB"]:
-          ldsNumBytesB = 0
-          ldsNumBytesAlignedB = 0
+        return (ldsNumBytes, ldsNumBytesAligned)
 
+
+      def calcLdsNumBytesM():
         if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
+          ldsAlign = int(64 / state["ProblemType"]["DataType"].numRegisters())
+          ldsAlign = 64 if state["ProblemType"]["DataType"].is6bitFloat() else ldsAlign
           bpeAB = state["ProblemType"]["DataType"].numBytes()
           if state["UnrollMajorLDSMetadata"]:
             ldsNumBytesMetadata = (state["_DepthUMetadata"] + state["LdsPadMetadata"]) * state["MacroTileMetadata"]
@@ -1845,73 +2649,262 @@ class Solution(collections.abc.Mapping):
           padInterval = state["LdsBlockSizePerPadMetadata"]
           if padInterval != 0:
             ldsNumBytesMetadata = int(roundUp(state["_DepthUMetadata"] * state["MacroTileMetadata"] / bpeAB) / padInterval * (padInterval + state["LdsPadMetadata"]))
-          ldsNumBytesAlignedMetadata = roundUpToNearestMultiple(ldsNumBytesMetadata, ldsAlign) * bpeAB
-          ldsNumBytesMetadata = ldsNumBytesMetadata * bpeAB
+          ldsNumBytesAlignedMetadata = int(roundUpToNearestMultiple(ldsNumBytesMetadata, ldsAlign) * bpeAB)
+          ldsNumBytesMetadata = int(ldsNumBytesMetadata * bpeAB)
         else:
           ldsNumBytesMetadata = 0
           ldsNumBytesAlignedMetadata = 0
 
-        return ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB, ldsNumBytesMetadata, ldsNumBytesAlignedMetadata
+        return ldsNumBytesMetadata, ldsNumBytesAlignedMetadata
+
+      if state["LocalReadVectorWidthA"] == -1:
+        state["LocalReadVectorWidthA"] = state["LocalReadVectorWidth"]
+        if (not state["enableLDSTrA"]) and (state["ProblemType"]["Sparse"] == 1) and (state["LocalReadVectorWidthA"] != -1):
+          state["LocalReadVectorWidthA"] //= 2
+      if state["LocalReadVectorWidthB"] == -1:
+        state["LocalReadVectorWidthB"] = state["LocalReadVectorWidth"]
+        if (not state["enableLDSTrB"]) and (state["ProblemType"]["Sparse"] == 2) and (state["LocalReadVectorWidthB"] != -1):
+          state["LocalReadVectorWidthB"] //= 2
+
+      def calLRVW():
+        # Default LocalReadVectorWidth
+        if state["EnableMatrixInstruction"]:
+          # Default LocalReadVectorWidth
+          autoLRVWA = False
+          maxNumDsLoadBytesA = Solution.MAX_NUM_DS_LOAD_BYTES
+          if (not state["enableLDSTrA"]) and (state["ProblemType"]["Sparse"] == 1):
+            maxNumDsLoadBytesA //= 2
+          maxLRVWA = int(maxNumDsLoadBytesA // state["ProblemType"]["MacDataTypeA"].numBytes())
+          # Set maxLRVW to 32 for 6 bits float: use two load instructions b128(4 vgpr) and b64(2 vgpr) to mimic b192
+          if isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and state["ProblemType"]["MacDataTypeA"].numBytes() == 0.75:
+            maxLRVWA = 32
+          if state["LocalReadVectorWidthA"] == -1:
+            autoLRVWA = True
+            if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeA"].numBytes() > maxNumDsLoadBytesA):
+              state["LocalReadVectorWidthA"] = maxLRVWA
+            else:
+              state["LocalReadVectorWidthA"] = min(state["MIInputPerThreadA"], maxLRVWA)
+            if state["LocalReadVectorWidthA"] > maxLRVWA:
+              raise RuntimeError("LocalReadVectorWidthA (%d) exceeds max %d (# bytes of lrvw > 32)" \
+                                 % (state["LocalReadVectorWidthA"], maxLRVWA))
+          else:
+            if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+              if state["LocalReadVectorWidthA"] != maxLRVWA and state["TransposeLDS"]:
+                reject(state, printRejectionReason, f"gfx1250 requires lrvwA == {maxLRVWA} for datatype {state['ProblemType']['MacDataTypeA']}, actual value: {state['LocalReadVectorWidthA']}")
+            if state["ProblemType"]["Sparse"]:
+              if state["LocalReadVectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes() > maxNumDsLoadBytesA:
+                reject(state, printRejectionReason, "LocalReadVectorWidthA(%d) * BytePerMacDataTypeA(%s) > %d bytes." % (state["LocalReadVectorWidthA"], state["ProblemType"]["MacDataTypeA"].numBytes(), maxNumDsLoadBytesA))
+            elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["MacDataTypeA"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])):
+              if state["LocalReadVectorWidthA"] < state["MIInputPerThread"] and not state["LDSTrInst"] and not isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+                reject(state, printRejectionReason, "LocalReadVectorWidthA < %u" %(state["MIInputPerThread"])) # << Rejected here
+            if state["LocalReadVectorWidthA"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidth require Transpose LDS")
+
+          if autoLRVWA:
+            if state["LocalReadVectorWidthA"] // state["MIInputPerThreadA"] > 1:
+              if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthA"] // state["MIInputPerThreadA"]):
+                # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                state["LocalReadVectorWidthA"] //= 2
+
+          # Default LocalReadVectorWidth
+          autoLRVWB = False
+          maxNumDsLoadBytesB = Solution.MAX_NUM_DS_LOAD_BYTES
+          if (not state["enableLDSTrB"]) and (state["ProblemType"]["Sparse"] == 2):
+            maxNumDsLoadBytesB //= 2
+          maxLRVWB = int(maxNumDsLoadBytesB // state["ProblemType"]["MacDataTypeB"].numBytes())
+          # Set maxLRVW to 32 for 6 bits float: use two load instructions b128(4 vgpr) and b64(2 vgpr) to mimic b192
+          if isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and state["ProblemType"]["MacDataTypeB"].numBytes() == 0.75:
+            maxLRVWB = 32
+          if state["LocalReadVectorWidthB"] == -1:
+            autoLRVWB = True
+            if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeB"].numBytes() > maxNumDsLoadBytesB):
+              state["LocalReadVectorWidthB"] = maxLRVWB
+            else:
+              state["LocalReadVectorWidthB"] = min(state["MIInputPerThreadB"], maxLRVWB)
+            if state["LocalReadVectorWidthB"] > maxLRVWB:
+              raise RuntimeError("LocalReadVectorWidthB (%d) exceeds max %d (# bytes of lrvw > 32)" \
+                                 % (state["LocalReadVectorWidthB"], maxLRVWB))
+          else:
+            if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+              if state["LocalReadVectorWidthB"] != maxLRVWB and state["TransposeLDS"]:
+                reject(state, printRejectionReason, f"gfx1250 requires lrvwB == {maxLRVWB} for MacDataTypeB {state['ProblemType']['MacDataTypeB']}, actual value: {state['LocalReadVectorWidthB']}")
+            # TODO: Find better conditons to filter gfx1250 solutions
+            if state["ProblemType"]["Sparse"]:
+              if state["LocalReadVectorWidthB"] * state["ProblemType"]["MacDataTypeB"].numBytes() > maxNumDsLoadBytesB:
+                reject(state, printRejectionReason, "LocalReadVectorWidthB(%d) * BytePerMacDataTypeB(%s) > %d bytes." % (state["LocalReadVectorWidthB"], state["ProblemType"]["MacDataTypeB"].numBytes(), maxNumDsLoadBytesB))
+            elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["MacDataTypeB"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])):
+              if state["LocalReadVectorWidthB"] < state["MIInputPerThread"] and not state["LDSTrInst"] and not isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+                reject(state, printRejectionReason, "LocalReadVectorWidthB < %u" %(state["MIInputPerThread"]))
+            if state["LocalReadVectorWidthB"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidthB require Transpose LDS")
+
+          if autoLRVWB:
+            if state["LocalReadVectorWidthB"] // state["MIInputPerThreadB"] > 1:
+              if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthB"] // state["MIInputPerThreadB"]):
+                # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                state["LocalReadVectorWidthB"] //= 2
+
+          if autoLRVWA or autoLRVWB:
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
+            if (wlrA > 1) or (wlrB > 1):
+              padA, padB, padM, padMXSA, padMXSB = calcLdsPad(isaInfoMap)
+              ldsBlockSizePerPadA = calcLdsBlockSizePerPad("A", state["LocalReadVectorWidthA"])
+              ldsBlockSizePerPadB = calcLdsBlockSizePerPad("B", state["LocalReadVectorWidthB"])
+              ldsBlockSizePerPadMXSA = calcLdsBlockSizePerPad("MXSA", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockA"] else 0
+              ldsBlockSizePerPadMXSB = calcLdsBlockSizePerPad("MXSB", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockB"] else 0
+              ldsBlockSizePerPadA = 0 if padA == 0 else ldsBlockSizePerPadA
+              ldsBlockSizePerPadB = 0 if padB == 0 else ldsBlockSizePerPadB
+              ldsBlockSizePerPadMXSA = 0 if padMXSA == 0 else ldsBlockSizePerPadMXSA
+              ldsBlockSizePerPadMXSB = 0 if padMXSB == 0 else ldsBlockSizePerPadMXSB
+              checkLdsBlockSizePerPadForTDM(ldsBlockSizePerPadA, ldsBlockSizePerPadB, ldsBlockSizePerPadMXSA, ldsBlockSizePerPadMXSB)
+              (ldsNumBytesA, ldsNumBytesAlignedA) = calcLdsNumBytesAB("A", padA, ldsBlockSizePerPadA)
+              (ldsNumBytesB, ldsNumBytesAlignedB) = calcLdsNumBytesAB("B", padB, ldsBlockSizePerPadB)
+              (ldsNumBytesMXSA, ldsNumBytesAlignedMXSA) = calcLdsNumBytesAB("MXSA", padMXSA, ldsBlockSizePerPadMXSA) if state["ProblemType"]["MXBlockA"] else (0, 0)
+              (ldsNumBytesMXSB, ldsNumBytesAlignedMXSB) = calcLdsNumBytesAB("MXSB", padMXSB, ldsBlockSizePerPadMXSB) if state["ProblemType"]["MXBlockB"] else (0, 0)
+              (ldsNumBytesMetadata, ldsNumBytesAlignedMetadata) = calcLdsNumBytesM()
+              if (ldsNumBytesAlignedA + ldsNumBytesAlignedB) > state["MaxLDS"]:
+                if wlrA > 1:
+                  state["LocalReadVectorWidthA"] //= 2
+                if wlrB > 1:
+                  state["LocalReadVectorWidthB"] //= 2
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThreadA"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThreadB"], 1)
+            if wlrA > wlrB:
+              state["LocalReadVectorWidthA"] = wlrB * state["MIInputPerThreadA"]
+              if state["ProblemType"]["Sparse"] == 1:
+                state["LocalReadVectorWidthA"] //= 2
+            if wlrA < wlrB:
+              state["LocalReadVectorWidthB"] = wlrA * state["MIInputPerThreadB"]
+              if state["ProblemType"]["Sparse"] == 2:
+                state["LocalReadVectorWidthB"] //= 2
+
+          if state["ProblemType"]["Sparse"] == 1:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthA"]
+          elif state["ProblemType"]["Sparse"] == 2:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthB"]
+
+          if state["enableGLTrA"] or state["enableGLTrB"]:
+            state["LocalReadVectorWidth"] = 8
+            state["LocalReadVectorWidthA"] = 8
+            state["LocalReadVectorWidthB"] = 8
+        else:
+          if state["UseDotInstruction"]:
+            # dot2: LRVW should be equal to NumDotElements * InnerUnroll
+            if state["LocalReadVectorWidth"] not in [-1, state["NumDotElements"] * state["InnerUnroll"]]:
+              reject(state, printRejectionReason, "dot kernel requires LocalReadVectorWidth = NumDotElements(%u) * InnerUnroll(%u)" \
+                % (state["NumDotElements"], state["InnerUnroll"]))
+              return
+            state["LocalReadVectorWidth"] = state["NumDotElements"] * state["InnerUnroll"]
+            state["LocalReadVectorWidthA"] = state["NumDotElements"] * state["InnerUnroll"]
+            state["LocalReadVectorWidthB"] = state["NumDotElements"] * state["InnerUnroll"]
+          else: # mac
+            if state["LocalReadVectorWidth"] == -1:
+              state["LocalReadVectorWidth"] = state["VectorWidthA"]
+            if state["LocalReadVectorWidth"] != state["VectorWidthA"] or \
+               state["LocalReadVectorWidth"] != state["VectorWidthB"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidth must equal VectorWidthA/B for MAC kernels")
+            if state["LocalReadVectorWidthA"] == -1:
+              state["LocalReadVectorWidthA"] = state["VectorWidthA"]
+            if state["LocalReadVectorWidthB"] == -1:
+              state["LocalReadVectorWidthB"] = state["VectorWidthB"]
+
+
+      def calLRVWFor950MX():
+        # Determine if we need to infer LRVW. Returns True if,
+        #   - state["LocalReadVectorWidth{tc}"] is -1, and,
+        #   - state["ProblemType"]["MacDataType{tc}"] is not 6-bit float
+        # If the LRVW is set by the user, validate the configuration and rejects if,
+        #   - state["LocalReadVectorWidth{tc}"] * state["ProblemType"]["MacDataType{tc}"].numRegisters() < 1 if not sparse
+        #   - state["LocalReadVectorWidth{tc}"] // 2 * state["ProblemType"]["MacDataType{tc}"].numRegisters() < 1 is sparse
+        #   - state["LocalReadVectorWidth{tc}"] > state["MIInputPerThread"] and LDS is not transposed 
+        def isAutoLRVW(tc) -> bool:
+          autoLRVW = False
+          if state[f"LocalReadVectorWidth{tc}"] != -1:
+            tmplrvw = (state[f"LocalReadVectorWidth{tc}"] // 2) if state["ProblemType"]["Sparse"] else state[f"LocalReadVectorWidth{tc}"]
+            if tmplrvw * state["ProblemType"][f"MacDataType{tc}"].numRegisters() < 1:
+              reject(state, "LocalReadVectorWidth * dataRegister < 1")
+            if state[f"LocalReadVectorWidth{tc}"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, "LocalReadVectorWidth require Transpose LDS")
+          else:
+            if state["ProblemType"][f"MacDataType{tc}"].is6bitFloat():
+              state[f"LocalReadVectorWidth{tc}"] = 32 if state[f"UnrollMajorLDS{tc}"] else 16
+            else:
+              autoLRVW = True
+              if state["TransposeLDS"] and (not state[f"DirectToLds{tc}"]):
+                state[f"LocalReadVectorWidth{tc}"] = int(16 // state["ProblemType"][f"MacDataType{tc}"].numBytes())
+              else:
+                if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"][f"MacDataType{tc}"].numBytes() > 16:
+                  state[f"LocalReadVectorWidth{tc}"] = int(16 // state["ProblemType"][f"MacDataType{tc}"].numBytes())
+                else:
+                  state[f"LocalReadVectorWidth{tc}"] = state["MIInputPerThread"]
+              if state[f"LocalReadVectorWidth{tc}"] // state["MIInputPerThread"] > 1:
+                if (state["DepthU"] // state["MatrixInstK"] <= state[f"LocalReadVectorWidth{tc}"] // state["MIInputPerThread"]):
+                  # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                  state[f"LocalReadVectorWidth{tc}"] //= 2
+          return autoLRVW
+
+        if state["EnableMatrixInstruction"]:
+          autoLRVWA = isAutoLRVW("A")
+          autoLRVWB = isAutoLRVW("B")
+          if autoLRVWA or autoLRVWB:
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
+
+            if (wlrA > 1) or (wlrB > 1):
+              padA, padB, padM = calcLdsPad(state["LocalReadVectorWidth"], isaInfoMap)
+              ldsBlockSizePerPadA, ldsBlockSizePerPadB = calcLdsBlockSizePerPad(state["LocalReadVectorWidth"])
+              ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB, ldsNumBytesMetadata, ldsNumBytesAlignedMetadata, \
+              ldsNumBytesMXSA, ldsNumBytesAlignedMXSA, ldsNumBytesMXSB, ldsNumBytesAlignedMXSB \
+                = calcLdsNumBytes(padA, ldsBlockSizePerPadA, padB, ldsBlockSizePerPadB)
+              ldsNumBytes = ldsNumBytesAlignedA + ldsNumBytesAlignedB + \
+                            ldsNumBytesAlignedMXSA + ldsNumBytesAlignedMXSB + \
+                            ldsNumBytesAlignedMetadata 
+              if ldsNumBytes > state["MaxLDS"]:
+                if wlrA > 1:
+                  state["LocalReadVectorWidthA"] //= 2
+                if wlrB > 1:
+                  state["LocalReadVectorWidthB"] //= 2
+
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThreadA"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThreadB"], 1)
+            if wlrA > wlrB:
+              state["LocalReadVectorWidthA"] = wlrB * state["MIInputPerThreadA"]
+              if state["ProblemType"]["Sparse"] == 1:
+                state["LocalReadVectorWidthA"] //= 2
+            if wlrA < wlrB:
+              state["LocalReadVectorWidthB"] = wlrA * state["MIInputPerThreadB"]
+              if state["ProblemType"]["Sparse"] == 2:
+                state["LocalReadVectorWidthB"] //= 2
+
+          if state["ProblemType"]["Sparse"] == 1:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthA"]
+          elif state["ProblemType"]["Sparse"] == 2:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthB"]
+
+          if state["ProblemType"]["MXBlockA"]:
+            state["LocalReadVectorWidthMXSA"] = 1 # TODO: check if need to fomulization
+          if state["ProblemType"]["MXBlockB"]:
+            state["LocalReadVectorWidthMXSB"] = 1 # TODO: check if need to fomulization
+        else:
+          reject(state, printRejectionReason, "expecting MFMA for MX datatypes")
+          return
 
       # Default LocalReadVectorWidth
-      if state["EnableMatrixInstruction"]:
-        autoLRVW = 0
-        if state["LocalReadVectorWidth"] == -1:
-          autoLRVW = 1
-          if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["DataType"].numBytes() > 16):
-            state["LocalReadVectorWidth"] = 16 // state["ProblemType"]["DataType"].numBytes()
-          else:
-            state["LocalReadVectorWidth"] = state["MIInputPerThread"]
-        else:
-          if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"]["DataType"].numBytes() > 16:
-            if state["LocalReadVectorWidth"] < state["MIInputPerThread"] // 2:
-              reject(state, printRejectionReason, "LocalReadVectorWidth < %u" %(state["MIInputPerThread"] // 2))
-          elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["DataType"].is8bitFloat() and (state["MatrixInstK"] == 64 or state["MatrixInstK"] == 128)):
-            if state["LocalReadVectorWidth"] < state["MIInputPerThread"]:
-              reject(state, printRejectionReason, "LocalReadVectorWidth < %u" %(state["MIInputPerThread"]))
-          if state["LocalReadVectorWidth"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
-            reject(state, printRejectionReason, "LocalReadVectorWidth require Transpose LDS")
-
-        if autoLRVW:
-          if state["LocalReadVectorWidth"] // state["MIInputPerThread"] > 1:
-            if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidth"] // state["MIInputPerThread"]):
-              # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
-              state["LocalReadVectorWidth"] //= 2
-          if state["LocalReadVectorWidth"] // state["MIInputPerThread"] > 1:
-            padA, padB, padM = calcLdsPad(state["LocalReadVectorWidth"], isaInfoMap)
-            ldsBlockSizePerPadA, ldsBlockSizePerPadB = calcLdsBlockSizePerPad(state["LocalReadVectorWidth"])
-            ldsBlockSizePerPadA = 0 if padA == 0 else ldsBlockSizePerPadA
-            ldsBlockSizePerPadB = 0 if padB == 0 else ldsBlockSizePerPadB
-            ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB, ldsNumBytesMetadata, ldsNumBytesAlignedMetadata = calcLdsNumBytes(padA, ldsBlockSizePerPadA, padB, ldsBlockSizePerPadB)
-            if (ldsNumBytesAlignedA + ldsNumBytesAlignedB) > state["MaxLDS"]:
-              state["LocalReadVectorWidth"] //= 2
-
-        if state["enableGLTrA"] or state["enableGLTrB"]:
-          state["LocalReadVectorWidth"] = 8
+      if state["ISA"] == IsaVersion(9,5,0) and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+        calLRVWFor950MX()
       else:
-        if state["UseDotInstruction"]:
-          # dot2: LRVW should be equal to NumDotElements * InnerUnroll
-          if state["LocalReadVectorWidth"] not in [-1, state["NumDotElements"] * state["InnerUnroll"]]:
-            reject(state, printRejectionReason, "dot kernel requires LocalReadVectorWidth = NumDotElements(%u) * InnerUnroll(%u)" \
-              % (state["NumDotElements"], state["InnerUnroll"]))
-            return
-          state["LocalReadVectorWidth"] = state["NumDotElements"] * state["InnerUnroll"]
-        else: # mac
-          if state["LocalReadVectorWidth"] == -1:
-            state["LocalReadVectorWidth"] = state["VectorWidthA"]
-          if state["LocalReadVectorWidth"] != state["VectorWidthA"] or \
-             state["LocalReadVectorWidth"] != state["VectorWidthB"]:
-            reject(state, printRejectionReason, "LocalReadVectorWidth must equal VectorWidthA/B for MAC kernels")
+        calLRVW()
 
       def calcOptGRVW(lrvw: int, unrollMajorLDS: bool, datatype: DataType) -> int:
         # with UnrollMajorLDS, GRVW need to less or equal than LRVW to have conflict free LDS read with padding.
         optGRVW = lrvw if unrollMajorLDS else 4 / datatype.numRegisters()
-        if optGRVW * datatype.numBytes() > 16:
-          optGRVW = 16 // datatype.numBytes()
+        if optGRVW * datatype.numBytes() > 16 and not(isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and datatype.numBytes() == 0.75):
+          optGRVW = int(16 // datatype.numBytes())
         return optGRVW
 
       def calSwizzlePackK(state, tc):
-        return 16 // state[f"MIInputPerThread{tc}"] // state["ProblemType"][f"DataType{tc}"].numBytes()
+        return 16 // state[f"MIInputPerThread{tc}"] // int(state["ProblemType"][f"DataType{tc}"].numBytes())
 
       genGRVWA = False
       genGRVWB = False
@@ -1927,16 +2920,24 @@ class Solution(collections.abc.Mapping):
           elif state["GlobalReadVectorWidthA"] == -1:
             if state["ProblemType"]["SwizzleTensorA"]:
               state["GlobalReadVectorWidthA"] = state["MIInputPerThreadA"] * calSwizzlePackK(state, "A")
+            elif state["ProblemType"]["DataTypeA"].is6bitFloat():
+              state["GlobalReadVectorWidthA"] = 32	  
             elif state["enableGLTrA"]:
               state["GlobalReadVectorWidthA"] = 8
             else:
-              optGRVW = calcOptGRVW(state["LocalReadVectorWidth"], state["UnrollMajorLDSA"], state["ProblemType"]["DataTypeA"])
+              optGRVW = calcOptGRVW(state["LocalReadVectorWidthA"], state["UnrollMajorLDSA"], state["ProblemType"]["DataTypeA"])
               curGRVW = 1
               state["GlobalReadVectorWidthA"] = int(curGRVW)
               while (curGRVW <= optGRVW):
                 if (state["MacroTile0"]*state["_DepthUA"]//state["NumThreads"]) % curGRVW == 0:
                   state["GlobalReadVectorWidthA"] = int(curGRVW)
                 curGRVW *= 2
+        if state["ProblemType"]["MXBlockA"]:
+          state["GlobalReadVectorWidthMXSA"] = max(state["MacroTile0"] * state["_DepthUMXSA"] // state["NumThreads"], 1)
+          # workaround for DTL
+          # use 32bit load for DTL if GlobalReadVectorWidthMXS is 8
+          if state["DirectToLdsMXSA"] and state["GlobalReadVectorWidthMXSA"] == 8:
+            state["GlobalReadVectorWidthMXSA"] = 4
       else:
         # dot2
         if state["UseDotInstruction"]:
@@ -1954,7 +2955,6 @@ class Solution(collections.abc.Mapping):
           if state["ProblemType"]["TLUA"]:
             state["AssertFree0ElementMultiple"] = max(state["AssertFree0ElementMultiple"], state["GlobalReadVectorWidthA"])
 
-
       # Default GlobalReadVectorWidthB
       if state["EnableMatrixInstruction"]:
         if state["GlobalReadVectorWidthB"] < 0:
@@ -1967,16 +2967,24 @@ class Solution(collections.abc.Mapping):
           elif state["GlobalReadVectorWidthB"] == -1:
             if state["ProblemType"]["SwizzleTensorB"]:
               state["GlobalReadVectorWidthB"] = state["MIInputPerThreadB"] * calSwizzlePackK(state, "B")
+            elif state["ProblemType"]["DataTypeB"].is6bitFloat():
+              state["GlobalReadVectorWidthB"] = 32
             elif state["enableGLTrB"]:
               state["GlobalReadVectorWidthB"] = 8
             else:
-              optGRVW = calcOptGRVW(state["LocalReadVectorWidth"], state["UnrollMajorLDSB"], state["ProblemType"]["DataTypeB"])
+              optGRVW = calcOptGRVW(state["LocalReadVectorWidthB"], state["UnrollMajorLDSB"], state["ProblemType"]["DataTypeB"])
               curGRVW = 1
               state["GlobalReadVectorWidthB"] = int(curGRVW)
               while (curGRVW <= optGRVW):
                 if (state["MacroTile1"]*state["_DepthUB"]//state["NumThreads"]) % curGRVW == 0:
                   state["GlobalReadVectorWidthB"] = int(curGRVW)
                 curGRVW *= 2
+        if state["ProblemType"]["MXBlockB"]:
+          state["GlobalReadVectorWidthMXSB"] = max(state["MacroTile1"] * state["_DepthUMXSB"] // state["NumThreads"], 1)
+          # workaround for DTL
+          # use 32bit load for DTL if GlobalReadVectorWidthMXS is 8
+          if state["DirectToLdsMXSB"] and state["GlobalReadVectorWidthMXSB"] == 8:
+            state["GlobalReadVectorWidthMXSB"] = 4
       else:
         # dot2
         if state["UseDotInstruction"]:
@@ -1993,6 +3001,22 @@ class Solution(collections.abc.Mapping):
           # TODO: support edge shiftptr to release this constraint.
           if state["ProblemType"]["TLUB"]:
             state["AssertFree1ElementMultiple"] = max(state["AssertFree1ElementMultiple"], state["GlobalReadVectorWidthB"])
+
+      if state["EnableMatrixInstruction"]:
+        if state["ProblemType"]["MXBlockA"]:
+          state["GlobalReadVectorWidthMXSA"] = max(state["MacroTile0"] * state["_DepthUMXSA"] // state["NumThreads"], 1)
+          if state["ProblemType"]["TLUMXSA"]:
+            state["GlobalReadVectorWidthMXSA"] = min(state["GlobalReadVectorWidthMXSA"], state["MacroTile0"])
+          else:
+            state["GlobalReadVectorWidthMXSA"] = min(state["GlobalReadVectorWidthMXSA"], state["_DepthUMXSA"])
+          state["GlobalReadVectorWidthMXSA"] = min(state["GlobalReadVectorWidthMXSA"], 16)
+        if state["ProblemType"]["MXBlockB"]:
+          state["GlobalReadVectorWidthMXSB"] = max(state["MacroTile1"] * state["_DepthUMXSB"] // state["NumThreads"], 1)
+          if state["ProblemType"]["TLUMXSB"]:
+            state["GlobalReadVectorWidthMXSB"] = min(state["GlobalReadVectorWidthMXSB"], state["MacroTile1"])
+          else:
+            state["GlobalReadVectorWidthMXSB"] = min(state["GlobalReadVectorWidthMXSB"], state["_DepthUMXSB"])
+          state["GlobalReadVectorWidthMXSB"] = min(state["GlobalReadVectorWidthMXSB"], 16)
 
       #for tensor swizzling, we calculate pack-k to achieve buffer_load_dwordx4
       for tc in ("A", "B",):
@@ -2030,16 +3054,16 @@ class Solution(collections.abc.Mapping):
         state["GlobalReadVectorWidthB"] = min(state["GlobalReadVectorWidthA"], state["GlobalReadVectorWidthB"])
 
       # reject - VW too big
-      if (state["VectorWidthA"] * state["ProblemType"]["DataType"].numBytes()) > 16:
-        reject(state, printRejectionReason, "VWA * DataType.numBytes() > 16")
-      if (state["VectorWidthB"] * state["ProblemType"]["DataType"].numBytes()) > 16:
-        reject(state, printRejectionReason, "VWB * DataType.numBytes() > 16")
+      if (state["VectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes()) > 16:
+        reject(state, printRejectionReason, "VWA * MacDataTypeA.numBytes() > 16")
+      if (state["VectorWidthB"] * state["ProblemType"]["MacDataTypeB"].numBytes()) > 16:
+        reject(state, printRejectionReason, "VWB * MacDataTypeB.numBytes() > 16")
 
       # reject - GRVW too big
-      if (state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataTypeA"].numBytes()) > 16 and not state["UseF32XEmulation"]:
-        reject(state, printRejectionReason, "GRVWA * DataTypeA.numBytes() > 16")
-      if (state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataTypeB"].numBytes()) > 16 and not state["UseF32XEmulation"]:
-        reject(state, printRejectionReason, "GRVWB * DataTypeB.numBytes() > 16")
+      if (state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataTypeA"].numBytes()) > 24:
+        reject(state, printRejectionReason, "GRVWA * DataTypeA.numBytes() > 24")
+      if (state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataTypeB"].numBytes()) > 24:
+        reject(state, printRejectionReason, "GRVWB * DataTypeB.numBytes() > 24")
 
       disableGNLC = False # Set to true to disable GNLC if needed
       if state["UseSgprForGRO"] == 1:
@@ -2058,6 +3082,9 @@ class Solution(collections.abc.Mapping):
             sameLayout = state["ProblemType"]["TLU%s"%tc] != state["UnrollMajorLDS%s"%tc]
             state["UseGeneralizedNLCOne%s"%tc] = grwidth != 8 and sameLayout \
               and state["WaveSeparateGlobalRead%s"%tc] == 0 and not state["DirectToVgpr%s"%tc]
+            # workaround: disable UseGeneralizedNLCOne for MXBlock (TODO: enable it for MXBlock)
+            if state["ProblemType"]["MXBlock%s"%tc]:
+              state["UseGeneralizedNLCOne%s"%tc] = False
           else:
             state["UseGeneralizedNLCOne%s"%tc] = False
         state["UseGeneralizedNLCOneMetadata"] = False
@@ -2078,18 +3105,73 @@ class Solution(collections.abc.Mapping):
       while True: # exit criteria at end
         validDepthU = True
 
-        # how many elements to load
+        # handle global read vector width A
         if state["ProblemType"]["TLUA"]: # NT/NN
           totalElementsCoalescedA = state["MacroTileA"]
-          totalElementsPerpA = depthUA
+          totalElementsPerpA = state["_DepthUA"]
           if state["DirectToVgprA"]:
             totalElementsCoalescedA *= state["MIWaveGroup"][1]
         else: # TN/TT
-          totalElementsCoalescedA = depthUA
+          totalElementsCoalescedA = state["_DepthUA"]
           totalElementsPerpA = state["MacroTileA"]
           if state["DirectToVgprA"]:
             totalElementsPerpA *= state["MIWaveGroup"][1]
 
+        if state["GlobalReadVectorWidthA"] > totalElementsCoalescedA:
+          reject(state, printRejectionReason, f"GRVWA({state['GlobalReadVectorWidthA']}) > Coaleased({totalElementsCoalescedA})")
+
+        totalElementsA = totalElementsCoalescedA * totalElementsPerpA
+
+        tva = totalElementsA // state["GlobalReadVectorWidthA"]
+        if not Solution.setGlobalReadVectorWidth(state, "A", tva, state["GlobalReadVectorWidthA"], printRejectionReason):
+          validDepthU = False
+
+        if state["EnableMatrixInstruction"] and state["GlobalReadVectorWidthA"]:
+          partialA = state["ProblemType"]["TLUA"] and (state["AssertFree0ElementMultiple"] % state["GlobalReadVectorWidthA"] != 0)
+          if partialA and not state["UseGeneralizedNLCOneA"]:
+            limitBytes = 24 if state["ProblemType"]["DataType"].is6bitFloat else 16
+            glvwAlimit = int(limitBytes / state["ProblemType"]["MacDataTypeA"].numBytes())
+            if state["SourceSwap"]:
+              matrixInstM = (state["MatrixInstM"] * state["MatrixInstBM"]) if (state["MatrixInstM"] == 4) else state["MatrixInstM"]
+              glvwAlimit = matrixInstM * state["VectorWidthA"]
+            else:
+              matrixInstN = (state["MatrixInstN"] * state["MatrixInstBN"]) if (state["MatrixInstN"] == 4) else state["MatrixInstN"]
+              glvwAlimit  = state["MIOutputVectorWidth"] * (state["WavefrontSize"] // matrixInstN)
+            if state["ProblemType"]["MacDataTypeA"].numRegisters() == 0.25:
+              glvwAlimit = max(glvwAlimit, 4)
+
+            # reduce GLVA if GLVA larger than MIOVW
+            if state["GlobalReadVectorWidthA"] > glvwAlimit:
+              tva = totalElementsA // glvwAlimit
+              if not Solution.setGlobalReadVectorWidth(state, "A", tva, glvwAlimit, printRejectionReason):
+                validDepthU = False
+
+        GlobalReadVectorWidthA = state["GlobalReadVectorWidthA"]
+        totalVectorsCoalescedA = totalElementsCoalescedA // GlobalReadVectorWidthA
+
+        # handle global read vector width MXSA
+        if state["ProblemType"]["MXBlockA"] and not state["UseSubtileImpl"]:
+          if state["ProblemType"]["TLUMXSA"]: # NT/NN
+            totalElementsCoalescedMXSA = state["MacroTileMXSA"]
+            totalElementsPerpMXSA = state["_DepthUMXSA"]
+            if state["DirectToVgprMXSA"]:
+              totalElementsCoalescedMXSA *= state["MIWaveGroup"][1]
+          else: # TN/TT
+            totalElementsCoalescedMXSA = state["_DepthUMXSA"]
+            totalElementsPerpMXSA = state["MacroTileMXSA"]
+            if state["DirectToVgprMXSA"]:
+              totalElementsPerpMXSA *= state["MIWaveGroup"][1]
+
+          totalElementsMXSA = totalElementsCoalescedMXSA * totalElementsPerpMXSA
+
+          tvmxsa = totalElementsMXSA // state["GlobalReadVectorWidthMXSA"]
+          if not Solution.setGlobalReadVectorWidth(state, "MXSA", tvmxsa, state["GlobalReadVectorWidthMXSA"], printRejectionReason):
+            validDepthU = False
+
+          GlobalReadVectorWidthMXSA = state["GlobalReadVectorWidthMXSA"]
+          totalVectorsCoalescedMXSA = totalElementsCoalescedMXSA // GlobalReadVectorWidthMXSA
+
+        # handle global read vector width B
         if state["ProblemType"]["TLUB"]: # NT/TT
           totalElementsCoalescedB = state["MacroTileB"]
           totalElementsPerpB = depthUB
@@ -2101,8 +3183,12 @@ class Solution(collections.abc.Mapping):
           if state["DirectToVgprB"]:
             totalElementsPerpB *= state["MIWaveGroup"][0]
 
-        totalElementsA = totalElementsCoalescedA * totalElementsPerpA
+        if state["GlobalReadVectorWidthB"] > totalElementsCoalescedB:
+          reject(state, printRejectionReason, f"GRVWB({state['GlobalReadVectorWidthB']}) > Coaleased({totalElementsCoalescedB})")
+
         totalElementsB = totalElementsCoalescedB * totalElementsPerpB
+
+        # handle global read vector width M
         if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
           if state["ProblemType"]["TLUMetadata"]:
             totalElementsCoalescedM = state["MacroTileMetadata"]
@@ -2112,43 +3198,22 @@ class Solution(collections.abc.Mapping):
             totalElementsPerpM = state["MacroTileMetadata"]
           totalElementsM = totalElementsCoalescedM * totalElementsPerpM
 
-        tva = totalElementsA // state["GlobalReadVectorWidthA"]
-        if not Solution.setGlobalReadVectorWidth(state, "A", tva, state["GlobalReadVectorWidthA"], printRejectionReason):
-          validDepthU = False
-
         tvb = totalElementsB // state["GlobalReadVectorWidthB"]
         if not Solution.setGlobalReadVectorWidth(state, "B", tvb, state["GlobalReadVectorWidthB"], printRejectionReason):
           validDepthU = False
 
-        if state["EnableMatrixInstruction"] and state["GlobalReadVectorWidthA"]:
-          partialA = state["ProblemType"]["TLUA"] and (state["AssertFree0ElementMultiple"] % state["GlobalReadVectorWidthA"] != 0)
-          if partialA and not state["UseGeneralizedNLCOneA"]:
-            glvwAlimit = 16 // state["ProblemType"]["DataType"].numBytes()
-            if state["SourceSwap"]:
-              matrixInstM = (state["MatrixInstM"] * state["MatrixInstBM"]) if (state["MatrixInstM"] == 4) else state["MatrixInstM"]
-              glvwAlimit = matrixInstM * state["VectorWidthA"]
-            else:
-              matrixInstN = (state["MatrixInstN"] * state["MatrixInstBN"]) if (state["MatrixInstN"] == 4) else state["MatrixInstN"]
-              glvwAlimit  = state["MIOutputVectorWidth"] * (state["WavefrontSize"] // matrixInstN)
-            if state["ProblemType"]["DataType"].numRegisters() == 0.25:
-              glvwAlimit = max(glvwAlimit, 4)
-
-            # reduce GLVA if GLVA larger than MIOVW
-            if state["GlobalReadVectorWidthA"] > glvwAlimit:
-              tva = totalElementsA // glvwAlimit
-              if not Solution.setGlobalReadVectorWidth(state, "A", tva, glvwAlimit, printRejectionReason):
-                validDepthU = False
-
         if state["EnableMatrixInstruction"] and state["GlobalReadVectorWidthB"]:
           partialB = state["ProblemType"]["TLUB"] and (state["AssertFree1ElementMultiple"] % state["GlobalReadVectorWidthB"] != 0)
           if partialB and not state["UseGeneralizedNLCOneB"]:
-            glvwBlimit = 16 // state["ProblemType"]["DataType"].numBytes()
+            limitBytes = 24 if state["ProblemType"]["DataType"].is6bitFloat else 16
+            glvwBlimit = int(limitBytes / state["ProblemType"]["MacDataTypeB"].numBytes())
             if state["SourceSwap"]:
               matrixInstM = (state["MatrixInstM"] * state["MatrixInstBM"]) if (state["MatrixInstM"] == 4) else state["MatrixInstM"]
               glvwBlimit  = state["MIOutputVectorWidth"] * (state["WavefrontSize"] // matrixInstM)
-            # else:  # use origin shiftptr for B
-            #   matrixInstN = (state["MatrixInstN"] * state["MatrixInstBN"]) if (state["MatrixInstN"] == 4) else state["MatrixInstN"]
-            if state["ProblemType"]["DataType"].numRegisters() == 0.25:
+            else:  # use origin shiftptr for B
+              matrixInstN = (state["MatrixInstN"] * state["MatrixInstBN"]) if (state["MatrixInstN"] == 4) else state["MatrixInstN"]
+              glvwBlimit = matrixInstN * state["VectorWidthB"]
+            if state["ProblemType"]["MacDataTypeB"].numRegisters() == 0.25:
               glvwBlimit = max(glvwBlimit, 4)
 
             # reduce GLVB if GLVB larger than MIOVW
@@ -2157,30 +3222,47 @@ class Solution(collections.abc.Mapping):
               if not Solution.setGlobalReadVectorWidth(state, "B", tvb, glvwBlimit, printRejectionReason):
                 validDepthU = False
 
-        if validDepthU and state["KernelLanguage"] == "Assembly":
-          if isaInfoMap[state["ISA"]].archCaps["HasEccHalf"]:
-            if state["ProblemType"]["DataType"].numRegisters() == 0.5 and (not state["ProblemType"]["HighPrecisionAccumulate"]) \
-               and (not state["ProblemType"]["DataTypeA"].isSingle()) and (not state["ProblemType"]["DataTypeB"].isSingle()):
-                if state["GlobalReadVectorWidthA"] == 1 or state["GlobalReadVectorWidthB"] == 1:
-                  reject(state, printRejectionReason, "HalfEcc requires HPA if glvw = 1")
-                  break
+        GlobalReadVectorWidthB = state["GlobalReadVectorWidthB"]
+        totalVectorsCoalescedB = totalElementsCoalescedB // GlobalReadVectorWidthB
 
+        # handle global read vector width MXSB
+        if state["ProblemType"]["MXBlockB"] and not state["UseSubtileImpl"]:
+          if state["ProblemType"]["TLUMXSB"]: # NT/NN
+            totalElementsCoalescedMXSB = state["MacroTileMXSB"]
+            totalElementsPerpMXSB = state["_DepthUMXSB"]
+            if state["DirectToVgprMXSB"]:
+              totalElementsCoalescedMXSB *= state["MIWaveGroup"][1]
+          else: # TN/TT
+            totalElementsCoalescedMXSB = state["_DepthUMXSB"]
+            totalElementsPerpMXSB = state["MacroTileMXSB"]
+            if state["DirectToVgprMXSB"]:
+              totalElementsPerpMXSB *= state["MIWaveGroup"][1]
+
+          totalElementsMXSB = totalElementsCoalescedMXSB * totalElementsPerpMXSB
+
+          tvmxsa = totalElementsMXSB // state["GlobalReadVectorWidthMXSB"]
+          if not Solution.setGlobalReadVectorWidth(state, "MXSB", tvmxsa, state["GlobalReadVectorWidthMXSB"], printRejectionReason):
+            validDepthU = False
+
+          GlobalReadVectorWidthMXSB = state["GlobalReadVectorWidthMXSB"]
+          totalVectorsCoalescedMXSB = totalElementsCoalescedMXSB // GlobalReadVectorWidthMXSB
+
+         # handle global read vector width Metadata
         if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
           grvw = 1
           vw = 1
           if state["ProblemType"]["Sparse"] == 2:
-            grvw = state["GlobalReadVectorWidthB"] // 4
-            vw = state["VectorWidthB"] // 4
+            grvw = math.ceil(state["GlobalReadVectorWidthB"] / 4)
+            vw = math.ceil(state["VectorWidthB"] / 4)
             if state["GlobalReadVectorWidthB"] % 4 != 0:
               reject(state, printRejectionReason, "Sparse B requires GRVWB %% 4 == 0, current GRVWB is %u"%state["GlobalReadVectorWidthB"])
               break
           else:
-            grvw = state["GlobalReadVectorWidthA"] // 4
-            vw = state["VectorWidthA"] // 4
+            grvw = math.ceil(state["GlobalReadVectorWidthA"] / 4)
+            vw = math.ceil(state["VectorWidthA"] / 4)
             if state["GlobalReadVectorWidthA"] % 4 != 0:
               reject(state, printRejectionReason, "Sparse A requires GRVWA %% 4 == 0, current GRVWA is %u"%state["GlobalReadVectorWidthA"])
               break
-
 
           tvm = totalElementsM // grvw
 
@@ -2210,16 +3292,18 @@ class Solution(collections.abc.Mapping):
                 if not Solution.setGlobalReadVectorWidth(state, "Metadata", tvm, glvwMlimit, printRejectionReason):
                   validDepthU = False
 
+        if validDepthU and state["KernelLanguage"] == "Assembly":
+          if isaInfoMap[state["ISA"]].archCaps["HasEccHalf"]:
+            if state["ProblemType"]["DataType"].numRegisters() == 0.5 and (not state["ProblemType"]["HighPrecisionAccumulate"]) \
+               and (not state["ProblemType"]["DataTypeA"].isSingle()) and (not state["ProblemType"]["DataTypeB"].isSingle()):
+                if state["GlobalReadVectorWidthA"] == 1 or state["GlobalReadVectorWidthB"] == 1:
+                  reject(state, printRejectionReason, "HalfEcc requires HPA if glvw = 1")
+                  break
+
         if state["ProblemType"]["Sparse"] and state["DirectToVgprSparseMetadata"]:
           if state["VectorWidthA"] > 1 or state["VectorWidthB"] > 1 :
             reject(state, printRejectionReason, "Not implement DTVSM with VW>1")
             break
-
-        # Now convert elements to vectors based on GlobalReadVectorWidth
-        GlobalReadVectorWidthA = state["GlobalReadVectorWidthA"]
-        GlobalReadVectorWidthB = state["GlobalReadVectorWidthB"]
-        totalVectorsCoalescedA = totalElementsCoalescedA // GlobalReadVectorWidthA
-        totalVectorsCoalescedB = totalElementsCoalescedB // GlobalReadVectorWidthB
 
         extraComment = ""
         if validDepthU:
@@ -2274,19 +3358,9 @@ class Solution(collections.abc.Mapping):
     if state["ScheduleIterAlg"] == 2:
       state["InnerUnroll"] = state["DepthU"] // state["MatrixInstK"]
       state["PrefetchLocalRead"] = 1
-      state["ExpandPointerSwap"] = 1
+      #state["ExpandPointerSwap"] = 1 # EPS is adjusted in advance
       state["1LDSBuffer"] = 1
-      print2("\nSet SIA=2, force PrefetchLocalRead=1, ExpandPointerSwap=1, 1LDSBuffer=1")
-
-    if state["ExpandPointerSwap"] == 1:
-      # Pointer swap only used if PGR==1 or (PGR>1 and double/double complex) - so set ExpandPointerSwap=0 here
-      # So far, EPS=1 and PGR>1 works only with double/double complex.
-      #if not (bufferLoad and state["PrefetchGlobalRead"] == 1):
-      if not (bufferLoad and ( state["PrefetchGlobalRead"] == 1 \
-              or (state["PrefetchGlobalRead"] > 1 and \
-                  (state["ProblemType"]["DataType"].isDouble() or state["ProblemType"]["DataType"].isDoubleComplex()))
-              or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))):
-        state["ExpandPointerSwap"] = 0
+      print2("\nSet SIA=2, force PrefetchLocalRead=1, 1LDSBuffer=1")
 
     # Default GlobalStoreVectorWidth
     if state["StoreVectorWidth"] == -1:
@@ -2294,15 +3368,19 @@ class Solution(collections.abc.Mapping):
         state["StoreVectorWidth"] = state["VectorWidthA"]
       else:
         if state["EnableMatrixInstruction"]:
-          state["StoreVectorWidth"] = state["MIOutputVectorWidth"]
-          if state["VectorWidthA"] * state["MIOutputVectorWidth"] <= 4 / state["ProblemType"]["DestDataType"].numRegisters():
-            state["StoreVectorWidth"] = state["VectorWidthA"] * state["MIOutputVectorWidth"]
+          # Adjusting StoreVectorWidth for larger CGEMM register count
+          if state["ProblemType"]["DestDataType"].isSingleComplex():
+            state["StoreVectorWidth"] = 4 // state["ProblemType"]["DestDataType"].numRegisters()
+          else:
+            state["StoreVectorWidth"] = state["MIOutputVectorWidth"]
+            if state["VectorWidthA"] * state["MIOutputVectorWidth"] <= 4 / state["ProblemType"]["DestDataType"].numRegisters():
+              state["StoreVectorWidth"] = state["VectorWidthA"] * state["MIOutputVectorWidth"]
           if state["LocalSplitU"] > 1:
             state["StoreVectorWidth"] = state["VectorWidthA"]
         else:
           state["StoreVectorWidth"] = state["VectorWidthA"]
 
-    if state["EnableMatrixInstruction"]:
+    if state["EnableMatrixInstruction"] and not state["UseSubtileImpl"]:
       if state["SourceSwap"]:
         if ((state["VectorWidthA"] % state["StoreVectorWidth"]) != 0):
           reject(state, printRejectionReason, "MFMA SourceSwap mode doesn't support vwA(%u) with svw(%u)" % (state["VectorWidthA"], state["StoreVectorWidth"]))
@@ -2337,8 +3415,8 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "LSU and non-SourceSwap doesn't support StoreVectorWidth(%u)>VWA(%u)." \
             % (state["StoreVectorWidth"], state["VectorWidthA"]))
         return
-      if not (state["ProblemType"]["ComputeDataType"].isSingle() or state["ProblemType"]["ComputeDataType"].isInt32()):
-        reject(state, printRejectionReason, "TODO: LSU doesn't support ComputeDataType!=(single or Int32).")
+      if not (state["ProblemType"]["ComputeDataType"].isSingle() or state["ProblemType"]["ComputeDataType"].isInt32() or state["ProblemType"]["ComputeDataType"].isComplex()):
+        reject(state, printRejectionReason, "TODO: LSU doesn't support ComputeDataType!=(single, Int32 or complex).")
         return
       if state["StoreRemapVectorWidth"] > 0:
         reject(state, printRejectionReason, "TODO: LSU doesn't support StoreRemapVectorWidth>0.")
@@ -2389,7 +3467,9 @@ class Solution(collections.abc.Mapping):
         reject(state, "dot2 kernel requires InnerUnroll = 1,2 or 4")
       if state["NumWaveSplitK"] not in [1,2,4,8,16,32,64]:
         reject(state, "Unsupported NumWaveSplitK value. Need to be power of 2 and does not exceed 64.")
-      if state["DepthU"] % (state["LocalReadVectorWidth"] * state["NumWaveSplitK"]) != 0:
+      if state["_DepthUA"] % (state["LocalReadVectorWidthA"] * state["NumWaveSplitK"]) != 0:
+        reject(state, "Non-valid DepthU for dot2 kernel, need to be multiple of (LocalReadVectorWidth * InnerUnroll * NumWaveSplitK) for atomics")
+      if state["_DepthUB"] % (state["LocalReadVectorWidthB"] * state["NumWaveSplitK"]) != 0:
         reject(state, "Non-valid DepthU for dot2 kernel, need to be multiple of (LocalReadVectorWidth * InnerUnroll * NumWaveSplitK) for atomics")
       # TODO: Need to consider VectorWidth in LraTileAssignmentVALU
       if state["VectorWidthA"] != 1 or state["VectorWidthB"] != 1:
@@ -2411,11 +3491,19 @@ class Solution(collections.abc.Mapping):
       state["NumLoadsCoalescedMetadata"] = 1
 
     if not Solution.setGlobalLoadTileDimClassic(state, "A", state["NumLoadsA"], \
-        totalVectorsCoalescedA, totalElementsPerpA, depthUA, printRejectionReason):
+        totalVectorsCoalescedA, totalElementsPerpA, state["_DepthUA"], printRejectionReason):
       return
+    if state["ProblemType"]["MXBlockA"] and not state["UseSubtileImpl"]:
+      if not Solution.setGlobalLoadTileDimClassic(state, "MXSA", state["NumLoadsMXSA"], \
+          totalVectorsCoalescedMXSA, totalElementsPerpMXSA, state["_DepthUMXSA"], printRejectionReason):
+        return
     if not Solution.setGlobalLoadTileDimClassic(state, "B", state["NumLoadsB"], \
-        totalVectorsCoalescedB, totalElementsPerpB, depthUB, printRejectionReason):
+        totalVectorsCoalescedB, totalElementsPerpB, state["_DepthUB"], printRejectionReason):
       return
+    if state["ProblemType"]["MXBlockB"] and not state["UseSubtileImpl"]:
+      if not Solution.setGlobalLoadTileDimClassic(state, "MXSB", state["NumLoadsMXSB"], \
+          totalVectorsCoalescedMXSB, totalElementsPerpMXSB, state["_DepthUMXSB"], printRejectionReason):
+        return
 
     if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
       if state["ProblemType"]["TLUMetadata"]:
@@ -2479,8 +3567,17 @@ class Solution(collections.abc.Mapping):
 
     state["LVCA"] = roundupRatio(state["LSCA"] , state["GlobalReadVectorWidthA"])
     state["LVPA"] = roundupRatio(state["LSPA"] , state["GlobalReadVectorWidthA"])
+
+    if state["ProblemType"]["MXBlockA"]:
+      state["LVCMXSA"] = roundupRatio(state["LSCMXSA"] , state["GlobalReadVectorWidthMXSA"])
+      state["LVPMXSA"] = roundupRatio(state["LSPMXSA"] , state["GlobalReadVectorWidthMXSA"])
+
     state["LVCB"] = roundupRatio(state["LSCB"] , state["GlobalReadVectorWidthB"])
     state["LVPB"] = roundupRatio(state["LSPB"] , state["GlobalReadVectorWidthB"])
+
+    if state["ProblemType"]["MXBlockB"]:
+      state["LVCMXSB"] = roundupRatio(state["LSCMXSB"] , state["GlobalReadVectorWidthMXSB"])
+      state["LVPMXSB"] = roundupRatio(state["LSPMXSB"] , state["GlobalReadVectorWidthMXSB"])
 
     if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
       state["LVCMetadata"] = roundupRatio(state["LSCMetadata"] , state["GlobalReadVectorWidthMetadata"])
@@ -2505,10 +3602,42 @@ class Solution(collections.abc.Mapping):
 
     # NoTailLoop parameter initialization.
     # If ASEM is multiple of DepthU TailLoop will not be used.
-    # Unless kernel is Stream-K; Stream-K always requires TailLoop to handle work division.
     state["NoTailLoop"] = False
-    if state["AssertSummationElementMultiple"] % state["DepthU"] == 0 and state["StreamK"] == 0:
+    if state["AssertSummationElementMultiple"] % state["DepthU"] == 0:
       state["NoTailLoop"] = True
+
+    # TailloopInNll optimization check
+    if state["TailloopInNll"]:
+      # Disable TailloopInNll
+      # - (not MFMA) or WMMA
+      # - PrefetchGlobalRead is 0
+      # - NoTailLoop
+      # - DepthU is not power of 2
+      # - LocalSplitU > 1
+      # - MX case
+      if ((not state["EnableMatrixInstruction"]) or isaInfoMap[isa].asmCaps["HasWMMA"]) or \
+         (state["PrefetchGlobalRead"] == 0) or \
+         state["NoTailLoop"] or \
+         (state["DepthU"] <=1 or (state["DepthU"] & (state["DepthU"] - 1) != 0)) or \
+         state["LocalSplitU"] > 1 or \
+         state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
+        state["TailloopInNll"] = False
+
+      # need restrictions for TailloopInNll
+      if state["TailloopInNll"]:
+        # need to disable SuppressNoLoadLoop
+        state["SuppressNoLoadLoop"] = False
+
+      # disable StaggerUcode
+      # - TailloopInNll
+      # - MX + StreamK (not enough sgpr)
+      if state["TailloopInNll"] or \
+         (state["StreamK"] and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"])):
+        # need to disable StaggerU
+        state["StaggerU"] = 0
+        state["StaggerUMapping"] = 0
+        state["StaggerUStride"] = 0
+        state["InternalSupportParams"]["SupportCustomStaggerU"] = False # Disable CustomStaggerU for no StagggerU code
 
     # Determine if we can load directly-to-Vgpr
     # need to check after state["LocalReadVectorWidth"] = -1 is resolved
@@ -2523,11 +3652,17 @@ class Solution(collections.abc.Mapping):
     # LDS
     ########################################
 
-    state["TransposeLDSMetadata"] = False if state["ProblemType"]["Sparse"] == 2 else True
-    state["UnrollMajorLDSMetadata"] = False if state["ProblemType"]["Sparse"] == 2 else True
+    if state["ProblemType"]["Sparse"]:
+      transposeLDSMetadata = int(state["TransposeLDSMetadata"])
+      if transposeLDSMetadata == -1:
+        state["TransposeLDSMetadata"] = int(not state["ProblemType"]["TLUMetadata"])
+      else:
+        state["TransposeLDSMetadata"] = int(transposeLDSMetadata)
 
-    if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
-      state["UnrollMajorLDSMetadata"] = state["TransposeLDSMetadata"] and (not state["ProblemType"]["TLUMetadata"])
+      state["UnrollMajorLDSMetadata"] = False if state["ProblemType"]["Sparse"] == 2 else True
+
+      if not state["DirectToVgprSparseMetadata"]:
+        state["UnrollMajorLDSMetadata"] = state["TransposeLDSMetadata"]
 
     # Determine if we can load directly-to-LDS.
     # Transpose requires a trip through registers to perform the transpose so can't use DirectToLdsA
@@ -2541,14 +3676,24 @@ class Solution(collections.abc.Mapping):
     # LDS (load size coalesced) * LSPA must load some multiple of 256 bytes.
     # No longer support loadX2/loadx4 .
     for tc in ['A', 'B']:
+      tcmx = "MXS%s"%tc
+      if state["UseSubtileImpl"] and state["ProblemType"]["MXBlock%s"%tc]:
+        state["DirectToLds%s"%tcmx] = False
       if state["DirectToLds%s"%tc]:
         isDtlDoable = Solution.isDirectToLdsDoable(state, tc, isaInfoMap, printRejectionReason)
         if (not state["DirectToVgpr%s"%tc]) and isDtlDoable:
-          state['tailLoopOpt%s'%tc] = False
           state["DirectToLds%s"%tc] = True
           state["LocalWriteUseSgpr%s"%tc] = True
+          # MX case
+          if state["ProblemType"]["MXBlock%s"%tc]:
+            isDtlMxDoable = Solution.isDirectToLdsDoable(state, tcmx, isaInfoMap, printRejectionReason)
+            state["DirectToLds%s"%tcmx] = isDtlMxDoable
         else:
           state["DirectToLds%s"%tc] = False
+          state["LocalWriteUseSgpr%s"%tc] = False
+          # MX case
+          if state["ProblemType"]["MXBlock%s"%tc]:
+            state["DirectToLds%s"%tcmx] = False
           if not isDtlDoable:
             if state["UseGeneralizedNLCOne%s"%tc]:
               reject(state, printRejectionReason, "DirectToLds%s not doable, but GNLC%s enabled, rejecting"%(tc, tc))
@@ -2565,16 +3710,17 @@ class Solution(collections.abc.Mapping):
     if state["1LDSBuffer"] == -1 and state["DirectToLds"]:
       #1LDS buffer must be 0 for DirectToLdsA
       state["1LDSBuffer"] = 0
+    # MX case
+    if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+      if state["DirectToLdsA"] != state["DirectToLdsMXSA"] or state["DirectToLdsB"] != state["DirectToLdsMXSB"]:
+          reject(state, printRejectionReason, "DirectToLdsA/B and DirectToLdsMXSA/B should match")
+      if state["DirectToLdsA"] != state["DirectToLdsB"]:
+          reject(state, printRejectionReason, "DirectToLdsA and DirectToLdsB should match")
 
     # does not work with UnrollLoopSwapGlobalReadOrder
     if (state["DirectToLds"] == 2 or state["DirectToLds"] == 3) and state["UnrollLoopSwapGlobalReadOrder"]:
       reject(state, printRejectionReason, "DirectToLdsA or B only does not supports UnrollLoopSwapGlobalReadOrder")
       return False
-
-    # Temp: Force enable CLR when DTL is used for TF32.
-    # TODO: Determine why DTL+CLR=0 causes issues
-    if state["UseF32XEmulation"] and state["DirectToLds"]:
-      state["ClusterLocalRead"] = 1
 
     # Re-check DTV + WaveGroup after DTL is confirmed
     if state["DirectToLds"]:
@@ -2585,13 +3731,27 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "DirectToLds + (DirectToVgprB + WaveGroups along M-Dim) is not supported yet")
         return False
 
+    state["enableLDSTrMetadata"] = isaInfoMap[isa].asmCaps["HasLDSTrB64B8"] and state["ProblemType"]["MetadataLayout"]
+    if state["enableLDSTrMetadata"]:
+      state["VectorWidthMetadata"] = 1
+
+      # the VetorWidth of the sparse matrix and metadta need to be the same.
+      if state["ProblemType"]["Sparse"] == 1:
+        state["VectorWidthA"] = 1
+      else:
+        state["VectorWidthB"] = 1
+
     auto_LdsBlockSizePerPadA_for_mix = 0
     if state["LdsBlockSizePerPadA"] == -1:
       auto_LdsBlockSizePerPadA_for_mix = 1
     auto_LdsBlockSizePerPadB_for_mix = 0
     if state["LdsBlockSizePerPadB"] == -1:
       auto_LdsBlockSizePerPadB_for_mix = 1
-    state["LdsBlockSizePerPadA"], state["LdsBlockSizePerPadB"] = calcLdsBlockSizePerPad(state["LocalReadVectorWidth"])
+    state["LdsBlockSizePerPadA"] = calcLdsBlockSizePerPad("A", state["LocalReadVectorWidthA"])
+    state["LdsBlockSizePerPadB"] = calcLdsBlockSizePerPad("B", state["LocalReadVectorWidthB"])
+    state["LdsBlockSizePerPadMXSA"] = calcLdsBlockSizePerPad("MXSA", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockA"] else 0
+    state["LdsBlockSizePerPadMXSB"] = calcLdsBlockSizePerPad("MXSB", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockB"] else 0
+    checkLdsBlockSizePerPadForTDM(state["LdsBlockSizePerPadA"], state["LdsBlockSizePerPadB"], state["LdsBlockSizePerPadMXSA"], state["LdsBlockSizePerPadMXSB"])
 
     if state["LdsBlockSizePerPadMetadata"] == -1:
       state["LdsBlockSizePerPadMetadata"] = state["LdsBlockSizePerPadA"]
@@ -2599,18 +3759,18 @@ class Solution(collections.abc.Mapping):
     if state["EnableMatrixInstruction"]:
       if state["LdsBlockSizePerPadA"] and not state["UseGeneralizedNLCOneA"]:
         if state["UnrollMajorLDSA"]:
-          if state["LdsBlockSizePerPadA"] % (state["_DepthUA"] * state["ProblemType"]["DataTypeA"].numBytes()) != 0:
+          if state["LdsBlockSizePerPadA"] % int(state["_DepthUA"] * getLdsBpe("A")) != 0:
             reject(state, printRejectionReason, "reject: LdsBlockSizePerPadA %u %% depthU %u x bpeA != 0" % (state["LdsBlockSizePerPadA"],state["_DepthUA"]))
-          if (state["LdsBlockSizePerPadA"] // (state["_DepthUA"] * state["ProblemType"]["DataType"].numBytes())) % state["LSPA"] != 0 and \
-              state["LSPA"] % (state["LdsBlockSizePerPadA"] // (state["_DepthUA"] * state["ProblemType"]["DataType"].numBytes())) != 0:
+          if (state["LdsBlockSizePerPadA"] // (state["_DepthUA"] * state["ProblemType"]["MacDataTypeA"].numBytes())) % state["LSPA"] != 0 and \
+              state["LSPA"] % (state["LdsBlockSizePerPadA"] // (state["_DepthUA"] * state["ProblemType"]["MacDataTypeA"].numBytes())) != 0:
             reject(state, printRejectionReason, "can't pad by addrVgpr or instOffset")
 
       if state["LdsBlockSizePerPadB"] and not state["UseGeneralizedNLCOneB"]:
         if state["UnrollMajorLDSB"]:
-          if state["LdsBlockSizePerPadB"] % state["_DepthUB"] * state["ProblemType"]["DataTypeB"].numBytes() != 0:
+          if state["LdsBlockSizePerPadB"] % int(state["_DepthUB"] * getLdsBpe("B")) != 0:
             reject(state, printRejectionReason, "reject: LdsBlockSizePerPadB %u %% depthU %u x bpeB != 0" % (state["LdsBlockSizePerPadB"],state["_DepthUB"]))
-          if (state["LdsBlockSizePerPadB"] // (state["_DepthUB"] * state["ProblemType"]["DataType"].numBytes())) % state["LSPB"] != 0 and \
-              state["LSPB"] % (state["LdsBlockSizePerPadB"] // (state["_DepthUB"] * state["ProblemType"]["DataType"].numBytes())) != 0:
+          if (state["LdsBlockSizePerPadB"] // (state["_DepthUB"] * state["ProblemType"]["MacDataTypeB"].numBytes())) % state["LSPB"] != 0 and \
+              state["LSPB"] % (state["LdsBlockSizePerPadB"] // (state["_DepthUB"] * state["ProblemType"]["MacDataTypeB"].numBytes())) != 0:
             reject(state, printRejectionReason, "can't pad by addrVgpr or instOffset")
     else:
       if not state["UseDotInstruction"] and (state["UnrollMajorLDSA"] or state["UnrollMajorLDSB"]):
@@ -2710,7 +3870,7 @@ class Solution(collections.abc.Mapping):
 
       def subCheckLdsBlockSizePerPad(tc, idx):
         lbspp = state["LdsBlockSizePerPad%s"%tc]
-        bpe = state["ProblemType"]["DataType"].numBytes()
+        bpe = state["ProblemType"]["MacDataType%s"%tc].numBytes()
         bpr = 4
         vw = state["GlobalReadVectorWidth%s"%tc]
         tlu = state["ProblemType"]["TLU%s"%tc]
@@ -2776,16 +3936,81 @@ class Solution(collections.abc.Mapping):
     state["NoLdsWriteCode"] = False
     if (state["DirectToVgprA"] or state["DirectToLdsA"]) and (state["DirectToVgprB"] or state["DirectToLdsB"]):
       state["NoLdsWriteCode"] = True
+      # MX case
+      if state["ProblemType"]["MXBlockA"]:
+        if not (state["DirectToVgprMXSA"] or state["DirectToLdsMXSA"]):
+          state["NoLdsWriteCode"] = False
+      if state["ProblemType"]["MXBlockB"]:
+        if not (state["DirectToVgprMXSB"] or state["DirectToLdsMXSB"]):
+          state["NoLdsWriteCode"] = False
+    elif state["enableTDMA"] and state["enableTDMB"]:
+      state["NoLdsWriteCode"] = True
+
+    # Use64bShadowLimitMX for MX case only
+    if not (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+      state["Use64bShadowLimitMX"] = False
+
+    # enable scheduling GR (in LWcode for PGR2) over barrier sync
+    if not state["EnableMatrixInstruction"]:
+      # not valid for non MFMA case
+      state["ScheduleGROverBarrier"] = 0
+    else:
+      numMFMA = state["MIWaveTile"][0] * state["MIWaveTile"][1] * (state["DepthU"] // (state["MatrixInstK"] * state["LocalSplitU"]))
+      if state["ScheduleGROverBarrier"] == -1:
+        # auto enable ScheduleGROverBarrier for PGR>=3
+        # PGR2+tripleLDS case, manual enablement only
+        state["ScheduleGROverBarrier"] = 0
+        if state["PrefetchGlobalRead"] >= 3:
+          # better to avoid applying this logic for smaller MT sizes
+          # Set threshold as
+          #  PGR3: MT128x64x64 with MT16x16x32x1 (with 4 waves)
+          # threshold //= 2 for MI32
+          thresholdMFMA = 128*64*64 / (16*16*32*4) # MI16x16x32x1 4waves
+          if state["MatrixInstM"] == 32:
+            thresholdMFMA //= 2
+          if numMFMA >= thresholdMFMA:
+            state["ScheduleGROverBarrier"] = 1
+      if state["ScheduleGROverBarrier"]:
+        # enable ScheduleGROverBarrier only for
+        # - NoLdsWriteCode and not DTV, and
+        # - PGR>=2, and
+        # - PLR>=1
+        # - small MT (detail below)
+        if (not state["NoLdsWriteCode"]) or \
+           (state["DirectToVgprA"] or state["DirectToVgprB"]) or \
+           state["PrefetchGlobalRead"] < 2:
+          state["ScheduleGROverBarrier"] = 0
+        # disable this logic for very small MT sizes
+        # Set threshold as MT64x64x64 with MT16x16x32x1 (with 4 waves)
+        # threshold //= 2 for MI32
+        thresholdMFMA = 64*64*64 / (16*16*32*4) # MI16x16x32x1 4waves
+        if state["MatrixInstM"] == 32:
+          thresholdMFMA //= 2
+        if numMFMA < thresholdMFMA:
+          state["ScheduleGROverBarrier"] = 0
+
+    # number of minimum GR inc inst per MFMA
+    # default 1
+    # Set at least 2 for gfx950 + MI16 + smaller MT case
+    # Set 3 for MX (number of GRInc is doubled)
+    if state["MinGRIncPerMfma"] == -1:
+      state["MinGRIncPerMfma"] = 1
+      if isa == (9, 5, 0):
+        if state["EnableMatrixInstruction"] and state["MatrixInstM"] == 16 and state["MatrixInstB"] == 1:
+          if numMFMA<=16 or (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+            state["MinGRIncPerMfma"] = 3
+          elif numMFMA<=32:
+            state["MinGRIncPerMfma"] = 2
 
     # calculate ldsPad
-    state["LdsPadA"], state["LdsPadB"], state["LdsPadMetadata"] = calcLdsPad(state["LocalReadVectorWidth"], isaInfoMap)
+    state["LdsPadA"], state["LdsPadB"], state["LdsPadMetadata"], state["LdsPadMXSA"], state["LdsPadMXSB"] = calcLdsPad(isaInfoMap)
 
-    if state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataType"].numBytes() == 32 and state["LdsPadA"] == 16 // state["ProblemType"]["DataType"].numBytes():
+    if state["GlobalReadVectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes() == 32 and state["LdsPadA"] == 16 // state["ProblemType"]["MacDataTypeA"].numBytes():
       if auto_LdsBlockSizePerPadA_for_mix:
         state["LdsBlockSizePerPadA"] = 128
     assert(state["LdsPadA"] >= 0)
 
-    if state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataType"].numBytes() == 32 and state["LdsPadB"] == 16 // state["ProblemType"]["DataType"].numBytes():
+    if state["GlobalReadVectorWidthB"] * state["ProblemType"]["MacDataTypeB"].numBytes() == 32 and state["LdsPadB"] == 16 // state["ProblemType"]["MacDataTypeB"].numBytes():
       if auto_LdsBlockSizePerPadB_for_mix:
         state["LdsBlockSizePerPadB"] = 128
     assert(state["LdsPadB"] >= 0)
@@ -2795,44 +4020,133 @@ class Solution(collections.abc.Mapping):
       if state["LdsPad%s"%tc] == 0:
         state["LdsBlockSizePerPad%s"%tc] = 0
 
+    # Normalize lds block-size-per-pad fields to native Python int.
+    assert(int(state["LdsBlockSizePerPadA"]) == state["LdsBlockSizePerPadA"])
+    assert(int(state["LdsBlockSizePerPadB"]) == state["LdsBlockSizePerPadB"])
+    assert(int(state["LdsBlockSizePerPadMetadata"]) == state["LdsBlockSizePerPadMetadata"])
+    state["LdsBlockSizePerPadA"] = int(state["LdsBlockSizePerPadA"])
+    state["LdsBlockSizePerPadB"] = int(state["LdsBlockSizePerPadB"])
+    state["LdsBlockSizePerPadMetadata"] = int(state["LdsBlockSizePerPadMetadata"])
+
     if (state["UnrollMajorLDSA"] or state["UnrollMajorLDSB"]) and (not state["EnableMatrixInstruction"]) and (not state["UseDotInstruction"]):
         reject(state, printRejectionReason, "UnrollMajorLDS Supports only in EnableMatrixInstruction=1 or dot2 kernel")
 
-    ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB, ldsNumBytesMetadata, ldsNumBytesAlignedMetadata = calcLdsNumBytes(state["LdsPadA"], state["LdsBlockSizePerPadA"], state["LdsPadB"], state["LdsBlockSizePerPadB"])
-    state["LdsOffsetA_Blk"]=0
-    state["LdsOffsetB_Blk"]=0
-    state["LdsOffsetMetadata_Blk"]=0
+    (ldsNumBytesA, ldsNumBytesAlignedA) = calcLdsNumBytesAB("A", state["LdsPadA"], state["LdsBlockSizePerPadA"])
+    (ldsNumBytesB, ldsNumBytesAlignedB) = calcLdsNumBytesAB("B", state["LdsPadB"], state["LdsBlockSizePerPadB"])
+    (ldsNumBytesMXSA, ldsNumBytesAlignedMXSA) = calcLdsNumBytesAB("MXSA", state["LdsPadMXSA"], state["LdsBlockSizePerPadMXSA"]) if state["ProblemType"]["MXBlockA"] else (0, 0)
+    (ldsNumBytesMXSB, ldsNumBytesAlignedMXSB) = calcLdsNumBytesAB("MXSB", state["LdsPadMXSB"], state["LdsBlockSizePerPadMXSB"]) if state["ProblemType"]["MXBlockB"] else (0, 0)
+    (ldsNumBytesMetadata, ldsNumBytesAlignedMetadata) = calcLdsNumBytesM()
+
+    state["LdsOffsetA_Blk"] = 0
+    state["LdsOffsetB_Blk"] = 0
+    state["LdsOffsetMXSA_Blk"] = 0
+    state["LdsOffsetMXSB_Blk"] = 0
+    state["LdsOffsetMetadata_Blk"] = 0
+
     # todo, can the alignment be a power of 2?
     state["LdsOffsetA"] = 0
-    state["LdsNumElementsAlignedA"] = ldsNumBytesAlignedA
-    state["LdsNumElementsAlignedB"] = ldsNumBytesAlignedB
-    state["LdsNumElementsAlignedMetadata"] = ldsNumBytesAlignedMetadata
-    if state["PrefetchGlobalRead"]:
-      state["LdsOffsetMetadata"] = state["LdsOffsetA"] + state["LdsNumElementsAlignedA"]
-      state["LdsOffsetB"] = state["LdsOffsetMetadata"] + state["LdsNumElementsAlignedMetadata"]
+    state["LdsNumElementsAlignedA"] = int(ldsNumBytesAlignedA)
+    state["LdsNumElementsAlignedMXSA"] = int(ldsNumBytesAlignedMXSA)
+    state["LdsNumElementsAlignedB"] = int(ldsNumBytesAlignedB)
+    state["LdsNumElementsAlignedMXSB"] = int(ldsNumBytesAlignedMXSB)
+    state["LdsNumElementsAlignedMetadata"] = int(ldsNumBytesAlignedMetadata)
+    # check for auto DtlPlusLdsBuf
+    if state["DtlPlusLdsBuf"] == -1:
+      if state["PrefetchGlobalRead"] > 2:
+        state["DtlPlusLdsBuf"] = 1
+      else:
+        state["DtlPlusLdsBuf"] = 0
+    # disable DtlPlusLdsBuf if not applicable
+    if state["DtlPlusLdsBuf"]:
+      # DTLA + DTLB only
+      if not(state["DirectToLdsA"] and state["DirectToLdsB"]):
+        state["DtlPlusLdsBuf"] = 0
+      # PGR>=2 only
+      if state["PrefetchGlobalRead"] < 2:
+        state["DtlPlusLdsBuf"] = 0
+      # SIA==3 only
+      if state["ScheduleIterAlg"] != 3:
+        state["DtlPlusLdsBuf"] = 0
+      # restrict feature combinations
+      if state["DtlPlusLdsBuf"]:
+        # force 1LDSBuffer = 0
+        state["1LDSBuffer"] = 0
 
-      offsetBlk = state["LdsOffsetB"] + ldsNumBytesAlignedB
+    # Here, 1LDSBuffer == -1 is not resolved yet.
+    # (cannot move 1LDSBuffer==-1 resolution code above because of referring ldsNumBytesAB)
+    # Assuming larger buffer here
+    numLdsBlk = 1 if state["1LDSBuffer"] == 1 else 2
+    if state["PrefetchGlobalRead"] >= 3:
+      # PGR>=3, number of LDS Block is set to PGR
+      numLdsBlk = state["PrefetchGlobalRead"]
+      # force 1LDSBuffer = 0
+      state["1LDSBuffer"] = 0
+    if state["PrefetchGlobalRead"] >= 2 and state["DtlPlusLdsBuf"]:
+      # PGR>=2 + DtlPlusLdsBuf case, try to allocate PGR+1 LDSBlk to schedule GR over barrier
+      numLdsBlk = state["PrefetchGlobalRead"] + 1
 
-      state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
-        (state["1LDSBuffer"] == 0) and \
-        (offsetBlk + int(2**(math.ceil(math.log(offsetBlk, 2)))) > state["MaxLDS"])
-
-      if offsetBlk > 0 and not state["StoreSwapAddr"]:
-        # Rounds offsetBlk to a power of two to enable inlining {s,v}_xor constants for swapping offsets
-        offsetBlk = int(2**(math.ceil(math.log(offsetBlk, 2))))
-
+    def setLdsOffsets(offsetBlk, numLdsBlk, ldsNumBytesB):
+      if numLdsBlk <= 1:
+        # 1LDSBuffer case, use 2 to calculate ldsNumBytesAB
+        numLdsBlk = 2
       state["LdsOffsetA_Blk"] = offsetBlk
-      state["LdsOffsetMetadata_Blk"] = state["LdsOffsetA_Blk"] + state["LdsNumElementsAlignedA"]
+      state["LdsOffsetMXSA_Blk"] = state["LdsOffsetA_Blk"] + state["LdsNumElementsAlignedA"]
+      state["LdsOffsetMXSB_Blk"] = state["LdsOffsetMXSA_Blk"] + state["LdsNumElementsAlignedMXSA"]
+      state["LdsOffsetMetadata_Blk"] = state["LdsOffsetMXSB_Blk"] + state["LdsNumElementsAlignedMXSB"]
       state["LdsOffsetB_Blk"] = state["LdsOffsetMetadata_Blk"] + state["LdsNumElementsAlignedMetadata"]
-      ldsNumBytesAB = state["LdsOffsetB_Blk"] + ldsNumBytesB
+      ldsNumBytesAB = (numLdsBlk - 2) * offsetBlk + state["LdsOffsetB_Blk"] + ldsNumBytesB
+      return ldsNumBytesAB
+
+    state["ldsNumBytesA"] = ldsNumBytesA
+    state["ldsNumBytesB"] = ldsNumBytesB
+    state["ldsNumBytesMXSA"] = ldsNumBytesMXSA
+    state["ldsNumBytesMXSB"] = ldsNumBytesMXSB
+    state["ldsNumBytesMetadata"] = ldsNumBytesMetadata
+
+    state["LdsOffsetA"] = 0
+    state["LdsOffsetMXSA"] = state["LdsOffsetA"] + state["LdsNumElementsAlignedA"]
+    state["LdsOffsetMXSB"] = state["LdsOffsetMXSA"] + state["LdsNumElementsAlignedMXSA"]
+    state["LdsOffsetMetadata"] = state["LdsOffsetMXSB"] + state["LdsNumElementsAlignedMXSB"]
+    state["LdsOffsetB"] = state["LdsOffsetMetadata"] + state["LdsNumElementsAlignedMetadata"]
+    if state["PrefetchGlobalRead"]:
+      offsetBlk = state["LdsOffsetB"] + ldsNumBytesAlignedB
+      roundupOffsetBlk = int(2**(math.ceil(math.log(offsetBlk, 2)))) if offsetBlk > 0 else 0
+
+      if not isaInfoMap[isa].asmCaps["HasWMMA"]:
+        state["StoreSwapAddr"] = (state["PrefetchGlobalRead"] == 2) and \
+          (state["1LDSBuffer"] == 0) and numLdsBlk == 2 and \
+          (offsetBlk + roundupOffsetBlk) > state["MaxLDS"]
+      else:
+        state["StoreSwapAddr"] = offsetBlk > 0 and (state["1LDSBuffer"] != 1) and \
+          (offsetBlk + int(2**(math.ceil(math.log(offsetBlk, 2)))) > state["MaxLDS"])
+
+      if offsetBlk > 0 and not state["StoreSwapAddr"] and numLdsBlk == 2:
+        # Rounds offsetBlk to a power of two to enable inlining {s,v}_xor constants for swapping offsets
+        # skip ceiling to nearest power of two for numLdsBlk>=3
+        offsetBlk = roundupOffsetBlk
+
+      ldsNumBytesAB = setLdsOffsets(offsetBlk, numLdsBlk, ldsNumBytesB)
+      # decrement numLdsBlk for DtlPlusLdsBuf if it exceeds MaxLDS
+      # PGR 2 case, reject kernel (need to use StoreSwapAddr in that case)
+      if state["DtlPlusLdsBuf"] and ldsNumBytesAB > state["MaxLDS"]:
+        numLdsBlk -= 1
+        # continue with original logic for PGR2 + numLdsBlk==2
+        if state["PrefetchGlobalRead"] == 2:
+          if  (offsetBlk + roundupOffsetBlk) > state["MaxLDS"]:
+            state["StoreSwapAddr"] = True
+          else:
+            offsetBlk = roundupOffsetBlk
+        # re-calculate LDS size with numLdsBlk==2
+        ldsNumBytesAB = setLdsOffsets(offsetBlk, numLdsBlk, ldsNumBytesB)
+        # unset DtlPlusLdsBuf
+        state["DtlPlusLdsBuf"] = 0
     else:
-      state["LdsOffsetMetadata"] = ldsNumBytesAlignedA
-      state["LdsOffsetB"] = state["LdsOffsetMetadata"] + ldsNumBytesAlignedMetadata
       ldsNumBytesAB = state["LdsOffsetB"] + ldsNumBytesB
+    state["NumLdsBlk"] = numLdsBlk
 
     # lds buffer size for reduction
     # if User want to control the LDS usage, we may open this para in the future
-    ldsNumBytesReduction = state["LocalSplitU"] * state["MacroTile0"] * state["MacroTile1"] * state["ProblemType"]["ComputeDataType"].numBytes() if state["LocalSplitU"] > 1 else 0
+    ldsNumBytesReduction = state["LocalSplitU"] * state["MacroTile0"] * state["MacroTile1"] * int(state["ProblemType"]["ComputeDataType"].numBytes()) if state["LocalSplitU"] > 1 else 0
     state["LocalSplitUReuseLDS"] = 1
     if ldsNumBytesReduction > state["MaxLDS"]:
       state["LocalSplitUReuseLDS"] = math.ceil(ldsNumBytesReduction / state["MaxLDS"])
@@ -2868,9 +4182,13 @@ class Solution(collections.abc.Mapping):
       # Should be able to support as long as NO scheduleLocalWrite
       if (not state["ScheduleIterAlg"] == 2) and (not state["ScheduleIterAlg"] == 3) and (state["ScheduleLocalWrite"]):
         reject(state, printRejectionReason, "1LDSBuffer only support SIA2 or SIA3, or SIA1 without SLW")
-      state["LdsOffsetB"] = ldsNumBytesAlignedA
-      state["LdsOffsetMetadata"] = state["LdsOffsetB"] + ldsNumBytesAlignedB
-      ldsNumBytesAB = ldsNumBytesAlignedA + ldsNumBytesAlignedB + ldsNumBytesMetadata
+      state["LdsOffsetA"] = 0
+      state["LdsOffsetMXSA"] = state["LdsOffsetA"] + state["LdsNumElementsAlignedA"]
+      state["LdsOffsetB"] = state["LdsOffsetMXSA"] + state["LdsNumElementsAlignedMXSA"]
+      state["LdsOffsetMXSB"] = state["LdsOffsetB"] + state["LdsNumElementsAlignedB"]
+      state["LdsOffsetMetadata"] = state["LdsOffsetMXSB"] + state["LdsNumElementsAlignedMXSB"]
+      ldsNumBytesAB = state["LdsOffsetMetadata"] + ldsNumBytesMetadata
+      state["StoreSwapAddr"] = False
 
     # lds size is the greater of the two
     ldsNumBytes = max(ldsNumBytesAB, ldsNumBytesReduction, ldsNumBytesOccupancy)
@@ -2879,14 +4197,14 @@ class Solution(collections.abc.Mapping):
       if ldsNumBytes > 32768 or \
           state["ProblemType"]["ComputeDataType"].numBytes() * state["MacroTile0"] * state["MacroTile1"] > 32768*4:
         state["NumElementsPerBatchStore"] = 0
-        state["StorePriorityOpt"] = 0
+        state["StorePriorityOpt"] = False
         state["StoreSyncOpt"] = 0
-        state["GroupLoadStore"] = 0
+        state["GroupLoadStore"] = False
       else:
         state["NumElementsPerBatchStore"] = 16 if not state["ProblemType"]["DataType"].numBytes() == 8 else 1
 
     # Mbsk prefetch optimization
-    if state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel':
+    if state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel' and state["AdaptiveGemmGSUA"] == 0:
         state["MbskPrefetchMethod"] = 0
     elif state["MbskPrefetchMethod"] == -1:
       numStoreElements = state["NumElementsPerThread"] // state["StoreVectorWidth"]
@@ -2902,12 +4220,12 @@ class Solution(collections.abc.Mapping):
 
     if state["StoreRemapVectorWidth"] == -1:
       # use de_read_b64 as default in storeRemap to avoid bank conflict
-      defaultRemap = 8 // state["ProblemType"]["DestDataType"].numBytes()
+      defaultRemap = 8 // int(state["ProblemType"]["DestDataType"].numBytes())
       defaultRemap = max(defaultRemap, state["MacroTile0"]//state["WavefrontSize"])
       if state["EnableMatrixInstruction"]:
         ldsRemapPad = max(defaultRemap, state["MIOutputVectorWidth"])
         ldsNumElementsRemapC = (state["MacroTile0"]+ldsRemapPad)* state["MatrixInstN"] * state["MIWaveGroup"][1]
-        computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
+        computeBytes = int(state["ProblemType"]["ComputeDataType"].numBytes())
         # max(GlobalAccumulation case, non-GlobalAccumulation)
         ldsNumElementsRemapC = max(ldsNumElementsRemapC, ldsNumElementsRemapC * (computeBytes / state["ProblemType"]["DestDataType"].numBytes()))
         ldsSize = ldsNumElementsRemapC * state["ProblemType"]["DestDataType"].numBytes()
@@ -2952,20 +4270,12 @@ class Solution(collections.abc.Mapping):
 
     # Sparse problem
     if state["ProblemType"]["Sparse"]:
-      if state["PrefetchGlobalRead"] and not state["ExpandPointerSwap"]:
-        reject(state, printRejectionReason, "Sparse A kernel only support PGR with EPS=1.")
+      # if state["PrefetchGlobalRead"] and not state["ExpandPointerSwap"]:
+      #   reject(state, printRejectionReason, "Sparse A kernel only support PGR with EPS=1.")
+      #   return
+      if not isaInfoMap[isa].asmCaps["HasSWMMAC"] and state["EnableMatrixInstruction"] and state["MIArchVgpr"]:
+        reject(state, printRejectionReason, "Current ISA does not support MIArchVgpr in Sparse kernels.")
         return
-      if state["EnableMatrixInstruction"] and state["MIArchVgpr"]:
-        reject(state, printRejectionReason, "Sparse A kernel does not support MIArchVgpr yet.")
-        return
-      # Not Support Feature
-      if state["ProblemType"]["Sparse"] == 1 and state["SourceSwap"] :
-        reject(state, printRejectionReason, "Sparse A kernel cannot support SourceSwap.")
-        return
-      else:
-        if state["ProblemType"]["Sparse"] == 2 and not state["SourceSwap"]:
-          reject(state, printRejectionReason, "Sparse B kernel must enable SourceSwap.")
-          return
       state["AssertSummationElementMultiple"] = 8
 
     # check if need to use lds init Acc vgprs
@@ -3053,9 +4363,9 @@ class Solution(collections.abc.Mapping):
       else:
         multiplier = state["ProblemType"]["DataType"].numBytes()
 
-      ldsNumBytesRemapCNonGSU = ldsNumBytesRemapC * multiplier
-      ldsNumBytesRemapCGSU    = ldsNumBytesRemapC * multiplierGSU
-      ldsNumBytesRemapC *= max(multiplier, multiplierGSU)
+      ldsNumBytesRemapCNonGSU = int(ldsNumBytesRemapC * multiplier)
+      ldsNumBytesRemapCGSU    = int(ldsNumBytesRemapC * multiplierGSU)
+      ldsNumBytesRemapC       = int(ldsNumBytesRemapC * max(multiplier, multiplierGSU))
 
 
       #print("ldsNumBytesRemapC=%u" % ldsNumBytesRemapC)
@@ -3140,14 +4450,14 @@ class Solution(collections.abc.Mapping):
         if tile01 > -1:
           maxKId = state["WavefrontSize"] // ((state["MatrixInstM"] if (tile01 == 0) else state["MatrixInstN"]) * state["MatrixInstB"])
           for dataType in state["ProblemType"]["BiasDataTypeList"]:
-            epilogueSize = max(epilogueSize, state["MacroTile%d"%tile01] * maxKId * dataType.numBytes()) # TODO- GetTurn ?
+            epilogueSize = max(epilogueSize, int(state["MacroTile%d"%tile01] * maxKId * dataType.numBytes())) # TODO- GetTurn ?
       else:
-        epilogueSize = state["NumThreads"] * state["ProblemType"]["ComputeDataType"].numBytes() * vecDT.bias(0).turn
+        epilogueSize = int(state["NumThreads"] * state["ProblemType"]["ComputeDataType"].numBytes() * vecDT.bias(0).turn)
     # Calculate max ldsNumBytes for other epilogues
     if state["ProblemType"]["UseScaleAlphaVec"]:
-      epilogueSize += state["NumThreads"] * state["ProblemType"]["ComputeDataType"].numBytes() * vecDT.scaleAlpha(0).turn
+      epilogueSize += int(state["NumThreads"] * state["ProblemType"]["ComputeDataType"].numBytes() * vecDT.scaleAlpha(0).turn)
     if state["ProblemType"]["UseScaleAB"] == "Vector":
-      epilogueSize += state["NumThreads"] * state["ProblemType"]["ComputeDataType"].numBytes() * (vecDT.scaleA.turn + vecDT.scaleB.turn)
+      epilogueSize += int(state["NumThreads"] * state["ProblemType"]["ComputeDataType"].numBytes() * (vecDT.scaleA.turn + vecDT.scaleB.turn))
     ldsNumBytes = max(ldsNumBytes, state["LdsOffsetBias"] + epilogueSize)
 
     state["LdsBytesNoAmax"] = ldsNumBytes
@@ -3156,7 +4466,7 @@ class Solution(collections.abc.Mapping):
       # 4 data * half_wave_num * amax bytePerE
       num_workItems = state["NumThreads"]
       half_wave_size = state["WavefrontSize"] // 2
-      amaxBPE = state["ProblemType"]["DataTypeAmaxD"].numBytes()
+      amaxBPE = int(state["ProblemType"]["DataTypeAmaxD"].numBytes())
       ldsAmaxDBytes = 4 * (num_workItems // half_wave_size) * amaxBPE
       ldsNumBytes += ldsAmaxDBytes
 
@@ -3198,7 +4508,7 @@ class Solution(collections.abc.Mapping):
 
     # Since we use PLR >= LoopIters for allocating numberOfIters vgprBuffer for a while
     # we need to support both PLR >= LoopIters and CLR parameter for solutions in rocBLAS
-    if state["ClusterLocalRead"] and state["PrefetchLocalRead"] >= state["LoopIters"] and not state["ScheduleIterAlg"] == 2:
+    if state["ClusterLocalRead"] and state["PrefetchLocalRead"] >= state["LoopIters"] and not state["ScheduleIterAlg"] == 2 and not state["ForceUnrollSubIter"]:
       # Reject configuration: DTV enabled on one side is incompatible with PLR = 0
       if state["DirectToVgprA"] ^ state["DirectToVgprB"]:
         reject(state, printRejectionReason, "DirectToVgpr does not work with PrefetchLocalRead(%u) >= LoopIters(%u)"%(state["PrefetchLocalRead"], state["LoopIters"]))
@@ -3216,29 +4526,62 @@ class Solution(collections.abc.Mapping):
     # reject iterations are not enough to use wider local read
     if state["EnableMatrixInstruction"] and state["PrefetchLocalRead"] > 0:
       # Multiple = WLR-size / input-size = how many iters could be covered by one WLR ?
-      wlrMultiple = state["LocalReadVectorWidth"]//state["MIInputPerThread"]
+      wlrMultiple = state["LocalReadVectorWidthA"]//state["MIInputPerThreadA"]
       # NOTE: wlrmultiple can be 0 for new MFMA
-      if not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["DataType"].is8bitFloat() and (state["MatrixInstK"] == 64 or state["MatrixInstK"] == 128)):
+      if not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["DataType"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])) and (not isaInfoMap[isa].asmCaps["HasWMMA_V3"]):
         if wlrMultiple == 0:
-          reject(state, printRejectionReason, "LocalReadVectorWidth %u is less than MIInput" % (state["LocalReadVectorWidth"]))
+          reject(state, printRejectionReason, "LocalReadVectorWidthA %u is less than MIInputA" % (state["LocalReadVectorWidthA"]))
           return
       # for example, if the original ds_read is b32...
       #   1. if LoopIters = 5 (b32 x 5 times), WLR-Multiple = 2 (b64), then we can fit the WLR
       #   2. if LoopIters = 2 (b32 x 2 times), WLR-Multiple = 4 (b128), this is not allowed
       #   3. if LoopIters = 2 (b32 x 2 times), WLR-Multiple = 2 (b64), this is allowed
       if wlrMultiple and state["LoopIters"] % wlrMultiple != 0:
-        reject(state, printRejectionReason, "LocalReadVectorWidth %u cannot be distributed evenly, LoopIters %u should be divisible by WLR-Multiple %u" \
-          % (state["LocalReadVectorWidth"], state["LoopIters"], wlrMultiple))
+        reject(state, printRejectionReason, "LocalReadVectorWidthA %u cannot be distributed evenly, LoopIters %u should be divisible by WLR-Multiple %u" \
+          % (state["LocalReadVectorWidthA"], state["LoopIters"], wlrMultiple))
 
       if state["LoopIters"] - (state["PrefetchLocalRead"] * wlrMultiple) < 0 :
-        reject(state, printRejectionReason, "with PrefetchLocalRead %u LoopIters %u LocalReadVectorWidth %u, not enough LoopIters to prefetch %ux%u iterations, " \
-          % (state["PrefetchLocalRead"],state["LoopIters"],state["LocalReadVectorWidth"], state["PrefetchLocalRead"] , wlrMultiple) )
+        reject(state, printRejectionReason, "with PrefetchLocalRead %u LoopIters %u LocalReadVectorWidthA %u, not enough LoopIters to prefetch %ux%u iterations, " \
+          % (state["PrefetchLocalRead"],state["LoopIters"],state["LocalReadVectorWidthA"], state["PrefetchLocalRead"] , wlrMultiple) )
+
+      # Multiple = WLR-size / input-size = how many iters could be covered by one WLR ?
+      wlrMultiple = state["LocalReadVectorWidthB"]//state["MIInputPerThreadB"]
+      # NOTE: wlrmultiple can be 0 for new MFMA
+      if not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["DataType"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])) and (not isaInfoMap[isa].asmCaps["HasWMMA_V3"]):
+        if wlrMultiple == 0:
+          reject(state, printRejectionReason, "LocalReadVectorWidthB %u is less than MIInputB" % (state["LocalReadVectorWidthB"]))
+          return
+      # for example, if the original ds_read is b32...
+      #   1. if LoopIters = 5 (b32 x 5 times), WLR-Multiple = 2 (b64), then we can fit the WLR
+      #   2. if LoopIters = 2 (b32 x 2 times), WLR-Multiple = 4 (b128), this is not allowed
+      #   3. if LoopIters = 2 (b32 x 2 times), WLR-Multiple = 2 (b64), this is allowed
+      if wlrMultiple and state["LoopIters"] % wlrMultiple != 0:
+        reject(state, printRejectionReason, "LocalReadVectorWidthB %u cannot be distributed evenly, LoopIters %u should be divisible by WLR-Multiple %u" \
+          % (state["LocalReadVectorWidthB"], state["LoopIters"], wlrMultiple))
+
+      if state["LoopIters"] - (state["PrefetchLocalRead"] * wlrMultiple) < 0 :
+        reject(state, printRejectionReason, "with PrefetchLocalRead %u LoopIters %u LocalReadVectorWidthB %u, not enough LoopIters to prefetch %ux%u iterations, " \
+          % (state["PrefetchLocalRead"],state["LoopIters"],state["LocalReadVectorWidthB"], state["PrefetchLocalRead"] , wlrMultiple) )
 
     # # reject conditions with lower performance
     # if state["ScheduleIterAlg"] == 2 and \
     # (state["ExpandPointerSwap"] != 1 or state["LoopIters"] != 1 or state["ScheduleGlobalRead"] != 1):
     #   reject(state, printRejectionReason, "ScheduleIterAlg 2 only work with EPS1_SGR1, LoopIter=1")
 
+    # reject for PGR>=3
+    if state["PrefetchGlobalRead"] >= 3:
+      # DTLA + DTLB only
+      if not(state["DirectToLdsA"] and state["DirectToLdsB"]):
+        reject(state, printRejectionReason, "PrefetchGlobalRead>=3 Supports only DirectToLdsA and DirectToLdsB")
+      # does not work with PLR=0
+      if state["PrefetchLocalRead"] == 0:
+        reject(state, printRejectionReason, "PrefetchGlobalRead>=3 Supports only PrefetchLocalRead >= 1")
+      # support SIA==3 only
+      if state["ScheduleIterAlg"] != 3:
+        reject(state, printRejectionReason, "PrefetchGlobalRead>=3 Supports only ScheduleIterAlg == 3")
+      # TODO: enable PGR>=3 for Sparse
+      if state["ProblemType"]["Sparse"]:
+        reject(state, printRejectionReason, "PrefetchGlobalRead>=3 + Sparse is not supported yet")
     if state["TransposeLDS"] == 1:
       if not state["EnableMatrixInstruction"]:
         reject(state, printRejectionReason, "TransposeLds Supports only in MatrixInstruction=1")
@@ -3247,44 +4590,54 @@ class Solution(collections.abc.Mapping):
           reject(state, printRejectionReason, "TransposeLds requires TLUA=0 or TLUB=0")
     if state["EnableMatrixInstruction"]:
       # enable widerLocalRead
-      if state["LocalReadVectorWidth"] > state["MIInputPerThread"]:
+      if state["LocalReadVectorWidthA"] > state["MIInputPerThreadA"]:
         # wider localRead support 2 types
         # 1. prefetch all lds to register
         # 2. using larger InnerUnroll
         if not (state["PrefetchLocalRead"] >= state["LoopIters"] and state["InnerUnroll"] == 1) and \
             not state["ClusterLocalRead"] and \
-            not state["InnerUnroll"] >= state["LocalReadVectorWidth"] // state["MIInputPerThread"]:
+            not state["InnerUnroll"] >= state["LocalReadVectorWidthA"] // state["MIInputPerThreadA"]:
+          reject(state, printRejectionReason, "wider localRead only support ClusterLocalRead or (InnerUnroll > WiderLocalReadxN)")
+      if state["LocalReadVectorWidthB"] > state["MIInputPerThreadB"]:
+        # wider localRead support 2 types
+        # 1. prefetch all lds to register
+        # 2. using larger InnerUnroll
+        if not (state["PrefetchLocalRead"] >= state["LoopIters"] and state["InnerUnroll"] == 1) and \
+            not state["ClusterLocalRead"] and \
+            not state["InnerUnroll"] >= state["LocalReadVectorWidthB"] // state["MIInputPerThreadB"]:
           reject(state, printRejectionReason, "wider localRead only support ClusterLocalRead or (InnerUnroll > WiderLocalReadxN)")
 
-    if state["GlobalReadPerMfma"] > 1 and state["PrefetchGlobalRead"] == 2:
-      reject(state, printRejectionReason, "GlobalReadPerMfma need to be 1 if PGR2")
+    if state["GlobalReadPerMfma"] > 1 and state["PrefetchGlobalRead"] >= 2:
+      reject(state, printRejectionReason, "GlobalReadPerMfma need to be 1 if PGR>=2")
 
     if state["UseInstOffsetForGRO"] == -1:
       state["UseInstOffsetForGRO"] = 1 if state["DirectToLds"] else 0
 
     state["ULSGRODoubleG2L"] = 0
     if state["UnrollLoopSwapGlobalReadOrder"] == 1:
-      bpeAB       = state["ProblemType"]["DataType"].numBytes()
+      bpeA       = state["ProblemType"]["DataType"].numBytes()
       bpr         = 4
       numVgprG2LA = roundUp((state["NumLoadsCoalescedA"] * state["NumLoadsPerpendicularA"] * \
-        state["GlobalReadVectorWidthA"] * bpeAB) / (float)(bpr))
+        state["GlobalReadVectorWidthA"] * bpeA) / (float)(bpr))
       numVgprG2LB = roundUp((state["NumLoadsCoalescedB"] * state["NumLoadsPerpendicularB"] * \
-        state["GlobalReadVectorWidthB"] * bpeAB) / (float)(bpr))
+        state["GlobalReadVectorWidthB"] * bpeA) / (float)(bpr))
       if numVgprG2LA % 2 == 1 or numVgprG2LB % 2 == 1:
         reject(state, printRejectionReason, "G2LA/B vgpr has bubble inside. Cannot use UnrollLoopSwapGlobalReadOrder=1.")
       if state["GlobalReadVectorWidthA"] != state["GlobalReadVectorWidthB"]:
         # TODO: Add a configuration to schedule better.
         state["ULSGRODoubleG2L"] = 1
       minGRVW = min(state["GlobalReadVectorWidthA"], state["GlobalReadVectorWidthB"])
-      if minGRVW * bpeAB < 4:
+      if minGRVW * bpeA < 4:
         # G2LA/B vgpr index will jump.
         state["ULSGRODoubleG2L"] = 1
       if state["ExpandPointerSwap"] == 1:
         reject(state, printRejectionReason, "ExpandPointerSwap need to be 0 if UnrollLoopSwapGlobalReadOrder")
-      if state["PrefetchGlobalRead"] != 2:
-        reject(state, printRejectionReason, "PrefetchGlobalRead need to be 2 if UnrollLoopSwapGlobalReadOrder")
+      if state["PrefetchGlobalRead"] < 2:
+        reject(state, printRejectionReason, "PrefetchGlobalRead need to be >=2 if UnrollLoopSwapGlobalReadOrder")
       if state["ProblemType"]["DataTypeA"].numBytes() != state["ProblemType"]["DataTypeB"].numBytes():
         reject(state, printRejectionReason, "UnrollLoopSwapGlobalReadOrder doesn't support mixed precision.")
+      if state["ProblemType"]["MXBlockA"] and (not state["DirectToLdsMXSA"]) or state["ProblemType"]["MXBlockB"] and (not state["DirectToLdsMXSB"]):
+        reject(state, printRejectionReason, "UnrollLoopSwapGlobalReadOrder doesn't support MX + non DTL")
 
     if state["ExpandPointerSwap"] == 1 and state["LDSTrInst"]:
       reject(state, printRejectionReason, "LDSTrInst + ExpandPointerSwap not supported")
@@ -3297,6 +4650,8 @@ class Solution(collections.abc.Mapping):
     # If GLVW==1 or Assert*ElementMultiple for the coalesced dim is > GRVW, then shifting is not
     # necessary and the shift/unshift code will not be generated
     state["EdgeType"] = "ShiftPtr" # Use ShiftPtr by default
+    if state["enableTDMA"] and state["enableTDMB"]:
+      state["EdgeType"] = "None"
 
     # Precise bounds check uses the "num_records" field in the buffer to
     # precisely detect when we are inbounds or not.  Only a one-dimensional
@@ -3352,10 +4707,12 @@ class Solution(collections.abc.Mapping):
       # 40 is based on current SGPR usage, this may need to be tuned in the future:
       numLoadsA = state["NumLoadsCoalescedA"]*state["NumLoadsPerpendicularA"]
       numLoadsB = state["NumLoadsCoalescedB"]*state["NumLoadsPerpendicularB"]
+      numLoadMXSA = state["NumLoadsCoalescedMXSA"]*state["NumLoadsPerpendicularMXSA"] if state["ProblemType"]["MXBlockA"] else 0
+      numLoadMXSB = state["NumLoadsCoalescedMXSB"]*state["NumLoadsPerpendicularMXSB"] if state["ProblemType"]["MXBlockB"] else 0
       numLoadsM = 0
       if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
         numLoadsM = state["NumLoadsCoalescedMetadata"]*state["NumLoadsPerpendicularMetadata"]
-      if numLoadsA + numLoadsB + numLoadsM > 35 or state["ProblemType"]["SwizzleTensorA"] or state["ProblemType"]["SwizzleTensorB"]:
+      if (numLoadsA + numLoadsB + numLoadsM + numLoadMXSA + numLoadMXSB  > 35) or state["ProblemType"]["SwizzleTensorA"] or state["ProblemType"]["SwizzleTensorB"]:
         #print "info: Disabling UseSgprForGRO since predicting too many SGPR will be used"
         state["_UseSgprForGRO"] = 0
       else:
@@ -3429,10 +4786,10 @@ class Solution(collections.abc.Mapping):
       reject(state, printRejectionReason, "When both UseBias and UseScaleAlphaVec are enabled then UseBias and UseScaleAlphaVec must have same settings.")
 
     # ScaleAB or ScaleABVec
-    if state["ProblemType"]["DataTypeA"] != state["ProblemType"]["DataTypeB"] and \
-      state["ProblemType"]["DataTypeA"] != state["ProblemType"]["DataType"] and \
+    if state["ProblemType"]["DataTypeA"] != state["ProblemType"]["MacDataTypeA"] and \
+      state["ProblemType"]["DataTypeB"] != state["ProblemType"]["MacDataTypeB"] and \
       state["ProblemType"]["UseScaleAB"] == "Vector":
-      reject(state, "Currently does not support using scaleABVec if DataTypeA != DataTypeB != DataType.")
+      reject(state, "Currently does not support using scaleABVec if DataTypeA != MacDataTypeA and DataTypeB != MacDataTypeB.")
 
     if state["ProblemType"]["UseScaleAB"] and state["OptNoLoadLoop"]:
       # Hard to check alpha == 1.0 directly
@@ -3459,10 +4816,10 @@ class Solution(collections.abc.Mapping):
     #Need to force disabling PreloadKernArgs if compiler does not support
     #Can not just reject the solution since the user library may find any solutions
     if state["PreloadKernArgs"]:
-      if (rocmVersion.major < 6 or (rocmVersion.major == 6 and rocmVersion.patch < 32650)) or \
-          not (isa == (9, 0, 10) or isa[:2] == (9, 4) or isa == (9, 5, 0)):
+      if ((rocmVersion.major < 6 or (rocmVersion.major == 6 and rocmVersion.patch < 32650)) or \
+          not (isa == (9, 0, 10) or isa[:2] == (9, 4) or isa == (9, 5, 0) or isa == (12, 5, 0))):
         #print("Force to Disable PreloadKernArgs since this hipcc version doesn't support",)
-        state["PreloadKernArgs"] = 0
+        state["PreloadKernArgs"] = False
 
     # change negative ExtraLatencyForLR to 0 for non DirectToVgpr
     if state["ExtraLatencyForLR"] < 0 and not (state["DirectToVgprA"] or state["DirectToVgprB"]):
@@ -3512,12 +4869,18 @@ class Solution(collections.abc.Mapping):
     return self._state
 
   def __hash__(self):
-    return hash(str(self) + self._state.get("codeObjectFile", ""))
-    #return hash(self.getAttributes())
+    deviceNames = str(self._state.get("DeviceNames", ""))
+    return hash(str(self) + self._state.get("codeObjectFile", "") + deviceNames)
 
   def __eq__(self, other):
-    #return isinstance(other, Solution) and self.getAttributes() == other.getAttributes()
-    return isinstance(other, Solution) and str(self) == str(other)
+    if not isinstance(other, Solution):
+      return False
+    if str(self) != str(other):
+      return False
+    # Check DeviceNames to prevent deduplication of solutions for different devices
+    selfDeviceNames = self._state.get("DeviceNames", None)
+    otherDeviceNames = other._state.get("DeviceNames", None)
+    return selfDeviceNames == otherDeviceNames
 
   def __ne__(self, other):
     result = self.__eq__(other)

@@ -26,31 +26,23 @@ PluginBase::PluginBase()
 
 void PluginBase::resolveSymbols()
 {
-    const auto funcNameGetName = "hipdnnPluginGetName";
-    _funcGetName = _lib.getSymbol<decltype(_funcGetName)>(funcNameGetName);
+    _funcGetName = _lib.getSymbol<decltype(_funcGetName)>("hipdnnPluginGetName");
+    _funcGetVersion = _lib.getSymbol<decltype(_funcGetVersion)>("hipdnnPluginGetVersion");
+    _funcGetType = _lib.getSymbol<decltype(_funcGetType)>("hipdnnPluginGetType");
+    _funcGetLastErrorStr
+        = _lib.getSymbol<decltype(_funcGetLastErrorStr)>("hipdnnPluginGetLastErrorString");
 
-    const auto funcNameGetVersion = "hipdnnPluginGetVersion";
-    _funcGetVersion = _lib.getSymbol<decltype(_funcGetVersion)>(funcNameGetVersion);
-
-    const auto funcNameGetType = "hipdnnPluginGetType";
-    _funcGetType = _lib.getSymbol<decltype(_funcGetType)>(funcNameGetType);
-
-    const auto funcNameGetLastErrorStr = "hipdnnPluginGetLastErrorString";
-    _funcGetLastErrorStr = _lib.getSymbol<decltype(_funcGetLastErrorStr)>(funcNameGetLastErrorStr);
-
-    // Logging callback is optional
-    try
+    if(!tryAssignSymbol(_funcGetApiVersion, "hipdnnPluginGetApiVersion"))
     {
-        const auto funcNameSetLoggingCallback = "hipdnnPluginSetLoggingCallback";
-        _funcSetLoggingCallback
-            = _lib.getSymbol<decltype(_funcSetLoggingCallback)>(funcNameSetLoggingCallback);
+        HIPDNN_BACKEND_LOG_INFO("Plugin does not support returning plugin API version");
     }
-    catch(const HipdnnException&)
+    if(!tryAssignSymbol(_funcSetLoggingCallback, "hipdnnPluginSetLoggingCallback"))
     {
-        _funcSetLoggingCallback = nullptr;
-
-        // Add name of plugin if ever possible
-        HIPDNN_LOG_INFO("Plugin does not support logging callback");
+        HIPDNN_BACKEND_LOG_INFO("Plugin does not support logging callback");
+    }
+    if(!tryAssignSymbol(_funcSetLogLevel, "hipdnnPluginSetLogLevel"))
+    {
+        HIPDNN_BACKEND_LOG_INFO("Plugin does not support log level synchronization");
     }
 
 #ifndef NDEBUG
@@ -71,6 +63,25 @@ std::string_view PluginBase::version() const
     assert(_initialized);
     const char* version;
     invokePluginFunction("get plugin version", _funcGetVersion, &version);
+    return version;
+}
+
+std::string_view PluginBase::apiVersion() const
+{
+    assert(_initialized);
+    const char* version;
+    if(_funcGetApiVersion == nullptr)
+    {
+        // Plugins that do not export hipdnnPluginGetApiVersion are assumed
+        // to conform to the "1.0.0" plugin SDK baseline. Per RFC 0008 §4.5,
+        // the rollout invariant is that the in-tree plugin SDK is bumped
+        // to 1.0.0 before any new feature symbols are added, so any pre-
+        // existing plugin built against an earlier SDK is still compatible
+        // with the 1.0.0 surface and must not be filtered out as version-
+        // zero unknown.
+        return "1.0.0";
+    }
+    invokePluginFunction("get plugin api version", _funcGetApiVersion, &version);
     return version;
 }
 
@@ -100,6 +111,18 @@ hipdnnPluginStatus_t PluginBase::setLoggingCallback(hipdnnCallback_t callback) c
     }
 
     return _funcSetLoggingCallback(callback);
+}
+
+hipdnnPluginStatus_t PluginBase::setLogLevel(hipdnnSeverity_t level) const
+{
+    assert(_initialized);
+    if(_funcSetLogLevel == nullptr)
+    {
+        // Plugin does not support log level synchronization, so we vacuously return success
+        return HIPDNN_PLUGIN_STATUS_SUCCESS;
+    }
+
+    return _funcSetLogLevel(level);
 }
 
 } // namespace plugin

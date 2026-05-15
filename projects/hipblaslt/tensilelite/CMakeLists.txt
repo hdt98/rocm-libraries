@@ -15,6 +15,8 @@ if(TENSILELITE_ENABLE_HOST)
     set_target_properties(tensilelite-host
         PROPERTIES
             POSITION_INDEPENDENT_CODE ON
+            CXX_VISIBILITY_PRESET hidden
+            VISIBILITY_INLINES_HIDDEN ON
     )
     target_compile_options(tensilelite-host PRIVATE -fvisibility=hidden)
     target_compile_features(tensilelite-host PUBLIC cxx_std_17)
@@ -25,15 +27,13 @@ if(TENSILELITE_ENABLE_HOST)
             $<BUILD_INTERFACE:__HIP_HCC_COMPAT_MODE__=1> # if we don't have this we fail tests on 942_304cu
     )
 
-    if(HIPBLASLT_ENABLE_LLVM)
+    if(HIPBLASLT_ENABLE_YAML)
         target_link_libraries(tensilelite-host PRIVATE LLVMObjectYAML)
         target_include_directories(tensilelite-host PRIVATE ${LLVM_INCLUDE_DIRS})
-        target_compile_definitions(tensilelite-host PUBLIC TENSILE_YAML)
-    endif()
-
-    if(HIPBLASLT_ENABLE_MSGPACK)
+        target_compile_definitions(tensilelite-host PUBLIC $<BUILD_INTERFACE:TENSILE_YAML>)
+    else()
         target_link_libraries(tensilelite-host PRIVATE ${hipblaslt_msgpack_target})
-        target_compile_definitions(tensilelite-host PUBLIC $<BUILD_INTERFACE:TENSILE_MSGPACK>) # make TENSILELITE_MSGPACK
+        target_compile_definitions(tensilelite-host PUBLIC $<BUILD_INTERFACE:TENSILE_MSGPACK>)
     endif()
 
     target_include_directories(tensilelite-host
@@ -56,6 +56,9 @@ if(TENSILELITE_ENABLE_HOST)
     add_subdirectory(include)
 
     if(TENSILELITE_ENABLE_CLIENT)
+        # mxDataGenerator bootstrap and `hipblaslt::mxdatagen` helper target
+        # live in projects/hipblaslt/CMakeLists.txt and are guaranteed to be
+        # available before this subdirectory is processed.
         add_subdirectory(client)
     endif()
 

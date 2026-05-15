@@ -49,6 +49,22 @@ public:
                  const hipdnnPluginConstData_t* engineConfig,
                  const hipdnnPluginConstData_t* opGraph),
                 (const));
+    MOCK_METHOD(bool, supportsExecutionContextSerialization, (), (const));
+    MOCK_METHOD(void,
+                serializeExecutionContext,
+                (hipdnnEnginePluginHandle_t handle,
+                 hipdnnEnginePluginExecutionContext_t executionContext,
+                 hipdnnPluginConstData_t* serializedContext),
+                (const));
+    MOCK_METHOD(void,
+                destroySerializedExecutionContext,
+                (hipdnnEnginePluginHandle_t handle, hipdnnPluginConstData_t* serializedContext),
+                (const));
+    MOCK_METHOD(hipdnnEnginePluginExecutionContext_t,
+                createExecutionContextFromSerialized,
+                (hipdnnEnginePluginHandle_t handle,
+                 const hipdnnPluginConstData_t* serializedContext),
+                (const));
     MOCK_METHOD(void,
                 destroyExecutionContext,
                 (hipdnnEnginePluginHandle_t handle,
@@ -71,6 +87,7 @@ public:
     // Mock inherited methods from PluginBase
     MOCK_METHOD(std::string_view, name, (), (const));
     MOCK_METHOD(std::string_view, version, (), (const));
+    MOCK_METHOD(std::string_view, apiVersion, (), (const));
     MOCK_METHOD(hipdnnPluginType_t, type, (), (const));
     MOCK_METHOD(hipdnnPluginStatus_t, setLoggingCallback, (hipdnnCallback_t callback), (const));
 };

@@ -13,10 +13,15 @@ from pathlib import Path
 import sys
 from therock_matrix import subtree_to_project_map, collect_projects_to_run
 import time
-from typing import Mapping, Optional, Iterable
+from typing import Mapping, Optional, Iterable, List
 import os
 from pr_detect_changed_subtrees import get_valid_prefixes, find_matched_subtrees
 from config_loader import load_repo_config
+
+# Add TheRock's github_actions to path for shared utilities
+THEROCK_ACTIONS_PATH = Path("TheRock") / "build_tools" / "github_actions"
+sys.path.insert(0, str(THEROCK_ACTIONS_PATH))
+from amdgpu_family_matrix import BUILD_RUNNER_LABELS, select_weighted_label
 
 logging.basicConfig(level=logging.INFO)
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -25,24 +30,42 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # build or test workflows so any related jobs can be skipped if all paths
 # modified by a commit/PR match a pattern in this list.
 SKIPPABLE_PATH_PATTERNS = [
-    "docs/*",
-    ".gitignore",
+    "*.clinerules",
+    "*.cursorrules",
+    "*.mdc",
     "*.md",
     "*.rst",
-    "projects/*/docs/*",
+    "*.rtf",
+    "*/.markdownlint-ci2.yaml",
+    "*/.readthedocs.yaml",
+    "*/.spellcheck.local.yaml",
+    "*/.wordlist.txt",
+    ".gitignore",
+    "dnn-providers/*/.gitignore",
+    "dnn-providers/*/docs/*",
+    "docs/*",
     "projects/*/.gitignore",
-    "projects/*/*.md",
-    "projects/*/*.rst",
-    "shared/*/docs/*",
+    "projects/*/docs/*",
+    # Tools are standalone scripts/utilities not part of the build or test pipeline.
+    # Changes here should not trigger CI builds.
+    "projects/hipdnn/tools/*",
     "shared/*/.gitignore",
-    "shared/*/*.md",
-    "shared/*/*.rst",
+    "shared/*/docs/*",
 ]
 
 
 def is_path_skippable(path: str) -> bool:
     """Determines if a given relative path to a file matches any skippable patterns."""
     return any(fnmatch.fnmatch(path, pattern) for pattern in SKIPPABLE_PATH_PATTERNS)
+
+
+def get_pr_labels(args) -> List[str]:
+    """Gets a list of labels applied to a pull request."""
+    data = json.loads(args.get("pr_labels", "{}"))
+    labels = []
+    for label in data.get("labels", []):
+        labels.append(label["name"])
+    return labels
 
 
 def check_for_non_skippable_path(paths: Optional[Iterable[str]]) -> bool:
@@ -130,23 +153,43 @@ def get_changed_path_projects(paths: Optional[Iterable[str]]) -> Iterable[str]:
     return matched_subtrees
 
 
+def select_build_runner(platform: str) -> str:
+    """Select a build runner label based on platform and build variant."""
+    if platform not in BUILD_RUNNER_LABELS:
+        # Platform not configured for weighted selection, return default
+        print(f"  No build runner config for platform {platform}, using default")
+        return ""
+
+    platform_config = BUILD_RUNNER_LABELS[platform]
+
+    labels_config = platform_config["default"]
+    context_name = f"build-runner ({platform})"
+
+    return select_weighted_label(labels_config, context_name)
+
+
 def retrieve_projects(args):
     # For pushes and pull_requests, we only want to test changed projects
     base_ref = args.get("base_ref")
     modified_paths = get_modified_paths(base_ref)
 
-    # by default, we select full tests
-    test_type = "full"
+    # by default, we select standard tests
+    test_type = "standard"
 
     # Check if CI should be skipped based on modified paths
     # (only for push and pull_request events, not workflow_dispatch or nightly)
     if args.get("is_push") or args.get("is_pull_request"):
         paths_set = set(modified_paths)
         contains_non_skippable_files = check_for_non_skippable_path(paths_set)
+        pr_labels = get_pr_labels(args)
 
         # If only skippable paths were modified, skip CI
         if not contains_non_skippable_files:
             logging.info("Only skippable paths were modified, skipping CI")
+            return [], test_type
+
+        if "skip-therockci" in pr_labels:
+            logging.info("`skip-therockci` label was added, skipping CI")
             return [], test_type
 
     subtrees = get_changed_path_projects(modified_paths)
@@ -170,6 +213,7 @@ def retrieve_projects(args):
     # for nightly runs, run everything with full tests
     if args.get("is_nightly"):
         subtrees = list(subtree_to_project_map.keys())
+        test_type = "comprehensive"
 
     project_to_run = collect_projects_to_run(subtrees)
 
@@ -179,8 +223,13 @@ def retrieve_projects(args):
 def run(args):
     platform = args.get("platform")
     project_to_run, test_type = retrieve_projects(args)
+    build_runs_on = select_build_runner(platform)
     set_github_output(
-        {f"{platform}_projects": json.dumps(project_to_run), "test_type": test_type}
+        {
+            f"{platform}_projects": json.dumps(project_to_run),
+            "test_type": test_type,
+            "build_runs_on": build_runs_on,
+        }
     )
 
 
@@ -193,6 +242,8 @@ if __name__ == "__main__":
     args["is_push"] = github_event_name == "push"
     args["is_workflow_dispatch"] = github_event_name == "workflow_dispatch"
     args["is_nightly"] = github_event_name == "schedule"
+
+    args["pr_labels"] = os.environ.get("PR_LABELS", '{"labels": []}')
 
     input_projects = os.getenv("PROJECTS", "")
     args["input_projects"] = input_projects
