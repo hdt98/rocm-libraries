@@ -69,25 +69,7 @@ inline constexpr std::int32_t ScaleDataTypeToFlag_v = ScaleDataTypeToFlag<T>::va
 
 } // namespace scale::detail
 
-struct DefaultScaleMfmaCtrlFlags
-{
-    static constexpr std::int32_t OPSEL_A = 0;
-    static constexpr std::int32_t OPSEL_B = 0;
-};
-
-#if CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
-
-/**
- * @concept ScaleMfmaCtrlFlags
- * @brief  Expresses the interface of required members for each CtrlFlags type on Gfx9
- */
-template <typename CtrlFlags>
-concept ScaleMfmaCtrlFlags = requires(CtrlFlags ctrlFlags) {
-    // Flag members for scale MFMA instructions
-    { CtrlFlags::OPSEL_A } -> std::convertible_to<int>;
-    { CtrlFlags::OPSEL_B } -> std::convertible_to<int>;
-};
-
-#endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
+// No real flags for now, scale and opsel are handled in higher level and passed down directly.
+struct DefaultScaleMfmaCtrlFlags;
 
 } // namespace ck_tile::core::arch::mma

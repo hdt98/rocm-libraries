@@ -16,9 +16,9 @@ namespace impl {
 namespace warp_gemm_dispatcher {
 
 // C++20 using enum
-static constexpr auto ESingle = WGAttrNumAccessEnum::Single;
-static constexpr auto EDouble = WGAttrNumAccessEnum::Double;
-static constexpr auto EQuad   = WGAttrNumAccessEnum::Quad;
+static inline constexpr auto ESingle = WGAttrNumAccessEnum::Single;
+static inline constexpr auto EDouble = WGAttrNumAccessEnum::Double;
+static inline constexpr auto EQuad   = WGAttrNumAccessEnum::Quad;
 
 template <typename AType,
           typename BType,
@@ -31,9 +31,7 @@ template <typename AType,
           bool UseStructuredSparsity         = false,
           WGAttrNumAccessEnum AttrNumAccessA = ESingle,
           WGAttrNumAccessEnum AttrNumAccessB = AttrNumAccessA>
-struct Dispatcher
-{
-};
+struct Dispatcher;
 
 // clang-format off
 // fp32
@@ -144,12 +142,8 @@ template<> struct Dispatcher<bf8_t, bf8_t, float, 16, 16,  64,  true> { using Ty
 template<> struct Dispatcher<bf8_t, bf8_t, float, 32, 32,  16,  true> { using Type = WarpGemmMfma_f32_32x32x16_bf8_bf8_CTransposed; };
 
 // scale mfma based f8f6f4
-// template<typename A, typename B, WGAttrNumAccessEnum I>
-// struct Dispatcher<A, B, float, 16, 16, 128, false, false, false, I> { using Type = WarpGemmMfma_f32_16x16x128_f8f6f4<A, B, I>; };
-
-// Hack: Always use NumAccess 2 instead of 1. The latter seems to be used for something in the CTranspose Epilogue but for actual MMA it is wrong.
-template<> struct Dispatcher<fp8_t, fp8_t, float, 16, 16, 128, false, false, false, ck_tile::WGAttrNumAccessEnum::Single> { using Type = WarpGemmMfma_f32_16x16x128_f8f6f4<fp8_t, fp8_t, ck_tile::WGAttrNumAccessEnum::Double>; };
-template<> struct Dispatcher<fp8_t, fp8_t, float, 16, 16, 128, false, false, false, ck_tile::WGAttrNumAccessEnum::Double> { using Type = WarpGemmMfma_f32_16x16x128_f8f6f4<fp8_t, fp8_t, ck_tile::WGAttrNumAccessEnum::Double>; };
+template<typename A, typename B, WGAttrNumAccessEnum I>
+struct Dispatcher<A, B, float, 16, 16, 128, false, false, false, I> { using Type = WarpGemmMfma_f32_16x16x128_f8f6f4<A, B, I>; };
 
 template<WGAttrNumAccessEnum I> struct Dispatcher<fp8_t, fp8_t, float, 16, 16, 128,  true, false, false, I> { using Type = WarpGemmMfma_f32_16x16x128_fp8_fp8_CTransposed<I>; };
 template<WGAttrNumAccessEnum I> struct Dispatcher<fp8_t, bf8_t, float, 16, 16, 128,  true, false, false, I> { using Type = WarpGemmMfma_f32_16x16x128_fp8_bf8_CTransposed<I>; };
@@ -221,9 +215,9 @@ template <typename AType,
           WGAttrNumAccessEnum AttrNumAccessA = WGAttrNumAccessEnum::Single,
           WGAttrNumAccessEnum AttrNumAccessB = AttrNumAccessA>
 #if USE_NEW_UNIFIED_FRAMEWORK
-using WarpGemmDispatcher = typename impl::warp_gemm_dispatcher::UnificationDispatcher< //
+using WarpGemmDispatcher = typename impl::warp_gemm_dispatcher::UnificationDispatcher<
 #else
-using WarpGemmDispatcher = typename impl::warp_gemm_dispatcher::Dispatcher< //
+using WarpGemmDispatcher = typename impl::warp_gemm_dispatcher::Dispatcher<
 #endif
     AType,
     BType,
