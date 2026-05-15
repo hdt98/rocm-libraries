@@ -5,6 +5,19 @@ Documentation for rocFFT is available at
 
 ## (Unreleased) rocFFT 1.0.37
 
+### Added
+
+* Experimental mixed-precision triple plan API
+  `rocfft_plan_description_set_precision_triple`. Decouples on-device
+  storage precision (`rocfft_precision`), butterfly arithmetic precision
+  (`rocfft_compute_precision`), and inter-rank `MPI_Alltoallv` payload
+  precision (`rocfft_comm_precision`). The default `(native, native, native)`
+  preserves existing behavior.
+* Compressed `MPI_Alltoallv` path for non-native communication precision,
+  with backends for per-element narrow-precision cast (FP16/BF16/FP8) and
+  inline block floating point (mantissa widths 4, 8, 16). A fixed-rate
+  ZFP-style backend is included as a stub.
+
 ### Optimized
 
 * Allow plans to share hipModules if they use the same kernels.  This reduces time spent and memory used when

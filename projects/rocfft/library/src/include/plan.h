@@ -154,6 +154,22 @@ struct rocfft_plan_description_t
     MPI_Comm_wrapper_t mpi_comm;
 #endif
 
+    // mixed-precision triple; storage precision lives on the rocfft_plan
+    // itself, compute and communication precisions default to native (no-op)
+    struct precision_triple_t
+    {
+        rocfft_compute_precision compute_precision = rocfft_compute_precision_native;
+        rocfft_comm_precision    comm_precision    = rocfft_comm_precision_native;
+        unsigned int             comm_param        = 0;
+
+        // true when both precisions are native and the new code paths are bypassed
+        bool is_native() const
+        {
+            return compute_precision == rocfft_compute_precision_native
+                   && comm_precision == rocfft_comm_precision_native;
+        }
+    } precision_triple;
+
     LoadOps  loadOps;
     StoreOps storeOps;
 

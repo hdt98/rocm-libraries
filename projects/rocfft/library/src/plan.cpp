@@ -226,6 +226,70 @@ std::vector<size_t> rocfft_plan_t::WorkBufBytesPerDevice() const
     return workBufBytes;
 }
 
+rocfft_status
+    rocfft_plan_description_set_precision_triple(rocfft_plan_description  description,
+                                                 rocfft_compute_precision compute_precision,
+                                                 rocfft_comm_precision    comm_precision,
+                                                 unsigned int             precision_param)
+try
+{
+    log_trace(__func__,
+              "description",
+              description,
+              "compute_precision",
+              static_cast<int>(compute_precision),
+              "comm_precision",
+              static_cast<int>(comm_precision),
+              "precision_param",
+              precision_param);
+
+    if(description == nullptr)
+        return rocfft_status_invalid_arg_value;
+
+    switch(compute_precision)
+    {
+    case rocfft_compute_precision_native:
+    case rocfft_compute_precision_fp32_on_fp16:
+    case rocfft_compute_precision_fp32_on_bf16:
+    case rocfft_compute_precision_fp64_on_fp32:
+        break;
+    default:
+        return rocfft_status_invalid_arg_value;
+    }
+
+    switch(comm_precision)
+    {
+    case rocfft_comm_precision_native:
+    case rocfft_comm_precision_cast_fp16:
+    case rocfft_comm_precision_cast_bf16:
+    case rocfft_comm_precision_cast_fp8_e4m3:
+    case rocfft_comm_precision_cast_fp8_e5m2:
+        // precision_param is ignored for cast modes
+        break;
+    case rocfft_comm_precision_bfp:
+        // mantissa-bits in {1, ..., 23} make sense; 0 means "default"
+        if(precision_param > 23)
+            return rocfft_status_invalid_arg_value;
+        break;
+    case rocfft_comm_precision_zfp_fixed_rate:
+        // bits-per-element in {1, ..., 32} make sense; 0 means "default"
+        if(precision_param > 32)
+            return rocfft_status_invalid_arg_value;
+        break;
+    default:
+        return rocfft_status_invalid_arg_value;
+    }
+
+    description->precision_triple.compute_precision = compute_precision;
+    description->precision_triple.comm_precision    = comm_precision;
+    description->precision_triple.comm_param        = precision_param;
+    return rocfft_status_success;
+}
+catch(...)
+{
+    return rocfft_handle_exception();
+}
+
 rocfft_status rocfft_plan_description_set_comm(rocfft_plan_description description,
                                                rocfft_comm_type        comm_type,
                                                void*                   comm_handle)

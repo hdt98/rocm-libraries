@@ -254,6 +254,10 @@ set( rocfft_source
   enum_printer.cpp
   rtc_exports.cpp
   tuning_kernel_tuner.cpp
+  compressed_alltoall.cpp
+  compress_cast.cpp
+  compress_bfp.cpp
+  compress_zfp.cpp
   tuning_plan_tuner.cpp
   )
 

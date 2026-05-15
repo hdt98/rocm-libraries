@@ -134,6 +134,63 @@ typedef enum rocfft_comm_type_e
     rocfft_comm_mpi,
 } rocfft_comm_type;
 
+/*! @brief Inter-rank communication precision for distributed transforms.
+ *
+ *  Specifies the on-the-wire representation used by the
+ *  \c MPI_Alltoallv-class exchanges that move pencil/brick data between
+ *  ranks during a distributed FFT.  The communication precision is
+ *  independent of the on-device storage precision (\ref rocfft_precision)
+ *  and the butterfly arithmetic precision (\ref rocfft_compute_precision).
+ *
+ *  @warning Experimental.
+ */
+typedef enum rocfft_comm_precision_e
+{
+    /*! No compression: communication uses the same precision as storage.
+     *  This is the default and matches pre-existing behaviour. */
+    rocfft_comm_precision_native = 0,
+    /*! Per-element down-cast to IEEE binary16 (half) on send and
+     *  reconstruction back to storage precision on receive. */
+    rocfft_comm_precision_cast_fp16 = 1,
+    /*! Per-element down-cast to bfloat16 on send. */
+    rocfft_comm_precision_cast_bf16 = 2,
+    /*! Per-element down-cast to FP8 E4M3 (gfx942/gfx950 only). */
+    rocfft_comm_precision_cast_fp8_e4m3 = 3,
+    /*! Per-element down-cast to FP8 E5M2 (gfx942/gfx950 only). */
+    rocfft_comm_precision_cast_fp8_e5m2 = 4,
+    /*! Inline block floating point.  The payload is split into blocks
+     *  that share an exponent; the per-block mantissa width is given by
+     *  the \c precision_param argument to
+     *  \ref rocfft_plan_description_set_precision_triple. */
+    rocfft_comm_precision_bfp = 5,
+    /*! Fixed-rate lossy compression in the spirit of ZFP.  The
+     *  \c precision_param argument gives the bits-per-element budget. */
+    rocfft_comm_precision_zfp_fixed_rate = 6,
+} rocfft_comm_precision;
+
+/*! @brief Butterfly arithmetic precision for distributed transforms.
+ *
+ *  Specifies the precision used inside the FFT butterfly twiddles and
+ *  multiplies, independently of on-device storage and inter-rank
+ *  communication precisions.  The default
+ *  (\ref rocfft_compute_precision_native) keeps arithmetic at the
+ *  storage precision and matches pre-existing behaviour.
+ *
+ *  @warning Experimental.
+ */
+typedef enum rocfft_compute_precision_e
+{
+    /*! Compute uses the storage precision; identical to existing rocFFT
+     *  behaviour. */
+    rocfft_compute_precision_native = 0,
+    /*! FP32 accumulator on FP16 storage. */
+    rocfft_compute_precision_fp32_on_fp16 = 1,
+    /*! FP32 accumulator on BF16 storage. */
+    rocfft_compute_precision_fp32_on_bf16 = 2,
+    /*! FP64 accumulator on FP32 storage. */
+    rocfft_compute_precision_fp64_on_fp32 = 3,
+} rocfft_compute_precision;
+
 #if 0
 /*! @brief Execution mode */
 typedef enum rocfft_execution_mode_e
@@ -347,6 +404,45 @@ ROCFFT_EXPORT rocfft_status rocfft_get_version_string(char* buf, size_t len);
 ROCFFT_EXPORT rocfft_status rocfft_plan_description_set_comm(rocfft_plan_description description,
                                                              rocfft_comm_type        comm_type,
                                                              void*                   comm_handle);
+
+/*! @brief Set the mixed-precision triple \f$(p_s, p_c, p_t)\f$ on a plan
+ *  description.
+ *
+ *  @details Decouples three precisions used by a distributed FFT plan:
+ *    - on-device storage precision (\f$p_s\f$, set via the existing
+ *      \c precision argument of \ref rocfft_plan_create);
+ *    - butterfly arithmetic precision (\f$p_c\f$, this call's
+ *      \c compute_precision argument);
+ *    - inter-rank \c MPI_Alltoallv-class communication precision
+ *      (\f$p_t\f$, this call's \c comm_precision argument).
+ *
+ *  When \c comm_precision is \ref rocfft_comm_precision_native and
+ *  \c compute_precision is \ref rocfft_compute_precision_native the call
+ *  is a no-op and the plan behaves exactly as before this API existed.
+ *
+ *  @param[in,out] description  plan description handle
+ *  @param[in] compute_precision  butterfly arithmetic precision
+ *  @param[in] comm_precision  inter-rank communication precision
+ *  @param[in] precision_param  backend-specific parameter:
+ *                              - for \ref rocfft_comm_precision_bfp,
+ *                                the per-block mantissa width in bits
+ *                                (typical: 4--16; default 8 if 0);
+ *                              - for \ref rocfft_comm_precision_zfp_fixed_rate,
+ *                                the bits-per-element budget
+ *                                (typical: 2--16; default 8 if 0);
+ *                              - ignored for the cast and native modes.
+ *  @return \ref rocfft_status_success on success;
+ *          \ref rocfft_status_invalid_arg_value for an unrecognised enum
+ *          value or an out-of-range \c precision_param.
+ *
+ *  @warning Experimental.  The cast and BFP backends are functional;
+ *  the fixed-rate ZFP backend is currently a stub.
+ */
+ROCFFT_EXPORT rocfft_status
+    rocfft_plan_description_set_precision_triple(rocfft_plan_description  description,
+                                                 rocfft_compute_precision compute_precision,
+                                                 rocfft_comm_precision    comm_precision,
+                                                 unsigned int             precision_param);
 
 /*! @brief Define a brick as part of a decomposition of a field.
  *

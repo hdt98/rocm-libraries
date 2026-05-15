@@ -20,6 +20,7 @@
 
 #include "tree_node.h"
 #include "../../shared/precision_type.h"
+#include "compressed_alltoall.h"
 #include "function_pool.h"
 #include "kernel_launch.h"
 #include "logging.h"
@@ -936,6 +937,45 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan                     plan,
 
 #ifdef ROCFFT_MPI_ENABLE
     auto mpi_comm = ActiveMPIComm(plan);
+
+    // route through the compressed alltoallv path when the precision
+    // triple is non-native (see compressed_alltoall.h)
+    if(!plan->desc.precision_triple.is_native())
+    {
+        const int local_comm_rank = plan->desc.get_local_comm_rank();
+        if(LOG_PLAN_ENABLED())
+            log_plan("Using CompressedAlltoallv (precision triple is non-native)\n");
+
+        rocfft::compress::CompressedAlltoallv c2a(plan->desc.precision_triple.comm_precision,
+                                                  plan->desc.precision_triple.comm_param,
+                                                  precision,
+                                                  arrayType);
+
+        auto status = c2a.execute_async(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                        sendOffsets,
+                                        sendCounts,
+                                        recvBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                        recvOffsets,
+                                        recvCounts,
+                                        mpi_comm,
+                                        /*stream=*/hipStream_t{0});
+        if(status != rocfft_status_success)
+        {
+            comm_status   = COMM_MPI_ERROR;
+            error_message = "compressed alltoallv (rank " + std::to_string(local_comm_rank)
+                            + "): " + c2a.error_message();
+            return;
+        }
+        status = c2a.wait();
+        if(status != rocfft_status_success)
+        {
+            comm_status   = COMM_MPI_ERROR;
+            error_message = "compressed alltoallv wait (rank " + std::to_string(local_comm_rank)
+                            + "): " + c2a.error_message();
+            return;
+        }
+        return;
+    }
 
     MPI_Request  request;
     MPI_Datatype elem_type       = rocfft_type_to_mpi_type(precision, arrayType);
