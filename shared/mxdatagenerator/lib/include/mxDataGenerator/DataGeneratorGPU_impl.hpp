@@ -10,6 +10,14 @@
 
 #include <hip/hip_runtime.h>
 
+// Provides __amd_cvt_floatx{2,8,32}_to_fp{4,6,8}*_scale and __amd_scale_t.
+// Hits the gfx950 hardware MX convert instructions where available
+// (v_cvt_scalef32_pk_fp4_f32 / pk32_f32_fp6 / pk_fp8_f32 etc.); falls back to
+// the canonical fcbx software path on other architectures. Same wrapper
+// hipblaslt's hipblaslt_float4 / _float6 / _float8 types use, so generator
+// output is bit-identical to what those types produce.
+#include <hip/hip_ext_ocp.h>
+
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -384,13 +392,53 @@ namespace DGen
         // For E4M3 / E5M3: stored as a byte (S?EEEE.MMM) with the unbiased
         // exponent we want and a normalised (1.0) mantissa.
         // ----------------------------------------------------------------------
+        // Per-scale-format clamp: returns the unbiased exponent we will
+        // actually encode in the scale byte. Mirrors the saturation rules
+        // baked into encodeScale<ST> below; exposed separately so the data
+        // convert path passes the same clamped value to the hardware MX
+        // convert (keeping the kernel-visible scale and the scale used for
+        // data quantisation in lockstep).
+        template <ScaleType ST>
+        __device__ __forceinline__ int clampScaleExp(int unbiasedExp);
+
+        template <>
+        __device__ __forceinline__ int clampScaleExp<ScaleType::E8M0>(int unbiasedExp)
+        {
+            // Byte range [0, 254] -> unbiased [-127, 127]. 255 is reserved
+            // for NaN; we never produce it from numeric data.
+            if(unbiasedExp < -127)
+                return -127;
+            if(unbiasedExp > 127)
+                return 127;
+            return unbiasedExp;
+        }
+
+        template <>
+        __device__ __forceinline__ int clampScaleExp<ScaleType::E4M3>(int unbiasedExp)
+        {
+            if(unbiasedExp < -6)
+                return -6;
+            if(unbiasedExp > 7)
+                return 7;
+            return unbiasedExp;
+        }
+
+        template <>
+        __device__ __forceinline__ int clampScaleExp<ScaleType::E5M3>(int unbiasedExp)
+        {
+            if(unbiasedExp < -14)
+                return -14;
+            if(unbiasedExp > 15)
+                return 15;
+            return unbiasedExp;
+        }
+
         template <ScaleType ST>
         __device__ __forceinline__ uint8_t encodeScale(int unbiasedExp);
 
         template <>
         __device__ __forceinline__ uint8_t encodeScale<ScaleType::E8M0>(int unbiasedExp)
         {
-            // Bias = 127, range [0, 254]; 255 reserved for NaN.
             int v = unbiasedExp + 127;
             if(v < 0)
                 v = 0;
@@ -402,24 +450,23 @@ namespace DGen
         template <>
         __device__ __forceinline__ uint8_t encodeScale<ScaleType::E4M3>(int unbiasedExp)
         {
-            // Layout matches dataTypeInfo's ScaleFmt<1,4,3,...>: S=1 EEEE MMM
-            // We only need positive values for scale encoding.
-            constexpr int bias    = 7;
-            constexpr int maxExp  = 7; // biasedEMax - bias  (15 - 7 - 1 reserved = 7 here)
-            constexpr int minExp  = -6; // biasedEMin - bias = 1 - 7
+            // Byte layout S=1 EEEE MMM. Mantissa = 0 (normalised 1.0), so the
+            // encoded scale value is exactly 1.0 * 2^unbiasedExp.
+            constexpr int bias   = 7;
+            constexpr int maxExp = 7;
+            constexpr int minExp = -6;
             int           biased = unbiasedExp + bias;
             if(unbiasedExp > maxExp)
                 biased = maxExp + bias;
             if(unbiasedExp < minExp)
-                biased = 1; // smallest normal
-            // Normalised mantissa = 1.0 -> mantissa bits = 0.
+                biased = 1;
             return static_cast<uint8_t>(biased << 3);
         }
 
         template <>
         __device__ __forceinline__ uint8_t encodeScale<ScaleType::E5M3>(int unbiasedExp)
         {
-            // Layout: S? EEEEE MMM (S effectively unused for scale)
+            // Byte layout S? EEEEE MMM. Mantissa = 0; encoded scale = 2^unbiasedExp.
             constexpr int bias   = 15;
             constexpr int maxExp = 15;
             constexpr int minExp = -14;
@@ -473,157 +520,147 @@ namespace DGen
         }
 
         // ----------------------------------------------------------------------
-        // Device-side data quantisation: float -> N-bit OCP MX bit pattern
+        // Device-side data quantisation + packing.
         //
-        // Implements round-to-nearest-even quantisation of `value` (the
-        // already-scaled float) to a sign + biased-exponent + mantissa bit
-        // pattern occupying `signBits + expBits + mantBits` bits in the LSB.
-        // Saturating: out-of-range values clamp to +/- maxNormal.
+        // Each per-DTYPE specialisation takes one MX scale block worth of
+        // float values, applies the supplied unbiased scale exponent, RNE
+        // quantises to the target MX format, and writes the packed bytes
+        // directly into `outBytes`.
+        //
+        // Implementation defers to `__amd_cvt_*_scale` from <hip/hip_ext_ocp.h>
+        // - the same wrapper hipblaslt's hipblaslt_float4 / _float6 / _float8
+        // types use. On gfx950 these emit the hardware MX convert
+        // instructions (v_cvt_scalef32_pk_fp4_f32, pk32_f32_fp6, pk_fp8_f32);
+        // off gfx950 they fall back to the canonical fcbx software path so
+        // generator output is bit-identical to those production types.
+        //
+        // `blockSize` must equal `Tr::elementsPerScaleBlock`-style power-of-two
+        // (16 or 32 in current use). FP6 always converts a full 32-element
+        // group at once via __amd_cvt_floatx32_to_fp6x32_scale (the only
+        // F32->FP6 wrapper); for blockSize<32 the trailing inputs are
+        // zero-padded and the trailing output bytes discarded.
         // ----------------------------------------------------------------------
         template <typename DTYPE>
-        __device__ __forceinline__ uint32_t quantizeToOCP(float value)
+        __device__ __forceinline__ void convertBlockScaledRNE(uint8_t*      outBytes,
+                                                              float const*  values,
+                                                              int           blockSize,
+                                                              __amd_scale_t scaleExp);
+
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e2m1_mxfp4>(uint8_t*      outBytes,
+                                                  float const*  values,
+                                                  int           blockSize,
+                                                  __amd_scale_t scaleExp)
         {
-            using T = GpuTraits<DTYPE>;
-
-            // Sign + magnitude
-            uint32_t sign = (value < 0.0f) ? 1u : 0u;
-            float    mag  = __builtin_fabsf(value);
-
-            // NaN / Inf saturate to max normal magnitude (matches CPU saturating convert).
-            if(!__builtin_isfinite(mag))
-                mag = T::maxNormal;
-            if(mag > T::maxNormal)
-                mag = T::maxNormal;
-
-            // Round to a representable value. Use frexpf to split into exponent + mantissa.
-            int   e2 = 0;
-            float m  = __builtin_frexpf(mag, &e2);
-            // frexpf returns m in [0.5, 1) and e2 such that mag = m * 2^e2.
-            // The "1.M" representation has m' in [1, 2) and exp = e2 - 1.
-            int unbiasedExp = e2 - 1;
-
-            // Determine subnormal vs normal in DTYPE.
-            int const minNormalExp = 1 - T::bias; // smallest normal unbiased exp
-            int       biasedExp;
-            uint32_t  mantissa;
-
-            if(unbiasedExp < minNormalExp)
+            int const pairs = blockSize / 2;
+            for(int i = 0; i < pairs; ++i)
             {
-                // Subnormal: shift mantissa right by (minNormalExp - unbiasedExp).
-                int   shift     = minNormalExp - unbiasedExp;
-                float mScaled   = mag * __builtin_ldexpf(1.0f, T::mantBits + T::bias - 1);
-                // mScaled is the magnitude in units of "1 ULP of the smallest subnormal".
-                // Round to nearest even.
-                float floorVal  = __builtin_floorf(mScaled);
-                float frac      = mScaled - floorVal;
-                uint32_t intVal = static_cast<uint32_t>(floorVal);
-                if(frac > 0.5f
-                   || (frac == 0.5f && (intVal & 1u)))
-                    intVal += 1u;
-                if(intVal >= (1u << T::mantBits))
-                {
-                    // Rounded up into the smallest normal.
-                    biasedExp = 1;
-                    mantissa  = 0;
-                }
-                else
-                {
-                    biasedExp = 0;
-                    mantissa  = intVal;
-                }
-                (void)shift;
-            }
-            else
-            {
-                // Normal: extract mantissa bits from the m'.M' expansion.
-                float    mPrime    = m * 2.0f;        // in [1, 2)
-                float    fracPart  = mPrime - 1.0f;   // in [0, 1)
-                float    scaled    = fracPart * static_cast<float>(1u << T::mantBits);
-                float    floorVal  = __builtin_floorf(scaled);
-                float    frac      = scaled - floorVal;
-                uint32_t intVal    = static_cast<uint32_t>(floorVal);
-                if(frac > 0.5f || (frac == 0.5f && (intVal & 1u)))
-                    intVal += 1u;
-                if(intVal >= (1u << T::mantBits))
-                {
-                    intVal = 0;
-                    unbiasedExp += 1;
-                }
-                biasedExp = unbiasedExp + T::bias;
-                mantissa  = intVal;
-
-                // Saturate to max representable.
-                if(biasedExp > (1 << T::expBits) - 1)
-                {
-                    // Clamp to max normal.
-                    biasedExp = (1 << T::expBits) - 1;
-                    mantissa  = (1u << T::mantBits) - 1u;
-                    if constexpr(T::expBits == 5)
-                    {
-                        // E5M2 reserves all-ones-exp for inf/nan.
-                        biasedExp = (1 << T::expBits) - 2;
-                        mantissa  = (1u << T::mantBits) - 1u;
-                    }
-                    else if constexpr(T::expBits == 4 && T::mantBits == 3)
-                    {
-                        // E4M3 reserves the all-ones bit pattern for NaN.
-                        biasedExp = (1 << T::expBits) - 1;
-                        mantissa  = (1u << T::mantBits) - 2u;
-                    }
-                }
-            }
-
-            // Pack: [sign | biasedExp | mantissa] in the low bits.
-            uint32_t packed = (sign << (T::expBits + T::mantBits))
-                              | (static_cast<uint32_t>(biasedExp) << T::mantBits)
-                              | mantissa;
-            return packed;
-        }
-
-        // ----------------------------------------------------------------------
-        // Bit packing for FP4 (4 bits per element) and FP6 (6 bits per element).
-        // Each thread block handles one MX scale block, so writes within a
-        // block are race-free.
-        // ----------------------------------------------------------------------
-
-        // Packs 32 nibbles (one MX FP4 block, blockSize=32) into 16 bytes.
-        // For blockSize=16, packs 16 nibbles into 8 bytes.
-        __device__ __forceinline__ void packFP4Block(uint8_t* outBytes,
-                                                     uint8_t const* unpacked,
-                                                     int            blockSize)
-        {
-            for(int i = 0; i < blockSize / 2; ++i)
-            {
-                uint8_t lo = unpacked[2 * i] & 0x0f;
-                uint8_t hi = unpacked[2 * i + 1] & 0x0f;
-                outBytes[i] = static_cast<uint8_t>((hi << 4) | lo);
+                __amd_floatx2_storage_t pair{values[2 * i], values[2 * i + 1]};
+                outBytes[i] = static_cast<uint8_t>(
+                    __amd_cvt_floatx2_to_fp4x2_scale(pair, __AMD_OCP_E2M1, scaleExp));
             }
         }
 
-        // Packs `blockSize` 6-bit values from `unpacked` (one byte each, low 6
-        // bits valid) into `outBytes` (blockSize * 6 / 8 bytes). Only valid
-        // when blockSize is a multiple of 4.
-        __device__ __forceinline__ void packFP6Block(uint8_t* outBytes,
-                                                     uint8_t const* unpacked,
-                                                     int            blockSize)
+        // FP4 with non-E8M0 scale formats (E4M3, E5M3) shares the data path -
+        // only the scale byte's encoding differs and that's handled by
+        // encodeScale<scaleKind> at the call site.
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e2m1_mxfp4_e4m3>(uint8_t*      outBytes,
+                                                       float const*  values,
+                                                       int           blockSize,
+                                                       __amd_scale_t scaleExp)
         {
-            for(int i = 0; i < blockSize; ++i)
+            convertBlockScaledRNE<ocp_e2m1_mxfp4>(outBytes, values, blockSize, scaleExp);
+        }
+
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e2m1_mxfp4_e5m3>(uint8_t*      outBytes,
+                                                       float const*  values,
+                                                       int           blockSize,
+                                                       __amd_scale_t scaleExp)
+        {
+            convertBlockScaledRNE<ocp_e2m1_mxfp4>(outBytes, values, blockSize, scaleExp);
+        }
+
+        // FP6 / BF6: one __amd_cvt_floatx32_to_fp6x32_scale call covers a full
+        // 32-element group. Pad inputs and trim outputs for blockSize < 32.
+        template <__amd_fp6_interpretation_t Interp>
+        __device__ __forceinline__ void convertBlockScaledRNEFp6(uint8_t*      outBytes,
+                                                                 float const*  values,
+                                                                 int           blockSize,
+                                                                 __amd_scale_t scaleExp)
+        {
+            __amd_floatx32_storage_t in;
+            for(int i = 0; i < 32; ++i)
+                in[i] = (i < blockSize) ? values[i] : 0.0f;
+            __amd_fp6x32_storage_t out
+                = __amd_cvt_floatx32_to_fp6x32_scale(in, Interp, scaleExp);
+            auto const* bytes  = reinterpret_cast<uint8_t const*>(&out);
+            int const   outLen = blockSize * 6 / 8;
+            for(int b = 0; b < outLen; ++b)
+                outBytes[b] = bytes[b];
+        }
+
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e2m3_mxfp6>(uint8_t*      outBytes,
+                                                  float const*  values,
+                                                  int           blockSize,
+                                                  __amd_scale_t scaleExp)
+        {
+            convertBlockScaledRNEFp6<__AMD_OCP_E2M3>(outBytes, values, blockSize, scaleExp);
+        }
+
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e3m2_mxfp6>(uint8_t*      outBytes,
+                                                  float const*  values,
+                                                  int           blockSize,
+                                                  __amd_scale_t scaleExp)
+        {
+            convertBlockScaledRNEFp6<__AMD_OCP_E3M2>(outBytes, values, blockSize, scaleExp);
+        }
+
+        // FP8 / BF8: pk2 convert per pair of elements; each call returns a
+        // 16-bit storage holding two FP8 bytes.
+        template <__amd_fp8_interpretation_t Interp>
+        __device__ __forceinline__ void convertBlockScaledRNEFp8(uint8_t*      outBytes,
+                                                                 float const*  values,
+                                                                 int           blockSize,
+                                                                 __amd_scale_t scaleExp)
+        {
+            int const pairs = blockSize / 2;
+            for(int i = 0; i < pairs; ++i)
             {
-                uint8_t v       = unpacked[i] & 0x3f;
-                int     bitOff  = i * 6;
-                int     byteOff = bitOff / 8;
-                int     shift   = bitOff % 8;
-                outBytes[byteOff] = static_cast<uint8_t>((outBytes[byteOff] & ~(0x3fu << shift))
-                                                         | (v << shift));
-                if(shift > 2 && byteOff + 1 < (blockSize * 6 + 7) / 8)
-                {
-                    int   leftover = shift - 2;
-                    uint8_t carry  = static_cast<uint8_t>((v >> (8 - shift)) & ((1u << leftover) - 1u));
-                    outBytes[byteOff + 1]
-                        = static_cast<uint8_t>((outBytes[byteOff + 1] & ~((1u << leftover) - 1u))
-                                               | carry);
-                }
+                __amd_floatx2_storage_t pair{values[2 * i], values[2 * i + 1]};
+                __amd_fp8x2_storage_t   p
+                    = __amd_cvt_floatx2_to_fp8x2_scale(pair, Interp, scaleExp);
+                outBytes[2 * i + 0] = static_cast<uint8_t>(p & 0xffu);
+                outBytes[2 * i + 1] = static_cast<uint8_t>((p >> 8) & 0xffu);
             }
+        }
+
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e4m3_mxfp8>(uint8_t*      outBytes,
+                                                  float const*  values,
+                                                  int           blockSize,
+                                                  __amd_scale_t scaleExp)
+        {
+            convertBlockScaledRNEFp8<__AMD_OCP_E4M3>(outBytes, values, blockSize, scaleExp);
+        }
+
+        template <>
+        __device__ __forceinline__ void
+            convertBlockScaledRNE<ocp_e5m2_mxfp8>(uint8_t*      outBytes,
+                                                  float const*  values,
+                                                  int           blockSize,
+                                                  __amd_scale_t scaleExp)
+        {
+            convertBlockScaledRNEFp8<__AMD_OCP_E5M2>(outBytes, values, blockSize, scaleExp);
         }
 
         // ----------------------------------------------------------------------
@@ -655,9 +692,8 @@ namespace DGen
 
             // Up to 32 elements per block; matches the only sizes used by
             // current callers (16 or 32). Stack allocation is fine.
-            uint8_t  unpacked[32];
-            float    values[32];
-            float    maxAbs = 0.0f;
+            float values[32];
+            float maxAbs = 0.0f;
 
             for(int i = 0; i < blockSize; ++i)
             {
@@ -672,54 +708,29 @@ namespace DGen
             // Derive scale: choose unbiasedExp such that block_max <= maxNormal * 2^scaleExp.
             // i.e. scaleExp = ceil(log2(block_max / maxNormal)). Round up so
             // that division by 2^scaleExp brings every element within range.
+            // For an all-zero block we pick a neutral scale of 2^0 = 1.
             int scaleExp = 0;
             if(maxAbs > 0.0f)
             {
-                float ratio  = maxAbs / Tr::maxNormal;
-                float l2     = __builtin_log2f(ratio);
-                scaleExp     = static_cast<int>(__builtin_ceilf(l2));
-                // Avoid rounding-induced over-saturation: bump up one if needed.
+                float ratio = maxAbs / Tr::maxNormal;
+                float l2    = __builtin_log2f(ratio);
+                scaleExp    = static_cast<int>(__builtin_ceilf(l2));
                 while(maxAbs > Tr::maxNormal * __builtin_ldexpf(1.0f, scaleExp))
                     ++scaleExp;
             }
-            else
-            {
-                // All zeros: pick a neutral scale of 1.0.
-                scaleExp = 0;
-            }
 
-            uint8_t scaleByte = encodeScale<Tr::scaleKind>(scaleExp);
-            float   scale     = decodeScale<Tr::scaleKind>(scaleByte);
-            scaleOut[blockIdx_] = scaleByte;
+            // Saturate to the encodable range for this scale format BEFORE
+            // touching either the scale byte or the data convert, so both
+            // sides agree on the actual scale value the kernel will see.
+            int const     clampedExp = clampScaleExp<Tr::scaleKind>(scaleExp);
+            __amd_scale_t scaleArg   = static_cast<__amd_scale_t>(clampedExp);
 
-            float invScale = (scale > 0.0f) ? (1.0f / scale) : 0.0f;
-            for(int i = 0; i < blockSize; ++i)
-            {
-                uint32_t bits = quantizeToOCP<DTYPE>(values[i] * invScale);
-                unpacked[i]   = static_cast<uint8_t>(bits & 0xff);
-            }
+            scaleOut[blockIdx_] = encodeScale<Tr::scaleKind>(clampedExp);
 
-            if constexpr(Tr::bitsPerElem == 4)
-            {
-                uint8_t* outRow = dataOut + blockIdx_ * static_cast<uint64_t>(blockSize / 2);
-                packFP4Block(outRow, unpacked, blockSize);
-            }
-            else if constexpr(Tr::bitsPerElem == 6)
-            {
-                uint8_t* outRow = dataOut + blockIdx_ * static_cast<uint64_t>(blockSize * 6 / 8);
-                // Initialise the destination bytes to zero so the partial-bit
-                // OR-writes produce a clean result.
-                for(int b = 0; b < blockSize * 6 / 8; ++b)
-                    outRow[b] = 0;
-                packFP6Block(outRow, unpacked, blockSize);
-            }
-            else
-            {
-                // 8 bits per element: direct copy.
-                uint8_t* outRow = dataOut + blockIdx_ * static_cast<uint64_t>(blockSize);
-                for(int i = 0; i < blockSize; ++i)
-                    outRow[i] = unpacked[i];
-            }
+            uint64_t bytesPerBlock
+                = static_cast<uint64_t>(blockSize) * Tr::bitsPerElem / 8u;
+            uint8_t* outRow = dataOut + blockIdx_ * bytesPerBlock;
+            convertBlockScaledRNE<DTYPE>(outRow, values, blockSize, scaleArg);
         }
 
         // ----------------------------------------------------------------------
