@@ -18051,6 +18051,17 @@ class KernelWriterAssembly(KernelWriter):
       if self.states.IncLdsBufSwitch:
         mod.add(SMovB32(dst=sgpr("LDSBufferReadInc"), src=sgpr(papBankSgpr),
                 comment="align local-read inc with PAP DTL write bank"))
+        mod.add(SMovB32(dst=sgpr("LDSBufferWriteInc"), src=sgpr(papBankSgpr),
+                comment="align local-write inc with PAP DTL write bank"))
+      elif self.states.useCommonSgprSwap:
+        mod.add(SMovB32(dst=sgpr("SwapCommon"), src=sgpr(papBankSgpr),
+                comment="align common LDS swap with PAP DTL write bank"))
+      elif not kernel["ExpandPointerSwap"]:
+        for tP in (tPA, tPB):
+          tc = tP["tensorChar"]
+          if kernel["DirectToLds%s" % tc]:
+            mod.add(SOrB32(dst=sgpr(f"LocalWriteAddr{tc}"), src0=sgpr(f"LocalWriteAddr{tc}"),
+                    src1=sgpr(papBankSgpr), comment=f"shift LocalWriteAddr{tc} to PAP DTL bank"))
 
       for tP in (tPA, tPB):
         tc = tP["tensorChar"]

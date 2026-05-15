@@ -3006,6 +3006,36 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         module.add(SMovB64(dst=sgpr("Srd%s+2" % tc, 2), src=sgpr(tmpSgpr + 2, 2), comment="restore Srd%s[2:3]" % tc))
 
+    def papStaggerState():
+      if not self.states.staggerUCode:
+        return []
+
+      state = [("StaggerUIter", 1), ("WrapUA", 2), ("WrapUB", 2)]
+      isDTVAorB = kernel["DirectToVgprA"] != kernel["DirectToVgprB"]
+      if kernel["PrefetchGlobalRead"] >= 2 and isDTVAorB:
+        state.append(("StaggerUIterDTV", 1))
+      if kernel["ProblemType"]["MXBlockA"]:
+        state.append(("WrapUMXSA", 2))
+      if kernel["ProblemType"]["MXBlockB"]:
+        state.append(("WrapUMXSB", 2))
+      if kernel["ProblemType"]["Sparse"]:
+        state.append(("WrapUMetadata", 2))
+      return state
+
+    def moveStaggerState(dstBase, srcBase, state, comment):
+      offset = 0
+      for name, size in state:
+        if size == 1:
+          module.add(SMovB32(dst=sgpr(dstBase + offset) if isinstance(dstBase, int) else sgpr(name),
+                             src=sgpr(name) if isinstance(dstBase, int) else sgpr(srcBase + offset),
+                             comment="%s %s" % (comment, name)))
+        else:
+          for i in range(size):
+            module.add(SMovB32(dst=sgpr(dstBase + offset + i) if isinstance(dstBase, int) else sgpr("%s+%u" % (name, i)),
+                               src=sgpr("%s+%u" % (name, i)) if isinstance(dstBase, int) else sgpr(srcBase + offset + i),
+                               comment="%s %s+%u" % (comment, name, i)))
+        offset += size
+
     def emitTensorLoad(tP, skipWait=False):
       tc = tP["tensorChar"]
       module.addComment1("PAP: next-tile addresses and first-PGR load %s" % tc)
@@ -3013,6 +3043,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         with self.allocTmpSgpr(4, 2, "PAP%sSrdSnapshot" % tc) as tmpSgprInfo:
           snapshotSrd(tP, tmpSgprInfo.idx)
           module.add(self.graAddresses(kernel, tP))
+          if self.states.staggerUCode:
+            module.add(self.calculateStagger(kernel, tP))
           moduleTmp = self.directToLdsM0Update(kernel, 0, tP, skipWait)
           module.add(replaceHolder(moduleTmp, 0))
           module.add(self.globalReadDo(kernel, 0, tP))
@@ -3030,15 +3062,28 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.isSwapGlobalReadOrderForDtvOrDtl(kernel, prefetch1=True):
       tensorParameters1st, tensorParameters2nd = tensorParameters2nd, tensorParameters1st
 
-    module.addComment1("PAP: prefetch first global -> local group")
-    module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=isOptNLL))
-    emitTensorLoad(tensorParameters1st)
-    if "MX" in tensorParameters1st:
-      emitTensorLoad(tensorParameters1st["MX"], skipWait=True)
-    if "MX" in tensorParameters2nd:
-      emitTensorLoad(tensorParameters2nd["MX"], skipWait=True)
-    skip2ndWaitForDtl = kernel["DirectToLds%s" % tensorParameters1st["tensorChar"]]
-    emitTensorLoad(tensorParameters2nd, skipWait=skip2ndWaitForDtl)
+    def emitPrefetchGroup():
+      module.addComment1("PAP: prefetch first global -> local group")
+      module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=isOptNLL))
+      if self.states.staggerUCode:
+        module.add(self.declareStaggerParms(kernel))
+      emitTensorLoad(tensorParameters1st)
+      if "MX" in tensorParameters1st:
+        emitTensorLoad(tensorParameters1st["MX"], skipWait=True)
+      if "MX" in tensorParameters2nd:
+        emitTensorLoad(tensorParameters2nd["MX"], skipWait=True)
+      skip2ndWaitForDtl = kernel["DirectToLds%s" % tensorParameters1st["tensorChar"]]
+      emitTensorLoad(tensorParameters2nd, skipWait=skip2ndWaitForDtl)
+
+    staggerState = papStaggerState()
+    if staggerState:
+      numStaggerSnapshotSgprs = sum(size for _, size in staggerState)
+      with self.allocTmpSgpr(numStaggerSnapshotSgprs, 2, "PAPStaggerSnapshot") as tmpSgprInfo:
+        moveStaggerState(tmpSgprInfo.idx, None, staggerState, "checkpoint")
+        emitPrefetchGroup()
+        moveStaggerState(None, tmpSgprInfo.idx, staggerState, "restore")
+    else:
+      emitPrefetchGroup()
     module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="first PGR group for next persistent iter prefetched"))
     if ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"])
         and not (kernel["enableTDMA"] and kernel["enableTDMB"])):
