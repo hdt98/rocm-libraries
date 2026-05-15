@@ -204,7 +204,7 @@ struct LoadAndConvertKernel
                              {m_block_base, 0},
                              Policy::template MakeDRAMDistribution<Problem, YDataType>());
 
-        const index_t num_n_loops = N / S::Block_N;
+        const index_t num_n_loops = integer_divide_ceil(N, S::Block_N);
         for(index_t n_iter = 0; n_iter < num_n_loops; ++n_iter)
         {
             auto dram_tile = load_tile(a_block_window);
@@ -214,6 +214,7 @@ struct LoadAndConvertKernel
             decltype(load_tile(c_block_window)) c_tile;
             load_and_convert_tile<8, LoadTranspose::value>(c_tile, a_block_lds_read_window);
             store_tile(c_block_window, c_tile);
+            block_sync_lds();
 
             if(n_iter < num_n_loops - 1)
             {
