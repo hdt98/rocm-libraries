@@ -26,11 +26,10 @@ set(_bz2_srcs
     "${BZIP2_UPSTREAM_SOURCE_DIR}/bzlib.c"
 )
 
-if(WIN32)
-    add_library(miopen_bz2 STATIC ${_bz2_srcs})
-else()
-    add_library(miopen_bz2 ${_bz2_srcs})  # honours BUILD_SHARED_LIBS
-endif()
+# Always static: bzip2 is linked privately into MIOpen and exported via
+# miopen-targets; an accidental shared bzip2 from BUILD_SHARED_LIBS=ON would
+# install alongside MIOpen's own shared lib for no benefit.
+add_library(miopen_bz2 STATIC ${_bz2_srcs})
 
 set_target_properties(miopen_bz2 PROPERTIES
     POSITION_INDEPENDENT_CODE ON

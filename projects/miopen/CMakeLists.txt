@@ -55,6 +55,12 @@ endif()
 # Default to a ROCm Clang toolchain when the user hasn't supplied one. When we
 # provide the default, treat this as a standalone build and pull third-party
 # deps via FetchContent (see cmake/ThirdParty.cmake).
+#
+# CMake limitation: the toolchain file is processed *before* this CMakeLists.txt
+# is evaluated, so this assignment only takes effect on subsequent `cmake`
+# invocations (the cache value is then picked up). On the very first configure
+# run the toolchain file is not applied. Re-running `cmake` from the same build
+# directory (or passing -DCMAKE_TOOLCHAIN_FILE=... explicitly) activates it.
 if(NOT CMAKE_TOOLCHAIN_FILE AND NOT DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
     set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ClangToolChain.cmake"
         CACHE FILEPATH "Toolchain file")

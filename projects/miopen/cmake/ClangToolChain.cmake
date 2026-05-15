@@ -37,8 +37,10 @@
 if(WIN32)
     set(DEFAULT_ROCM_COMPILER_EXTENSION ".exe")
     set(CMAKE_RC_COMPILER "CMAKE_RC_COMPILER-NOTREQUIRED")
-    # No suitable default on windows, use this as a possible example.
-    set(DEFAULT_ROCM_CMAKE_PATH "c:/dist/therock")
+    # No canonical ROCm install location exists on Windows, so leave the default
+    # empty. Users must either supply -DROCM_CMAKE_PATH=... explicitly or have
+    # hipconfig discoverable on PATH.
+    set(DEFAULT_ROCM_CMAKE_PATH "")
 else()
     # Can use /opt/rocm as the typical default install path on Linux
     set(DEFAULT_ROCM_CMAKE_PATH "/opt/rocm")
@@ -55,16 +57,16 @@ message(
 if(NOT _ROCM_CLANG_TOOLCHAIN_FIRST_RUN_COMPLETED)
     if(DEFINED ROCM_PATH)
         message(STATUS "ROCM_PATH provided: ${ROCM_PATH}")
-    elseif(DEFINED ROCM_CMAKE_HIPCOFING_PATH)
-        set(TRY_TO_FIND_ROCM_PATH_USING_HIPCONFIG "TRUE")
-        message(STATUS "ROCM_CMAKE_HIPCOFING_PATH provided: ${ROCM_CMAKE_HIPCOFING_PATH}")
+    elseif(DEFINED ROCM_CMAKE_HIPCONFIG_PATH)
+        set(TRY_TO_FIND_ROCM_PATH_USING_HIPCONFIG TRUE)
+        message(STATUS "ROCM_CMAKE_HIPCONFIG_PATH provided: ${ROCM_CMAKE_HIPCONFIG_PATH}")
     elseif(DEFINED ROCM_CMAKE_PATH)
         message(STATUS "ROCM_CMAKE_PATH provided: ${ROCM_CMAKE_PATH}")
     elseif(DEFINED ENV{ROCM_CMAKE_PATH})
         set(ROCM_CMAKE_PATH $ENV{ROCM_CMAKE_PATH})
         message(STATUS "ROCM_CMAKE_PATH set from environment: ${ROCM_CMAKE_PATH}")
     else()
-        set(TRY_TO_FIND_ROCM_PATH_USING_HIPCONFIG "TRUE")
+        set(TRY_TO_FIND_ROCM_PATH_USING_HIPCONFIG TRUE)
         message(
             STATUS
                 "No helper variables provided; attempting to detect ROCm path and hip package using system PATH and CMAKE_PREFIX_PATH."
@@ -88,7 +90,7 @@ endif()
 if(NOT DEFINED ROCM_PATH AND NOT DEFINED ROCM_CMAKE_PATH AND TRY_TO_FIND_ROCM_PATH_USING_HIPCONFIG)
 
     find_program(
-        HIPCONFIG_EXECUTABLE hipconfig PATHS ${ROCM_CMAKE_HIPCOFING_PATH} ${ROCM_CMAKE_PATH}
+        HIPCONFIG_EXECUTABLE hipconfig PATHS ${ROCM_CMAKE_HIPCONFIG_PATH} ${ROCM_CMAKE_PATH}
                                              ${DEFAULT_ROCM_CMAKE_PATH} PATH_SUFFIXES "/bin"
     )
     if(HIPCONFIG_EXECUTABLE)

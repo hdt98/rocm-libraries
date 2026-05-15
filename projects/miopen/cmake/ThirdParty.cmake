@@ -86,7 +86,9 @@ set(EIGEN_BUILD_DOC       OFF CACHE BOOL "" FORCE)
 # frugally-deep's CMake floor is older than 3.30's policy default.
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 # Suppress deprecation warnings from third-party CMakeLists (frugally-deep).
-set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+# Set as a normal variable so save/restore via _miopen_save_var/_miopen_restore_var
+# round-trips cleanly without leaving a cache entry behind.
+set(CMAKE_WARN_DEPRECATED OFF)
 
 # -----------------------------------------------------------------------------
 # Helper: log the find_package outcome for a dep so the configure log makes the
@@ -237,7 +239,11 @@ if(NOT BZIP2_FOUND)
         "${bzip2_BINARY_DIR}-wrapper"
         SYSTEM
     )
-    target_compile_options(miopen_bz2 PRIVATE -w)
+    if(MSVC)
+        target_compile_options(miopen_bz2 PRIVATE /W0)
+    else()
+        target_compile_options(miopen_bz2 PRIVATE -w)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------
@@ -262,7 +268,11 @@ if(NOT SQLite3_FOUND)
         "${sqlite3_BINARY_DIR}-wrapper"
         SYSTEM
     )
-    target_compile_options(miopen_sqlite3 PRIVATE -w)
+    if(MSVC)
+        target_compile_options(miopen_sqlite3 PRIVATE /W0)
+    else()
+        target_compile_options(miopen_sqlite3 PRIVATE -w)
+    endif()
 endif()
 
 # -----------------------------------------------------------------------------
@@ -281,13 +291,12 @@ if(NOT GTest_FOUND)
         URL_HASH SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c
         SYSTEM
         OVERRIDE_FIND_PACKAGE)
-    set(_miopen_saved_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    _miopen_save_var(BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS OFF)
     _miopen_suppress_rocm_toolchain_checks()
     FetchContent_MakeAvailable(GTest)
     _miopen_restore_rocm_toolchain_checks()
-    set(BUILD_SHARED_LIBS ${_miopen_saved_BUILD_SHARED_LIBS})
-    unset(_miopen_saved_BUILD_SHARED_LIBS)
+    _miopen_restore_var(BUILD_SHARED_LIBS)
 
     foreach(_tgt gtest gtest_main gmock gmock_main)
         if(TARGET ${_tgt})
@@ -315,6 +324,6 @@ endif()
 # Restore the variables we overrode at the top of this file so nothing leaks
 # into MIOpen's own CMakeLists.
 _miopen_restore_cache_var(BUILD_TESTING "Build the testing tree.")
-_miopen_restore_cache_var(CMAKE_WARN_DEPRECATED "")
+_miopen_restore_var(CMAKE_WARN_DEPRECATED)
 _miopen_restore_var(FETCHCONTENT_QUIET)
 _miopen_restore_var(CMAKE_POLICY_VERSION_MINIMUM)
