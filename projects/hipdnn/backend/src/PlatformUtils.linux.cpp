@@ -51,12 +51,12 @@ void closeLibrary(PluginLibHandle handle)
 void* getSymbol(PluginLibHandle handle, const char* symbolName)
 {
     void* symbol = hipdnn_data_sdk::utilities::getSymbol(handle, symbolName);
-    if(symbol == nullptr)
+    const char* error = dlerror();
+    if(error != nullptr)
     {
-        const char* error = dlerror();
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                              "Failed to get symbol: " + std::string(symbolName) + " (Error: "
-                                  + (error != nullptr ? error : "Unknown error") + ")");
+                              "Failed to get symbol: " + std::string(symbolName)
+                                  + " (Error: " + error + ")");
     }
     return symbol;
 }

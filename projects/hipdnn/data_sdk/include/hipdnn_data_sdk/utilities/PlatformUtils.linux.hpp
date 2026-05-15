@@ -89,15 +89,19 @@ inline void closeLibrary(SharedLibraryHandle handle)
 
 inline void* getSymbol(SharedLibraryHandle handle, const char* symbolName)
 {
+    dlerror();
     return dlsym(handle, symbolName);
 }
 
 inline std::filesystem::path getLoadedLibraryDirectoryForSymbol(const char* symbolName)
 {
+    dlerror();
     void* symbol = dlsym(RTLD_DEFAULT, symbolName);
-    if(symbol == nullptr)
+    const char* error = dlerror();
+    if(error != nullptr)
     {
-        throw std::runtime_error("Failed to find loaded symbol: " + std::string(symbolName));
+        throw std::runtime_error("Failed to find loaded symbol: " + std::string(symbolName) + " ("
+                                 + error + ")");
     }
 
     Dl_info info{};
