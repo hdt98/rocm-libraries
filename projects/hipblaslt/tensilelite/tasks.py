@@ -51,6 +51,11 @@ def detect_gpu_arch():
     except Exception as e:
         print(f"An unexpected error occurred during GPU detection: {e}", file=sys.stderr)
 
+    target_arch = os.environ.get("TARGET_ARCH")
+    if target_arch:
+        print(f"Using TARGET_ARCH from environment: {target_arch}", file=sys.stderr)
+        return target_arch
+
     print(f"Failed to detect a valid GPU architecture (gfx target not found).", file=sys.stderr)
     return None
 
