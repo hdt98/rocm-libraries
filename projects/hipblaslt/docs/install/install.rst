@@ -2,7 +2,7 @@
    :description: Installation instructions for hipBLASLt
    :keywords: lib, hipblaslt, blas, algorithm, install, sdk, rocm
 
-.. _installation:
+.. _install-hipblaslt:
 
 *****************
 Install hipBLASLt
