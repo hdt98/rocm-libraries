@@ -73,6 +73,8 @@ function(apply_test_category_labels target_name yaml_file working_dir)
     include("${CATEGORY_CMAKE}")
 endfunction()
 
+# Function to apply category labels at install time using a CTest-style YAML file
+# Optional 2nd parameter: install_test_file - path to write install-time test definitions
 function(apply_ctest_category_labels yaml_file)
     # Execute the Python script to generate CMake code
     if(NOT Python3_FOUND)
