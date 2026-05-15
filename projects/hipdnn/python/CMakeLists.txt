@@ -84,6 +84,7 @@ else()
                 -C \"cmake.define.tsl-robin-map_DIR=${tsl-robin-map_DIR}\"
                 -C \"cmake.define.FETCHCONTENT_SOURCE_DIR_NANOBIND=${nanobind_SOURCE_DIR}\"
                 -C \"cmake.define.FETCHCONTENT_SOURCE_DIR_TSL-ROBIN-MAP=${tsl-robin-map_SOURCE_DIR}\"
+                -C \"cmake.define.hip_DIR=${hip_DIR}\"
             RESULT_VARIABLE _result
         )
         if(_result)
