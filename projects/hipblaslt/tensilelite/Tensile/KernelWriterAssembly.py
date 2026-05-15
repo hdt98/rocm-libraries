@@ -9306,8 +9306,15 @@ class KernelWriterAssembly(KernelWriter):
         else:
           incUpper = 0 # GRO is positive for loop unroll
           srcGRInc = sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx))
-          if tc in ('A', 'B'):
-            useConstSgprGlobalReadIncs = self.states.a.useConstSgprGlobalReadIncs if tc == 'A' else self.states.b.useConstSgprGlobalReadIncs
+          if tc in ('A', 'B', 'MXSA', 'MXSB'):
+            if tc == 'A':
+              useConstSgprGlobalReadIncs = self.states.a.useConstSgprGlobalReadIncs
+            elif tc == 'B':
+              useConstSgprGlobalReadIncs = self.states.b.useConstSgprGlobalReadIncs
+            elif tc == 'MXSA':
+              useConstSgprGlobalReadIncs = self.states.mxsa.useConstSgprGlobalReadIncs
+            else:
+              useConstSgprGlobalReadIncs = self.states.mxsb.useConstSgprGlobalReadIncs
             if useConstSgprGlobalReadIncs:
               srcGRInc = "GlobalReadIncs%s"%tc
           imod.addModuleAsFlatItems(self.incrementSrd(tP, srcGRInc, hex(incUpper)))
@@ -17930,6 +17937,8 @@ class KernelWriterAssembly(KernelWriter):
     mod.add(self.tdmGlobalOffsetWaveSeparated(kernel, tPA, tPB))
     mod.add(self.tdmApplyStreamKTailOffsetWaveSeparated(kernel, tPA, tPB))
     mod.add(self.resetTDMDescriptorForTailWaveSeparated(kernel, tPA, tPB))
+    if kernel["LdsOffsetA_Blk"] == 0:
+      return mod
     comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
     with self.allocTmpSgpr(1) as tmpSgprRes:
       tailBankSgpr = tmpSgprRes.idx
@@ -17946,7 +17955,7 @@ class KernelWriterAssembly(KernelWriter):
     mod = Module(f"PAP TDM refresh descriptor ({tcA}/{tcB})")
     ldsAddrSgpr: str = comp.getLdsAddrSgprName(f"tdm{tcA}Group0")
     blkMask: int = kernel["LdsOffsetA_Blk"]
-    if preservePapBank:
+    if preservePapBank and blkMask != 0:
       with self.allocTmpSgpr(1) as tmpSgprRes:
         papBankSgpr = tmpSgprRes.idx
         mod.add(SAndB32(dst=sgpr(papBankSgpr), src0=sgpr(ldsAddrSgpr), src1=hex(blkMask),
@@ -17968,6 +17977,8 @@ class KernelWriterAssembly(KernelWriter):
     comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
     ldsAddrSgpr: str = comp.getLdsAddrSgprName("tdmAGroup0")
     blkMask: int = kernel["LdsOffsetA_Blk"]
+    if blkMask == 0:
+      return mod
     with self.allocTmpSgpr(1) as tmpSgprRes:
       papBankSgpr = tmpSgprRes.idx
       mod.add(SAndB32(dst=sgpr(papBankSgpr), src0=sgpr(ldsAddrSgpr), src1=hex(blkMask),
@@ -17981,10 +17992,13 @@ class KernelWriterAssembly(KernelWriter):
     mod = Module("TDM restore PAP LDS bank for primed path")
     skipLbl = Label(self.labels.getNameInc("SkipPapBankRestore"), "")
 
+    blkMask: int = kernel["LdsOffsetA_Blk"]
+    if blkMask == 0:
+      return mod
+
     mod.add(SCmpEQU32(src0=sgpr("SkPrefetchPrimed"), src1=0, comment="primed?"))
     mod.add(SCBranchSCC1(labelName=skipLbl.getLabelName(), comment="not primed, skip bank restore"))
 
-    blkMask: int = kernel["LdsOffsetA_Blk"]
     with self.allocTmpSgpr(1) as tmpSgprRes:
       papBankSgpr = tmpSgprRes.idx
       mod.add(SAndB32(dst=sgpr(papBankSgpr), src0=sgpr("SkPrefetchPrimed"), src1=hex(blkMask),
@@ -18118,6 +18132,8 @@ class KernelWriterAssembly(KernelWriter):
 
   def papTdmShiftTailLdsBank(self, kernel: Mapping, tPA: Mapping, tPB: Mapping) -> Module:
     mod = Module("TDM shift tail local-read LDS bank")
+    if kernel["LdsOffsetA_Blk"] == 0:
+      return mod
     with self.allocTmpSgpr(1) as tmpSgprRes:
       tailBankSgpr = tmpSgprRes.idx
       mod.add(self.papTdmSelectTailLdsBank(kernel, tailBankSgpr))

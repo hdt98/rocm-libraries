@@ -2841,7 +2841,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             module.add(self.openLoop(kernel, tensorParametersA, tensorParametersB, i))
         module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx))
 
-      if not forceNoTileCode and self.states.staggerUCode:
+      if not forceNoTileCode and self.states.staggerUCode and self.hasStaggerableGlobalRead(kernel):
         module.add(self.declareStaggerParms(kernel))
         # Calculate stagger A(MXSA)
         if not tdmA:
@@ -3043,6 +3043,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     def restoreBorrowedStaggerState(tmpSgpr, state):
       copyBorrowedStaggerState(None, tmpSgpr, state, "restore")
 
+    def emitTensorLoadUsesStagger(tP):
+      return self.states.staggerUCode and kernel["BufferLoad"] and usesCanonicalSrd(tP)
+
     def emitTensorLoad(tP, skipWait=False):
       tc = tP["tensorChar"]
       module.addComment1("PAP: next-tile addresses and first-PGR load %s" % tc)
@@ -3050,7 +3053,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         with self.allocTmpSgpr(4, 2, "PAP%sSrdSnapshot" % tc) as tmpSgprInfo:
           checkpointDescriptorState(tP, tmpSgprInfo.idx)
           module.add(self.graAddresses(kernel, tP))
-          if self.states.staggerUCode:
+          if emitTensorLoadUsesStagger(tP):
             module.add(self.calculateStagger(kernel, tP))
           moduleTmp = self.directToLdsM0Update(kernel, 0, tP, skipWait)
           module.add(replaceHolder(moduleTmp, 0))
@@ -3073,10 +3076,18 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.isSwapGlobalReadOrderForDtvOrDtl(kernel, prefetch1=True):
       tensorParameters1st, tensorParameters2nd = tensorParameters2nd, tensorParameters1st
 
+    prefetchTensorParameters = [tensorParameters1st]
+    if "MX" in tensorParameters1st:
+      prefetchTensorParameters.append(tensorParameters1st["MX"])
+    if "MX" in tensorParameters2nd:
+      prefetchTensorParameters.append(tensorParameters2nd["MX"])
+    prefetchTensorParameters.append(tensorParameters2nd)
+    papPrefetchUsesStagger = any(emitTensorLoadUsesStagger(tP) for tP in prefetchTensorParameters)
+
     def emitPrefetchGroup():
       module.addComment1("PAP: prefetch first global -> local group")
       module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=isOptNLL))
-      if self.states.staggerUCode:
+      if papPrefetchUsesStagger:
         module.add(self.declareStaggerParms(kernel))
       emitTensorLoad(tensorParameters1st)
       if "MX" in tensorParameters1st:
@@ -3086,7 +3097,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       skip2ndWaitForDtl = kernel["DirectToLds%s" % tensorParameters1st["tensorChar"]]
       emitTensorLoad(tensorParameters2nd, skipWait=skip2ndWaitForDtl)
 
-    staggerState = borrowedStaggerState()
+    staggerState = borrowedStaggerState() if papPrefetchUsesStagger else []
     if staggerState:
       numStaggerSnapshotSgprs = sum(size for _, size in staggerState)
       with self.allocTmpSgpr(numStaggerSnapshotSgprs, 2, "PAPStaggerSnapshot") as tmpSgprInfo:
@@ -4775,7 +4786,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
   def acquireStreamKConstSgpr(self, kernel, name):
     if self.isStreamKConstantsToVgprEnabled(kernel):
-      return self.sgprPool.checkOut(1, name)
+      return self.sgprPool.checkOut(1, name, preventOverflow=False)
     return name
 
   def releaseStreamKConstSgpr(self, nameOrIdx):
@@ -5313,7 +5324,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=deepCopyPack, packPre=deepCopyPackPre, NLLindex=NLLindex, NLLnum=NLLnum))
             self.restoreLocalPointers(kernel, tensorParametersA, tensorParametersB)
 
-    if self.states.actualSummationLoops>1 and self.states.staggerUCode:
+    if (self.states.actualSummationLoops>1 and self.states.staggerUCode
+        and self.hasStaggerableGlobalRead(kernel)):
       module.addComment1("remove stagger offsets")
       module.add(self.removeStaggerAB(kernel, tensorParametersA, tensorParametersB))
 
@@ -5417,7 +5429,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       is_wmma_v3 = self.states.asmCaps.get("HasWMMA_V3", False)
       if not is_wmma_v3:
         module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1))
-      if self.states.actualSummationLoops==1 and self.states.staggerUCode:
+      if (self.states.actualSummationLoops==1 and self.states.staggerUCode
+          and self.hasStaggerableGlobalRead(kernel)):
         module.addComment1("remove stagger offsets for tail loop")
         if is_wmma_v3:
           skipRemoveStaggerLabel = Label("SkipRemoveStagger", "")
@@ -6261,14 +6274,22 @@ class KernelWriter(metaclass=abc.ABCMeta):
     #exit(1)
 
     self.states.tailloopInNll = kernel["TailloopInNll"]
+    hasMx = kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]
+    usesTDM = kernel["enableTDMA"] or kernel["enableTDMB"]
+    usesDTL = kernel["DirectToLdsA"] or kernel["DirectToLdsB"]
+    # MX PAP on the canonical buffer-load path cannot afford the borrowed
+    # stagger-state checkpoint. Current MX PAP configs use StaggerU=0 here.
+    disableStaggerForMxPap = kernel["PrefetchAcrossPersistent"] and hasMx and not (usesTDM or usesDTL)
     # remove staggerU code for the following cases
     # - tailloopInNll (cannot support staggerU)
     # - StreamK + MX (not enough sgpr. gfx950 only for now)
+    # - MX PAP without TDM/DTL (not enough sgpr)
     self.states.staggerUCode = True
     if self.states.tailloopInNll or \
        (kernel["StreamK"] and \
-        (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) and \
-        isgfx950) or kernel["UseSubtileImpl"]:
+        hasMx and isgfx950) or \
+       disableStaggerForMxPap or \
+       kernel["UseSubtileImpl"]:
       self.states.staggerUCode = False
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:
@@ -9596,6 +9617,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
             and not kernel.get("SuppressNoLoadLoop", False)
             and kernel["PrefetchGlobalRead"] >= 1
             and not kernel.get("UseCustomMainLoopSchedule", 0))
+
+  def hasStaggerableGlobalRead(self, kernel):
+    """Return True if any emitted global-read path can consume StaggerU state."""
+    return (not kernel["enableTDMA"]
+            or not kernel["enableTDMB"]
+            or (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]))
 
   ##############################################################################
   # Function End

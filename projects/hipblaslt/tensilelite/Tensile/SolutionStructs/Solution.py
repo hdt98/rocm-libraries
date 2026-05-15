@@ -3642,6 +3642,15 @@ class Solution(collections.abc.Mapping):
         state["StaggerUStride"] = 0
         state["InternalSupportParams"]["SupportCustomStaggerU"] = False # Disable CustomStaggerU for no StagggerU code
 
+    hasMxForStagger = state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]
+    usesTdmForStagger = state["enableTDMA"] or state["enableTDMB"]
+    usesDtlForStagger = state["DirectToLdsA"] or state["DirectToLdsB"]
+    if state["PrefetchAcrossPersistent"] and hasMxForStagger and not (usesTdmForStagger or usesDtlForStagger):
+      state["StaggerU"] = 0
+      state["StaggerUMapping"] = 0
+      state["StaggerUStride"] = 0
+      state["InternalSupportParams"]["SupportCustomStaggerU"] = False
+
     # Determine if we can load directly-to-Vgpr
     # need to check after state["LocalReadVectorWidth"] = -1 is resolved
     if state["DirectToVgprA"]:
