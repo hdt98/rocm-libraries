@@ -244,6 +244,19 @@ if(NOT MIOPENPROVIDER_SKIP_TESTS)
             TEST_CONFIG    ${CMAKE_CURRENT_SOURCE_DIR}/config/MIOPEN_ENGINE.toml
         )
         message(STATUS "Created ${PROJECT_NAME}-external-integration-check target")
+
+        # TODO: Remove once TheRock fetches the hipdnn-integration-tests _run
+        # artifact alongside _test (see TheRock branch
+        # users/addickin/hipdnn_integration_tests_run_artifact). The main
+        # hipdnn_integration_tests binary lives in the artifact's _run
+        # component, but TheRock CI's miopenprovider test job only fetches
+        # _lib + _test (--hipdnn-integration-tests --tests in
+        # fetch_test_configurations.py). Bundling the binary here makes it
+        # arrive via miopenprovider_lib so the ctest entry registered above
+        # can find it as `../hipdnn_integration_tests` from miopen_plugin/.
+        install(PROGRAMS $<TARGET_FILE:hipdnn_integration_tests>
+                DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
     else()
         message(STATUS "hipdnn_integration_tests not found - skipping external-integration-check")
     endif()
