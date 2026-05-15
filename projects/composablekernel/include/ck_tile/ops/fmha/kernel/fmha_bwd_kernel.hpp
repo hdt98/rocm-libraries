@@ -106,6 +106,10 @@ struct FmhaBwdWorkspaceManager
             throw std::logic_error(
                 "PrepareWorkspaceHost: QrQtrDor pipeline does not use workspace");
         }
+        // alignas(16) FmhaBwdGroupPersistentCuState writes use x86 SIMD; fault on misalign.
+        if(reinterpret_cast<uintptr_t>(cpu_ws) % 16 != 0)
+            throw std::runtime_error(
+                "PrepareWorkspaceHost: cpu_ws must be 16-byte aligned");
         const auto nsplits = reinterpret_cast<index_t*>(cpu_ws);
         const auto offsets = reinterpret_cast<long_index_t*>(reinterpret_cast<char*>(cpu_ws) +
                                                              GetDqAccSplitsSize<false>(batch_size));
