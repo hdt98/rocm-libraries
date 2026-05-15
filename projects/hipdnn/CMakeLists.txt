@@ -114,9 +114,13 @@ set(HIPDNN_TEST_REFERENCE_DIR "${CMAKE_BINARY_DIR}/lib/hipdnn_reference_data"
 set(HIPDNN_TEST_REFERENCE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}"
     CACHE INTERNAL "Install directory for test reference data"
 )
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/hipdnn_reference_data/"
-     DESTINATION ${HIPDNN_TEST_REFERENCE_DIR}
-) # Copies only on calls to cmake
+set(_hipdnn_ref_data_src
+    "${CMAKE_SOURCE_DIR}/dnn-providers/integration-tests/hipdnn_reference_data")
+if(EXISTS "${_hipdnn_ref_data_src}")
+    file(COPY "${_hipdnn_ref_data_src}/"
+         DESTINATION ${HIPDNN_TEST_REFERENCE_DIR}
+    )
+endif()
 install(DIRECTORY "${CMAKE_BINARY_DIR}/lib/hipdnn_reference_data"
         DESTINATION ${HIPDNN_TEST_REFERENCE_INSTALL_DIR}
 )
