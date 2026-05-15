@@ -50,6 +50,8 @@ enum class hipblaslt_initialization
     // norm_dist with one element overwritten by +inf, -inf, or quiet NaN; index and special kind are
     // deterministic from the fixed seed (NaN uses canonical quiet_NaN, not RNG).
     norm_dist_one_special = 894,
+    // Uniform random in [-6.0, 6.0] (full FP4 E2M1 range); ~4% zeros vs ~50% for hpl
+    uniform_low_precision  = 999,
 };
 
 typedef enum class _hipblaslt_activation_type
@@ -267,6 +269,8 @@ constexpr auto hipblaslt_initialization2string(hipblaslt_initialization init)
         return "nan";
     case hipblaslt_initialization::norm_dist_one_special:
         return "norm_dist_one_special";
+    case hipblaslt_initialization::uniform_low_precision:
+        return "uniform_low_precision";
     }
     return "invalid";
 }
@@ -295,6 +299,7 @@ inline hipblaslt_initialization string2hipblaslt_initialization(const std::strin
         value == "neg_inf"    ? hipblaslt_initialization::neg_inf    :
         value == "nan"        ? hipblaslt_initialization::nan        :
         value == "norm_dist_one_special" ? hipblaslt_initialization::norm_dist_one_special :
+        value == "uniform_low_precision" ? hipblaslt_initialization::uniform_low_precision :
         static_cast<hipblaslt_initialization>(0);
 }
 // clang-format on
