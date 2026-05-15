@@ -68,6 +68,7 @@
 #include <algorithm>
 #include <array>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 
 #include <hipdnn_backend.h>
@@ -2152,12 +2153,17 @@ public:
      * creates a plan spec for each engine using its default knob settings.
      * Duplicates are silently skipped.
      *
-     * @param configs Engine configurations to add
-     * @return ErrorCode::OK on success
+     * @param configs Engine configurations to add (must not be empty)
+     * @return ErrorCode::OK on success, ErrorCode::INVALID_VALUE if configs is empty
      */
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error add_engine_configs(const std::vector<EngineConfigInfo>& configs)
     {
+        if(configs.empty())
+        {
+            return {ErrorCode::INVALID_VALUE, "Input list is empty"};
+        }
+
         for(const auto& config : configs)
         {
             PlanSpec spec;
@@ -2259,12 +2265,17 @@ public:
      * Each EngineVariant becomes one plan spec. Engines that are not valid
      * for this graph are silently skipped (batch operation semantics).
      *
-     * @param variants Engine variants to add
-     * @return ErrorCode::OK on success
+     * @param variants Engine variants to add (must not be empty)
+     * @return ErrorCode::OK on success, ErrorCode::INVALID_VALUE if variants is empty
      */
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error add_engine_variants(const std::vector<EngineVariant>& variants)
     {
+        if(variants.empty())
+        {
+            return {ErrorCode::INVALID_VALUE, "Input list is empty"};
+        }
+
         for(const auto& variant : variants)
         {
             // Silently skip engines that don't work for this graph (batch semantics)
@@ -2299,58 +2310,66 @@ public:
     /**
      * @brief Add plan specs from a Cartesian product sweep of knob values
      *
-     * Expands the sweep spec into individual plan specs via Cartesian product
+     * Expands each sweep spec into individual plan specs via Cartesian product
      * of the knob axes, merging with fixed settings. Engine must be valid
      * for this graph.
      *
-     * @param sweepSpec Sweep specification for one engine
+     * @param specs Sweep specifications (one per engine to sweep)
      * @return ErrorCode::OK on success, ErrorCode::INVALID_VALUE if the
-     *         Cartesian product exceeds safety limits
+     *         input is empty or a Cartesian product exceeds safety limits
      */
     // NOLINTNEXTLINE(readability-identifier-naming)
-    Error add_engine_sweep(const EngineSweepSpec& sweepSpec)
+    Error add_engine_sweep(const std::vector<EngineSweepSpec>& specs)
     {
-        // Validate engine
-        std::vector<Knob> knobs;
-        auto validateErr = get_knobs_for_engine(sweepSpec.engineId, knobs);
-        if(validateErr.is_bad())
+        if(specs.empty())
         {
-            return {ErrorCode::INVALID_VALUE,
-                    "Engine ID " + std::to_string(sweepSpec.engineId)
-                        + " is not valid for this graph"};
+            return {ErrorCode::INVALID_VALUE, "Input list is empty"};
         }
 
-        // Compute Cartesian product
-        std::vector<std::vector<KnobSetting>> combinations;
-        HIPDNN_CHECK_ERROR(autotune::computeCartesianProduct(sweepSpec.axes, combinations));
-
-        // For each combination, merge with fixed settings and add as a plan spec
-        for(auto& combo : combinations)
+        for(const auto& sweepSpec : specs)
         {
-            PlanSpec spec;
-            spec.engineId = sweepSpec.engineId;
-
-            // Add fixed settings first (stripping benchmarking knob)
-            for(const auto& [knobId, value] : sweepSpec.fixedSettings)
+            // Validate engine
+            std::vector<Knob> knobs;
+            auto validateErr = get_knobs_for_engine(sweepSpec.engineId, knobs);
+            if(validateErr.is_bad())
             {
-                if(knobId == autotune::BENCHMARKING_KNOB_NAME)
-                {
-                    continue;
-                }
-                spec.knobSettings.emplace_back(knobId, value);
+                return {ErrorCode::INVALID_VALUE,
+                        "Engine ID " + std::to_string(sweepSpec.engineId)
+                            + " is not valid for this graph"};
             }
 
-            // Add swept settings (stripping benchmarking knob)
-            for(auto& setting : combo)
-            {
-                if(setting.knobId() == autotune::BENCHMARKING_KNOB_NAME)
-                {
-                    continue;
-                }
-                spec.knobSettings.push_back(std::move(setting));
-            }
+            // Compute Cartesian product
+            std::vector<std::vector<KnobSetting>> combinations;
+            HIPDNN_CHECK_ERROR(autotune::computeCartesianProduct(sweepSpec.axes, combinations));
 
-            addPlanSpecIfUnique(spec);
+            // For each combination, merge with fixed settings and add as a plan spec
+            for(auto& combo : combinations)
+            {
+                PlanSpec spec;
+                spec.engineId = sweepSpec.engineId;
+
+                // Add fixed settings first (stripping benchmarking knob)
+                for(const auto& [knobId, value] : sweepSpec.fixedSettings)
+                {
+                    if(knobId == autotune::BENCHMARKING_KNOB_NAME)
+                    {
+                        continue;
+                    }
+                    spec.knobSettings.emplace_back(knobId, value);
+                }
+
+                // Add swept settings (stripping benchmarking knob)
+                for(auto& setting : combo)
+                {
+                    if(setting.knobId() == autotune::BENCHMARKING_KNOB_NAME)
+                    {
+                        continue;
+                    }
+                    spec.knobSettings.push_back(std::move(setting));
+                }
+
+                addPlanSpecIfUnique(spec);
+            }
         }
 
         return {ErrorCode::OK, ""};
@@ -2458,6 +2477,12 @@ public:
         {
             return {ErrorCode::INVALID_VALUE, "stabilityThreshold must be in the range (0.0, 1.0)"};
         }
+        if(config.strategy == AutotuneStrategy::RUN_UNTIL_STABLE
+           && config.maxIterations < config.windowSize)
+        {
+            return {ErrorCode::INVALID_VALUE,
+                    "maxIterations must be >= windowSize for RUN_UNTIL_STABLE"};
+        }
 
         if(!hasReadyGraphDesc())
         {
@@ -2529,12 +2554,18 @@ public:
         }
 
         // ── EXHAUSTIVE priming phase ────────────────────────────────────
+        // Track which spec indices had successful priming and any failure reasons
+        std::unordered_set<size_t> primingSucceeded;
+        std::unordered_map<size_t, std::string> primingFailureReasons;
+
         if(config.mode == TuneMode::EXHAUSTIVE)
         {
             HIPDNN_FE_LOG_INFO("EXHAUSTIVE mode: priming " << filteredSpecs.size() << " engines");
 
-            for(auto& spec : filteredSpecs)
+            for(size_t specIdx = 0; specIdx < filteredSpecs.size(); ++specIdx)
             {
+                auto& spec = filteredSpecs[specIdx];
+
                 // Check if this engine supports exhaustive priming
                 std::vector<Knob> knobs;
                 auto knobErr = get_knobs_for_engine(spec.engineId, knobs);
@@ -2576,6 +2607,8 @@ public:
                     HIPDNN_FE_LOG_WARN("EXHAUSTIVE priming failed for engine "
                                        << spec.engineId << ": " << compileErr.get_message()
                                        << " (continuing without priming)");
+                    primingFailureReasons[specIdx]
+                        = "Priming compilation failed: " + compileErr.get_message();
                     continue;
                 }
 
@@ -2594,6 +2627,8 @@ public:
                                 "Failed to set engine config on priming plan for engine "
                                     + std::to_string(spec.engineId)};
                     }
+                    primingFailureReasons[specIdx]
+                        = "Priming failed: could not set engine config on priming plan";
                     continue;
                 }
 
@@ -2607,6 +2642,8 @@ public:
                                 "Failed to finalize priming plan for engine "
                                     + std::to_string(spec.engineId)};
                     }
+                    primingFailureReasons[specIdx]
+                        = "Priming failed: could not finalize priming plan";
                     continue;
                 }
 
@@ -2623,7 +2660,13 @@ public:
                     }
                     HIPDNN_FE_LOG_WARN("EXHAUSTIVE priming execution failed for engine "
                                        << spec.engineId << " (continuing without priming)");
+                    primingFailureReasons[specIdx]
+                        = "Priming execution failed: " + execErr.get_message();
+                    continue;
                 }
+
+                // Priming succeeded for this spec
+                primingSucceeded.insert(specIdx);
 
                 // Priming plan is discarded (goes out of scope)
             }
@@ -2694,6 +2737,20 @@ public:
                     "No plans could be compiled from the provided plan specs."};
         }
 
+        // ── Query device name for metadata ────────────────────────────
+        std::string currentDeviceName;
+        {
+            int deviceId = 0;
+            if(hipGetDevice(&deviceId) == hipSuccess)
+            {
+                hipDeviceProp_t deviceProps;
+                if(hipGetDeviceProperties(&deviceProps, deviceId) == hipSuccess)
+                {
+                    currentDeviceName = deviceProps.gcnArchName;
+                }
+            }
+        }
+
         // ── Benchmark each plan ─────────────────────────────────────────
         std::vector<AutotuneResult> allResults;
         allResults.reserve(_compiledPlans.size());
@@ -2706,6 +2763,8 @@ public:
             result.engineId = spec.engineId;
             result.knobSettings = spec.knobSettings;
             result.modeUsed = config.mode;
+            result.strategyUsed = config.strategy;
+            result.deviceName = currentDeviceName;
             result.workspaceSize = plan.workspaceSize;
 
             // Resolve engine name
@@ -2721,20 +2780,25 @@ public:
                 result.engineName = oss.str();
             }
 
-            // Check if exhaustive priming was run for this engine
+            // Check if exhaustive priming actually succeeded for this spec
             if(config.mode == TuneMode::EXHAUSTIVE)
             {
-                std::vector<Knob> knobs;
-                auto knobErr = get_knobs_for_engine(spec.engineId, knobs);
-                if(knobErr.is_good())
+                if(primingSucceeded.count(specIdx) > 0)
                 {
-                    for(const auto& knob : knobs)
+                    result.ranExhaustive = true;
+                }
+                else
+                {
+                    result.ranExhaustive = false;
+                    // Append priming failure reason if applicable
+                    auto failIt = primingFailureReasons.find(specIdx);
+                    if(failIt != primingFailureReasons.end())
                     {
-                        if(knob.knobId() == autotune::BENCHMARKING_KNOB_NAME)
+                        if(!result.errorMessage.empty())
                         {
-                            result.ranExhaustive = true;
-                            break;
+                            result.errorMessage += "; ";
                         }
+                        result.errorMessage += failIt->second;
                     }
                 }
             }
@@ -2882,34 +2946,73 @@ public:
         }
 
         // ── Ranking ─────────────────────────────────────────────────────
+
+        // Separate succeeded and failed results
+        std::vector<AutotuneResult> succeededResults;
+        std::vector<AutotuneResult> failedResults;
+        for(auto& r : allResults)
+        {
+            if(r.succeeded)
+            {
+                succeededResults.push_back(std::move(r));
+            }
+            else
+            {
+                failedResults.push_back(std::move(r));
+            }
+        }
+
         if(config.rankingFn)
         {
-            config.rankingFn(allResults);
+            // Pass only succeeded results to the user's ranking function
+            try
+            {
+                config.rankingFn(succeededResults);
+            }
+            catch(const std::exception& e)
+            {
+                HIPDNN_FE_LOG_WARN("Custom ranking function threw an exception: "
+                                   << e.what() << ". Falling back to default ranking.");
+                std::stable_sort(succeededResults.begin(),
+                                 succeededResults.end(),
+                                 [](const AutotuneResult& a, const AutotuneResult& b) {
+                                     return a.minTimeMs < b.minTimeMs;
+                                 });
+            }
+            catch(...)
+            {
+                HIPDNN_FE_LOG_WARN("Custom ranking function threw an unknown exception. "
+                                   "Falling back to default ranking.");
+                std::stable_sort(succeededResults.begin(),
+                                 succeededResults.end(),
+                                 [](const AutotuneResult& a, const AutotuneResult& b) {
+                                     return a.minTimeMs < b.minTimeMs;
+                                 });
+            }
         }
         else
         {
-            // Default ranking: successful engines by minTimeMs ascending,
-            // failed engines at end
-            std::stable_sort(allResults.begin(),
-                             allResults.end(),
+            // Default ranking: succeeded engines by minTimeMs ascending
+            std::stable_sort(succeededResults.begin(),
+                             succeededResults.end(),
                              [](const AutotuneResult& a, const AutotuneResult& b) {
-                                 if(a.succeeded && !b.succeeded)
-                                 {
-                                     return true; // succeeded first
-                                 }
-                                 if(!a.succeeded && b.succeeded)
-                                 {
-                                     return false;
-                                 }
-                                 if(!a.succeeded)
-                                 {
-                                     return false; // failed engines: preserve order
-                                 }
                                  return a.minTimeMs < b.minTimeMs;
                              });
         }
 
-        // Assign ranks
+        // Reassemble: succeeded first, then failed
+        allResults.clear();
+        allResults.reserve(succeededResults.size() + failedResults.size());
+        for(auto& r : succeededResults)
+        {
+            allResults.push_back(std::move(r));
+        }
+        for(auto& r : failedResults)
+        {
+            allResults.push_back(std::move(r));
+        }
+
+        // Assign ranks: succeeded get 0-based ranks, failed get -1
         for(size_t i = 0; i < allResults.size(); ++i)
         {
             if(allResults[i].succeeded)

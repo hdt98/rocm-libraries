@@ -21,9 +21,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <cstdio>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -36,7 +40,7 @@ namespace autotune
 inline nlohmann::json knobSettingToJson(const KnobSetting& setting)
 {
     nlohmann::json knob;
-    knob["name"] = setting.knobId();
+    knob["knob_id"] = setting.knobId();
 
     std::visit(
         [&knob](const auto& value) {
@@ -78,6 +82,22 @@ inline std::string strategyToString(AutotuneStrategy strategy)
     }
 }
 
+/// Get the lowercase string representation of an AutotuneStrategy (for config file output)
+inline std::string strategyToLowerString(AutotuneStrategy strategy)
+{
+    switch(strategy)
+    {
+    case AutotuneStrategy::SINGLE_SHOT:
+        return "single_shot";
+    case AutotuneStrategy::FIXED_AVERAGE:
+        return "fixed_average";
+    case AutotuneStrategy::RUN_UNTIL_STABLE:
+        return "run_until_stable";
+    default:
+        return "unknown";
+    }
+}
+
 /// Get the string representation of a TuneMode
 inline std::string tuneModeToString(TuneMode mode)
 {
@@ -89,6 +109,20 @@ inline std::string tuneModeToString(TuneMode mode)
         return "EXHAUSTIVE";
     default:
         return "UNKNOWN";
+    }
+}
+
+/// Get the lowercase string representation of a TuneMode (for config file output)
+inline std::string tuneModeToLowerString(TuneMode mode)
+{
+    switch(mode)
+    {
+    case TuneMode::AUTO:
+        return "auto";
+    case TuneMode::EXHAUSTIVE:
+        return "exhaustive";
+    default:
+        return "unknown";
     }
 }
 
@@ -133,9 +167,30 @@ inline nlohmann::json buildOverrideEntry(const AutotuneResult& result,
     metadata["avg_time_ms"] = result.avgTimeMs;
     metadata["stddev_ms"] = result.stddevMs;
     metadata["iterations_run"] = result.iterationsRun;
-    metadata["mode"] = tuneModeToString(result.modeUsed);
+    metadata["mode"] = tuneModeToLowerString(result.modeUsed);
+    metadata["strategy"] = strategyToLowerString(result.strategyUsed);
     metadata["rank"] = result.rank;
     metadata["workspace_size"] = result.workspaceSize;
+    if(!result.deviceName.empty())
+    {
+        metadata["device"] = result.deviceName;
+    }
+
+    // Timestamp in ISO 8601 format, captured at write time
+    {
+        const auto now = std::chrono::system_clock::now();
+        const auto timeT = std::chrono::system_clock::to_time_t(now);
+        std::tm utcTm{};
+#if defined(_WIN32)
+        gmtime_s(&utcTm, &timeT);
+#else
+        gmtime_r(&timeT, &utcTm);
+#endif
+        std::ostringstream oss;
+        oss << std::put_time(&utcTm, "%Y-%m-%dT%H:%M:%SZ");
+        metadata["timestamp"] = oss.str();
+    }
+
     if(result.ranExhaustive)
     {
         metadata["ran_exhaustive"] = true;
@@ -159,7 +214,7 @@ inline nlohmann::json buildOverrideEntry(const AutotuneResult& result,
 ///       "op": "conv_fprop",
 ///       "engine_name": "MIOPEN_ENGINE",
 ///       "tensors": [ { "dim": [1, 3, 224, 224] }, { "dim": [64, 3, 7, 7] } ],
-///       "knobs": [ { "name": "SPLIT_K", "type": "int", "value": 2 } ],
+///       "knobs": [ { "knob_id": "SPLIT_K", "type": "int", "value": 2 } ],
 ///       "autotune_metadata": { "min_time_ms": 1.23, "rank": 0 }
 ///     }
 ///   ]
@@ -170,7 +225,7 @@ inline nlohmann::json buildOverrideEntry(const AutotuneResult& result,
 /// @param opName The operation name to use in entries
 /// @param results Ranked autotune results (only succeeded entries are written)
 /// @param deleteAllExisting When true, starts with an empty file; when false,
-///        loads existing entries and replaces matching (op, tensors) entries
+///        loads existing entries and replaces matching (op, tensors, knobs) entries
 /// @param tensorDims Tensor dimensions for the entry
 /// @return Error on I/O failure
 inline Error writeAutotuneResults(const std::string& filePath,
@@ -224,25 +279,113 @@ inline Error writeAutotuneResults(const std::string& filePath,
         return {ErrorCode::OK, ""};
     }
 
-    // Remove pre-existing entries that match the new batch's (op, tensors) signature,
-    // then append all new entries. This preserves multiple results within the same
-    // autotune session (ranked list) while replacing entries from previous sessions.
+    // Remove pre-existing entries that match any new entry's (op, tensors, knobs)
+    // signature, then append all new entries. Entries with different knob
+    // configurations for the same (op, tensors) are preserved.
     auto& overrides = root["engine_overrides"];
+
+    // Helper: compare two knob JSON arrays for equivalence (order-independent)
+    auto knobsMatch = [](const nlohmann::json& a, const nlohmann::json& b) -> bool {
+        // Both absent or both empty arrays are equivalent
+        const bool aEmpty = a.is_null() || (a.is_array() && a.empty());
+        const bool bEmpty = b.is_null() || (b.is_array() && b.empty());
+        if(aEmpty && bEmpty)
+        {
+            return true;
+        }
+        if(aEmpty != bEmpty)
+        {
+            return false;
+        }
+        if(a.size() != b.size())
+        {
+            return false;
+        }
+
+        // Build a set of (knob_id, value) pairs from each and compare
+        // For order-independent comparison, sort copies by knob_id
+        auto sortByKnobId = [](nlohmann::json arr) {
+            std::sort(arr.begin(), arr.end(), [](const nlohmann::json& x, const nlohmann::json& y) {
+                // Try knob_id first, fall back to name for backward compatibility
+                auto getId = [](const nlohmann::json& k) -> std::string {
+                    if(k.contains("knob_id"))
+                    {
+                        return k["knob_id"].get<std::string>();
+                    }
+                    if(k.contains("name"))
+                    {
+                        return k["name"].get<std::string>();
+                    }
+                    return "";
+                };
+                return getId(x) < getId(y);
+            });
+            return arr;
+        };
+
+        auto sortedA = sortByKnobId(a);
+        auto sortedB = sortByKnobId(b);
+
+        for(size_t i = 0; i < sortedA.size(); ++i)
+        {
+            auto getId = [](const nlohmann::json& k) -> std::string {
+                if(k.contains("knob_id"))
+                {
+                    return k["knob_id"].get<std::string>();
+                }
+                if(k.contains("name"))
+                {
+                    return k["name"].get<std::string>();
+                }
+                return "";
+            };
+
+            if(getId(sortedA[i]) != getId(sortedB[i]))
+            {
+                return false;
+            }
+            if(sortedA[i].contains("value") && sortedB[i].contains("value"))
+            {
+                if(sortedA[i]["value"] != sortedB[i]["value"])
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
 
     if(!overrides.empty() && !newEntries.empty())
     {
-        const auto& refOp = newEntries[0]["op"];
-        const auto& refTensors = newEntries[0]["tensors"];
-
-        // Erase pre-existing entries matching the new batch's (op, tensors) key
-        overrides.erase(std::remove_if(overrides.begin(),
-                                       overrides.end(),
-                                       [&](const nlohmann::json& existing) {
-                                           return existing.contains("op") && existing["op"] == refOp
-                                                  && existing.contains("tensors")
-                                                  && existing["tensors"] == refTensors;
-                                       }),
-                        overrides.end());
+        // Erase pre-existing entries matching any new entry's (op, tensors, knobs) key
+        overrides.erase(
+            std::remove_if(overrides.begin(),
+                           overrides.end(),
+                           [&](const nlohmann::json& existing) {
+                               for(const auto& newEntry : newEntries)
+                               {
+                                   if(existing.contains("op") && existing["op"] == newEntry["op"]
+                                      && existing.contains("tensors")
+                                      && existing["tensors"] == newEntry["tensors"])
+                                   {
+                                       // Compare knobs
+                                       const auto& existingKnobs
+                                           = existing.contains("knobs")
+                                                 ? existing["knobs"]
+                                                 : nlohmann::json(nlohmann::json::value_t::null);
+                                       const auto& newKnobs
+                                           = newEntry.contains("knobs")
+                                                 ? newEntry["knobs"]
+                                                 : nlohmann::json(nlohmann::json::value_t::null);
+                                       if(knobsMatch(existingKnobs, newKnobs))
+                                       {
+                                           return true;
+                                       }
+                                   }
+                               }
+                               return false;
+                           }),
+            overrides.end());
     }
 
     for(auto& newEntry : newEntries)

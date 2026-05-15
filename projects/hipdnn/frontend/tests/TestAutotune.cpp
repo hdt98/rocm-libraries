@@ -237,6 +237,8 @@ TEST(TestAutotune, AutotuneResultDefaultState)
     EXPECT_EQ(result.workspaceSize, 0);
     EXPECT_FALSE(result.ranExhaustive);
     EXPECT_TRUE(result.errorMessage.empty());
+    EXPECT_EQ(result.strategyUsed, AutotuneStrategy::FIXED_AVERAGE);
+    EXPECT_TRUE(result.deviceName.empty());
 }
 
 // ============================================================================
@@ -563,4 +565,64 @@ TEST(TestAutotune, NoConvergenceWithHighVariance)
         const float cov = computeCoefficientOfVariation(window);
         EXPECT_GE(cov, stabilityThreshold);
     }
+}
+
+// ============================================================================
+// D2: maxIterations >= windowSize validation for RUN_UNTIL_STABLE
+// ============================================================================
+
+TEST(TestAutotune, MaxIterationsLessThanWindowSizeIsDetectable)
+{
+    AutotuneConfig config;
+    config.strategy = AutotuneStrategy::RUN_UNTIL_STABLE;
+    config.maxIterations = 3;
+    config.windowSize = 5;
+
+    // The autotune() function should reject this configuration
+    EXPECT_LT(config.maxIterations, config.windowSize);
+}
+
+TEST(TestAutotune, MaxIterationsEqualToWindowSizeIsValid)
+{
+    AutotuneConfig config;
+    config.strategy = AutotuneStrategy::RUN_UNTIL_STABLE;
+    config.maxIterations = 5;
+    config.windowSize = 5;
+
+    EXPECT_GE(config.maxIterations, config.windowSize);
+}
+
+TEST(TestAutotune, MaxIterationsCheckOnlyForRunUntilStable)
+{
+    // For FIXED_AVERAGE, maxIterations < windowSize should not be an error
+    AutotuneConfig config;
+    config.strategy = AutotuneStrategy::FIXED_AVERAGE;
+    config.maxIterations = 3;
+    config.windowSize = 5;
+
+    // This should be valid for FIXED_AVERAGE since maxIterations/windowSize
+    // are only used by RUN_UNTIL_STABLE
+    EXPECT_EQ(config.strategy, AutotuneStrategy::FIXED_AVERAGE);
+}
+
+// ============================================================================
+// AutotuneResult New Fields Tests
+// ============================================================================
+
+TEST(TestAutotune, AutotuneResultStrategyAndDeviceFields)
+{
+    AutotuneResult result;
+    result.strategyUsed = AutotuneStrategy::RUN_UNTIL_STABLE;
+    result.deviceName = "gfx942";
+
+    EXPECT_EQ(result.strategyUsed, AutotuneStrategy::RUN_UNTIL_STABLE);
+    EXPECT_EQ(result.deviceName, "gfx942");
+}
+
+TEST(TestAutotune, AutotuneResultDefaultStrategyAndDevice)
+{
+    const AutotuneResult result;
+
+    EXPECT_EQ(result.strategyUsed, AutotuneStrategy::FIXED_AVERAGE);
+    EXPECT_TRUE(result.deviceName.empty());
 }

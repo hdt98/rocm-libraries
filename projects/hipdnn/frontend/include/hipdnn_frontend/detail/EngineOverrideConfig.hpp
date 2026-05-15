@@ -377,7 +377,8 @@ private:
             {
                 for(const auto& k : entry.at("knobs"))
                 {
-                    auto name = k.at("name").get<std::string>();
+                    auto name = (k.contains("knob_id") ? k.at("knob_id") : k.at("name"))
+                                    .get<std::string>();
                     auto type = k.at("type").get<std::string>();
                     if(type == "int" || type == "integer")
                     {

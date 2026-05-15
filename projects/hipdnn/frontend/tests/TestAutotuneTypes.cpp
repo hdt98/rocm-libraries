@@ -425,6 +425,8 @@ TEST(TestAutotuneTypes, AutotuneResultDefaults)
     EXPECT_EQ(result.workspaceSize, 0);
     EXPECT_FALSE(result.ranExhaustive);
     EXPECT_TRUE(result.errorMessage.empty());
+    EXPECT_EQ(result.strategyUsed, AutotuneStrategy::FIXED_AVERAGE);
+    EXPECT_TRUE(result.deviceName.empty());
 }
 
 TEST(TestAutotuneTypes, AutotuneResultPopulated)
@@ -443,6 +445,8 @@ TEST(TestAutotuneTypes, AutotuneResultPopulated)
     result.converged = true;
     result.workspaceSize = 4096;
     result.ranExhaustive = true;
+    result.strategyUsed = AutotuneStrategy::SINGLE_SHOT;
+    result.deviceName = "gfx942";
 
     EXPECT_EQ(result.engineId, 42);
     EXPECT_EQ(result.engineName, "MIOpen_ConvFwd");
@@ -457,6 +461,8 @@ TEST(TestAutotuneTypes, AutotuneResultPopulated)
     EXPECT_TRUE(result.converged);
     EXPECT_EQ(result.workspaceSize, 4096);
     EXPECT_TRUE(result.ranExhaustive);
+    EXPECT_EQ(result.strategyUsed, AutotuneStrategy::SINGLE_SHOT);
+    EXPECT_EQ(result.deviceName, "gfx942");
 }
 
 // ============================================================================

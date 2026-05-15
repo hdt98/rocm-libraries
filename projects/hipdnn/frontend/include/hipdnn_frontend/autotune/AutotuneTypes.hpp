@@ -89,6 +89,10 @@ struct AutotuneResult
     bool ranExhaustive = false;
 
     std::string errorMessage; ///< Empty if no error; describes failure otherwise
+
+    AutotuneStrategy strategyUsed
+        = AutotuneStrategy::FIXED_AVERAGE; ///< Which strategy was used for this engine
+    std::string deviceName; ///< GPU device name (e.g., "gfx942"), populated by autotune()
 };
 
 /**

@@ -84,7 +84,7 @@ TEST(TestAutotuneFileWriter, KnobSettingToJsonInt)
     const KnobSetting setting("TILE_SIZE", int64_t{128});
     auto json = knobSettingToJson(setting);
 
-    EXPECT_EQ(json["name"], "TILE_SIZE");
+    EXPECT_EQ(json["knob_id"], "TILE_SIZE");
     EXPECT_EQ(json["type"], "int");
     EXPECT_EQ(json["value"], 128);
 }
@@ -94,7 +94,7 @@ TEST(TestAutotuneFileWriter, KnobSettingToJsonDouble)
     const KnobSetting setting("LEARNING_RATE", 0.001);
     auto json = knobSettingToJson(setting);
 
-    EXPECT_EQ(json["name"], "LEARNING_RATE");
+    EXPECT_EQ(json["knob_id"], "LEARNING_RATE");
     EXPECT_EQ(json["type"], "double");
     EXPECT_DOUBLE_EQ(json["value"].get<double>(), 0.001);
 }
@@ -104,7 +104,7 @@ TEST(TestAutotuneFileWriter, KnobSettingToJsonString)
     const KnobSetting setting("ALGORITHM", std::string("gemm_v2"));
     auto json = knobSettingToJson(setting);
 
-    EXPECT_EQ(json["name"], "ALGORITHM");
+    EXPECT_EQ(json["knob_id"], "ALGORITHM");
     EXPECT_EQ(json["type"], "string");
     EXPECT_EQ(json["value"], "gemm_v2");
 }
@@ -138,9 +138,9 @@ TEST(TestAutotuneFileWriter, BuildOverrideEntryWithKnobs)
 
     ASSERT_TRUE(entry.contains("knobs"));
     ASSERT_EQ(entry["knobs"].size(), 2u);
-    EXPECT_EQ(entry["knobs"][0]["name"], "TILE_SIZE");
+    EXPECT_EQ(entry["knobs"][0]["knob_id"], "TILE_SIZE");
     EXPECT_EQ(entry["knobs"][0]["value"], 128);
-    EXPECT_EQ(entry["knobs"][1]["name"], "SPLIT_K");
+    EXPECT_EQ(entry["knobs"][1]["knob_id"], "SPLIT_K");
     EXPECT_EQ(entry["knobs"][1]["value"], 2);
 }
 
@@ -148,8 +148,10 @@ TEST(TestAutotuneFileWriter, BuildOverrideEntryWithMetadata)
 {
     auto result = makeResult(1, "MIOPEN_ENGINE", 1.5f, true, 0);
     result.modeUsed = TuneMode::EXHAUSTIVE;
+    result.strategyUsed = AutotuneStrategy::FIXED_AVERAGE;
     result.ranExhaustive = true;
     result.iterationsRun = 20;
+    result.deviceName = "gfx942";
 
     const std::vector<std::vector<int64_t>> tensorDims = {{1, 3, 224, 224}};
 
@@ -159,8 +161,15 @@ TEST(TestAutotuneFileWriter, BuildOverrideEntryWithMetadata)
     auto& meta = entry["autotune_metadata"];
     EXPECT_FLOAT_EQ(meta["min_time_ms"].get<float>(), 1.5f);
     EXPECT_EQ(meta["iterations_run"], 20);
-    EXPECT_EQ(meta["mode"], "EXHAUSTIVE");
+    EXPECT_EQ(meta["mode"], "exhaustive");
+    EXPECT_EQ(meta["strategy"], "fixed_average");
     EXPECT_EQ(meta["rank"], 0);
+    EXPECT_EQ(meta["device"], "gfx942");
+    EXPECT_TRUE(meta.contains("timestamp"));
+    // Timestamp should be ISO 8601 format (basic check for 'T' and 'Z')
+    auto ts = meta["timestamp"].get<std::string>();
+    EXPECT_NE(ts.find('T'), std::string::npos);
+    EXPECT_NE(ts.find('Z'), std::string::npos);
     EXPECT_TRUE(meta["ran_exhaustive"].get<bool>());
 }
 
@@ -244,11 +253,11 @@ TEST(TestAutotuneFileWriter, AppendToExistingFile)
     EXPECT_EQ(json["engine_overrides"][1]["op"], "conv_dgrad");
 }
 
-TEST(TestAutotuneFileWriter, ReplaceMatchingEntry)
+TEST(TestAutotuneFileWriter, ReplaceMatchingEntryWithSameKnobs)
 {
     const TempFile tmpFile;
 
-    // Write initial result
+    // Write initial result with no knobs
     std::vector<AutotuneResult> results1;
     results1.push_back(makeResult(1, "MIOPEN_ENGINE", 5.0f, true, 0));
 
@@ -256,19 +265,51 @@ TEST(TestAutotuneFileWriter, ReplaceMatchingEntry)
     auto err1 = writeAutotuneResults(tmpFile.path.string(), "conv_fprop", results1, false, dims);
     ASSERT_TRUE(err1.is_good());
 
-    // Write updated result for same op + tensors
+    // Write updated result for same op + tensors + same (empty) knobs
     std::vector<AutotuneResult> results2;
     results2.push_back(makeResult(2, "HIPBLASLT_ENGINE", 1.0f, true, 0));
 
     auto err2 = writeAutotuneResults(tmpFile.path.string(), "conv_fprop", results2, false, dims);
     ASSERT_TRUE(err2.is_good());
 
-    // Should have replaced the matching entry (same op + same tensors)
+    // Should have replaced the matching entry (same op + same tensors + same knobs)
     std::ifstream file(tmpFile.path);
     auto json = nlohmann::json::parse(file);
 
     EXPECT_EQ(json["engine_overrides"].size(), 1u);
     EXPECT_EQ(json["engine_overrides"][0]["engine_name"], "HIPBLASLT_ENGINE");
+}
+
+TEST(TestAutotuneFileWriter, PreserveEntriesWithDifferentKnobs)
+{
+    const TempFile tmpFile;
+
+    // Write initial result with SPLIT_K=2
+    std::vector<AutotuneResult> results1;
+    auto r1 = makeResult(1, "MIOPEN_ENGINE", 5.0f, true, 0);
+    r1.knobSettings.emplace_back("SPLIT_K", int64_t{2});
+    results1.push_back(r1);
+
+    const std::vector<std::vector<int64_t>> dims = {{1, 3, 224, 224}, {64, 3, 7, 7}};
+    auto err1 = writeAutotuneResults(tmpFile.path.string(), "conv_fprop", results1, false, dims);
+    ASSERT_TRUE(err1.is_good());
+
+    // Write new result for same op + tensors but DIFFERENT knobs (SPLIT_K=4)
+    std::vector<AutotuneResult> results2;
+    auto r2 = makeResult(2, "HIPBLASLT_ENGINE", 1.0f, true, 0);
+    r2.knobSettings.emplace_back("SPLIT_K", int64_t{4});
+    results2.push_back(r2);
+
+    auto err2 = writeAutotuneResults(tmpFile.path.string(), "conv_fprop", results2, false, dims);
+    ASSERT_TRUE(err2.is_good());
+
+    // Both entries should be preserved (different knob settings)
+    std::ifstream file(tmpFile.path);
+    auto json = nlohmann::json::parse(file);
+
+    EXPECT_EQ(json["engine_overrides"].size(), 2u);
+    EXPECT_EQ(json["engine_overrides"][0]["engine_name"], "MIOPEN_ENGINE");
+    EXPECT_EQ(json["engine_overrides"][1]["engine_name"], "HIPBLASLT_ENGINE");
 }
 
 TEST(TestAutotuneFileWriter, DeleteAllExistingContent)
@@ -392,10 +433,23 @@ TEST(TestAutotuneFileWriter, StrategyToString)
     EXPECT_EQ(strategyToString(AutotuneStrategy::RUN_UNTIL_STABLE), "RUN_UNTIL_STABLE");
 }
 
+TEST(TestAutotuneFileWriter, StrategyToLowerString)
+{
+    EXPECT_EQ(strategyToLowerString(AutotuneStrategy::SINGLE_SHOT), "single_shot");
+    EXPECT_EQ(strategyToLowerString(AutotuneStrategy::FIXED_AVERAGE), "fixed_average");
+    EXPECT_EQ(strategyToLowerString(AutotuneStrategy::RUN_UNTIL_STABLE), "run_until_stable");
+}
+
 TEST(TestAutotuneFileWriter, TuneModeToString)
 {
     EXPECT_EQ(tuneModeToString(TuneMode::AUTO), "AUTO");
     EXPECT_EQ(tuneModeToString(TuneMode::EXHAUSTIVE), "EXHAUSTIVE");
+}
+
+TEST(TestAutotuneFileWriter, TuneModeToLowerString)
+{
+    EXPECT_EQ(tuneModeToLowerString(TuneMode::AUTO), "auto");
+    EXPECT_EQ(tuneModeToLowerString(TuneMode::EXHAUSTIVE), "exhaustive");
 }
 
 // ── Error handling Tests ────────────────────────────────────────────────────
