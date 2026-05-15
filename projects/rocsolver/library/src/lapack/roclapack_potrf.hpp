@@ -217,25 +217,18 @@ static inline I split_n(I const n)
 {
     I const nb = potrf_get_NB<T>();
 
-    // ------------------------------------
-    // split at maximum of 1024 * nb may be sufficient
-    // to get good performance
-    // ------------------------------------
-    I const n1 = (n <= nb)     ? std::max(I(1), n / 2)
-        : (n <= 2 * nb)        ? nb
-        : (n <= 4 * nb)        ? 2 * nb
-        : (n <= 8 * nb)        ? 4 * nb
-        : (n <= 16 * nb)       ? 8 * nb
-        : (n <= 32 * nb)       ? 16 * nb
-        : (n <= 64 * nb)       ? 32 * nb
-        : (n <= 128 * nb)      ? 64 * nb
-        : (n <= 256 * nb)      ? 128 * nb
-        : (n <= 512 * nb)      ? 256 * nb
-        : (n <= 1024 * nb)     ? 512 * nb
-        : (n <= 2 * 1024 * nb) ? 1024 * nb
-                               : 1024 * nb;
+    // --------------------------------
+    // want n1 = 2^k * nb and n1 <= n/2
+    // --------------------------------
 
-    return n1;
+    I n1 = nb;
+    while(n1 * 2 <= n / 2)
+    {
+        n1 *= 2;
+    }
+
+    I const n2 = n - n1;
+    return (n1 <= n2) ? n1 : nb;
 }
 
 template <typename I, typename INFO, typename U>
