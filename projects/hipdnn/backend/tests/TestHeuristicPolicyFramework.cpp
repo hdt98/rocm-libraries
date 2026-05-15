@@ -18,6 +18,7 @@
 #include "plugin/HeuristicPluginResourceManager.hpp"
 
 #include <gtest/gtest.h>
+#include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 
 using namespace hipdnn_backend;
 
@@ -26,7 +27,10 @@ class TestHeuristicPolicyFramework : public ::testing::Test
 protected:
     void SetUp() override
     {
-        // Create handle for tests that need it
+        // hipdnnCreate loads real heuristic plugins (e.g. hipBLASLt in the
+        // superbuild) whose initializers probe the device. Skip on no-GPU
+        // runners to avoid a hard abort from the plugin's HIP error path.
+        SKIP_IF_NO_DEVICES();
         const hipdnnStatus_t status = hipdnnCreate(&_handle);
         ASSERT_EQ(status, HIPDNN_STATUS_SUCCESS);
         ASSERT_NE(_handle, nullptr);
