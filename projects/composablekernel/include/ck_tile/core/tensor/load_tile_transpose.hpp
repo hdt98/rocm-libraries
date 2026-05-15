@@ -14,7 +14,6 @@
 #include "ck_tile/core/container/statically_indexed_array.hpp"
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
-#include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 
 namespace ck_tile {
 
@@ -531,27 +530,6 @@ load_tile_transpose(const tile_window_with_static_distribution<BottomTensorView_
 }
 
 /**
- * Helper class for pattern-matching supported unary op sizes for mixed-precision transpose
- * conversion. This is used to select the appropriate PassThroughPack (e.g., PassThroughPack8,
- * PassThroughPack2) based on the vector length of the transpose load. Unsupported sizes will result
- * in a compile-time error.
- */
-template <index_t UnaryOpSize_>
-struct PassThroughPackSelector;
-
-template <>
-struct PassThroughPackSelector<8>
-{
-    using type = element_wise::PassThroughPack8;
-};
-
-template <>
-struct PassThroughPackSelector<2>
-{
-    using type = element_wise::PassThroughPack2;
-};
-
-/**
  * @brief Mixed-precision transpose load: converts input data type to output data type while
  * transposing.
  *
@@ -579,6 +557,7 @@ template <
     typename TileDistribution_,
     index_t NumCoord_,
     index_t UnaryOpSize_,
+    typename PassThroughPack_,
     typename Policy = DefaultTranspose<typename BottomTensorView_::DataType>,
     typename        = std::enable_if_t<TransposeTileDistrChecker<TileDistribution_,
                                                                  typename BottomTensorView_::DataType,
@@ -591,7 +570,8 @@ CK_TILE_DEVICE void load_tile_transpose_convert_with_offset(
                                                TileDistribution_,
                                                NumCoord_>& __restrict__ tile_window,
     const index_t offset,
-    number<UnaryOpSize_> = {})
+    number<UnaryOpSize_>            = {},
+    PassThroughPack_ elementwise_op = {})
 {
     using SrcDataType = typename BottomTensorView_::DataType;
     using DstDataType = typename DistributedTensor_::DataType;
@@ -626,13 +606,10 @@ CK_TILE_DEVICE void load_tile_transpose_convert_with_offset(
     constexpr index_t num_of_access = total_elems_in / number<UnaryOpSize_>{};
 
     // Read as input type, convert to output type
-    using SrcDataVec      = ext_vector_t<SrcDataType, number<UnaryOpSize_>{}>;
-    using DstDataVec      = ext_vector_t<DstDataType, number<UnaryOpSize_>{}>;
-    using PassThroughPack = typename PassThroughPackSelector<UnaryOpSize_>::type;
+    using SrcDataVec = ext_vector_t<SrcDataType, number<UnaryOpSize_>{}>;
+    using DstDataVec = ext_vector_t<DstDataType, number<UnaryOpSize_>{}>;
 
     static_for<0, num_of_access, 1>{}([&](auto i) {
-        const PassThroughPack elementwise_op{};
-
         elementwise_op(out_tensor.get_thread_buffer().template get_as<DstDataVec>()(i),
                        trans_tensor.get_thread_buffer().template get_as<SrcDataVec>()[i]);
     });
@@ -650,6 +627,7 @@ template <
     typename TileDistribution_,
     index_t NumCoord_,
     index_t UnaryOpSize_,
+    typename PassThroughPack_,
     typename Policy = DefaultTranspose<typename BottomTensorView_::DataType>,
     typename        = std::enable_if_t<TransposeTileDistrChecker<TileDistribution_,
                                                                  typename BottomTensorView_::DataType,
@@ -661,9 +639,11 @@ CK_TILE_DEVICE void load_tile_transpose_convert(
                                                WindowLengths_,
                                                TileDistribution_,
                                                NumCoord_>& __restrict__ tile_window,
-    number<UnaryOpSize_> = {})
+    number<UnaryOpSize_>            = {},
+    PassThroughPack_ elementwise_op = {})
 {
-    load_tile_transpose_convert_with_offset(out_tensor, tile_window, 0, number<UnaryOpSize_>{});
+    load_tile_transpose_convert_with_offset(
+        out_tensor, tile_window, 0, number<UnaryOpSize_>{}, elementwise_op);
 }
 
 } // namespace ck_tile

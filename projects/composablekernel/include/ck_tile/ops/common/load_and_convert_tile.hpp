@@ -10,6 +10,27 @@
 
 namespace ck_tile {
 
+/**
+ * Helper class for pattern-matching supported unary op sizes for mixed-precision transpose
+ * conversion. This is used to select the appropriate PassThroughPack (e.g., PassThroughPack8,
+ * PassThroughPack2) based on the vector length of the transpose load. Unsupported sizes will result
+ * in a compile-time error.
+ */
+template <index_t UnaryOpSize_>
+struct PassThroughPackSelector;
+
+template <>
+struct PassThroughPackSelector<8>
+{
+    using type = element_wise::PassThroughPack8;
+};
+
+template <>
+struct PassThroughPackSelector<2>
+{
+    using type = element_wise::PassThroughPack2;
+};
+
 template <typename SrcDataType,
           typename DstDataType,
           index_t UnaryOpSize,
@@ -31,7 +52,7 @@ struct ConverterLoader
         using SrcVectorType = ext_vector_t<RawSrcType, UnaryOpSize / PackedSize>;
         using DstVectorType = ext_vector_t<DstDataType, UnaryOpSize>;
         static_for<0, thread_buffer_size, 1>{}([&](auto i) {
-            const element_wise::PassThroughPack8 elementwise_op{};
+            constexpr typename PassThroughPackSelector<UnaryOpSize>::type elementwise_op{};
 
             elementwise_op(dst.get_thread_buffer().template get_as<DstVectorType>()(i),
                            src.get_thread_buffer().template get_as<SrcVectorType>()[i]);
@@ -49,7 +70,9 @@ struct ConverterLoader
             }
             else
             {
-                load_tile_transpose_convert(dst, src_window, number<UnaryOpSize>{});
+                constexpr typename PassThroughPackSelector<UnaryOpSize>::type elementwise_op{};
+
+                load_tile_transpose_convert(dst, src_window, number<UnaryOpSize>{}, elementwise_op);
             }
         }
         else
