@@ -71,8 +71,7 @@ class TestLoadAndConvert : public ::testing::Test
         using Kernel  = ck_tile::LoadAndConvertKernel<Problem, Policy>;
 
         const ck_tile::index_t block_size = Kernel::BlockSize();
-        const ck_tile::index_t grid_size  = ck_tile::integer_divide_ceil(M, Shape::Block_M) *
-                                           ck_tile::integer_divide_ceil(N, Shape::Block_N);
+        const ck_tile::index_t grid_size  = ck_tile::integer_divide_ceil(M, Shape::Block_M);
 
         launch_kernel(ck_tile::stream_config{nullptr, true},
                       make_kernel<1>(Kernel{},
