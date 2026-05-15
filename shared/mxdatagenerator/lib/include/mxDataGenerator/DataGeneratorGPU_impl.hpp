@@ -143,23 +143,59 @@ namespace DGen
             ScaledDiagonal         = 10,
             TrigonometricFromFloat = 11,
             NormalFromFloat        = 12,
+            // Constant element value carried by `cfg.constValue`. Backs
+            // Twos / NegOnes / MaxVals on the device: every element is the
+            // same float, then the standard quantize-derive-scale pipeline
+            // produces the right dequantised value (the byte pattern is
+            // re-encoded relative to the CPU's "literal data byte +
+            // scale=1.0" form, but the dequant float matches).
+            ConstantValue          = 13,
+            // Uniform-int sampler in [randIntLo, randIntHi]. As with the
+            // constant-fill modes, the per-block scale derivation re-encodes
+            // the byte pattern relative to the CPU's "literal int +
+            // scale=1.0" form; the dequantised value is still an integer in
+            // the requested range (saturation behaviour can differ from
+            // CPU when |hi| exceeds the dtype's max normal -- both paths
+            // satisfy the in-range invariant the mode promises).
+            RandInt                = 14,
         };
 
         struct DeviceInitConfig
         {
-            DeviceInitMode mode    = DeviceInitMode::Bounded;
-            float          minVal  = -1.0f;
-            float          maxVal  = 1.0f;
-            float          mean    = 0.0f;
-            float          stdDev  = 1.0f;
+            DeviceInitMode mode       = DeviceInitMode::Bounded;
+            float          minVal     = -1.0f;
+            float          maxVal     = 1.0f;
+            float          mean       = 0.0f;
+            float          stdDev     = 1.0f;
             // `dim0` is the size of the fastest-varying dimension (row count
             // for column-major matrices). Used by RowIndex/ColIndex/Identity.
             // `dim1` is the next dimension (column count). Used by Sequential
             // to compute the same row-major linearisation the CPU does.
-            uint64_t       dim0    = 0;
-            uint64_t       dim1    = 0;
+            uint64_t       dim0       = 0;
+            uint64_t       dim1       = 0;
+            // Used by DeviceInitMode::ConstantValue (Twos / NegOnes /
+            // MaxVals). Filled in by makeConfig<DTYPE> so MaxVals picks up
+            // the dtype-specific max normal.
+            float          constValue = 0.0f;
+            // Used by DeviceInitMode::RandInt. Inclusive range for the
+            // device PRNG sampler. A degenerate range (lo == hi) collapses
+            // to a constant.
+            int            randIntLo  = 0;
+            int            randIntHi  = 0;
         };
 
+        // Forward-declare GpuTraits so makeConfig<DTYPE> below can reference
+        // GpuTraits<DTYPE>::maxNormal in the MaxVals branch. The full
+        // specialisations live further down in this file (and are visible
+        // at every instantiation site, which is `generateInto<DTYPE>` at
+        // the bottom).
+        template <typename DTYPE>
+        struct GpuTraits;
+
+        // Templated on DTYPE because MaxVals carries no value of its own -
+        // its constant element value is the per-DTYPE max normal, which we
+        // pull from GpuTraits<DTYPE>::maxNormal.
+        template <typename DTYPE>
         inline DeviceInitConfig makeConfig(DataGeneratorOptions const& options,
                                            std::vector<index_t> const& sizes)
         {
@@ -202,13 +238,46 @@ namespace DGen
                         cfg.mean   = static_cast<float>(mode.mean);
                         cfg.stdDev = static_cast<float>(mode.std_dev);
                     }
+                    else if constexpr(std::is_same_v<T, Twos>)
+                    {
+                        cfg.mode       = DeviceInitMode::ConstantValue;
+                        cfg.constValue = 2.0f;
+                    }
+                    else if constexpr(std::is_same_v<T, NegOnes>)
+                    {
+                        cfg.mode       = DeviceInitMode::ConstantValue;
+                        cfg.constValue = -1.0f;
+                    }
+                    else if constexpr(std::is_same_v<T, MaxVals>)
+                    {
+                        // Use the dtype's max normal so the per-block
+                        // scale derivation picks scaleExp=0 (scale=1.0)
+                        // and the data byte encodes the max-normal
+                        // pattern - same dequantised value the CPU's
+                        // setDataMax(positive=true, subNormal=false)
+                        // produces.
+                        cfg.mode       = DeviceInitMode::ConstantValue;
+                        cfg.constValue = GpuTraits<DTYPE>::maxNormal;
+                    }
+                    else if constexpr(std::is_same_v<T, RandInt>)
+                    {
+                        // Mirror the CPU's invalid-argument check; defer
+                        // it to here (rather than the kernel) so callers
+                        // see the same exception type they would on CPU.
+                        if(mode.lo > mode.hi)
+                            throw std::invalid_argument(
+                                "DataGeneratorGPU::makeConfig: RandInt lo "
+                                "must be <= hi");
+                        cfg.mode      = DeviceInitMode::RandInt;
+                        cfg.randIntLo = mode.lo;
+                        cfg.randIntHi = mode.hi;
+                    }
                     else
                     {
-                        // The constant-fill / pathological modes (Twos,
-                        // NegOnes, MaxVals, DenormMins, DenormMaxs, NaNs,
-                        // Infs) and RandInt are routed through the host
-                        // fallback in `generateInto` and never reach this
-                        // visitor for the types we currently support.
+                        // Only DenormMins, DenormMaxs, NaNs and Infs reach
+                        // this branch, and they're all routed through the
+                        // host fallback in `generateInto` so we never
+                        // actually instantiate makeConfig for them.
                         //
                         // Compile-time enforcement isn't an option here:
                         // std::visit deduces the visitor's return type via
@@ -236,23 +305,28 @@ namespace DGen
             return cfg;
         }
 
-        // The on-device kernel quantises a float-per-element through the
-        // block-max scale derivation, which can't reproduce the exact bit
-        // patterns these modes need (e.g. NaN propagation, denorm-min, a
-        // constant 2.0 with scale=1.0 instead of an auto-derived scale, or
-        // exact-integer values that would lose their integer-ness once they
-        // pass through the device PRNG and the auto-derived scale).  Route
-        // them through the host CPU `DataGenerator<DTYPE>` and then
-        // hipMemcpy the bytes to device.
+        // The on-device pipeline quantises a float-per-element through the
+        // block-max scale derivation. That's fine for any mode whose
+        // contract is the *dequantised float value* (Twos, NegOnes, MaxVals,
+        // RandInt all flow through ConstantValue/RandInt device modes
+        // above), but it can't reproduce the *byte patterns* these modes
+        // require:
+        //   * DenormMins / DenormMaxs need a specific subnormal data-byte
+        //     encoding; the float pipeline can renormalise the encoding
+        //     into a normal one with the same numeric value.
+        //   * NaNs / Infs need NaN/Inf in *both* the data and scale bytes;
+        //     the scale-byte derivation is undefined for NaN inputs and
+        //     `__amd_cvt_*_scale` doesn't expose a way to pick a specific
+        //     NaN payload or the Inf encoding.
+        // Route those four through the host CPU `DataGenerator<DTYPE>` and
+        // then hipMemcpy the bytes to device.
         inline bool requiresHostFallback(DataInitMode const& initMode)
         {
             return std::visit(
                 [](auto const& mode) -> bool {
                     using T = std::decay_t<decltype(mode)>;
-                    return std::is_same_v<T, Twos> || std::is_same_v<T, NegOnes>
-                           || std::is_same_v<T, MaxVals> || std::is_same_v<T, DenormMins>
-                           || std::is_same_v<T, DenormMaxs> || std::is_same_v<T, NaNs>
-                           || std::is_same_v<T, Infs> || std::is_same_v<T, RandInt>;
+                    return std::is_same_v<T, DenormMins> || std::is_same_v<T, DenormMaxs>
+                           || std::is_same_v<T, NaNs> || std::is_same_v<T, Infs>;
                 },
                 initMode);
         }
@@ -262,9 +336,10 @@ namespace DGen
         //
         // Centralises the dtype-dependent constants used by the generic
         // device-side quantizer so we don't have to specialise every kernel.
+        // (`GpuTraits` itself is forward-declared above so the makeConfig
+        // template can refer to it; the specialisations below provide the
+        // actual constants.)
         // ----------------------------------------------------------------------
-        template <typename DTYPE>
-        struct GpuTraits;
 
         template <>
         struct GpuTraits<ocp_e2m1_mxfp4>
@@ -487,6 +562,26 @@ namespace DGen
                 float    r  = __builtin_sqrtf(-2.0f * __builtin_logf(u1));
                 float    z0 = r * __builtin_cosf(6.2831853f * u2);
                 return cfg.mean + cfg.stdDev * z0;
+            }
+            case DeviceInitMode::ConstantValue:
+                // Plumbed by makeConfig: 2.0 (Twos), -1.0 (NegOnes), or
+                // GpuTraits<DTYPE>::maxNormal (MaxVals).
+                return cfg.constValue;
+            case DeviceInitMode::RandInt:
+            {
+                // Uniform integer in [randIntLo, randIntHi]. Modulo into a
+                // 64-bit range so a full int range (lo=INT_MIN, hi=INT_MAX)
+                // doesn't overflow; bias from xorshift32 % range is
+                // negligible for the small ranges this mode is exercised
+                // with (typically < 256). Degenerate range (lo == hi)
+                // collapses to `lo` because range = 1 makes the modulo 0.
+                uint32_t       s     = seedMix(seed, dataIdx);
+                uint32_t const r     = xorshift32(s);
+                uint64_t const range = static_cast<uint64_t>(cfg.randIntHi)
+                                       - static_cast<uint64_t>(cfg.randIntLo) + 1ull;
+                int64_t const v
+                    = static_cast<int64_t>(cfg.randIntLo) + static_cast<int64_t>(r % range);
+                return static_cast<float>(v);
             }
             }
             return 0.0f;
@@ -1056,11 +1151,11 @@ namespace DGen
 
         size_t numBlocks = arraySize / static_cast<size_t>(options.blockScaling);
 
-        // Constant-fill / pathological modes can't go through the on-device
-        // PRNG-quantize-derive-scale pipeline (the auto-derived scale would
-        // pick up the constant magnitude rather than 1.0, NaN bit patterns
-        // would round-trip through float quantisation, etc.).  Generate on
-        // the host CPU and hipMemcpy.
+        // Pathological modes whose byte-level encoding the on-device
+        // pipeline can't reproduce (denorm bit patterns get renormalised,
+        // NaN/Inf scale bytes need special encodings the magnitude-derived
+        // path doesn't emit). See `requiresHostFallback` for the full
+        // breakdown. Generate on the host CPU and hipMemcpy the bytes.
         if(gpu_detail::requiresHostFallback(options.initMode))
         {
             DataGenerator<DTYPE> hostGen;
@@ -1083,7 +1178,7 @@ namespace DGen
         }
 
         // Configuration for the kernel.
-        gpu_detail::DeviceInitConfig cfg = gpu_detail::makeConfig(options, sizes);
+        gpu_detail::DeviceInitConfig cfg = gpu_detail::makeConfig<DTYPE>(options, sizes);
 
         // Launch: 256 threads per block; one thread = one MX block.
         constexpr int kThreadsPerBlock = 256;

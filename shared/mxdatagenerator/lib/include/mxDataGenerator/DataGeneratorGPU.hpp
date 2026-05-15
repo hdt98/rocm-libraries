@@ -32,10 +32,13 @@ namespace DGen
      *
      * Supported data types: ocp_e2m1_mxfp4 (+ e4m3/e5m3 scale variants),
      * ocp_e2m3_mxfp6, ocp_e3m2_mxfp6, ocp_e4m3_mxfp8, ocp_e5m2_mxfp8.
-     * Scale formats: E8M0, E4M3, E5M3. Init modes: Bounded,
-     * BoundedAlternatingSign, Unbounded, Identity, Ones, Zeros, Sequential,
-     * RowIndex, ColIndex, Checkerboard, ScaledDiagonal,
-     * TrigonometricFromFloat, NormalFromFloat.
+     * Scale formats: E8M0, E4M3, E5M3. Init modes generated entirely on
+     * device: Bounded, BoundedAlternatingSign, Unbounded, Identity, Ones,
+     * Zeros, Sequential, RowIndex, ColIndex, Checkerboard, ScaledDiagonal,
+     * TrigonometricFromFloat, NormalFromFloat, Twos, NegOnes, MaxVals,
+     * RandInt. The remaining `DataInitMode`s (DenormMins, DenormMaxs, NaNs,
+     * Infs) need byte-pattern semantics that the device pipeline can't
+     * reproduce, so they are computed on host CPU and copied to device.
      *
      * Notes on CPU/GPU parity for the deterministic modes (Identity, Ones,
      * Zeros, Sequential, RowIndex, ColIndex, Checkerboard, ScaledDiagonal):
@@ -48,6 +51,16 @@ namespace DGen
      * granularity for `Sequential` / `RowIndex` / `ColIndex`. Use
      * `forceDenorm = false` if you depend on byte-equivalent dequant across
      * backends.
+     *
+     * Notes on CPU/GPU parity for the constant-fill / RandInt modes
+     * generated on device (Twos, NegOnes, MaxVals, RandInt): the CPU writes
+     * a literal data byte with scale = 1.0 encoding; the GPU re-encodes the
+     * same value through its derived per-block scale. Dequantised floats
+     * match for Twos / NegOnes / MaxVals; for RandInt the in-range integer
+     * contract holds on both backends but the *sequence* differs (GPU uses
+     * xorshift32, CPU uses mt19937) and CPU saturates to dtype maxNormal
+     * while GPU saturates to scale * maxNormal -- both still satisfy
+     * "integer in [lo, hi]".
      */
     template <typename DTYPE>
     class DataGeneratorGPU

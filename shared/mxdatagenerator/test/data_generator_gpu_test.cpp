@@ -561,3 +561,217 @@ TEST(DataGeneratorGPU, CheckerboardMatchesCPU)
     std::vector<index_t> const strides   = {1, 64};
     expectCpuGpuReferenceFloatEq<DType>(Checkerboard{}, sizes, strides, "Checkerboard");
 }
+
+// -----------------------------------------------------------------------------
+// Constant-fill modes (Twos / NegOnes / MaxVals) on the device path.
+//
+// These modes used to be host-fallback (auto-derived per-block scale produces
+// a different byte pattern than the CPU's "literal data byte + scale=1.0"
+// encoding, but the *dequantised* float matches). The GPU now generates them
+// directly via DeviceInitMode::ConstantValue. Coverage spans every supported
+// DTYPE so the dtype-specific MaxVals magnitude (max normal differs per
+// dtype, plumbed via GpuTraits<DTYPE>::maxNormal) is exercised end-to-end.
+// -----------------------------------------------------------------------------
+namespace
+{
+    template <typename DType>
+    void expectAllReferenceFloatEqOnGpu(DataInitMode initMode, float expected, char const* label)
+    {
+        DataGeneratorOptions opt;
+        opt.blockScaling = 32;
+        opt.initMode     = initMode;
+        // Match the CPU-side constant-fill tests (forceDenorm=false). The
+        // GPU path is independent of forceDenorm for these modes -- the
+        // per-block scale derivation is driven by data magnitudes, not by
+        // the option flag -- but using the same value as the CPU keeps any
+        // future CPU=GPU comparison apples-to-apples.
+        opt.forceDenorm  = false;
+        std::vector<index_t> sizes{64, 64};
+        std::vector<index_t> strides{1, 64};
+
+        DataGeneratorGPU<DType> gpu;
+        gpu.setSeed(1);
+        gpu.generate(sizes, strides, opt);
+        auto refs = gpu.getReferenceFloat();
+        ASSERT_EQ(refs.size(), static_cast<size_t>(sizes[0] * sizes[1])) << label;
+        for(size_t i = 0; i < refs.size(); ++i)
+        {
+            EXPECT_EQ(refs[i], expected) << label << " element " << i;
+        }
+    }
+} // namespace
+
+TEST(DataGeneratorGPU, TwosF4)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e2m1_mxfp4>(Twos{}, 2.0f, "Twos F4");
+}
+TEST(DataGeneratorGPU, TwosF6_E2M3)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e2m3_mxfp6>(Twos{}, 2.0f, "Twos F6_E2M3");
+}
+TEST(DataGeneratorGPU, TwosF6_E3M2)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e3m2_mxfp6>(Twos{}, 2.0f, "Twos F6_E3M2");
+}
+TEST(DataGeneratorGPU, TwosF8_E4M3)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e4m3_mxfp8>(Twos{}, 2.0f, "Twos F8_E4M3");
+}
+TEST(DataGeneratorGPU, TwosF8_E5M2)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e5m2_mxfp8>(Twos{}, 2.0f, "Twos F8_E5M2");
+}
+
+TEST(DataGeneratorGPU, NegOnesF4)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e2m1_mxfp4>(NegOnes{}, -1.0f, "NegOnes F4");
+}
+TEST(DataGeneratorGPU, NegOnesF6_E2M3)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e2m3_mxfp6>(NegOnes{}, -1.0f, "NegOnes F6_E2M3");
+}
+TEST(DataGeneratorGPU, NegOnesF6_E3M2)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e3m2_mxfp6>(NegOnes{}, -1.0f, "NegOnes F6_E3M2");
+}
+TEST(DataGeneratorGPU, NegOnesF8_E4M3)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e4m3_mxfp8>(NegOnes{}, -1.0f, "NegOnes F8_E4M3");
+}
+TEST(DataGeneratorGPU, NegOnesF8_E5M2)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e5m2_mxfp8>(NegOnes{}, -1.0f, "NegOnes F8_E5M2");
+}
+
+// MaxVals: dequantised value is the per-DTYPE max normal. Mirrors the CPU
+// constant-fill matrix (data_generator_constant_fills_test.cpp).
+TEST(DataGeneratorGPU, MaxValsF4)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e2m1_mxfp4>(MaxVals{}, 6.0f, "MaxVals F4");
+}
+TEST(DataGeneratorGPU, MaxValsF6_E2M3)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e2m3_mxfp6>(MaxVals{}, 7.5f, "MaxVals F6_E2M3");
+}
+TEST(DataGeneratorGPU, MaxValsF6_E3M2)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e3m2_mxfp6>(MaxVals{}, 28.0f, "MaxVals F6_E3M2");
+}
+TEST(DataGeneratorGPU, MaxValsF8_E4M3)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e4m3_mxfp8>(MaxVals{}, 448.0f, "MaxVals F8_E4M3");
+}
+TEST(DataGeneratorGPU, MaxValsF8_E5M2)
+{
+    expectAllReferenceFloatEqOnGpu<ocp_e5m2_mxfp8>(MaxVals{}, 57344.0f, "MaxVals F8_E5M2");
+}
+
+// -----------------------------------------------------------------------------
+// RandInt on the device path.
+//
+// The CPU path uses mt19937 + uniform_int_distribution; the GPU uses a
+// per-element xorshift32. The two never agree byte-for-byte, so the
+// contract we test is the same one the CPU constant-fill tests use:
+//   * every dequantised value is an integer,
+//   * every value lies in [lo, hi],
+//   * the spread is non-degenerate when hi > lo.
+// CPU saturates to dtype maxNormal when |hi| > maxNormal; GPU saturates to
+// scale * maxNormal which can be larger - both still satisfy the in-range
+// invariant for the per-DTYPE ranges hipBLASLt's legacy random_int<T> uses.
+// -----------------------------------------------------------------------------
+namespace
+{
+    template <typename DType>
+    void expectRandIntInRangeOnGpu(int lo, int hi)
+    {
+        DataGeneratorOptions opt;
+        opt.blockScaling = 32;
+        opt.initMode     = RandInt{lo, hi};
+        opt.forceDenorm  = false;
+        std::vector<index_t> sizes{64, 64};
+        std::vector<index_t> strides{1, 64};
+
+        DataGeneratorGPU<DType> gpu;
+        gpu.setSeed(123);
+        gpu.generate(sizes, strides, opt);
+        auto refs = gpu.getReferenceFloat();
+        ASSERT_EQ(refs.size(), static_cast<size_t>(sizes[0] * sizes[1]));
+
+        int  distinctCount = 0;
+        bool seen[256]     = {};
+        for(size_t i = 0; i < refs.size(); ++i)
+        {
+            float const v = refs[i];
+            EXPECT_FALSE(std::isnan(v)) << "element " << i;
+            EXPECT_FALSE(std::isinf(v)) << "element " << i;
+            EXPECT_EQ(v, std::trunc(v)) << "element " << i << " = " << v;
+            EXPECT_GE(v, static_cast<float>(lo)) << "element " << i;
+            EXPECT_LE(v, static_cast<float>(hi)) << "element " << i;
+            int const slot = static_cast<int>(v) - lo;
+            if(slot >= 0 && slot < 256 && !seen[slot])
+            {
+                seen[slot] = true;
+                ++distinctCount;
+            }
+        }
+        if(hi > lo)
+        {
+            EXPECT_GT(distinctCount, 1) << "RandInt produced a degenerate sample";
+        }
+    }
+} // namespace
+
+TEST(DataGeneratorGPU, RandIntF4_Range_m4_4)
+{
+    expectRandIntInRangeOnGpu<ocp_e2m1_mxfp4>(-4, 4);
+}
+TEST(DataGeneratorGPU, RandIntF6_E2M3_Range_m7_7)
+{
+    expectRandIntInRangeOnGpu<ocp_e2m3_mxfp6>(-7, 7);
+}
+TEST(DataGeneratorGPU, RandIntF6_E3M2_Range_m28_28)
+{
+    expectRandIntInRangeOnGpu<ocp_e3m2_mxfp6>(-28, 28);
+}
+TEST(DataGeneratorGPU, RandIntF8_E4M3_Range_1_10)
+{
+    expectRandIntInRangeOnGpu<ocp_e4m3_mxfp8>(1, 10);
+}
+TEST(DataGeneratorGPU, RandIntF8_E5M2_Range_1_10)
+{
+    expectRandIntInRangeOnGpu<ocp_e5m2_mxfp8>(1, 10);
+}
+
+// Degenerate range (lo == hi) must produce that single value at every
+// element. Exercises the `range = 1` path in the device int sampler.
+TEST(DataGeneratorGPU, RandIntDegenerateRangeIsConstant)
+{
+    DataGeneratorOptions opt;
+    opt.blockScaling = 32;
+    opt.initMode     = RandInt{3, 3};
+    opt.forceDenorm  = false;
+    std::vector<index_t> sizes{64, 64};
+    std::vector<index_t> strides{1, 64};
+
+    DataGeneratorGPU<ocp_e4m3_mxfp8> gpu;
+    gpu.generate(sizes, strides, opt);
+    auto refs = gpu.getReferenceFloat();
+    ASSERT_EQ(refs.size(), 64u * 64u);
+    for(float v : refs)
+        EXPECT_EQ(v, 3.0f);
+}
+
+// Inverted range (lo > hi) is invalid; mirror the CPU `std::invalid_argument`
+// on this side too. Caught at makeConfig time, before any kernel launch.
+TEST(DataGeneratorGPU, RandIntInvertedRangeThrows)
+{
+    DataGeneratorOptions opt;
+    opt.blockScaling = 32;
+    opt.initMode     = RandInt{5, -5};
+    opt.forceDenorm  = false;
+    std::vector<index_t> sizes{64, 64};
+    std::vector<index_t> strides{1, 64};
+
+    DataGeneratorGPU<ocp_e4m3_mxfp8> gpu;
+    EXPECT_THROW(gpu.generate(sizes, strides, opt), std::invalid_argument);
+}
