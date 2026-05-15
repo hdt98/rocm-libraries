@@ -224,7 +224,7 @@ INSTANTIATE_TEST_SUITE_P(
         EngineFilteringTestCase{"PreferGoodPluginExplicitly",
                                 hipdnn_tests::plugin_constants::engineId<GoodPlugin>(),
                                 true},
-        EngineFilteringTestCase{"PreferNonExistentEngineId", 999999, std::nullopt},
+        EngineFilteringTestCase{"PreferNonExistentEngineId", 999999, true},
         EngineFilteringTestCase{"PreferExecuteFailsPlugin",
                                 hipdnn_tests::plugin_constants::engineId<ExecuteFailsPlugin>(),
                                 false}),
