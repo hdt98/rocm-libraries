@@ -291,3 +291,224 @@ TEST(DataGeneratorGPU, NoSwizzleLeavesScalesCanonical)
     auto again = gpu.getScaleBytes();
     EXPECT_EQ(canonical, again);
 }
+
+// -----------------------------------------------------------------------------
+// preSwizzleScalesGFX950Device, padding code paths.
+//
+// The 64x64 case above leaves paddedRows == numRows and paddedCols == numCols,
+// so the in-place memcpy2D pad branch never runs. These cases exercise:
+//   * unaligned rows only (50 -> 64),
+//   * both unaligned (50 rows, 13 cols -> 64x16).
+// Mirrors host coverage in test/preswizzle_test.cpp.
+// -----------------------------------------------------------------------------
+TEST(DataGeneratorGPU, PreSwizzleScalesGFX950DeviceUnalignedRowsMatchesHost)
+{
+    using DType = ocp_e2m1_mxfp4;
+
+    DataGeneratorOptions opt;
+    opt.blockScaling = 32;
+    opt.initMode     = Bounded{};
+    opt.min          = -1.0;
+    opt.max          = 1.0;
+
+    // 50 rows of K/32 scales x 16 cols. data sizes pick numerics so that the
+    // scale buffer ends up exactly 50 x 16 (= 800 bytes); 50 isn't a multiple
+    // of 32, so paddedRows = 64, exercising the rowwise pad path.
+    std::vector<index_t> sizes   = {50 * 32, 16};
+    std::vector<index_t> strides = {1, 50 * 32};
+
+    DataGeneratorGPU<DType> gpu;
+    gpu.setSeed(7);
+    gpu.generate(sizes, strides, opt);
+    auto canonical = gpu.getScaleBytes();
+    ASSERT_EQ(canonical.size(), 50u * 16u);
+
+    gpu.preSwizzleScalesGFX950Device({50, 16});
+    auto gpuSwizzled = gpu.getScaleBytes();
+
+    auto hostSwizzled = preSwizzleScalesGFX950(canonical, std::vector<size_t>{50, 16});
+
+    ASSERT_EQ(gpuSwizzled.size(), hostSwizzled.size());
+    EXPECT_EQ(gpuSwizzled.size(), 64u * 16u)
+        << "rowwise pad should round 50 -> 64 (cols already aligned)";
+    EXPECT_EQ(gpuSwizzled, hostSwizzled);
+}
+
+TEST(DataGeneratorGPU, PreSwizzleScalesGFX950DeviceBothUnalignedMatchesHost)
+{
+    using DType = ocp_e2m1_mxfp4;
+
+    DataGeneratorOptions opt;
+    opt.blockScaling = 32;
+    opt.initMode     = Bounded{};
+    opt.min          = -1.0;
+    opt.max          = 1.0;
+
+    // 50 rows x 13 cols of scales: neither is aligned. Padded -> 64 x 16.
+    std::vector<index_t> sizes   = {50 * 32, 13};
+    std::vector<index_t> strides = {1, 50 * 32};
+
+    DataGeneratorGPU<DType> gpu;
+    gpu.setSeed(11);
+    gpu.generate(sizes, strides, opt);
+    auto canonical = gpu.getScaleBytes();
+    ASSERT_EQ(canonical.size(), 50u * 13u);
+
+    gpu.preSwizzleScalesGFX950Device({50, 13});
+    auto gpuSwizzled = gpu.getScaleBytes();
+
+    auto hostSwizzled = preSwizzleScalesGFX950(canonical, std::vector<size_t>{50, 13});
+
+    ASSERT_EQ(gpuSwizzled.size(), hostSwizzled.size());
+    EXPECT_EQ(gpuSwizzled.size(), 64u * 16u)
+        << "both dims pad: 50 -> 64 rows, 13 -> 16 cols";
+    EXPECT_EQ(gpuSwizzled, hostSwizzled);
+}
+
+// -----------------------------------------------------------------------------
+// preSwizzleScalesGFX1250Device: GPU vs host should be byte-equivalent. Cover
+// both an aligned case (no padding on the fast dim) and an unaligned case
+// (fast dim is padded to a multiple of dimk = 128 / mxBlock).
+// -----------------------------------------------------------------------------
+TEST(DataGeneratorGPU, PreSwizzleScalesGFX1250DeviceAlignedMatchesHost)
+{
+    using DType = ocp_e2m1_mxfp4;
+
+    DataGeneratorOptions opt;
+    opt.blockScaling = 32;
+    opt.initMode     = Bounded{};
+    opt.min          = -1.0;
+    opt.max          = 1.0;
+
+    // mxBlock = 32 -> dimk = 128 / 32 = 4.
+    // Pick fastDim = 16 (multiple of 4) so paddedFast == fastDim, no padding.
+    constexpr size_t slowDim = 17; // not a multiple of dimk: still fine, slowDim isn't padded
+    constexpr size_t fastDim = 16;
+    constexpr size_t mxBlock = 32;
+
+    // Data sizes chosen so the scale buffer ends up slowDim x fastDim.
+    std::vector<index_t> sizes   = {static_cast<index_t>(slowDim * mxBlock),
+                                    static_cast<index_t>(fastDim)};
+    std::vector<index_t> strides = {1, static_cast<index_t>(slowDim * mxBlock)};
+
+    DataGeneratorGPU<DType> gpu;
+    gpu.setSeed(101);
+    gpu.generate(sizes, strides, opt);
+    auto canonical = gpu.getScaleBytes();
+    ASSERT_EQ(canonical.size(), slowDim * fastDim);
+
+    gpu.preSwizzleScalesGFX1250Device(slowDim, fastDim, mxBlock);
+    auto gpuSwizzled = gpu.getScaleBytes();
+
+    auto hostSwizzled = preSwizzleScalesGFX1250(canonical, slowDim, fastDim, mxBlock);
+
+    ASSERT_EQ(gpuSwizzled.size(), hostSwizzled.size());
+    EXPECT_EQ(gpuSwizzled.size(), slowDim * fastDim)
+        << "aligned fast dim -> no padding";
+    EXPECT_EQ(gpuSwizzled, hostSwizzled);
+}
+
+TEST(DataGeneratorGPU, PreSwizzleScalesGFX1250DeviceUnalignedFastDimMatchesHost)
+{
+    using DType = ocp_e2m1_mxfp4;
+
+    DataGeneratorOptions opt;
+    opt.blockScaling = 32;
+    opt.initMode     = Bounded{};
+    opt.min          = -1.0;
+    opt.max          = 1.0;
+
+    // mxBlock = 32 -> dimk = 4.
+    // fastDim = 13 (not a multiple of 4) -> paddedFast = 16.
+    constexpr size_t slowDim = 17;
+    constexpr size_t fastDim = 13;
+    constexpr size_t mxBlock = 32;
+
+    std::vector<index_t> sizes   = {static_cast<index_t>(slowDim * mxBlock),
+                                    static_cast<index_t>(fastDim)};
+    std::vector<index_t> strides = {1, static_cast<index_t>(slowDim * mxBlock)};
+
+    DataGeneratorGPU<DType> gpu;
+    gpu.setSeed(102);
+    gpu.generate(sizes, strides, opt);
+    auto canonical = gpu.getScaleBytes();
+    ASSERT_EQ(canonical.size(), slowDim * fastDim);
+
+    gpu.preSwizzleScalesGFX1250Device(slowDim, fastDim, mxBlock);
+    auto gpuSwizzled = gpu.getScaleBytes();
+
+    auto hostSwizzled = preSwizzleScalesGFX1250(canonical, slowDim, fastDim, mxBlock);
+
+    ASSERT_EQ(gpuSwizzled.size(), hostSwizzled.size());
+    EXPECT_EQ(gpuSwizzled.size(), slowDim * 16u)
+        << "fastDim 13 -> padded to 16 (next multiple of dimk=4)";
+    EXPECT_EQ(gpuSwizzled, hostSwizzled);
+}
+
+// -----------------------------------------------------------------------------
+// Deterministic init modes: GPU getReferenceFloat() must equal the CPU
+// reference element-for-element. The byte-level encodings can differ (the GPU
+// path always derives a per-block scale, while the CPU path writes the
+// canonical 1.0-scale + literal-value encoding for these modes), but the
+// dequantised float output is the contract these modes promise.
+//
+// `Sequential` is intentionally NOT tested here: the CPU implementation
+// stores `(row*cols + col) % 256` while the GPU stores the column-major
+// linear index `row + col*dim0`. That divergence pre-dates this branch and
+// would be a behaviour change either way; left to a follow-up.
+// -----------------------------------------------------------------------------
+namespace
+{
+    template <typename DType>
+    void expectCpuGpuReferenceFloatEq(DataInitMode                initMode,
+                                      std::vector<index_t> const& sizes,
+                                      std::vector<index_t> const& strides,
+                                      char const*                 modeName)
+    {
+        DataGeneratorOptions opt;
+        opt.blockScaling = 32;
+        opt.initMode     = initMode;
+
+        DataGenerator<DType> cpu;
+        cpu.setSeed(1);
+        cpu.generate(sizes, strides, opt);
+
+        DataGeneratorGPU<DType> gpu;
+        gpu.setSeed(1);
+        gpu.generate(sizes, strides, opt);
+
+        auto cpuRefs = cpu.getReferenceFloat();
+        auto gpuRefs = gpu.getReferenceFloat();
+
+        ASSERT_EQ(cpuRefs.size(), gpuRefs.size())
+            << "CPU/GPU reference vector size mismatch for " << modeName;
+        EXPECT_EQ(cpuRefs, gpuRefs)
+            << "CPU/GPU reference float mismatch for " << modeName;
+    }
+} // namespace
+
+TEST(DataGeneratorGPU, ZerosMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(Zeros{}, sizes, strides, "Zeros");
+}
+
+TEST(DataGeneratorGPU, OnesMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(Ones{}, sizes, strides, "Ones");
+}
+
+TEST(DataGeneratorGPU, IdentityMatchesCPU)
+{
+    using DType                          = ocp_e4m3_mxfp8;
+    // Square matrix - generate_data_identity asserts size.size() == 2 and
+    // writes 1.0 along min(rows, cols).
+    std::vector<index_t> const sizes     = {64, 64};
+    std::vector<index_t> const strides   = {1, 64};
+    expectCpuGpuReferenceFloatEq<DType>(Identity{}, sizes, strides, "Identity");
+}
