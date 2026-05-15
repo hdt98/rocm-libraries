@@ -35,7 +35,7 @@ from Tensile.Tests.gpu_detection import has_arch
 # (one MatrixInstruction) and a single benchmark problem size.
 _CONFIG = """\
 GlobalParameters:
-  ISA: [[9,5,0]]
+  ISA: [[9,4,2]]
   MinimumRequiredVersion: 5.0.0
   NumElementsToValidate: 0
   DataInitTypeBeta: 0
