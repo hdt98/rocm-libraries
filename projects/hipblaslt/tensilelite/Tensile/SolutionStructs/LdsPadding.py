@@ -33,12 +33,12 @@ per data type:
   FP16 -- ds_load_tr16_b128 (128-bit, 4 banks/thread)
   FP32 -- ds_load_b32        (32-bit, 1 bank/thread)
 
-Public API:
-  get_fp4_mt_config(mt, key, miWaveTile, miWaveGroup)   -> int
-  get_fp8_mt_config(mt, key, miWaveTile, miWaveGroup)   -> int
-  get_fp16_mt_config(mt, key, miWaveGroup)              -> int
-  get_fp32_mt_config(mt, key, vw, lrvw, miWaveGroup)    -> int
-  get_mxs_mt_config(matrixInstK, mxBlock, vw, key)      -> int
+Public API (see each `def` for the full signature):
+  get_fp4_mt_config  -- FP4       ds_load_tr4_b64   padding
+  get_fp8_mt_config  -- FP8       ds_load_tr8_b64   padding
+  get_fp16_mt_config -- FP16      ds_load_tr16_b128 padding
+  get_fp32_mt_config -- FP32/TF32 ds_load_b32       padding
+  get_mxs_mt_config  -- MX scale tensor padding
 
   key is one of "perBlock", "pad", "shift" (FP4/FP8 only for "shift").
 """
