@@ -242,7 +242,7 @@ typedef enum
      * ordering. UIDs must be unique and must also be present in
      * HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS.
      */
-    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS = 704,
+    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT = 704,
 
     /**
      * @brief Per-execute override shapes, packed flat across all UIDs
@@ -253,7 +253,7 @@ typedef enum
      * array comes from OVERRIDE_LENGTHS. The total element count must equal
      * the sum of OVERRIDE_LENGTHS.
      */
-    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES = 705,
+    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT = 705,
 
     /**
      * @brief Per-execute override strides, packed flat across all UIDs
@@ -263,7 +263,7 @@ typedef enum
      * OVERRIDE_UNIQUE_IDS. Sliced using OVERRIDE_LENGTHS like OVERRIDE_SHAPES,
      * and must have the same total element count.
      */
-    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES = 706,
+    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT = 706,
 
     /**
      * @brief Per-UID rank of the override shape/stride vectors
@@ -274,7 +274,7 @@ typedef enum
      * int64_t in the variant pack and narrowed to uint32_t only at the SDK
      * dispatch boundary.
      */
-    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS = 707,
+    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT = 707,
 
     /** @} */
 

@@ -407,7 +407,7 @@ TEST_F(TestGraph, PlanOnlyOverrideExecuteWritesOverrideVariantPackAttributes)
             variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_WORKSPACE, HIPDNN_TYPE_VOID_PTR, 1, _));
     EXPECT_CALL(*_mockBackend,
                 backendSetAttribute(variantPackDesc,
-                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                                     HIPDNN_TYPE_INT64,
                                     static_cast<int64_t>(overrideUids.size()),
                                     NotNull()))
@@ -423,7 +423,7 @@ TEST_F(TestGraph, PlanOnlyOverrideExecuteWritesOverrideVariantPackAttributes)
         }));
     EXPECT_CALL(*_mockBackend,
                 backendSetAttribute(variantPackDesc,
-                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                                     HIPDNN_TYPE_INT64,
                                     2,
                                     NotNull()))
@@ -439,7 +439,7 @@ TEST_F(TestGraph, PlanOnlyOverrideExecuteWritesOverrideVariantPackAttributes)
         }));
     EXPECT_CALL(*_mockBackend,
                 backendSetAttribute(variantPackDesc,
-                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
+                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
                                     HIPDNN_TYPE_INT64,
                                     5,
                                     NotNull()))
@@ -455,7 +455,7 @@ TEST_F(TestGraph, PlanOnlyOverrideExecuteWritesOverrideVariantPackAttributes)
         }));
     EXPECT_CALL(*_mockBackend,
                 backendSetAttribute(variantPackDesc,
-                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+                                    HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
                                     HIPDNN_TYPE_INT64,
                                     5,
                                     NotNull()))
@@ -515,21 +515,21 @@ TEST_F(TestGraph, PlanOnlyOverrideExecuteEmptyOverridesUsesLegacyVariantPackAttr
     EXPECT_CALL(*_mockBackend, backendSetAttribute(variantPackDesc, _, _, _, _))
         .Times(3)
         .WillRepeatedly(Return(HIPDNN_STATUS_SUCCESS));
-    EXPECT_CALL(
-        *_mockBackend,
-        backendSetAttribute(variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS, _, _, _))
+    EXPECT_CALL(*_mockBackend,
+                backendSetAttribute(
+                    variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT, _, _, _))
+        .Times(0);
+    EXPECT_CALL(*_mockBackend,
+                backendSetAttribute(
+                    variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT, _, _, _))
         .Times(0);
     EXPECT_CALL(
         *_mockBackend,
-        backendSetAttribute(variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS, _, _, _))
+        backendSetAttribute(variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT, _, _, _))
         .Times(0);
-    EXPECT_CALL(
-        *_mockBackend,
-        backendSetAttribute(variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES, _, _, _))
-        .Times(0);
-    EXPECT_CALL(
-        *_mockBackend,
-        backendSetAttribute(variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES, _, _, _))
+    EXPECT_CALL(*_mockBackend,
+                backendSetAttribute(
+                    variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT, _, _, _))
         .Times(0);
     EXPECT_CALL(*_mockBackend, backendFinalize(variantPackDesc))
         .WillOnce(Return(HIPDNN_STATUS_SUCCESS));
@@ -609,7 +609,7 @@ TEST_F(TestGraph, PlanOnlyOverrideExecutePropagatesOverrideAttributeFailure)
     EXPECT_CALL(
         *_mockBackend,
         backendSetAttribute(
-            variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES, HIPDNN_TYPE_INT64, 2, _))
+            variantPackDesc, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT, HIPDNN_TYPE_INT64, 2, _))
         .WillOnce(Return(HIPDNN_STATUS_INTERNAL_ERROR))
         .RetiresOnSaturation();
     EXPECT_CALL(*_mockBackend, backendFinalize(variantPackDesc)).Times(0);

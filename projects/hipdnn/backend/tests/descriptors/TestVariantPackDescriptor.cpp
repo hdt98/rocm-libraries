@@ -59,22 +59,22 @@ void setOverrideVariantPackAttributes(VariantDescriptor& descriptor,
                                       const std::vector<int64_t>& overrideStrides,
                                       const std::vector<int64_t>& overrideLengths)
 {
-    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                             HIPDNN_TYPE_INT64,
                             static_cast<int64_t>(overrideUids.size()),
                             overrideUids.data());
 
-    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
+    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
                             HIPDNN_TYPE_INT64,
                             static_cast<int64_t>(overrideShapes.size()),
                             overrideShapes.data());
 
-    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
                             HIPDNN_TYPE_INT64,
                             static_cast<int64_t>(overrideStrides.size()),
                             overrideStrides.data());
 
-    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+    descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                             HIPDNN_TYPE_INT64,
                             static_cast<int64_t>(overrideLengths.size()),
                             overrideLengths.data());
@@ -320,20 +320,20 @@ TEST_P(TestVariantPackDescriptorPartialOverrideRejects, FinalizeRejectsPartialOv
 
     const auto& testCase = GetParam();
     std::vector<int64_t> values{1};
-    hipdnnBackendAttributeName_t attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS;
+    hipdnnBackendAttributeName_t attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT;
     switch(testCase.attribute)
     {
     case SingleOverrideAttribute::UNIQUE_IDS:
-        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS;
+        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT;
         break;
     case SingleOverrideAttribute::SHAPES:
-        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES;
+        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT;
         break;
     case SingleOverrideAttribute::STRIDES:
-        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES;
+        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT;
         break;
     case SingleOverrideAttribute::LENGTHS:
-        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS;
+        attr = HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT;
         break;
     default:
         break;
@@ -546,22 +546,22 @@ protected:
                                  1,
                                  static_cast<const void*>(&_workspace));
 
-        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                                  HIPDNN_TYPE_INT64,
                                  static_cast<int64_t>(_overrideUids.size()),
                                  _overrideUids.data());
 
-        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
+        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
                                  HIPDNN_TYPE_INT64,
                                  static_cast<int64_t>(_overrideShapes.size()),
                                  _overrideShapes.data());
 
-        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
                                  HIPDNN_TYPE_INT64,
                                  static_cast<int64_t>(_overrideStrides.size()),
                                  _overrideStrides.data());
 
-        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                                  HIPDNN_TYPE_INT64,
                                  static_cast<int64_t>(_overrideLengths.size()),
                                  _overrideLengths.data());
@@ -578,12 +578,13 @@ TEST_F(TestVariantPackDescriptorWithOverrides, OverrideLengthsRejectsNonInt64Ele
     // boundary type, not the variant-pack storage type).
     std::array<int64_t, 2> retrieved{};
     int64_t elementCount = 0;
-    ASSERT_THROW_HIPDNN_STATUS(_descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
-                                                        HIPDNN_TYPE_VOID_PTR,
-                                                        static_cast<int64_t>(retrieved.size()),
-                                                        &elementCount,
-                                                        retrieved.data()),
-                               HIPDNN_STATUS_BAD_PARAM);
+    ASSERT_THROW_HIPDNN_STATUS(
+        _descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
+                                 HIPDNN_TYPE_VOID_PTR,
+                                 static_cast<int64_t>(retrieved.size()),
+                                 &elementCount,
+                                 retrieved.data()),
+        HIPDNN_STATUS_BAD_PARAM);
 }
 
 TEST_F(TestVariantPackDescriptorWithOverrides, OverrideLengthsAccessorReturnsStoredVector)
@@ -606,19 +607,19 @@ TEST_F(TestVariantPackDescriptorWithOverrides, QueryThenGetVectorAttributes)
                                   HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
                                   std::vector<int64_t>(_uids.begin(), _uids.end()));
     expectQueryThenGetInt64Vector(_descriptor,
-                                  HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+                                  HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                                   std::vector<int64_t>(_overrideUids.begin(), _overrideUids.end()));
     expectQueryThenGetInt64Vector(
         _descriptor,
-        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
+        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
         std::vector<int64_t>(_overrideShapes.begin(), _overrideShapes.end()));
     expectQueryThenGetInt64Vector(
         _descriptor,
-        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
         std::vector<int64_t>(_overrideStrides.begin(), _overrideStrides.end()));
     expectQueryThenGetInt64Vector(
         _descriptor,
-        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
         std::vector<int64_t>(_overrideLengths.begin(), _overrideLengths.end()));
 }
 
@@ -704,10 +705,11 @@ TEST_F(TestVariantPackDescriptorWhenInitialized, OverrideAttributesEmptyByDefaul
     EXPECT_TRUE(_descriptor.getOverrideStrides().empty());
     EXPECT_TRUE(_descriptor.getOverrideLengths().empty());
 
-    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS, {});
-    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES, {});
-    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES, {});
-    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS, {});
+    expectQueryThenGetInt64Vector(
+        _descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT, {});
+    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT, {});
+    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT, {});
+    expectQueryThenGetInt64Vector(_descriptor, HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT, {});
 }
 
 } // namespace hipdnn_backend

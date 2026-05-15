@@ -24,20 +24,12 @@
 
 #include <array>
 #include <cstdint>
-#include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
-
-#ifdef _WIN32
-#include <process.h>
-#else
-#include <unistd.h>
-#endif
 
 #ifdef HIPDNN_ENABLE_SDPA
 
@@ -78,38 +70,6 @@ std::shared_ptr<Graph> createSimplePointwiseGraph(const std::string& graphName,
 // Bring the shared `compileGraph(graph, handle)` helper into the file's
 // anonymous namespace so existing call sites resolve unqualified.
 using hipdnn_tests::override_test_utils::compileGraph;
-
-class ScopedTempFile
-{
-public:
-    explicit ScopedTempFile(std::filesystem::path path)
-        : _path(std::move(path))
-    {
-        std::filesystem::remove(_path);
-    }
-
-    ~ScopedTempFile()
-    {
-        std::error_code ignored;
-        std::filesystem::remove(_path, ignored);
-    }
-
-    ScopedTempFile(const ScopedTempFile&) = delete;
-    ScopedTempFile& operator=(const ScopedTempFile&) = delete;
-
-    const std::filesystem::path& path() const
-    {
-        return _path;
-    }
-
-    std::string string() const
-    {
-        return _path.string();
-    }
-
-private:
-    std::filesystem::path _path;
-};
 
 /// Common fixture: load a configurable set of fake plugins and create a handle.
 /// Each test starts with any already-loaded fake-plugin records reset.
@@ -183,6 +143,21 @@ protected:
         ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
     }
 
+    void loadImplementingAndSecondOverride()
+    {
+        const auto& implementingPath
+            = hipdnn_tests::plugin_constants::testOverrideImplementingPluginPath();
+        const auto& secondPath = hipdnn_tests::plugin_constants::testSecondOverridePluginPath();
+        ownPluginLibraries({implementingPath, secondPath});
+
+        const std::array<const char*, 2> paths = {implementingPath.c_str(), secondPath.c_str()};
+
+        ASSERT_EQ(hipdnnSetEnginePluginPaths_ext(
+                      paths.size(), paths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                  HIPDNN_STATUS_SUCCESS);
+        ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
+    }
+
     void resetOverrideImplementingRecord() const
     {
         resetRecordForOwnedPlugin(
@@ -195,6 +170,12 @@ protected:
         return getRecordForOwnedPlugin(
             hipdnn_tests::plugin_constants::testOverrideImplementingPluginPath(),
             "OverrideImplementing");
+    }
+
+    const TestPluginLastCallRecord* getSecondOverrideRecord() const
+    {
+        return getRecordForOwnedPlugin(
+            hipdnn_tests::plugin_constants::testSecondOverridePluginPath(), "SecondOverride");
     }
 
     const TestPluginLastCallRecord* getRecordForOwnedPlugin(const std::string& pluginPath,
@@ -239,15 +220,6 @@ private:
 std::vector<int64_t> packedNchwStrides(const std::vector<int64_t>& dims)
 {
     return hipdnn_data_sdk::utilities::generateStrides(dims);
-}
-
-int currentProcessId()
-{
-#ifdef _WIN32
-    return _getpid();
-#else
-    return ::getpid();
-#endif
 }
 
 std::string describeCompiledPlanForFailure(const std::vector<uint8_t>& compiledPlan)
@@ -319,43 +291,6 @@ void expectCapturedOverridesByUid(
 }
 
 } // namespace
-
-class IntegrationOverrideExecutePluginLookup : public ::testing::Test
-{
-};
-
-TEST_F(IntegrationOverrideExecutePluginLookup, NoLoadMissThenScopedOwnerHitAndUnload)
-{
-    const auto sourcePath = test_plugin_internal::resolvePluginPathRelativeToBackend(
-        hipdnn_tests::plugin_constants::testSecondOverridePluginPath());
-    const auto probePath
-        = std::filesystem::temp_directory_path()
-          / ("hipdnn_second_override_noload_probe_" + std::to_string(currentProcessId())
-             + sourcePath.extension().string());
-    const ScopedTempFile probeFile(probePath);
-    std::filesystem::copy_file(
-        sourcePath, probeFile.path(), std::filesystem::copy_options::overwrite_existing);
-
-    const auto pluginPath = probeFile.string();
-    constexpr const char* SUFFIX = "SecondOverride";
-
-    ASSERT_EQ(getLastCallRecordIfLoaded(pluginPath, SUFFIX), nullptr)
-        << "RTLD_NOLOAD lookup must not load a plugin on miss.";
-
-    {
-        const ScopedTestPluginLibrary owner(pluginPath);
-        ASSERT_NE(getLastCallRecordIfLoaded(pluginPath, SUFFIX), nullptr)
-            << "RTLD_NOLOAD lookup should resolve while a real owner pins the plugin.";
-
-        resetLastCallRecord(owner, SUFFIX);
-        const auto* record = getLastCallRecord(owner, SUFFIX);
-        ASSERT_NE(record, nullptr);
-        EXPECT_EQ(record->whichEntry, TestPluginExecuteEntry::NONE);
-    }
-
-    EXPECT_EQ(getLastCallRecordIfLoaded(pluginPath, SUFFIX), nullptr)
-        << "The temporary RTLD_NOLOAD handle must not keep the plugin loaded after owner teardown.";
-}
 
 class IntegrationOverrideExecutePluginDispatch : public IntegrationOverrideExecuteBase
 {
@@ -528,8 +463,10 @@ TEST_F(IntegrationOverrideExecuteFourCorner, OverrideGraphImplementingPluginUses
     const std::vector<std::vector<int64_t>> overrideShapes = {overrideShape, overrideShape};
     const std::vector<std::vector<int64_t>> overrideStrides = {overrideStride, overrideStride};
 
+    int workspaceStorage = 0;
+    void* workspace = &workspaceStorage;
     auto result = graph->execute(
-        _handle, variantPack, nullptr, overrideUids, overrideShapes, overrideStrides);
+        _handle, variantPack, workspace, overrideUids, overrideShapes, overrideStrides);
     ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
 
     const auto* record = getRecordForOwnedPlugin(
@@ -539,7 +476,54 @@ TEST_F(IntegrationOverrideExecuteFourCorner, OverrideGraphImplementingPluginUses
     EXPECT_EQ(record->whichEntry, TestPluginExecuteEntry::OP_GRAPH_WITH_OVERRIDES)
         << "Corner 4: override-flag graph + override-implementing plugin must "
            "dispatch through the override entry.";
+    EXPECT_EQ(record->workspace, workspace);
     expectCapturedOverrides(*record, overrideUids, overrideShapes, overrideStrides);
+}
+
+TEST_F(IntegrationOverrideExecuteFourCorner,
+       OverrideGraphWithMultipleOverridePluginsDispatchesOverrideEntry)
+{
+    loadImplementingAndSecondOverride();
+
+    const std::vector<int64_t> declaredDims = {1, 3, 4, 4};
+    SimpleTensorBundle<float> bundle(declaredDims);
+
+    auto graph = createSimplePointwiseGraph(
+        "FourCorner_TwoOverridePlugins", declaredDims, /*overrideShapeEnabled=*/true);
+    compileGraph(graph, _handle);
+
+    std::unordered_map<int64_t, void*> variantPack;
+    variantPack[1] = bundle.xTensor.memory().deviceData();
+    variantPack[2] = bundle.yTensor.memory().deviceData();
+
+    const std::vector<int64_t> overrideUids = {1};
+    const std::vector<std::vector<int64_t>> overrideShapes = {{1, 3, 2, 2}};
+    const std::vector<std::vector<int64_t>> overrideStrides = {{12, 4, 2, 1}};
+
+    auto result = graph->execute(
+        _handle, variantPack, nullptr, overrideUids, overrideShapes, overrideStrides);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    const auto* implementingRecord = getOverrideImplementingRecord();
+    const auto* secondRecord = getSecondOverrideRecord();
+    ASSERT_NE(implementingRecord, nullptr);
+    ASSERT_NE(secondRecord, nullptr);
+
+    const bool implementingDispatched
+        = implementingRecord->whichEntry == TestPluginExecuteEntry::OP_GRAPH_WITH_OVERRIDES;
+    const bool secondDispatched
+        = secondRecord->whichEntry == TestPluginExecuteEntry::OP_GRAPH_WITH_OVERRIDES;
+    EXPECT_NE(implementingDispatched, secondDispatched)
+        << "Exactly one selected override-capable plugin should execute the graph.";
+
+    if(implementingDispatched)
+    {
+        expectCapturedOverrides(*implementingRecord, overrideUids, overrideShapes, overrideStrides);
+    }
+    if(secondDispatched)
+    {
+        expectCapturedOverrides(*secondRecord, overrideUids, overrideShapes, overrideStrides);
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -680,6 +664,51 @@ TEST_F(IntegrationOverrideExecuteEquivalence, MapAndParallelArrayProduceSameDisp
         *recordAfterMap, {{1, OverrideEntry{shape, stride}}, {2, OverrideEntry{shape, stride}}});
 }
 
+TEST_F(IntegrationOverrideExecuteEquivalence, SinglePlanExecutesMultipleOverridePayloads)
+{
+    loadImplementingOnly();
+
+    const std::vector<int64_t> declaredDims = {1, 3, 4, 4};
+    SimpleTensorBundle<float> bundle(declaredDims);
+
+    auto graph = createSimplePointwiseGraph(
+        "Equivalence_ReusedPlanDifferentPayloads", declaredDims, /*overrideShapeEnabled=*/true);
+    compileGraph(graph, _handle);
+
+    std::unordered_map<int64_t, void*> variantPack;
+    variantPack[1] = bundle.xTensor.memory().deviceData();
+    variantPack[2] = bundle.yTensor.memory().deviceData();
+
+    struct Payload
+    {
+        std::vector<int64_t> uids;
+        std::vector<std::vector<int64_t>> shapes;
+        std::vector<std::vector<int64_t>> strides;
+    };
+
+    const std::vector<Payload> payloads = {
+        Payload{{1}, {{1, 3, 4, 4}}, {{48, 16, 4, 1}}},
+        Payload{{2}, {{1, 3, 2, 2}}, {{12, 4, 2, 1}}},
+        Payload{{1, 2}, {{1, 3, 1, 4}, {1, 3, 3, 2}}, {{48, 16, 4, 1}, {24, 8, 2, 1}}},
+    };
+
+    for(size_t i = 0; i < payloads.size(); ++i)
+    {
+        SCOPED_TRACE("payload[" + std::to_string(i) + "]");
+        const auto& payload = payloads[i];
+        resetOverrideImplementingRecord();
+
+        auto result = graph->execute(
+            _handle, variantPack, nullptr, payload.uids, payload.shapes, payload.strides);
+        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+        const auto* record = getOverrideImplementingRecord();
+        ASSERT_NE(record, nullptr);
+        EXPECT_EQ(record->whichEntry, TestPluginExecuteEntry::OP_GRAPH_WITH_OVERRIDES);
+        expectCapturedOverrides(*record, payload.uids, payload.shapes, payload.strides);
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Execution-plan validity guard for the override-execute parallel-array form.
 //
@@ -805,6 +834,36 @@ TEST_F(IntegrationOverrideExecutePlanOnly, RestoredCompiledPlanOverrideExecuteFo
     const std::vector<int64_t> stride = {12, 4, 2, 1};
     const std::vector<std::vector<int64_t>> overrideShapes = {shape, shape};
     const std::vector<std::vector<int64_t>> overrideStrides = {stride, stride};
+
+    resetOverrideImplementingRecord();
+    auto result = graph->execute(
+        _handle, variantPack, nullptr, overrideUids, overrideShapes, overrideStrides);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    const auto* record = getOverrideImplementingRecord();
+    ASSERT_NE(record, nullptr);
+    EXPECT_EQ(record->whichEntry, TestPluginExecuteEntry::OP_GRAPH_WITH_OVERRIDES);
+    expectCapturedOverrides(*record, overrideUids, overrideShapes, overrideStrides);
+}
+
+TEST_F(IntegrationOverrideExecutePlanOnly, RestoredCompiledPlanForwardsDifferentOverrideRanks)
+{
+    loadImplementingOnly();
+
+    const std::vector<int64_t> dims = {1, 3, 4, 4};
+    SimpleTensorBundle<float> bundle(dims);
+    std::shared_ptr<Graph> graph;
+    createPlanOnlyGraph(_handle, dims, graph);
+    ASSERT_NE(graph, nullptr);
+
+    std::unordered_map<int64_t, void*> variantPack;
+    variantPack[1] = bundle.xTensor.memory().deviceData();
+    variantPack[2] = bundle.yTensor.memory().deviceData();
+    variantPack[99] = bundle.xTensor.memory().deviceData();
+
+    const std::vector<int64_t> overrideUids = {1, 99};
+    const std::vector<std::vector<int64_t>> overrideShapes = {{1, 3, 2, 2}, {2, 3, 4}};
+    const std::vector<std::vector<int64_t>> overrideStrides = {{12, 4, 2, 1}, {12, 4, 1}};
 
     resetOverrideImplementingRecord();
     auto result = graph->execute(

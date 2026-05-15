@@ -219,13 +219,13 @@ TEST_F(IntegrationMalformedVersionPlugin, VersionLiarPluginExcludedForOverrideGr
     if(plansResult.code == ErrorCode::OK)
     {
         const auto supportResult = graph->check_support();
-        EXPECT_NE(supportResult.code, ErrorCode::OK)
+        EXPECT_EQ(supportResult.code, ErrorCode::GRAPH_NOT_SUPPORTED)
             << "A plugin reporting the override API version but missing the override symbol "
                "must be ineligible during engine selection.";
     }
     else
     {
-        EXPECT_NE(plansResult.code, ErrorCode::OK);
+        EXPECT_EQ(plansResult.code, ErrorCode::GRAPH_NOT_SUPPORTED);
     }
 
     const auto* record = getLastCallRecordIfLoaded(liarPath, "VersionLiar");

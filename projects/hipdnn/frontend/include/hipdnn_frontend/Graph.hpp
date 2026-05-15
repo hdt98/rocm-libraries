@@ -1942,37 +1942,38 @@ public:
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendSetAttribute(
                 variantPackDesc->get(),
-                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                 HIPDNN_TYPE_INT64,
                 static_cast<int64_t>(overrideUids.size()),
                 static_cast<const void*>(overrideUids.data())),
-            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS.");
+            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendSetAttribute(
                 variantPackDesc->get(),
-                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                 HIPDNN_TYPE_INT64,
                 static_cast<int64_t>(overrideLengths.size()),
                 static_cast<const void*>(overrideLengths.data())),
-            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS.");
-
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
-                                             variantPackDesc->get(),
-                                             HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
-                                             HIPDNN_TYPE_INT64,
-                                             static_cast<int64_t>(flatShapes.size()),
-                                             static_cast<const void*>(flatShapes.data())),
-                                         "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES.");
+            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendSetAttribute(
                 variantPackDesc->get(),
-                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
+                HIPDNN_TYPE_INT64,
+                static_cast<int64_t>(flatShapes.size()),
+                static_cast<const void*>(flatShapes.data())),
+            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT.");
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendSetAttribute(
+                variantPackDesc->get(),
+                HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
                 HIPDNN_TYPE_INT64,
                 static_cast<int64_t>(flatStrides.size()),
                 static_cast<const void*>(flatStrides.data())),
-            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES.");
+            "failed to set HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendFinalize(variantPackDesc->get()),

@@ -40,7 +40,6 @@ TEST(TestPlatformUtils, GetCurrentModuleDirectoryReturnsExistingDirectory)
     EXPECT_TRUE(std::filesystem::is_directory(result));
 }
 
-#if defined(__linux__)
 namespace
 {
 const auto TEST_PLUGIN_DIR
@@ -104,8 +103,7 @@ TEST(TestPlatformUtils, GetSymbolClearsStaleDlerrorBeforeLookup)
 
 TEST(TestPlatformUtils, OpenLibraryThrowsHipdnnExceptionForMissingLibrary)
 {
-    EXPECT_THROW(
-        hipdnn_backend::platform_utilities::openLibrary("libhipdnn_missing_test_library.so"),
-        hipdnn_backend::HipdnnException);
+    EXPECT_THROW(hipdnn_backend::platform_utilities::openLibrary(
+                     hipdnn_data_sdk::utilities::getLibraryName("hipdnn_missing_test_library")),
+                 hipdnn_backend::HipdnnException);
 }
-#endif

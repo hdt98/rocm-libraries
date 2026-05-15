@@ -2,81 +2,18 @@
 // SPDX-License-Identifier:  MIT
 
 #include "VariantDescriptor.hpp"
+#include "DescriptorAttributeUtils.hpp"
 #include "FlatbufferUtilities.hpp"
 #include "HipdnnBackendDescriptorType.h"
 #include "HipdnnException.hpp"
 
-#include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <limits>
 #include <string>
 #include <unordered_set>
 
 namespace hipdnn_backend
 {
-
-namespace
-{
-
-void setVariantInt64Vector(std::vector<int64_t>& target,
-                           hipdnnBackendAttributeType_t attributeType,
-                           int64_t elementCount,
-                           const void* arrayOfElements,
-                           const char* errorPrefix)
-{
-    THROW_IF_NULL(errorPrefix, HIPDNN_STATUS_BAD_PARAM_NULL_POINTER, "errorPrefix is null");
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   std::string(errorPrefix) + ": attributeType mismatch");
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  std::string(errorPrefix) + ": arrayOfElements is null");
-    THROW_IF_FALSE(elementCount > 0,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   std::string(errorPrefix) + ": elementCount must be positive");
-
-    target.resize(static_cast<size_t>(elementCount));
-    std::memcpy(
-        target.data(), arrayOfElements, static_cast<size_t>(elementCount) * sizeof(int64_t));
-}
-
-void getVariantInt64Vector(const std::vector<int64_t>& source,
-                           hipdnnBackendAttributeType_t attributeType,
-                           int64_t requestedElementCount,
-                           int64_t* elementCount,
-                           void* arrayOfElements,
-                           const char* errorPrefix)
-{
-    THROW_IF_NULL(errorPrefix, HIPDNN_STATUS_BAD_PARAM_NULL_POINTER, "errorPrefix is null");
-    THROW_IF_FALSE(attributeType == HIPDNN_TYPE_INT64,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   std::string(errorPrefix) + ": attributeType mismatch");
-
-    if(arrayOfElements == nullptr || requestedElementCount == 0)
-    {
-        THROW_IF_NULL(elementCount,
-                      HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                      std::string(errorPrefix) + ": elementCount is null");
-        *elementCount = static_cast<int64_t>(source.size());
-        return;
-    }
-
-    THROW_IF_LT(requestedElementCount,
-                static_cast<int64_t>(0),
-                HIPDNN_STATUS_BAD_PARAM,
-                std::string(errorPrefix) + ": requestedElementCount is negative");
-
-    const auto copyCount
-        = std::min<size_t>(static_cast<size_t>(requestedElementCount), source.size());
-    if(elementCount != nullptr)
-    {
-        *elementCount = static_cast<int64_t>(copyCount);
-    }
-    std::memcpy(arrayOfElements, source.data(), copyCount * sizeof(int64_t));
-}
-
-} // namespace
 
 bool VariantDescriptor::hasOverrideAttributes() const
 {
@@ -193,12 +130,13 @@ void VariantDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
         break;
 
     case HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS:
-        getVariantInt64Vector(_uniqueIds,
-                              attributeType,
-                              requestedElementCount,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::getAttribute()");
+        getScalarVector<int64_t>(_uniqueIds,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 requestedElementCount,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::getAttribute()");
         break;
 
     case HIPDNN_ATTR_VARIANT_PACK_WORKSPACE:
@@ -221,40 +159,44 @@ void VariantDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
         *static_cast<void**>(arrayOfElements) = _workspace;
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS:
-        getVariantInt64Vector(_overrideUniqueIds,
-                              attributeType,
-                              requestedElementCount,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::getAttribute(OVERRIDE_UNIQUE_IDS)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT:
+        getScalarVector<int64_t>(_overrideUniqueIds,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 requestedElementCount,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::getAttribute(OVERRIDE_UNIQUE_IDS)");
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES:
-        getVariantInt64Vector(_overrideShapes,
-                              attributeType,
-                              requestedElementCount,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::getAttribute(OVERRIDE_SHAPES)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT:
+        getScalarVector<int64_t>(_overrideShapes,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 requestedElementCount,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::getAttribute(OVERRIDE_SHAPES)");
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES:
-        getVariantInt64Vector(_overrideStrides,
-                              attributeType,
-                              requestedElementCount,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::getAttribute(OVERRIDE_STRIDES)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT:
+        getScalarVector<int64_t>(_overrideStrides,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 requestedElementCount,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::getAttribute(OVERRIDE_STRIDES)");
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS:
-        getVariantInt64Vector(_overrideLengths,
-                              attributeType,
-                              requestedElementCount,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::getAttribute(OVERRIDE_LENGTHS)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT:
+        getScalarVector<int64_t>(_overrideLengths,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 requestedElementCount,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::getAttribute(OVERRIDE_LENGTHS)");
         break;
 
     default:
@@ -287,11 +229,12 @@ void VariantDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
         break;
 
     case HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS:
-        setVariantInt64Vector(_uniqueIds,
-                              attributeType,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::setAttribute()");
+        setScalarVector<int64_t>(_uniqueIds,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::setAttribute()");
         break;
 
     case HIPDNN_ATTR_VARIANT_PACK_WORKSPACE:
@@ -306,36 +249,40 @@ void VariantDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
         _workspace = *static_cast<void* const*>(arrayOfElements);
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS:
-        setVariantInt64Vector(_overrideUniqueIds,
-                              attributeType,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::setAttribute(OVERRIDE_UNIQUE_IDS)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT:
+        setScalarVector<int64_t>(_overrideUniqueIds,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::setAttribute(OVERRIDE_UNIQUE_IDS)");
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES:
-        setVariantInt64Vector(_overrideShapes,
-                              attributeType,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::setAttribute(OVERRIDE_SHAPES)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT:
+        setScalarVector<int64_t>(_overrideShapes,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::setAttribute(OVERRIDE_SHAPES)");
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES:
-        setVariantInt64Vector(_overrideStrides,
-                              attributeType,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::setAttribute(OVERRIDE_STRIDES)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT:
+        setScalarVector<int64_t>(_overrideStrides,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::setAttribute(OVERRIDE_STRIDES)");
         break;
 
-    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS:
-        setVariantInt64Vector(_overrideLengths,
-                              attributeType,
-                              elementCount,
-                              arrayOfElements,
-                              "VariantDescriptor::setAttribute(OVERRIDE_LENGTHS)");
+    case HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT:
+        setScalarVector<int64_t>(_overrideLengths,
+                                 HIPDNN_TYPE_INT64,
+                                 attributeType,
+                                 elementCount,
+                                 arrayOfElements,
+                                 "VariantDescriptor::setAttribute(OVERRIDE_LENGTHS)");
         break;
 
     default:

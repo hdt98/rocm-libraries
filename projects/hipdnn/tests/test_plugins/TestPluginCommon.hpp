@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -80,6 +79,7 @@ using TestPluginConstMallocBuffer = std::unique_ptr<const void, TestPluginFreeDe
 struct TestPluginLastCallRecord
 {
     TestPluginExecuteEntry whichEntry = TestPluginExecuteEntry::NONE;
+    void* workspace = nullptr;
     uint32_t numOverrides = 0;
     std::array<int64_t, K_MAX_TEST_OVERRIDES> capturedUniqueIds{};
     std::array<uint32_t, K_MAX_TEST_OVERRIDES> capturedLengths{};
@@ -380,18 +380,37 @@ public:
     {
         HIPDNN_PLUGIN_LOG_INFO("executeGraphWithOverrides called numOverrides=" << numOverrides);
 
+        constexpr auto MAX_TEST_OVERRIDES_U32 = static_cast<uint32_t>(K_MAX_TEST_OVERRIDES);
+        constexpr auto MAX_TEST_OVERRIDE_RANK_U32 = static_cast<uint32_t>(K_MAX_TEST_OVERRIDE_RANK);
+        if(numOverrides > MAX_TEST_OVERRIDES_U32)
+        {
+            throw hipdnn_plugin_sdk::HipdnnPluginException(
+                HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                "Test plugin override capture capacity exceeded: numOverrides="
+                    + std::to_string(numOverrides)
+                    + ", capacity=" + std::to_string(K_MAX_TEST_OVERRIDES));
+        }
+        for(uint32_t i = 0; i < numOverrides; ++i)
+        {
+            if(overrideLengths[i] > MAX_TEST_OVERRIDE_RANK_U32)
+            {
+                throw hipdnn_plugin_sdk::HipdnnPluginException(
+                    HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                    "Test plugin override rank capture capacity exceeded for index "
+                        + std::to_string(i) + ": rank=" + std::to_string(overrideLengths[i])
+                        + ", capacity=" + std::to_string(K_MAX_TEST_OVERRIDE_RANK));
+            }
+        }
+
         auto& rec = lastCallRecord();
         rec = TestPluginLastCallRecord{};
         rec.whichEntry = TestPluginExecuteEntry::OP_GRAPH_WITH_OVERRIDES;
         rec.numOverrides = numOverrides;
-        const auto cappedN = std::min(numOverrides, static_cast<uint32_t>(K_MAX_TEST_OVERRIDES));
-        for(uint32_t i = 0; i < cappedN; ++i)
+        for(uint32_t i = 0; i < numOverrides; ++i)
         {
             rec.capturedUniqueIds[i] = overrideUniqueIds[i];
             rec.capturedLengths[i] = overrideLengths[i];
-            const auto cappedR
-                = std::min(overrideLengths[i], static_cast<uint32_t>(K_MAX_TEST_OVERRIDE_RANK));
-            for(uint32_t r = 0; r < cappedR; ++r)
+            for(uint32_t r = 0; r < overrideLengths[i]; ++r)
             {
                 rec.capturedShapes[i][r] = overrideShapes[i][r];
                 rec.capturedStrides[i][r] = overrideStrides[i][r];
@@ -945,6 +964,7 @@ public:
             auto& rec = getInstance()->lastCallRecord();
             rec = TestPluginLastCallRecord{};
             rec.whichEntry = TestPluginExecuteEntry::OP_GRAPH;
+            rec.workspace = workspace;
 
             getInstance()->executeGraph();
 
@@ -995,6 +1015,7 @@ public:
 
             getInstance()->executeGraphWithOverrides(
                 numOverrides, overrideUniqueIds, overrideLengths, overrideShapes, overrideStrides);
+            getInstance()->lastCallRecord().workspace = workspace;
 
             LOG_API_SUCCESS(apiName, "executed graph with overrides");
         });

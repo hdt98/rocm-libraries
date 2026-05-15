@@ -79,25 +79,25 @@ TEST_F(IntegrationVariantPackDescriptorApi, OverrideAttributesSetGetAndFinalize)
                                         static_cast<const void*>(&workspace)),
               HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendSetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(overrideUids.size()),
                                         overrideUids.data()),
               HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendSetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(overrideShapes.size()),
                                         overrideShapes.data()),
               HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendSetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(overrideStrides.size()),
                                         overrideStrides.data()),
               HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendSetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(overrideLengths.size()),
                                         overrideLengths.data()),
@@ -111,7 +111,7 @@ TEST_F(IntegrationVariantPackDescriptorApi, OverrideAttributesSetGetAndFinalize)
     int64_t elementCount = 0;
 
     EXPECT_EQ(hipdnnBackendGetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(retrievedUids.size()),
                                         &elementCount,
@@ -121,7 +121,7 @@ TEST_F(IntegrationVariantPackDescriptorApi, OverrideAttributesSetGetAndFinalize)
     EXPECT_EQ(retrievedUids, overrideUids);
 
     EXPECT_EQ(hipdnnBackendGetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(retrievedLengths.size()),
                                         &elementCount,
@@ -131,7 +131,7 @@ TEST_F(IntegrationVariantPackDescriptorApi, OverrideAttributesSetGetAndFinalize)
     EXPECT_EQ(retrievedLengths, overrideLengths);
 
     EXPECT_EQ(hipdnnBackendGetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(retrievedShapes.size()),
                                         &elementCount,
@@ -141,7 +141,7 @@ TEST_F(IntegrationVariantPackDescriptorApi, OverrideAttributesSetGetAndFinalize)
     EXPECT_EQ(retrievedShapes, overrideShapes);
 
     EXPECT_EQ(hipdnnBackendGetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(retrievedStrides.size()),
                                         &elementCount,
@@ -178,13 +178,13 @@ TEST_F(IntegrationVariantPackDescriptorApi, OverrideAttributesRejectZeroLengthOn
                                         static_cast<const void*>(&workspace)),
               HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendSetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(overrideUids.size()),
                                         overrideUids.data()),
               HIPDNN_STATUS_SUCCESS);
     EXPECT_EQ(hipdnnBackendSetAttribute(_varpack,
-                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS,
+                                        HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT,
                                         HIPDNN_TYPE_INT64,
                                         static_cast<int64_t>(overrideLengths.size()),
                                         overrideLengths.data()),

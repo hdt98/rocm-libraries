@@ -86,16 +86,16 @@ bool readIsOverrideShapeEnabled(const GraphDescriptor& graphDesc)
 const hipdnn_data_sdk::utilities::Version&
     computeMinimumPluginApiVersion(bool isOverrideShapeEnabled)
 {
-    static const hipdnn_data_sdk::utilities::Version s_sBaselineVersion{
+    static const hipdnn_data_sdk::utilities::Version s_baselineVersion{
         hipdnn_plugin_sdk::K_ENGINE_PLUGIN_API_VERSION_BASELINE};
-    static const hipdnn_data_sdk::utilities::Version s_sOverrideExecuteMinVersion{
+    static const hipdnn_data_sdk::utilities::Version s_overrideExecuteMinVersion{
         hipdnn_plugin_sdk::K_OVERRIDE_EXECUTE_MIN_API_VERSION};
 
     if(isOverrideShapeEnabled)
     {
-        return s_sOverrideExecuteMinVersion;
+        return s_overrideExecuteMinVersion;
     }
-    return s_sBaselineVersion;
+    return s_baselineVersion;
 }
 
 } // namespace
@@ -703,9 +703,12 @@ void EnginePluginResourceManager::executeOpGraph(hipdnnBackendDescriptor_t execu
 
         // Validate before narrowing variant-pack int64 lengths to the SDK uint32 surface.
         const auto numOverridesSize = overrideUniqueIds.size();
-        THROW_IF_TRUE(numOverridesSize > std::numeric_limits<uint32_t>::max(),
-                      HIPDNN_STATUS_BAD_PARAM_OUT_OF_BOUND,
-                      "Override variant pack: number of overrides exceeds uint32 max");
+        if constexpr(sizeof(size_t) > sizeof(uint32_t))
+        {
+            THROW_IF_TRUE(numOverridesSize > std::numeric_limits<uint32_t>::max(),
+                          HIPDNN_STATUS_BAD_PARAM_OUT_OF_BOUND,
+                          "Override variant pack: number of overrides exceeds uint32 max");
+        }
 
         std::vector<uint32_t> overrideLengthsU32;
         overrideLengthsU32.reserve(numOverridesSize);

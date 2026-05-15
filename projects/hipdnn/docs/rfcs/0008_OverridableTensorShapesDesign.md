@@ -208,18 +208,18 @@ immediately:
    `override_uids.size()`, `override_shapes.size()`, and
    `override_strides.size()` must be equal. (The map overload has no
    such constraint by construction.)
-2. **Unknown UID.** Each override key must identify a tensor declared
+2. **Duplicate UIDs.** The parallel-array overload's `override_uids`
+   must contain no duplicates.
+3. **Unknown UID.** Each override key must identify a tensor declared
    in the graph. Workspace is never overridable.
-3. **Rank mismatch.** Each entry's shape and stride vectors must equal
+4. **Rank mismatch.** Each entry's shape and stride vectors must equal
    the declared rank of the named tensor.
-4. **Max-shape exceeded.** For non-wildcard dimensions, each override
+5. **Positive shape values.** Each override shape value must be `> 0`.
+6. **Positive stride values.** Each override stride must be `> 0`.
+7. **Max-shape exceeded.** For non-wildcard dimensions, each override
    dim must be `<=` the declared graph-time dim (the max-shape).
    Wildcard dimensions (Phase 2, build-time `dims[d] == -1`) have no
    upper bound, and any positive override value is permitted.
-5. **Duplicate UIDs.** The parallel-array overload's `override_uids`
-   must contain no duplicates.
-6. **Positive shape values.** Each override shape value must be `> 0`.
-7. **Positive stride values.** Each override stride must be `> 0`.
 8. **Stride ordering preserved.** Overrides that reorder the layout
    are rejected at execution time; see
    [§6.3](#63-dynamic-tensor-semantics) for the canonical static /
@@ -232,25 +232,26 @@ dispatch falls through to the existing entry.
 ### 4.3 Backend C-API and variant-pack attributes
 
 The single existing `hipdnnBackendExecute` is preserved; override
-semantics fold into the variant pack via four new attributes in the
-reserved 700–799 range. Three are payload attributes; the fourth is
-a single per-UID rank sideband:
+semantics fold into the variant pack via four hipDNN extension
+attributes in the reserved 700–799 range. Three are payload
+attributes; the fourth is a single per-UID rank sideband:
 
 ```c
-HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS = 704  // array of int64 UIDs
-HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES     = 705  // flat int64 dims, concatenated
-HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES    = 706  // flat int64 strides, concatenated
-HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS    = 707  // per-UID rank sideband
+HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_UNIQUE_IDS_EXT = 704  // array of int64 UIDs
+HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_SHAPES_EXT     = 705  // flat int64 dims, concatenated
+HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_STRIDES_EXT    = 706  // flat int64 strides, concatenated
+HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_LENGTHS_EXT    = 707  // per-UID rank sideband
 ```
 
 **Single per-UID rank.** Shapes and strides for a given tensor share
-the same rank, so a single `OVERRIDE_LENGTHS` sideband suffices to
-slice both `OVERRIDE_SHAPES` and `OVERRIDE_STRIDES`.
+the same rank, so a single `OVERRIDE_LENGTHS_EXT` sideband suffices to
+slice both `OVERRIDE_SHAPES_EXT` and `OVERRIDE_STRIDES_EXT`.
 
-**Storage convention.** `OVERRIDE_SHAPES` and `OVERRIDE_STRIDES` are
-flat `int64_t[]` buffers (the concatenation of per-UID inner vectors).
-`OVERRIDE_LENGTHS[i]` carries the rank of the tensor identified by
-`OVERRIDE_UNIQUE_IDS[i]`, in the same order.
+**Storage convention.** `OVERRIDE_SHAPES_EXT` and
+`OVERRIDE_STRIDES_EXT` are flat `int64_t[]` buffers (the concatenation
+of per-UID inner vectors). `OVERRIDE_LENGTHS_EXT[i]` carries the rank
+of the tensor identified by `OVERRIDE_UNIQUE_IDS_EXT[i]`, in the same
+order.
 
 **Worked example.** A graph that overrides three tensors of ranks
 3, 4, and 4:
@@ -388,7 +389,7 @@ but is out of scope for this RFC.
 ### 4.6 Host dispatch logic
 
 The host dispatch path inspects the variant pack for the new
-`HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_*` attributes and dispatches
+`HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_*_EXT` attributes and dispatches
 accordingly:
 
 ```cpp
@@ -473,8 +474,9 @@ see [§6.3](#63-dynamic-tensor-semantics).
 ### 5.3 Override transport: variant-pack attributes + plugin SDK entry
 
 **Decision**: keep a single `hipdnnBackendExecute`; add four new
-variant-pack attributes (`HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_*`:
-three payload plus one per-UID rank sideband) in the 700–799 range,
+hipDNN extension variant-pack attributes
+(`HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_*_EXT`: three payload plus one
+per-UID rank sideband) in the 700–799 range,
 AND add the optional plugin SDK entry
 `hipdnnEnginePluginExecuteOpGraphWithOverrides`. Both surfaces are
 required.
@@ -1093,7 +1095,7 @@ would be additive on top of the current parallel-vector transport.
   must fit within these.
 - **Override transport**: the mechanism by which override values
   reach the plugin: frontend translation into variant-pack
-  `HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_*` attributes (IDs 704–707
+  `HIPDNN_ATTR_VARIANT_PACK_OVERRIDE_*_EXT` attributes (IDs 704–707
   carrying the UID list, per-tensor dim arrays, per-tensor stride
   arrays, and per-tensor rank sideband respectively), host extraction
   into flat parallel arrays, and dispatch to the optional plugin

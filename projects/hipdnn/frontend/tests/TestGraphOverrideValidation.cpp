@@ -109,6 +109,14 @@ TEST(TestGraphBackedOverrideValidation, AcceptsValidOverrides)
     EXPECT_TRUE(result.is_good()) << result.err_msg;
 }
 
+TEST(TestGraphBackedOverrideValidation, AcceptsWildcardDeclaredDimension)
+{
+    auto result = detail::validateGraphBackedOverrideArguments(
+        makeTensorMap({1, 3, -1, 4}, {48, 16, 4, 1}), {1}, {{1, 3, 128, 4}}, {{1536, 512, 4, 1}});
+
+    EXPECT_TRUE(result.is_good()) << result.err_msg;
+}
+
 TEST_P(TestGraphBackedOverrideValidation, RejectsInvalidOverrides)
 {
     const auto& testCase = GetParam();
@@ -134,21 +142,21 @@ INSTANTIATE_TEST_SUITE_P(
                               {1, 1},
                               {{1, 3, 4, 4}, {1, 3, 4, 4}},
                               {{48, 16, 4, 1}, {48, 16, 4, 1}},
-                              "rule 5"},
+                              "rule 2"},
         GraphBackedRejectCase{
-            "UnknownUid", makeTensorMap(), {99}, {{1, 3, 4, 4}}, {{48, 16, 4, 1}}, "rule 2"},
+            "UnknownUid", makeTensorMap(), {99}, {{1, 3, 4, 4}}, {{48, 16, 4, 1}}, "rule 3"},
         GraphBackedRejectCase{
-            "RankMismatch", makeTensorMap(), {1}, {{1, 3, 4}}, {{16, 4, 1}}, "rule 3"},
+            "RankMismatch", makeTensorMap(), {1}, {{1, 3, 4}}, {{16, 4, 1}}, "rule 4"},
         GraphBackedRejectCase{
-            "NonPositiveShape", makeTensorMap(), {1}, {{1, 3, 0, 4}}, {{48, 16, 4, 1}}, "rule 6"},
+            "NonPositiveShape", makeTensorMap(), {1}, {{1, 3, 0, 4}}, {{48, 16, 4, 1}}, "rule 5"},
         GraphBackedRejectCase{
-            "NonPositiveStride", makeTensorMap(), {1}, {{1, 3, 4, 4}}, {{48, 16, 0, 1}}, "rule 7"},
+            "NonPositiveStride", makeTensorMap(), {1}, {{1, 3, 4, 4}}, {{48, 16, 0, 1}}, "rule 6"},
         GraphBackedRejectCase{"ShapeExceedsDeclared",
                               makeTensorMap(),
                               {1},
                               {{1, 3, 8, 4}},
                               {{96, 32, 4, 1}},
-                              "rule 4"},
+                              "rule 7"},
         GraphBackedRejectCase{"DeclaredStrideRankMismatch",
                               makeTensorMap({1, 3, 4, 4}, {16, 4, 1}),
                               {1},
