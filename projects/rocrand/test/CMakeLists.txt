@@ -30,6 +30,8 @@ file(WRITE "${INSTALL_TEST_FILE}"
 ]=]
 )
 
+# Register a CTest entry that invokes the test executable via a path relative to
+# CMAKE_CURRENT_BINARY_DIR and also append an install-time entry for it.
 function(add_relative_test test_name test_target)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")
@@ -123,7 +125,7 @@ function(add_test_target test_src is_internal)
     ${CMAKE_SOURCE_DIR}/rtest.*
     )
     foreach( file_i ${third_party_dlls})
-      add_custom_command( TARGET ${test_name} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test )
+      add_custom_command( TARGET ${test_name} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test COMMENT "Copying ${file_i} to test output directory" )
     endforeach( file_i )
   endif()
 endfunction()
