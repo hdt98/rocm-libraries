@@ -35,15 +35,6 @@ struct is_streamk_partitioner<StreamKTilePartitioner<Shape, S, P>> : std::true_t
 {
 };
 
-template <typename... Args>
-CK_TILE_HOST void LogInfo(Args&&... args) noexcept
-{
-    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-    {
-        CK_TILE_INFO(std::forward<Args>(args)...);
-    }
-}
-
 /// @brief The Grouped Convolution kernel device arguments.
 template <typename GroupedConvTraitsType_, typename TilePartitioner_ = void>
 struct GroupedConvBwdWeightKernelArgs

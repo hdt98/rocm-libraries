@@ -10,6 +10,15 @@
 
 namespace ck_tile {
 
+template <typename... Args>
+CK_TILE_HOST void LogInfo(Args&&... args) noexcept
+{
+    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+    {
+        CK_TILE_INFO(std::forward<Args>(args)...);
+    }
+}
+
 template <index_t NDimSpatial_,
           ConvolutionSpecialization ConvSpecialization_,
           typename InLayout_,

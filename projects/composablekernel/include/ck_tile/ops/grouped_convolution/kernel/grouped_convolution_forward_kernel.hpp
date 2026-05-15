@@ -125,15 +125,24 @@ struct GroupedConvFwdKernelArgs
         GemmK     = a_grid_desc_m_k.get_length(number<1>{});
         GemmBatch = integer_divide_ceil(args.G_, NumGroupsToMerge);
 
-        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-        {
-            std::cout << "GemmM: " << GemmM << ", GemmN: " << GemmN << ", GemmK: " << GemmK
-                      << ", GemmBatch: " << GemmBatch << ", N per split: " << n_per_split
-                      << ", number of N splits: " << n_splits
-                      << ", input_batch_stride: " << input_batch_stride
-                      << ", output_batch_stride: " << output_batch_stride
-                      << ", NumGroupsToMerge: " << NumGroupsToMerge << std::endl;
-        }
+        LogInfo("GemmM: ",
+                GemmM,
+                ", GemmN: ",
+                GemmN,
+                ", GemmK: ",
+                GemmK,
+                ", GemmBatch: ",
+                GemmBatch,
+                ", N per split: ",
+                n_per_split,
+                ", number of N splits: ",
+                n_splits,
+                ", input_batch_stride: ",
+                input_batch_stride,
+                ", output_batch_stride: ",
+                output_batch_stride,
+                ", NumGroupsToMerge: ",
+                NumGroupsToMerge);
     }
 
     template <
@@ -225,15 +234,24 @@ struct GroupedConvFwdKernelArgs
         GemmK     = a_grid_desc_m_k.get_length(number<1>{});
         GemmBatch = integer_divide_ceil(args.G_, NumGroupsToMerge);
 
-        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-        {
-            std::cout << "GemmM: " << GemmM << ", GemmN: " << GemmN << ", GemmK: " << GemmK
-                      << ", GemmBatch: " << GemmBatch << ", N per split: " << n_per_split
-                      << ", number of N splits: " << n_splits
-                      << ", input_batch_stride: " << input_batch_stride
-                      << ", output_batch_stride: " << output_batch_stride
-                      << ", NumGroupsToMerge: " << NumGroupsToMerge << std::endl;
-        }
+        LogInfo("GemmM: ",
+                GemmM,
+                ", GemmN: ",
+                GemmN,
+                ", GemmK: ",
+                GemmK,
+                ", GemmBatch: ",
+                GemmBatch,
+                ", N per split: ",
+                n_per_split,
+                ", number of N splits: ",
+                n_splits,
+                ", input_batch_stride: ",
+                input_batch_stride,
+                ", output_batch_stride: ",
+                output_batch_stride,
+                ", NumGroupsToMerge: ",
+                NumGroupsToMerge);
     }
 
     template <
@@ -332,15 +350,24 @@ struct GroupedConvFwdKernelArgs
         GemmK     = a_grid_desc_m_k.get_length(number<1>{});
         GemmBatch = integer_divide_ceil(args.G_, NumGroupsToMerge);
 
-        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-        {
-            std::cout << "GemmM: " << GemmM << ", GemmN: " << GemmN << ", GemmK: " << GemmK
-                      << ", GemmBatch: " << GemmBatch << ", N per split: " << n_per_split
-                      << ", number of N splits: " << n_splits
-                      << ", input_batch_stride: " << input_batch_stride
-                      << ", output_batch_stride: " << output_batch_stride
-                      << ", NumGroupsToMerge: " << NumGroupsToMerge << std::endl;
-        }
+        LogInfo("GemmM: ",
+                GemmM,
+                ", GemmN: ",
+                GemmN,
+                ", GemmK: ",
+                GemmK,
+                ", GemmBatch: ",
+                GemmBatch,
+                ", N per split: ",
+                n_per_split,
+                ", number of N splits: ",
+                n_splits,
+                ", input_batch_stride: ",
+                input_batch_stride,
+                ", output_batch_stride: ",
+                output_batch_stride,
+                ", NumGroupsToMerge: ",
+                NumGroupsToMerge);
     }
     using AGridDescMK = remove_cvref_t<
         decltype(ConvToGemmFwdTransformer{}
@@ -671,10 +698,7 @@ struct GroupedConvolutionForwardKernel
         {
             if(kargs.k_batch != 1)
             {
-                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                {
-                    CK_TILE_ERROR("Conditions not met for Kbatch >1 !");
-                }
+                LogInfo("Conditions not met for Kbatch >1 !");
                 return false;
             }
         }
@@ -734,11 +758,7 @@ struct GroupedConvolutionForwardKernel
         if constexpr(GroupedConvTraitsType_::ExplicitGemm &&
                      ConvSpecialization != ConvolutionSpecialization::Filter1x1Stride1Pad0)
         {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-            {
-                CK_TILE_ERROR(
-                    "Explicit Gemm is supported only for Filter1x1Stride1Pad0 specialization!");
-            }
+            LogInfo("ExplicitGemm is only supported for Filter1x1Stride1Pad0 specialization.");
             return false;
         }
 
@@ -751,41 +771,32 @@ struct GroupedConvolutionForwardKernel
             if(ConvC % GroupedConvTraitsType_::VectorSizeA != 0 &&
                GroupedConvTraitsType_::NumGroupsToMerge == 1)
             {
-                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                {
-                    CK_TILE_ERROR("Conv C is not a multiple of vector load size for input image!");
-                }
+                LogInfo("Conv C is not a multiple of vector load size for input image! ConvC: ",
+                        ConvC,
+                        ", VectorSizeA: ",
+                        GroupedConvTraitsType_::VectorSizeA);
                 return false;
             }
             else if(GroupedConvTraitsType_::NumGroupsToMerge > 1)
             {
                 if(ConvC != 1)
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                    {
-                        CK_TILE_ERROR("ConvC must be equal to 1 for NumGroupsToMerge > 1 to allow "
-                                      "vector reads on group dimension!");
-                    }
+                    LogInfo("ConvC must be equal to 1 for NumGroupsToMerge > 1 to allow "
+                            "vector reads on group dimension!");
                     return false;
                 }
 
                 const index_t ConvG = kargs.wei_g_k_c_xs_lengths[number<0>{}];
                 if(ConvG % GroupedConvTraitsType_::NumGroupsToMerge != 0)
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                    {
-                        CK_TILE_ERROR("ConvG must be a multiple of NumGroupsToMerge!");
-                    }
+                    LogInfo("ConvG must be a multiple of NumGroupsToMerge!");
                     return false;
                 }
             }
         }
         else
         {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-            {
-                CK_TILE_ERROR("Not supported input layout!");
-            }
+            LogInfo("Not supported input layout! Now InLayout is ", InLayout::name);
             return false;
         }
 
@@ -797,19 +808,16 @@ struct GroupedConvolutionForwardKernel
         {
             if(ConvC % GroupedConvTraitsType_::VectorSizeB != 0)
             {
-                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                {
-                    CK_TILE_ERROR("Conv C is not a multiple of vector load size for weight!");
-                }
+                LogInfo("Conv C is not a multiple of vector load size for weight! ConvC: ",
+                        ConvC,
+                        ", VectorSizeB: ",
+                        GroupedConvTraitsType_::VectorSizeB);
                 return false;
             }
         }
         else
         {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-            {
-                CK_TILE_ERROR("Not supported weight layout!");
-            }
+            LogInfo("Not supported weight layout! Now WeiLayout is ", WeiLayout::name);
             return false;
         }
 
@@ -827,31 +835,24 @@ struct GroupedConvolutionForwardKernel
                     if(ConvG % GroupedConvTraitsType_::NumGroupsToMerge != 0 ||
                        ConvG % GroupedConvTraitsType_::VectorSizeC != 0)
                     {
-                        if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                        {
-                            CK_TILE_ERROR("ConvG must be a multiple of NumGroupsToMerge to allow "
-                                          "writing over G dimension");
-                        }
+                        LogInfo("ConvG must be a multiple of NumGroupsToMerge to allow "
+                                "writing over G dimension");
                         return false;
                     }
                 }
                 else
                 {
-                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                    {
-                        CK_TILE_ERROR(
-                            "ConvK is not a multiple of vector store size for output image!");
-                    }
+                    LogInfo("Conv K is not a multiple of vector store size for output! ConvK: ",
+                            ConvK,
+                            ", VectorSizeC: ",
+                            GroupedConvTraitsType_::VectorSizeC);
                     return false;
                 }
             }
         }
         else
         {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-            {
-                CK_TILE_ERROR("Not supported output layout!");
-            }
+            LogInfo("Not supported output layout! Now OutLayout is ", OutLayout::name);
             return false;
         }
 
@@ -861,21 +862,18 @@ struct GroupedConvolutionForwardKernel
             // limitations
             if(ConvC != 1)
             {
-                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                {
-                    CK_TILE_ERROR("ConvC must be equal to 1 for NumGroupsToMerge > 1 to allow "
-                                  "vector reads on group dimension!");
-                }
+                LogInfo("ConvC must be equal to 1 for NumGroupsToMerge > 1 to allow "
+                        "vector reads on group dimension!");
                 return false;
             }
 
             const index_t ConvG = kargs.wei_g_k_c_xs_lengths[number<0>{}];
             if(ConvG % GroupedConvTraitsType_::NumGroupsToMerge != 0)
             {
-                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-                {
-                    CK_TILE_ERROR("ConvG must be a multiple of NumGroupsToMerge!");
-                }
+                LogInfo("Number of groups must be divisible by NumGroupsToMerge! ConvG: ",
+                        ConvG,
+                        ", NumGroupsToMerge: ",
+                        GroupedConvTraitsType_::NumGroupsToMerge);
                 return false;
             }
         }
