@@ -83,7 +83,7 @@ BenchmarkProblems:
           - Exact: [256, 256, 1, 256]
 """
 
-_HAS_GFX942 = has_arch("gfx950")
+_HAS_GFX942 = has_arch("gfx942")
 
 
 def _write_config(path: str) -> None:
