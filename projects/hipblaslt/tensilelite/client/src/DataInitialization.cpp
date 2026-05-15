@@ -203,6 +203,8 @@ namespace TensileLite
                 return "TrigIndAbsSin";
             case InitMode::TrigIndAbsCos:
                 return "TrigIndAbsCos";
+            case InitMode::UniformLowPrecision:
+                return "UniformLowPrecision";
 
             case InitMode::Count:
                 break;
@@ -274,6 +276,8 @@ namespace TensileLite
                 mode = InitMode::TrigIndAbsSin;
             else if(strValue == ToString(InitMode::TrigIndAbsCos))
                 mode = InitMode::TrigIndAbsCos;
+            else if(strValue == ToString(InitMode::UniformLowPrecision))
+                mode = InitMode::UniformLowPrecision;
             else if(std::all_of(strValue.begin(), strValue.end(), isdigit))
             {
                 int value = atoi(strValue.c_str());
@@ -1793,9 +1797,9 @@ namespace TensileLite
             // bytes the kernel sees are identical to the bytes the reference reads. We
             // gate on m_mxScaleFormat > 0 because that is the user-visible signal that
             // they opted into the subtile / pre-swizzle layout.
-            bool useMXGenerator = isMXFP4OrFP8Problem(problem) && m_mxScaleFormat > 0;
+            bool useMXGenerator = isMXProblem(problem) && m_mxScaleFormat > 0;
             if(useMXGenerator)
-                initializeMXDataForFP4OrFP8(problem);
+                initializeMXData(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
@@ -1891,7 +1895,7 @@ namespace TensileLite
             }
         }
 
-        void DataInitialization::initializeMXDataForFP4OrFP8(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
             // can safely skip them. For MX-FP4 / MX-FP8 / MX-BFloat8 sides we drive
@@ -1964,7 +1968,7 @@ namespace TensileLite
                 }
             }
 
-            if(isMXFP4OrFP8Tensor(problem.a(), problem.mxBlockA()))
+            if(isMXTensor(problem.a(), problem.mxBlockA()))
             {
                 auto const& tensorA = problem.a();
                 auto        rows    = tensorA.sizes()[0];
@@ -2038,7 +2042,7 @@ namespace TensileLite
                         auto* dataPtr  = static_cast<uint8_t*>(pristineA.cpuInput.valid.get())
                                          + b * dataBatchStrideBytes;
                         auto* scalePtr = gpuScaleBuf.data() + b * scaleBatchStrideBytes;
-                        generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                        generateMXInput(hipMxDataTypeForDataGenerator(tensorA.dataType()),
                                         hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                         dataPtr,
                                         scalePtr,
@@ -2072,7 +2076,7 @@ namespace TensileLite
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
             }
 
-            if(isMXFP4OrFP8Tensor(problem.b(), problem.mxBlockB()))
+            if(isMXTensor(problem.b(), problem.mxBlockB()))
             {
                 auto const& tensorB = problem.b();
                 auto        rows    = tensorB.sizes()[0];
@@ -2141,7 +2145,7 @@ namespace TensileLite
                         auto* dataPtr  = static_cast<uint8_t*>(pristineB.cpuInput.valid.get())
                                          + b * dataBatchStrideBytes;
                         auto* scalePtr = gpuScaleBuf.data() + b * scaleBatchStrideBytes;
-                        generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                        generateMXInput(hipMxDataTypeForDataGenerator(tensorB.dataType()),
                                         hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                         dataPtr,
                                         scalePtr,
@@ -2174,7 +2178,7 @@ namespace TensileLite
             }
         }
 #else  // HIPBLASLT_ENABLE_MXDATAGENERATOR
-        void DataInitialization::initializeMXDataForFP4OrFP8(ContractionProblemGemm const& /*problem*/)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& /*problem*/)
         {
             // The MX data generator is disabled at build time. Reaching this
             // path means a problem requiring MX FP4 or MX FP8 initialization was issued
@@ -2620,7 +2624,29 @@ namespace TensileLite
                     bool preswizzledAlready = (isMXSA && m_mxPreswizzledA)
                                              || (isMXSB && m_mxPreswizzledB);
 
-                    if (m_isMXPreswizzleArch && preswizzledAlready)
+                    // The picked solution dictates the in-device MX scale layout via
+                    // problemType.mxScaleFormat (mirrors the MXScaleFormat solution
+                    // parameter): 0=NoSwizzle, 1=HostPreSwizzle, 2=InMemorySwizzle.
+                    // Sentinel -1 means "no solution selected yet" (e.g. the first
+                    // prepareGPUInputs call per problem, before solution iteration);
+                    // in that case the path below uses the arch-driven default
+                    // (gfx950 host preswizzle, otherwise K-swizzle).
+                    int kernelMxScaleFormat = -1;
+                    if (m_currentSolution != nullptr)
+                        kernelMxScaleFormat = m_currentSolution->problemType.mxScaleFormat;
+
+                    if (kernelMxScaleFormat == 0)
+                    {
+                        // NoSwizzle: kernel reads scales in canonical row/column
+                        // layout (buffer_load_* path). Upload cpuInput.valid as-is,
+                        // no K-swizzle, no padding permute.
+                        ptr = copyInputBuffers(desc,
+                                               p.gpuInput.valid.get(),
+                                               p.cpuInput.valid.get(),
+                                               p.maxElements,
+                                               hipMemcpyHostToDevice);
+                    }
+                    else if (m_isMXPreswizzleArch && preswizzledAlready)
                     {
                         // gfx950 subtile: preswizzle was applied by initializeMXDataForFP4 and
                         // gpuInput.valid was already populated — use it as-is.

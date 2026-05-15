@@ -15,8 +15,8 @@ GlobalParameters:
   DataInitTypeC: 0
   DataInitTypeAlpha: 1
   DataInitTypeBeta: 0
-  DataInitTypeMXSA: 1
-  DataInitTypeMXSB: 1
+  DataInitTypeMXSA: 3
+  DataInitTypeMXSB: 3
   MXScaleFormat: 1
   BoundsCheck: 0
   KeepBuildTmp: True
@@ -28,9 +28,7 @@ GlobalParameters:
 
 BenchmarkProblems:
   ########################################
-  # FP8 TN — PGR=0, DU = 1*MI_K = 128
-  #
-  # K must be a multiple of DU=128.
+  # FP8 TN — PGR=0, DU = 2*MI_K = 256, MT 128x128
   ########################################
   -
     - # ProblemType
@@ -52,10 +50,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 128, 1,  1, 8, 8,  2, 2]  # MT 256x256
+          - [16, 16, 128, 1,  1, 4, 4,  2, 2]  # MT 128x128
         - PrefetchGlobalRead: [0]
         - PrefetchLocalRead: [0]
-        - DepthU: [128]                 # 1*MI_K = 128
+        - DepthU: [256]                 # 2*MI_K = 256
         - ScheduleIterAlg: [3]
         - DirectToLds: [1]
         - StreamK: [3]
@@ -64,12 +62,12 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [256, 256, 1, 128]   # K = 1*DU
-          - Exact: [512, 512, 1, 256]   # K = 2*DU
-          - Exact: [256, 256, 1, 256]   # K = 2*DU
+          - Exact: [128, 128, 1, 256]   # K = 1*DU
+          - Exact: [256, 256, 1, 512]   # K = 2*DU
+          - Exact: [128, 128, 1, 512]   # K = 2*DU
 
   ########################################
-  # FP8 TN — PGR=2 (scheduler path), DU = 1*MI_K = 128
+  # FP8 TN — PGR=2 (scheduler path), DU = 2*MI_K = 256, MT 128x128
   ########################################
   -
     - # ProblemType
@@ -91,10 +89,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 128, 1,  1, 8, 8,  2, 2]  # MT 256x256
+          - [16, 16, 128, 1,  1, 4, 4,  2, 2]  # MT 128x128
         - PrefetchGlobalRead: [2]
         - PrefetchLocalRead: [1]
-        - DepthU: [128]                 # 1*MI_K = 128
+        - DepthU: [256]                 # 2*MI_K = 256
         - ScheduleIterAlg: [3]
         - DirectToLds: [1]
         - StreamK: [3]
@@ -103,6 +101,6 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [256, 256, 1, 128]   # K = 1*DU
-          - Exact: [512, 512, 1, 256]   # K = 2*DU
-          - Exact: [256, 256, 1, 256]   # K = 2*DU
+          - Exact: [128, 128, 1, 256]   # K = 1*DU
+          - Exact: [256, 256, 1, 512]   # K = 2*DU
+          - Exact: [128, 128, 1, 512]   # K = 2*DU

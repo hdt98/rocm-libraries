@@ -469,8 +469,7 @@ class TileInfo:
       self.lr = None
       self.globalMMATileGrid   = list(gr_cfg.globalMMATileGrid(self.macroTile, self.depthU))
       self.localMMATileGrid    = [self.globalMMATileGrid[0] // self.waveGroupSize, self.globalMMATileGrid[1]]
-      self.subtileShape          = list(gr_cfg.subtileShape)
-      self.subtileShape        = self.subtileShape
+      self.subtileShape        = list(gr_cfg.subtileShape)
       self.globalSubtileGrid   = [1, 1]  # all waves load the full scale tile in one round
       self.localSubtileGrid    = [1, 1]
       self.subtileSize         = lr_cfg.subtileSizeBytes() // lr_cfg.subtileShape[0]
@@ -927,6 +926,74 @@ def initVgprTilesToZero(writer, kernel, tileInfo):
 
   return module
 
+# ---------------------------------------------------------------------------
+# Pick the MXMFMAInstruction instType for the V_MFMA_SCALE_F32_<MxNxK>_F8F6F4
+# family from kernel data types.
+#
+# The CBSZ/BLGP fields:
+#       000 E4M3 (FP8)        010 E2M3 (FP6)        100 E2M1 (FP4)
+#       001 E5M2 (BF8)        011 E3M2 (BF6)
+#
+# Returns None when DataType{A,B} aren't populated
+# ---------------------------------------------------------------------------
+def _selectF8F6F4InstType(kernel):
+  pt = kernel.get("ProblemType")
+  if pt is None:
+    return None
+
+  aType = pt.get("DataTypeA")
+  bType = pt.get("DataTypeB")
+  if aType is None or bType is None:
+    raise RuntimeError(f"Unsupported data types for MFMA instruction: A = {aType}, B = {bType}\n")
+
+  sourceSwap = bool(kernel.get("SourceSwap", False))
+  if sourceSwap:
+    aType, bType = bType, aType
+
+  # Defensive: support MagicMock / minimal stubs that don't define predicates.
+  def _pred(t, name):
+    fn = getattr(t, name, None)
+    return bool(fn()) if callable(fn) else False
+
+  # Pure types
+  aIsF8  = _pred(aType, "isFloat8")
+  bIsF8  = _pred(bType, "isFloat8")
+  if aIsF8 and bIsF8:
+    return InstType.INST_F8
+
+  aIsBF8 = _pred(aType, "isBFloat8")
+  bIsBF8 = _pred(bType, "isBFloat8")
+  if aIsBF8 and bIsBF8:
+    return InstType.INST_BF8
+
+  aIsF4  = _pred(aType, "isFloat4")
+  bIsF4  = _pred(bType, "isFloat4")
+  if aIsF4 and bIsF4:
+    return InstType.INST_F4
+
+  # Mixed FP8/BF8 (8-bit only)
+  if aIsF8 and bIsBF8:
+    return InstType.INST_F8_BF8
+
+  if aIsBF8 and bIsF8:
+    return InstType.INST_BF8_F8
+
+  # Mixed F8 and F4
+  if aIsF8 and bIsF4:
+    return InstType.INST_F8_F4
+
+  if aIsF4 and bIsF8:
+    return InstType.INST_F4_F8
+
+  # Mixed BF8 and F4
+  if aIsBF8 and bIsF4:
+    return InstType.INST_B8_F4
+
+  if aIsF4 and bIsBF8:
+    return InstType.INST_F4_B8
+
+  raise RuntimeError(f"Unsupported data types for MFMA instruction: A = {aType}, B = {bType}\n")
+
 
 ##################################################
 # Subroutine to generate MMA Instruction
@@ -959,30 +1026,11 @@ def emitMfmaInstruction(writer, kernel, vgprTileA, vgprTileB, vgprTileC, vgprTil
   miK = kernel["MatrixInstK"]
 
   if miK == 128:
-    # MX 16x16x128 — derive instType from A/B data types (mirrors dataTypeToMfmaInstTypePair)
-    dtA = kernel["ProblemType"]["DataTypeA"]
-    dtB = kernel["ProblemType"]["DataTypeB"]
-    sourceSwap = kernel["SourceSwap"]
-    abbrevA = dtA.toNameAbbrev()
-    abbrevB = dtB.toNameAbbrev()
-    abbrev = abbrevA + "_" + abbrevB if abbrevA != abbrevB else abbrevA
-    _ABBREV_TO_INST_TYPE = {
-      'fp4':      InstType.INST_F4,
-      'fp8':      InstType.INST_F8,
-      'bf8':      InstType.INST_BF8,
-      'fp8_bf8':  InstType.INST_F8_BF8 if not sourceSwap else InstType.INST_BF8_F8,
-      'bf8_fp8':  InstType.INST_BF8_F8 if not sourceSwap else InstType.INST_F8_BF8,
-      'fp8_fp4':  InstType.INST_F8_F4  if not sourceSwap else InstType.INST_F4_F8,
-      'fp4_fp8':  InstType.INST_F4_F8  if not sourceSwap else InstType.INST_F8_F4,
-      'bf8_fp4':  InstType.INST_B8_F4  if not sourceSwap else InstType.INST_F4_B8,
-      'fp4_bf8':  InstType.INST_F4_B8  if not sourceSwap else InstType.INST_B8_F4,
-    }
-    if abbrev not in _ABBREV_TO_INST_TYPE:
-      raise NotImplementedError(f"emitMfmaInstruction: unsupported miK=128 dtype pair ({dtA}, {dtB})")
-    instType = _ABBREV_TO_INST_TYPE[abbrev]
+    # MX FP4: 16x16x128
+    mxInstType = _selectF8F6F4InstType(kernel)
     if scaleAVgpr >= 0 and scaleBVgpr >= 0:
       # Use actual loaded scale VGPRs
-      module.add(MXMFMAInstruction(instType=instType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
+      module.add(MXMFMAInstruction(instType=mxInstType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
                                    acc=dAccAlias(vgprDStart,opDSize), \
                                    a=aOperand, \
                                    b=bOperand, \
@@ -994,7 +1042,7 @@ def emitMfmaInstruction(writer, kernel, vgprTileA, vgprTileB, vgprTileC, vgprTil
       # Fallback: hardcoded scale 0x7f (scale=1.0 for all elements)
       tmpVgprScale = writer.vgprPool.checkOut(1)
       module.add(VMovB32(dst=vgpr(tmpVgprScale), src=hex(0x7f7f7f7f), comment="hardcoded scale 0x7f (E8M0)"))
-      module.add(MXMFMAInstruction(instType=instType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
+      module.add(MXMFMAInstruction(instType=mxInstType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
                                    acc=dAccAlias(vgprDStart,opDSize), \
                                    a=aOperand, \
                                    b=bOperand, \
@@ -1072,14 +1120,16 @@ def emitMfmaCode(writer, kernel):
 
         if hasScaleA:
           # Scale group index: one VGPR per lrSubtileShape[0] M-tiles x lrSubtileShape[1] K-tiles
-          subtileKShape = lrSubtileShapeA[1]
-          subtileKGrid = tiA.localSubtileGrid[1]
           scaleMShapeA = tiMXSA.lrSubtileShape[0]  # M tiles per scale LR subtile (2 fp4, 4 fp8)
           scaleMShapeB = tiMXSB.lrSubtileShape[0]
           scaleKShapeA = tiMXSA.lrSubtileShape[1]  # K tiles per scale LR subtile (2 fp4, 1 fp8)
           scaleKShapeB = tiMXSB.lrSubtileShape[1]
-          scaleGroupA = (mma0 // scaleMShapeA) * subtileKGrid + mmak // subtileKShape
-          scaleGroupB = (mma1 // scaleMShapeB) * subtileKGrid + mmak // subtileKShape
+          # Use the scale's own K LR subtile grid (not the data's K subtile grid).
+          # For both DU=128 and DU=256 the scale K grid is 1, keeping scaleGroupA in [0, numMMATiles/4).
+          scaleKGridA = tiMXSA.lrLocalSubtileGrid[1]
+          scaleKGridB = tiMXSB.lrLocalSubtileGrid[1]
+          scaleGroupA = (mma0 // scaleMShapeA) * scaleKGridA + mmak // scaleKShapeA
+          scaleGroupB = (mma1 // scaleMShapeB) * scaleKGridB + mmak // scaleKShapeB
 
           scaleAVgpr = tiMXSA.vgprTiles[4 * scaleGroupA].regList.indices[0] if tiMXSA.mxBlock else -1
           scaleBVgpr = tiMXSB.vgprTiles[4 * scaleGroupB].regList.indices[0] if tiMXSB.mxBlock else -1
@@ -1246,8 +1296,8 @@ def mainLoop(writer, kernel):
     grAGran = ReadGranularity(mn=grMNA,   k=grKA) if tiA.loadRatioGR <= 1.0 else ReadGranularity(mn=2*grMNA, k=grKA)
     grBGran = ReadGranularity(mn=grMNB,   k=grKB) if tiB.loadRatioGR <= 1.0 else ReadGranularity(mn=2*grMNB, k=grKB)
     numSubIterK = tiA.localMMATileGrid[1]
-    lrSAGran = ReadGranularity(mn=2, k=numSubIterK) if scaleTiA else None
-    lrSBGran = ReadGranularity(mn=2, k=numSubIterK) if scaleTiB else None
+    lrSAGran = ReadGranularity(mn=scaleTiA.lrSubtileShape[0], k=numSubIterK) if scaleTiA else None
+    lrSBGran = ReadGranularity(mn=scaleTiB.lrSubtileShape[0], k=numSubIterK) if scaleTiB else None
     grSAGran = ReadGranularity(mn=scaleTiA.localMMATileGrid[0], k=scaleTiA.localMMATileGrid[1]) if scaleTiA else None
     grSBGran = ReadGranularity(mn=scaleTiB.localMMATileGrid[0], k=scaleTiB.localMMATileGrid[1]) if scaleTiB else None
 

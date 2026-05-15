@@ -486,8 +486,10 @@ def localReadDoScaleSubtile(tc, writer, kernel):
 
   tileInfo = writer.states.mxsa.tileInfo if tc == 'MXSA' else writer.states.mxsb.tileInfo
 
-  # Iterate over scale groups: one ds_read per 2 M-adjacent subtiles
-  numScaleGroups = math.ceil(tileInfo.localSubtileGrid[0] / 2) * tileInfo.localSubtileGrid[1]
+  # lrLocalSubtileGrid gives the per-wave LR group count (M-groups × K-groups).
+  # localSubtileGrid=[1,1] for MXScaleTilePair (GR covers full tile in one pass)
+  # and must not be used to count LR groups.
+  numScaleGroups = int(tileInfo.lrLocalSubtileGrid[0]) * int(tileInfo.lrLocalSubtileGrid[1])
   for gid in range(numScaleGroups):
     module.add(emitSubtileScaleDsRead(tc, writer, kernel, gid))
 

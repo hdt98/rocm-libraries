@@ -54,25 +54,34 @@ namespace TensileLite
                 || isMXFP4Tensor(problem.b(), problem.mxBlockB());
         }
 
-        inline bool isMXFP4OrFP8Tensor(const TensorDescriptor& tensor, size_t mxBlock)
+        inline bool isMXTensor(const TensorDescriptor& tensor, size_t mxBlock)
         {
             if(mxBlock == 0)
                 return false;
             auto dt = tensor.dataType();
+            if(dt == rocisa::DataType::Float6 or
+                    dt == rocisa::DataType::BFloat6)
+            {
+                 throw std::runtime_error("Float6 and BFloat6 currently are not supported");
+            }
             return dt == rocisa::DataType::Float4
                 || dt == rocisa::DataType::Float8
                 || dt == rocisa::DataType::BFloat8;
         }
 
-        inline bool isMXFP4OrFP8Problem(const ContractionProblemGemm& problem)
+        inline bool isMXProblem(const ContractionProblemGemm& problem)
         {
-            return isMXFP4OrFP8Tensor(problem.a(), problem.mxBlockA())
-                || isMXFP4OrFP8Tensor(problem.b(), problem.mxBlockB());
+            return isMXTensor(problem.a(), problem.mxBlockA())
+                || isMXTensor(problem.b(), problem.mxBlockB());
         }
 
         // Problem-indept. from 0~7, and 16, and 23~26 (fixed values for every problem)
         // And problem-dept. from 8~15 (values depend on problem)
         // RandomNegPosLimited: integer -128~128. fp -1.0~1.0
+        // UniformLowPrecision (27): uniform random in [-maxVal, maxVal] where maxVal is
+        //   the maximum representable value of the target type. Only supported for
+        //   low-precision packed types (FP4, FP6, BF6). Produces significantly fewer
+        //   zeros than Random by covering the full representable range uniformly.
         enum class InitMode
         {
             Zero = 0, // 0
@@ -102,6 +111,7 @@ namespace TensileLite
             TrigIndCos, // 24
             TrigIndAbsSin, // 25
             TrigIndAbsCos, // 26
+            UniformLowPrecision, // 27
             Count
         };
 
@@ -540,6 +550,8 @@ namespace TensileLite
                     return getValue<T, InitMode::RandomNegPosLimited>();
                 case InitMode::Free:
                     return convertDoubleTo<T>(value);
+                case InitMode::UniformLowPrecision:
+                    return getValue<T, InitMode::UniformLowPrecision>();
                 case InitMode::SerialIdx:
                 case InitMode::SerialDim0:
                 case InitMode::SerialDim1:
@@ -616,8 +628,12 @@ namespace TensileLite
                     break;
                 case InitMode::DenormMax:
                     initArray<T, InitMode::DenormMax>(array, elements);
+                    break;
                 case InitMode::RandomNegPosLimited:
                     initArray<T, InitMode::RandomNegPosLimited>(array, elements);
+                    break;
+                case InitMode::UniformLowPrecision:
+                    initArray<T, InitMode::UniformLowPrecision>(array, elements);
                     break;
                 case InitMode::SerialIdx:
                     initArrayConvert<T>(array, elements);
@@ -730,6 +746,9 @@ namespace TensileLite
                     break;
                 case InitMode::RandomNegPosLimited:
                     initArray<T, InitMode::RandomNegPosLimited>(array, tensor);
+                    break;
+                case InitMode::UniformLowPrecision:
+                    initArray<T, InitMode::UniformLowPrecision>(array, tensor);
                     break;
                 case InitMode::Free:
                 case InitMode::Count:
@@ -891,10 +910,10 @@ namespace TensileLite
                    && m_currentGemmProblem != nullptr
                    && !m_gpuPtrs.empty())
                 {
-                    bool isMXFP4OrFP8 = isMXFP4OrFP8Problem(*m_currentGemmProblem);
-                    if(isMXFP4OrFP8)
+                    bool isMX = isMXProblem(*m_currentGemmProblem);
+                    if(isMX)
                     {
-                        initializeMXDataForFP4OrFP8(*m_currentGemmProblem);
+                        initializeMXData(*m_currentGemmProblem);
                         copyValidToGPUBuffer(*m_currentGemmProblem);
                         copyInputs(m_gpuPtrs,
                                    m_gpuBatchPtrs,
@@ -1021,7 +1040,7 @@ namespace TensileLite
 
             void initializeConstantInputs(ContractionProblemGemm const& problem);
 
-            void initializeMXDataForFP4OrFP8(ContractionProblemGemm const& problem);
+            void initializeMXData(ContractionProblemGemm const& problem);
 
             void copyInputs(std::vector<void*>&               ptrs,
                             std::vector<void**>&              batchPtrs,
@@ -3712,6 +3731,110 @@ namespace TensileLite
         inline E5M3 DataInitialization::getValue<E5M3, InitMode::RandomNegPosLimited>()
         {
             return getValueWithUpperLowerBoundInteger<E5M3>();
+        }
+
+        // ---- UniformLowPrecision: only supported for low-precision types (FP4, FP6, BF6) ----
+
+#define TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(T)                                        \
+        template <>                                                                         \
+        inline T DataInitialization::getValue<T, InitMode::UniformLowPrecision>()            \
+        {                                                                                   \
+            throw std::runtime_error(                                                       \
+                "UniformLowPrecision init mode is only supported for low-precision "         \
+                "data types (FP4, FP6, BF6).");                                             \
+        }
+
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(float)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(double)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(BFloat16)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(Half)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(Float8)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(BFloat8)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(Float8_fnuz)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(BFloat8_fnuz)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(int32_t)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(Int8x4)
+        TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED(int8_t)
+
+        template <>
+        inline std::complex<float>
+            DataInitialization::getValue<std::complex<float>, InitMode::UniformLowPrecision>()
+        {
+            throw std::runtime_error(
+                "UniformLowPrecision init mode is only supported for low-precision "
+                "data types (FP4, FP6, BF6).");
+        }
+
+        template <>
+        inline std::complex<double>
+            DataInitialization::getValue<std::complex<double>, InitMode::UniformLowPrecision>()
+        {
+            throw std::runtime_error(
+                "UniformLowPrecision init mode is only supported for low-precision "
+                "data types (FP4, FP6, BF6).");
+        }
+
+#undef TENSILE_UNIFORM_LOW_PRECISION_UNSUPPORTED
+
+#ifndef _WIN32
+#ifdef TENSILE_USE_FP6
+        template <>
+        inline Float6x32
+            DataInitialization::getValue<Float6x32, InitMode::UniformLowPrecision>()
+        {
+            float maxVal = getValue<Float6x32, InitMode::Max>().getElement(0);
+            float v[32];
+            for(int i = 0; i < 32; i++)
+                v[i] = getValueWithUpperLowerBoundFP<float>(maxVal, -maxVal);
+            return Float6x32(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
+                            v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15],
+                            v[16], v[17], v[18], v[19], v[20], v[21], v[22], v[23],
+                            v[24], v[25], v[26], v[27], v[28], v[29], v[30], v[31]);
+        }
+#endif // #ifdef TENSILE_USE_FP6
+
+#ifdef TENSILE_USE_BF6
+        template <>
+        inline BFloat6x32
+            DataInitialization::getValue<BFloat6x32, InitMode::UniformLowPrecision>()
+        {
+            float maxVal = getValue<BFloat6x32, InitMode::Max>().getElement(0);
+            float v[32];
+            for(int i = 0; i < 32; i++)
+                v[i] = getValueWithUpperLowerBoundFP<float>(maxVal, -maxVal);
+            return BFloat6x32(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
+                            v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15],
+                            v[16], v[17], v[18], v[19], v[20], v[21], v[22], v[23],
+                            v[24], v[25], v[26], v[27], v[28], v[29], v[30], v[31]);
+        }
+#endif // #ifdef TENSILE_USE_BF6
+
+#ifdef TENSILE_USE_FP4
+        template <>
+        inline Float4x2
+            DataInitialization::getValue<Float4x2, InitMode::UniformLowPrecision>()
+        {
+            float maxVal = getValue<Float4x2, InitMode::Max>().getElement(0);
+            return Float4x2(getValueWithUpperLowerBoundFP<float>(maxVal, -maxVal),
+                            getValueWithUpperLowerBoundFP<float>(maxVal, -maxVal));
+        }
+#endif // #ifdef TENSILE_USE_FP4
+#endif // !_WIN32
+
+        template <>
+        inline E8 DataInitialization::getValue<E8, InitMode::UniformLowPrecision>()
+        {
+            throw std::runtime_error(
+                "UniformLowPrecision init mode is only supported for low-precision "
+                "data types (FP4, FP6, BF6).");
+        }
+
+        template <>
+        inline E5M3 DataInitialization::getValue<E5M3, InitMode::UniformLowPrecision>()
+        {
+            throw std::runtime_error(
+                "UniformLowPrecision init mode is only supported for low-precision "
+                "data types (FP4, FP6, BF6).");
         }
 
         template <>

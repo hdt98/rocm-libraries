@@ -31,6 +31,8 @@ import numpy as np
 
 import math
 
+from types import SimpleNamespace
+
 from gpu_test_helpers import (
     HAS_HIP,
     TileConfig,
@@ -38,9 +40,30 @@ from gpu_test_helpers import (
     AB_B8,
     assemble_and_run,
     generate_kernel_asm,
+    generate_load_params,
+    generate_srd_setup,
     setup_roundtrip_writer,
     build_roundtrip_inner_asm,
     collect_tile_vgprs,
+    init_rocisa,
+)
+
+from rocisa.code import Module
+from rocisa.container import sgpr, vgpr, accvgpr, VOP3PModifiers
+from rocisa.enum import InstType
+from rocisa.instruction import SBarrier, SMovB32, MXMFMAInstruction
+
+from Tensile.Components.Subtile.Kernel import TileInfo, MXSA_E8M0, MXSB_E8M0
+from Tensile.Components.Subtile.SubtileGREmit import (
+    graTileAssignment, globalReadDTLInitCommonSgpr, globalReadDoSubtile,
+)
+from Tensile.Components.Subtile.SubtileLREmit import lraTileAssignment, localReadDoSubtile
+from Tensile.Components.Subtile.SubtileScaleEmit import (
+    globalReadScaleSwizzledDTLInitCommonSgpr,
+    graTileAssignmentScaleSwizzled,
+    lraTileAssignmentScaleSwizzled,
+    emitScaleGRLoad,
+    emitScaleLRLoad,
 )
 
 # ---------------------------------------------------------------------------
@@ -56,7 +79,387 @@ MFMA_WAIT_NOPS = 16  # s_nop 7 repeated 16 times (128 cycles) after MFMAs
 # ---------------------------------------------------------------------------
 CONFIGS = [
     TileConfig(mt_a=256, mt_b=256, depth_u=128, stride_a=128, stride_b=128),
+    TileConfig(mt_a=128, mt_b=128, depth_u=256, stride_a=256, stride_b=256),
 ]
+
+# ---------------------------------------------------------------------------
+# MX scale constants (for 128×128×256 FP8 config with MXBlock=32)
+# ---------------------------------------------------------------------------
+_MXBLOCK        = 32
+_LR_SUBTILE_SZ  = 256   # bytes per LR subtile (2×2 MMA tiles × 64 bytes)
+_SCALE_GROUPS   = 2     # lrLocalSubtileGrid[0] × [1] = 2 × 1
+_SCALE_LDS_PER_WAVE = WAVESIZE * 16          # 1024 bytes (loadWidth * waveSize)
+_SCALE_LDS_TOTAL    = NUM_WAVES * _SCALE_LDS_PER_WAVE   # 4096 bytes per tensor
+
+
+# ---------------------------------------------------------------------------
+# MX scale helpers (pre-swizzle + expected VGPR computation)
+# ---------------------------------------------------------------------------
+
+def pre_swizzle_scales_gfx950(canonical: np.ndarray) -> np.ndarray:
+    """GFX950 32×8 pre-swizzle for a canonical (sm × sn) E8M0 scale matrix."""
+    sm_orig, sn_orig = canonical.shape
+    sm = int(np.ceil(sm_orig / 32)) * 32
+    sn = int(np.ceil(sn_orig / 8)) * 8
+    padded = np.zeros((sm, sn), dtype=canonical.dtype)
+    padded[:sm_orig, :sn_orig] = canonical
+    s = padded.reshape(sm // 32, 2, 16, sn // 8, 2, 4)
+    s = s.transpose(0, 3, 5, 2, 4, 1)
+    return s.reshape(sm, sn)
+
+
+def make_scale_input(rows: int, cols: int, seed: int = 100) -> np.ndarray:
+    """Random E8M0 uint8 scale matrix.
+
+    Valid range is 0..254 (byte 255 = NaN is excluded). Byte 0 represents
+    2^(-127) and is a valid scale value (E8M0 HasZero=false).
+    """
+    rng = np.random.default_rng(seed)
+    return rng.integers(0, 255, size=(rows, cols), dtype=np.uint8)
+
+
+def compute_expected_scale_vgprs(flat_buf: np.ndarray, wave_id: int,
+                                  is_a: bool) -> np.ndarray:
+    """Expected scale VGPR bytes for each lane of wave_id (MT=128×128, DU=256).
+
+    Returns uint8 array of shape (_SCALE_GROUPS, WAVESIZE, 4).
+    """
+    partition_idx    = (wave_id % 2) if is_a else (wave_id // 2)
+    partition_offset = partition_idx * 512   # 512 bytes per partition
+    expected = np.zeros((_SCALE_GROUPS, WAVESIZE, 4), dtype=np.uint8)
+    for g in range(_SCALE_GROUPS):
+        group_offset = g * _LR_SUBTILE_SZ   # 0 or 256
+        for lane in range(WAVESIZE):
+            lr_off = partition_offset + lane * 4 + group_offset
+            expected[g, lane] = flat_buf[lr_off : lr_off + 4]
+    return expected
+
+
+# ---------------------------------------------------------------------------
+# Combined writer setup (A/B MFMA + MXSA/MXSB scale)
+# ---------------------------------------------------------------------------
+
+def setup_roundtrip_writer_with_scale(cfg):
+    """Extend a roundtrip writer with MXSA/MXSB scale TileInfo.
+
+    Calls setup_roundtrip_writer for A/B, then allocates scale SGPRs and
+    creates scale TileInfo objects.  ldsTotalSize is set to _SCALE_LDS_TOTAL
+    (= 4096, the scale LDS swap mask); the A/B swap value will be incorrect
+    but is never used in single-iteration unit tests.
+
+    Returns:
+        (writer, kernel, tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+         lds_size_ab, lds_declared)
+    """
+    writer, kernel, tileInfoA, tileInfoB, lds_size_ab = setup_roundtrip_writer(
+        cfg, geometry=AB_B8, inst_k=MATRIX_INST_K, bpe=BPE_FP8)
+
+    # Add MX fields to kernel dict
+    k_scale = cfg.depth_u // _MXBLOCK
+    kernel["_DepthUMXSA"]  = k_scale
+    kernel["_DepthUMXSB"]  = k_scale
+    kernel["NonTemporalMXSA"] = 0
+    kernel["NonTemporalMXSB"] = 0
+    kernel["ProblemType"]["MXBlockA"] = _MXBLOCK
+    kernel["ProblemType"]["MXBlockB"] = _MXBLOCK
+
+    # Allocate consecutive pair for strides (enables single s_load_dwordx2)
+    strides_base = writer.sgprPool.checkOut(2, preventOverflow=False)
+    writer.sgprs["StridesMXSA"] = strides_base
+    writer.sgprs["StridesMXSB"] = strides_base + 1
+
+    # 4-dword-aligned SRD descriptors for scale (base loaded directly from kernarg)
+    writer.sgprs["SrdMXSA"] = writer.sgprPool.checkOutAligned(
+        4, 4, "SrdMXSA", preventOverflow=False)
+    writer.sgprs["SrdMXSB"] = writer.sgprPool.checkOutAligned(
+        4, 4, "SrdMXSB", preventOverflow=False)
+    writer.sgprs["LocalWriteBaseAddrMXSA"] = writer.sgprPool.checkOut(
+        1, preventOverflow=False)
+    writer.sgprs["LocalWriteBaseAddrMXSB"] = writer.sgprPool.checkOut(
+        1, preventOverflow=False)
+    writer.sgprs["SwapMXSA"] = writer.sgprPool.checkOut(1, preventOverflow=False)
+    writer.sgprs["SwapMXSB"] = writer.sgprPool.checkOut(1, preventOverflow=False)
+
+    # Create scale TileInfo — states.mxsa/mxsb must exist before TileInfo init
+    # (globalReadScaleSwizzledDTLInitCommonSgpr reads them at emit time, not init)
+    tiMXSA = TileInfo(MXSA_E8M0, 'MXSA', writer, kernel)
+    tiMXSB = TileInfo(MXSB_E8M0, 'MXSB', writer, kernel)
+    writer.states.mxsa = SimpleNamespace(tileInfo=tiMXSA)
+    writer.states.mxsb = SimpleNamespace(tileInfo=tiMXSB)
+
+    tiMXSA.allocOffsetRegisters(writer, kernel)
+    tiMXSB.allocOffsetRegisters(writer, kernel)
+    tiMXSA.allocVgprTileRegisters_legacy(writer, kernel)
+    tiMXSB.allocVgprTileRegisters_legacy(writer, kernel)
+
+    # Scale LDS after A/B LDS.  ldsTotalSize = scale swap mask (4096).
+    # XOR property: ldsStartOffsetMXSA XOR (ldsStartOffsetMXSA + 4096) = 4096
+    # holds whenever ldsStartOffsetMXSA has bit-13 = 0 (i.e. is a multiple of 8192,
+    # or < 8192).  For lds_size_ab = 65536 = 0x10000: 0x10000 XOR 0x11000 = 0x1000. ✓
+    writer.ldsStartOffsetMXSA = lds_size_ab
+    writer.ldsStartOffsetMXSB = lds_size_ab + _SCALE_LDS_TOTAL
+    writer.ldsTotalSize       = _SCALE_LDS_TOTAL   # scale swap mask
+
+    # Declared LDS: A/B + MXSA double-buffer + MXSB double-buffer
+    lds_declared = lds_size_ab + 4 * _SCALE_LDS_TOTAL   # ab + 4×4096
+    return (writer, kernel, tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+            lds_size_ab, lds_declared)
+
+
+def _generate_scale_srd_setup():
+    """Set SrdMXSA/B descriptor fields 2 and 3 (base already in fields 0:1)."""
+    module = Module("SRD scale")
+    module.add(SMovB32(dst=sgpr("SrdMXSA+2"), src="0xFFFFFFFF",
+                       comment="SrdMXSA NumRecords"))
+    module.add(SMovB32(dst=sgpr("SrdMXSA+3"), src="0x20000",
+                       comment="SrdMXSA OOB_SELECT=2"))
+    module.add(SMovB32(dst=sgpr("SrdMXSB+2"), src="0xFFFFFFFF",
+                       comment="SrdMXSB NumRecords"))
+    module.add(SMovB32(dst=sgpr("SrdMXSB+3"), src="0x20000",
+                       comment="SrdMXSB OOB_SELECT=2"))
+    return module
+
+
+# ---------------------------------------------------------------------------
+# Scale VGPR export (all 4 waves in parallel)
+# ---------------------------------------------------------------------------
+
+def _generate_scale_export_asm(tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+                                mfma_output_size):
+    """Generate assembly to export all scale VGPRs for all 4 waves in parallel.
+
+    Output layout (appended after mfma_output_size bytes):
+      wave_id * scale_wave_region  +  [MXSA_g0 | MXSA_g1 | MXSB_g0 | MXSB_g1]
+    Each group = WAVESIZE × 4 = 256 bytes.  scale_wave_region = 4 × 256 = 1024.
+    """
+    scale_wave_region = _SCALE_GROUPS * 2 * WAVESIZE * 4  # 1024 bytes per wave
+    shift = int(math.log2(scale_wave_region))               # 10
+
+    # Collect all used VGPRs to find free temporaries
+    used = collect_tile_vgprs(tileInfoA, tileInfoB)
+    for ti in (tiMXSA, tiMXSB):
+        for t in ti.vgprTiles:
+            used.update(t.regList.indices)
+        used.update(ti.sharedVgprGROffset)
+        used.update(ti.sharedVgprLROffset)
+        used.update(ti.sharedVgprLROffsetSwap)
+
+    next_v = max(used | {0}) + 1
+    wave_off = next_v; next_v += 1
+    lane     = next_v; next_v += 1
+    if next_v % 2 != 0:
+        next_v += 1
+    alo = next_v; next_v += 1
+    ahi = next_v; next_v += 1
+
+    lines = [" // ---- Scale VGPR export: all waves in parallel ----"]
+    lines.append(f" v_lshrrev_b32 v{wave_off}, 6, v0"
+                 f"          // wave_id = tid >> 6")
+    lines.append(f" v_lshlrev_b32 v{wave_off}, {shift}, v{wave_off}"
+                 f"  // wave_id * {scale_wave_region}")
+    # Fold mfma_output_size into wave_off (both are per-wave constants)
+    lines.append(f" v_add_u32 v{wave_off}, {mfma_output_size}, v{wave_off}"
+                 f"  // + mfma_output_size")
+    lines.append(f" v_and_b32 v{lane}, 0x3F, v0             // lane_id")
+    lines.append(f" v_lshlrev_b32 v{lane}, 2, v{lane}       // lane_id * 4")
+
+    group_idx = 0
+    for tc_label, ti in [("MXSA", tiMXSA), ("MXSB", tiMXSB)]:
+        seen_vgpr = []
+        for tile in ti.vgprTiles:
+            vstart = tile.regList.indices[0] if tile.regList.indices else None
+            if vstart is None or vstart in seen_vgpr:
+                continue
+            seen_vgpr.append(vstart)
+            within_wave_off = group_idx * WAVESIZE * 4   # byte offset within wave region
+
+            lines.append(f" // {tc_label} group {len(seen_vgpr)-1}: v{vstart}")
+            lines.append(f" v_add_u32 v{alo}, v{wave_off}, v{lane}  // wave_off + lane*4")
+            if within_wave_off:
+                lines.append(f" v_add_u32 v{alo}, {within_wave_off}, v{alo}"
+                             f"  // + group offset")
+            lines.append(f" v_mov_b32 v{ahi}, s9")
+            lines.append(f" v_add_co_u32 v{alo}, vcc, s8, v{alo}")
+            lines.append(f" v_addc_co_u32 v{ahi}, vcc, v{ahi}, 0, vcc")
+            lines.append(f" flat_store_dword v[{alo}:{ahi}], v{vstart}")
+            lines.append(f" s_waitcnt vmcnt(0)")
+            group_idx += 1
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Combined FP8 MFMA + scale GR/LR kernel
+# ---------------------------------------------------------------------------
+
+def generate_mfma_kernel_fp8_with_scale(cfg):
+    """Generate a combined FP8 GR→LDS→LR→MFMA + scale GR→LDS→LR kernel.
+
+    Kernarg layout (inputs in this order: A, B, scale_A, scale_B):
+      0x00 input_A_ptr  (8B) → s[4:5]
+      0x08 input_B_ptr  (8B) → s[6:7]
+      0x10 scale_A_ptr  (8B) → SrdMXSA[0:1]
+      0x18 scale_B_ptr  (8B) → SrdMXSB[0:1]
+      0x20 output_ptr   (8B) → s[8:9]
+      0x28 strideA      (4B) → s10
+      0x2C strideB      (4B) → s11
+      0x30 strideMXSA   (4B) → StridesMXSA
+      0x34 strideMXSB   (4B) → StridesMXSB
+
+    Output layout:
+      [mfma_output_size bytes]  then
+      [wave 0 scale: MXSA_g0, MXSA_g1, MXSB_g0, MXSB_g1] ... [wave 3 scale]
+
+    Returns:
+        (kernel_asm, writer, kernel, tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+         mfma_pairs, mfma_output_size, output_size, lds_declared)
+    """
+    (writer, kernel, tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+     lds_size_ab, lds_declared) = setup_roundtrip_writer_with_scale(cfg)
+
+    # MFMA pairs and assembly — use MX-scale MFMA to test actual byte selection
+    mfma_pairs = generate_mfma_pairs(tileInfoA, tileInfoB, writer)
+    mfma_asm   = generate_mfma_asm_with_scale(mfma_pairs, tiMXSA, tiMXSB)
+
+    wave_region_mfma = len(mfma_pairs) * WAVESIZE * ACC_SIZE * 4
+    mfma_output_size = NUM_WAVES * wave_region_mfma
+
+    # Collect scale VGPRs so MFMA export temps don't overlap with them.
+    # (Scale tile VGPRs hold ds_read results that must survive past MFMA export.)
+    scale_used = set()
+    for ti in (tiMXSA, tiMXSB):
+        for t in ti.vgprTiles:
+            scale_used.update(t.regList.indices)
+        scale_used.update(ti.sharedVgprGROffset)
+        scale_used.update(ti.sharedVgprLROffset)
+        scale_used.update(ti.sharedVgprLROffsetSwap)
+
+    mfma_export_asm, _ = generate_mfma_export_asm(mfma_pairs, tileInfoA, tileInfoB,
+                                                    extra_used=scale_used)
+    scale_export_asm   = _generate_scale_export_asm(
+        tileInfoA, tileInfoB, tiMXSA, tiMXSB, mfma_output_size)
+
+    # A/B pipeline modules
+    gra_ab    = graTileAssignment(writer, kernel, useSwizzling=True)
+    lra_ab    = lraTileAssignment(writer, kernel)
+    dtl_ab    = globalReadDTLInitCommonSgpr(writer, kernel)
+    gr_a      = globalReadDoSubtile('A', writer, kernel)
+    gr_b      = globalReadDoSubtile('B', writer, kernel)
+    wait_gr   = SBarrier()   # use barrier; actual GR wait is implicit after vmcnt
+    lr_a      = localReadDoSubtile('A', writer, kernel)
+    lr_b      = localReadDoSubtile('B', writer, kernel)
+
+    # Scale pipeline modules
+    dtl_sc    = globalReadScaleSwizzledDTLInitCommonSgpr(writer, kernel)
+    gra_sc    = graTileAssignmentScaleSwizzled(writer, kernel)
+    lra_sc    = lraTileAssignmentScaleSwizzled(writer, kernel)
+    gr_mxsa   = emitScaleGRLoad(tiMXSA, writer, kernel)
+    gr_mxsb   = emitScaleGRLoad(tiMXSB, writer, kernel)
+    lr_mxsa   = emitScaleLRLoad(tiMXSA, writer, kernel)
+    lr_mxsb   = emitScaleLRLoad(tiMXSB, writer, kernel)
+
+    from rocisa.instruction import SWaitCnt
+    wait_vmcnt = SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait GR")
+    barrier    = SBarrier(comment="sync LDS")
+    wait_lgkm  = SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait LR")
+
+    # Extended prologue (covers all 9 kernel args)
+    prologue = generate_load_params([
+        (4,                            4, 0x00, "input_A_ptr + input_B_ptr"),
+        (writer.sgprs["SrdMXSA"],      2, 0x10, "scale_A_ptr -> SrdMXSA[0:1]"),
+        (writer.sgprs["SrdMXSB"],      2, 0x18, "scale_B_ptr -> SrdMXSB[0:1]"),
+        (8,                            4, 0x20, "output_ptr + strideA + strideB"),
+        (writer.sgprs["StridesMXSA"],  2, 0x30, "strideMXSA + strideMXSB"),
+    ])
+
+    inner_asm = "\n".join([
+        str(prologue),
+        str(generate_srd_setup()),         # A/B SRD: s[4:5] → SrdA, s[6:7] → SrdB
+        str(_generate_scale_srd_setup()),  # Scale SRD: complete fields 2 and 3
+        # A/B pipeline
+        str(gra_ab),
+        str(lra_ab),
+        str(dtl_ab),
+        str(gr_a),
+        str(gr_b),
+        str(wait_vmcnt),
+        str(barrier),
+        str(lr_a),
+        str(lr_b),
+        str(wait_lgkm),
+        # Scale pipeline
+        str(dtl_sc),
+        str(gra_sc),
+        str(lra_sc),
+        str(gr_mxsa),
+        str(gr_mxsb),
+        str(SWaitCnt(dscnt=-1, vlcnt=0, vscnt=-1, comment="wait scale GR")),
+        str(SBarrier(comment="sync scale LDS")),
+        str(lr_mxsa),
+        str(lr_mxsb),
+        str(SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait scale LR")),
+        # MFMA + export
+        mfma_asm,
+        mfma_export_asm,
+        scale_export_asm,
+    ])
+
+    args = (
+        ("input_A_ptr",  8, "global_buffer", "u8"),
+        ("input_B_ptr",  8, "global_buffer", "u8"),
+        ("scale_A_ptr",  8, "global_buffer", "u8"),
+        ("scale_B_ptr",  8, "global_buffer", "u8"),
+        ("output_ptr",   8, "global_buffer", "f32"),
+        ("strideA",      4, "by_value",      "u32"),
+        ("strideB",      4, "by_value",      "u32"),
+        ("strideMXSA",   4, "by_value",      "u32"),
+        ("strideMXSB",   4, "by_value",      "u32"),
+    )
+    kernel_asm = generate_kernel_asm(inner_asm, writer, args, lds_declared)
+
+    scale_output_size = NUM_WAVES * _SCALE_GROUPS * 2 * WAVESIZE * 4
+    output_size = mfma_output_size + scale_output_size
+    return (kernel_asm, writer, kernel, tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+            mfma_pairs, mfma_output_size, output_size, lds_declared)
+
+
+# ---------------------------------------------------------------------------
+# Scale output comparison
+# ---------------------------------------------------------------------------
+
+def compare_scale_output(scale_bytes, flat_a, flat_b, debug=False):
+    """Verify scale VGPRs for all 4 waves.
+
+    scale_bytes: raw bytes starting right after the MFMA output section.
+    Layout: wave_id * (4 groups × WAVESIZE × 4 bytes) + group_idx * WAVESIZE * 4 + lane * 4.
+    Returns error count.
+    """
+    errors = 0
+    scale_wave_region = _SCALE_GROUPS * 2 * WAVESIZE * 4   # 1024 bytes per wave
+
+    for wave_id in range(NUM_WAVES):
+        wave_data = scale_bytes[wave_id * scale_wave_region :
+                                (wave_id + 1) * scale_wave_region]
+        exp_a = compute_expected_scale_vgprs(flat_a, wave_id, is_a=True)
+        exp_b = compute_expected_scale_vgprs(flat_b, wave_id, is_a=False)
+
+        off = 0
+        for tc_label, expected in [("MXSA", exp_a), ("MXSB", exp_b)]:
+            for g in range(_SCALE_GROUPS):
+                chunk = np.frombuffer(wave_data[off : off + WAVESIZE * 4],
+                                      dtype=np.uint8).reshape(WAVESIZE, 4)
+                for lane in range(WAVESIZE):
+                    if not np.array_equal(chunk[lane], expected[g, lane]):
+                        errors += 1
+                        if errors <= 8 or debug:
+                            print(f"  SCALE MISMATCH wave={wave_id} {tc_label}"
+                                  f" g={g} lane={lane}:"
+                                  f" got {list(chunk[lane])}"
+                                  f" expected {list(expected[g, lane])}")
+                off += WAVESIZE * 4
+
+    return errors
+
 
 # ---------------------------------------------------------------------------
 # FP8 E4M3FN helpers
@@ -79,6 +482,18 @@ def fp8_e4m3fn_to_float32(byte_val: int) -> float:
     return sign * (1.0 + mantissa / 8.0) * (2.0 ** (exp_stored - 7))
 
 
+def e8m0_to_float(v: int) -> float:
+    """Decode E8M0 byte to float32. Value = 2^(v - 127).
+
+    v=0 → 2^(-127) (valid minimum scale; E8M0 HasZero=false).
+    v=255 → NaN (excluded by make_scale_input).
+    """
+    v = int(v) & 0xFF
+    if v == 255:
+        return float('nan')
+    return 2.0 ** (v - 127)
+
+
 def make_fp8_input(num_rows: int, num_cols: int, seed: int = 42) -> np.ndarray:
     """Build a random uint8 FP8 E4M3FN matrix.
 
@@ -98,52 +513,54 @@ def make_fp8_input(num_rows: int, num_cols: int, seed: int = 42) -> np.ndarray:
 
 
 def generate_mfma_pairs(tileInfoA, tileInfoB, writer):
-    """Enumerate MFMA pairs in (mma1 × mma0) order and allocate 4-AGPR accumulators.
+    """Enumerate MFMA pairs in (mma1 × mma0) order, each accumulating over all K-groups.
 
-    Matches the loop order in emitMfmaCode:
-      for mmak in range(localMMATileGrid[1]):   # K-loop (=1 for FP8 DU128)
-        for mma1 in range(localMMATileGrid[0]): # N tiles (B dimension)
-          for mma0 in range(localMMATileGrid[0]): # M tiles (A dimension)
+    One accumulator is allocated per (mma0, mma1) pair. For each pair, k_tiles
+    lists the (a_lo, b_lo) vgpr bases for every K-group (mmak). The MFMA
+    instructions for a pair are issued in K order, all targeting the same AGPR
+    accumulator, matching emitMfmaCode's accumulation semantics.
 
-    For FP8 DU=128: localMMATileGrid = [8, 1]; atileId = mma0; btileId = mma1.
-
-    Returns list of dicts: {mma0, mma1, a_lo, b_lo, acc}
+    Returns list of dicts: {mma0, mma1, acc, k_tiles: [{a_lo, b_lo, mmak}]}
     """
     pairs = []
     lrSubtileShapeA = tileInfoA.lr.subtileShape
     lrSubtileShapeB = tileInfoB.lr.subtileShape
+    lrGridA0 = tileInfoA.localMMATileGrid[0] // lrSubtileShapeA[0]
+    lrGridB0 = tileInfoB.localMMATileGrid[0] // lrSubtileShapeB[0]
+    numPerA  = int(lrSubtileShapeA[0]) * int(lrSubtileShapeA[1])
+    numPerB  = int(lrSubtileShapeB[0]) * int(lrSubtileShapeB[1])
 
-    for mmak in range(tileInfoA.localMMATileGrid[1]):
-        for mma1 in range(tileInfoB.localMMATileGrid[0]):
-            for mma0 in range(tileInfoA.localMMATileGrid[0]):
+    for mma1 in range(tileInfoB.localMMATileGrid[0]):
+        for mma0 in range(tileInfoA.localMMATileGrid[0]):
+            acc = writer.agprPool.checkOutAligned(4, 4, "mfma_acc",
+                                                  preventOverflow=False)
+            k_tiles = []
+            for mmak in range(tileInfoA.localMMATileGrid[1]):
                 # A tile index (matches emitMfmaCode's atileId formula)
-                lrGridA0 = tileInfoA.localMMATileGrid[0] // lrSubtileShapeA[0]
-                numPerA  = int(lrSubtileShapeA[0]) * int(lrSubtileShapeA[1])
-                aSId0    = mma0 // lrSubtileShapeA[0]
-                aSId1    = mmak // lrSubtileShapeA[1]
-                _mmak_A  = mmak % lrSubtileShapeA[1]
-                atileId  = (aSId1 * lrGridA0 + aSId0) * numPerA + _mmak_A
+                aSId0   = mma0 // lrSubtileShapeA[0]
+                aSId1   = mmak // lrSubtileShapeA[1]
+                _mmak_A = mmak % lrSubtileShapeA[1]
+                atileId = (aSId1 * lrGridA0 + aSId0) * numPerA + _mmak_A
 
                 # B tile index
-                lrGridB0 = tileInfoB.localMMATileGrid[0] // lrSubtileShapeB[0]
-                numPerB  = int(lrSubtileShapeB[0]) * int(lrSubtileShapeB[1])
-                bSId0    = mma1 // lrSubtileShapeB[0]
-                bSId1    = mmak // lrSubtileShapeB[1]
-                _mmak_B  = mmak % lrSubtileShapeB[1]
-                btileId  = (bSId1 * lrGridB0 + bSId0) * numPerB + _mmak_B
+                bSId0   = mma1 // lrSubtileShapeB[0]
+                bSId1   = mmak // lrSubtileShapeB[1]
+                _mmak_B = mmak % lrSubtileShapeB[1]
+                btileId = (bSId1 * lrGridB0 + bSId0) * numPerB + _mmak_B
 
                 a_lo = tileInfoA.vgprTiles[atileId].regList.indices[0]
                 b_lo = tileInfoB.vgprTiles[btileId].regList.indices[0]
+                k_tiles.append({'a_lo': a_lo, 'b_lo': b_lo, 'mmak': mmak})
 
-                acc = writer.agprPool.checkOutAligned(4, 4, "mfma_acc",
-                                                      preventOverflow=False)
-                pairs.append({'mma0': mma0, 'mma1': mma1,
-                               'a_lo': a_lo, 'b_lo': b_lo, 'acc': acc})
+            pairs.append({'mma0': mma0, 'mma1': mma1, 'acc': acc, 'k_tiles': k_tiles})
     return pairs
 
 
 def generate_mfma_asm(mfma_pairs):
     """Generate AGPR zero + MFMA instruction assembly for all pairs.
+
+    Each pair accumulates over all K-groups (k_tiles) into a single AGPR
+    accumulator, matching emitMfmaCode semantics.
 
     Returns assembly string (no export).
     """
@@ -157,22 +574,87 @@ def generate_mfma_asm(mfma_pairs):
     lines.append(" // === FP8 MFMA: v_mfma_f32_16x16x128_f8f6f4 cbsz:0 blgp:0 ===")
     lines.append(" // SRC0=B (N-dim, 8 VGPRs), SRC1=A (M-dim, 8 VGPRs), acc=4 AGPRs")
     for p in mfma_pairs:
-        a   = p['a_lo']
-        b   = p['b_lo']
         acc = p['acc']
-        lines.append(
-            f" v_mfma_f32_16x16x128_f8f6f4 a[{acc}:{acc + 3}],"
-            f" v[{b}:{b + 7}], v[{a}:{a + 7}], a[{acc}:{acc + 3}]"
-            f" cbsz:0 blgp:0"
-            f" // C[mma0={p['mma0']}, mma1={p['mma1']}] += A @ B.T"
-        )
+        for kt in p['k_tiles']:
+            a = kt['a_lo']
+            b = kt['b_lo']
+            lines.append(
+                f" v_mfma_f32_16x16x128_f8f6f4 a[{acc}:{acc + 3}],"
+                f" v[{b}:{b + 7}], v[{a}:{a + 7}], a[{acc}:{acc + 3}]"
+                f" cbsz:0 blgp:0"
+                f" // C[mma0={p['mma0']}, mma1={p['mma1']}, mmak={kt['mmak']}] += A @ B.T"
+            )
 
     lines.append(f" // Wait {MFMA_WAIT_NOPS} × 8 = {MFMA_WAIT_NOPS * 8} cycles for MFMA results")
     lines.extend([f" s_nop 7"] * MFMA_WAIT_NOPS)
     return "\n".join(lines)
 
 
-def generate_mfma_export_asm(mfma_pairs, tileInfoA, tileInfoB):
+def generate_mfma_asm_with_scale(mfma_pairs, tiMXSA, tiMXSB):
+    """Generate v_mfma_scale_f32_16x16x128_f8f6f4 instructions using loaded scale VGPRs.
+
+    Operand order matches generate_mfma_asm: SRC0=B (a param), SRC1=A (b param).
+    op_sel/op_sel_hi select the correct E8M0 byte from the 4-byte scale VGPR.
+    Requires rocIsa initialized for gfx950 (done by init_rocisa()).
+
+    Scale byte selection formula (mirrors emitMfmaCode):
+      scaleGroupA = (mma0 // scaleMShapeA) * scaleKGridA + mmak // scaleKShapeA
+      sAsel       = (mma0 % scaleMShapeA) + scaleMShapeA * (mmak % scaleKShapeA)
+    """
+    scaleMShapeA = tiMXSA.lrSubtileShape[0]
+    scaleMShapeB = tiMXSB.lrSubtileShape[0]
+    scaleKShapeA = tiMXSA.lrSubtileShape[1]
+    scaleKShapeB = tiMXSB.lrSubtileShape[1]
+    scaleKGridA  = tiMXSA.lrLocalSubtileGrid[1]
+    scaleKGridB  = tiMXSB.lrLocalSubtileGrid[1]
+
+    lines = [" // === Zero all MFMA accumulators ==="]
+    for p in mfma_pairs:
+        acc = p['acc']
+        for k in range(ACC_SIZE):
+            lines.append(f" v_accvgpr_write a{acc + k}, 0")
+    lines.append(" s_nop 7 // wait for accvgpr_write to settle")
+
+    lines.append(" // === MX FP8 MFMA: v_mfma_scale_f32_16x16x128_f8f6f4 ===")
+    for p in mfma_pairs:
+        acc  = p['acc']
+        mma0 = p['mma0']
+        mma1 = p['mma1']
+        for kt in p['k_tiles']:
+            a_lo = kt['a_lo']
+            b_lo = kt['b_lo']
+            mmak = kt['mmak']
+
+            scaleGroupA = (mma0 // scaleMShapeA) * scaleKGridA + mmak // scaleKShapeA
+            scaleGroupB = (mma1 // scaleMShapeB) * scaleKGridB + mmak // scaleKShapeB
+            sAsel = (mma0 % scaleMShapeA) + scaleMShapeA * (mmak % scaleKShapeA)
+            sBsel = (mma1 % scaleMShapeB) + scaleMShapeB * (mmak % scaleKShapeB)
+            scaleAVgpr = tiMXSA.vgprTiles[4 * scaleGroupA].regList.indices[0]
+            scaleBVgpr = tiMXSB.vgprTiles[4 * scaleGroupB].regList.indices[0]
+
+            instr = MXMFMAInstruction(
+                instType=InstType.INST_F8, accType=InstType.INST_F32,
+                variant=[16, 16, MATRIX_INST_K, 1],
+                acc=accvgpr(acc, ACC_SIZE),
+                a=vgpr(b_lo, 8),            # SRC0 = B (N-indexed)
+                b=vgpr(a_lo, 8),            # SRC1 = A (M-indexed)
+                acc2=accvgpr(acc, ACC_SIZE),
+                mxsa=vgpr(scaleAVgpr),      # scale for A (SRC1)
+                mxsb=vgpr(scaleBVgpr),      # scale for B (SRC0)
+                vop3=VOP3PModifiers(
+                    op_sel=[sAsel % 2, sBsel % 2],
+                    op_sel_hi=[(sAsel >> 1) % 2, (sBsel >> 1) % 2],
+                ),
+                comment=f"MX C[{mma0},{mma1}] += scA*A*scB*B K={mmak}",
+            )
+            lines.append(f" {str(instr)}")
+
+    lines.append(f" // Wait {MFMA_WAIT_NOPS} × 8 = {MFMA_WAIT_NOPS * 8} cycles for MFMA results")
+    lines.extend([" s_nop 7"] * MFMA_WAIT_NOPS)
+    return "\n".join(lines)
+
+
+def generate_mfma_export_asm(mfma_pairs, tileInfoA, tileInfoB, extra_used=None):
     """Generate assembly to export AGPR results from all waves in parallel.
 
     Each wave writes to its own region:
@@ -180,11 +662,17 @@ def generate_mfma_export_asm(mfma_pairs, tileInfoA, tileInfoB):
 
     wave_region_size = num_pairs * WAVESIZE * ACC_SIZE * 4 bytes
 
+    Args:
+        extra_used: optional set of additional VGPR indices to reserve
+                    (e.g. scale tile VGPRs) so temp registers don't overlap.
+
     Returns: (asm_string, next_free_vgpr)
     """
     wave_region_size = len(mfma_pairs) * WAVESIZE * ACC_SIZE * 4
 
-    used   = collect_tile_vgprs(tileInfoA, tileInfoB)
+    used = collect_tile_vgprs(tileInfoA, tileInfoB)
+    if extra_used:
+        used.update(extra_used)
     next_v = max(used | {0}) + 1
 
     wave_off = next_v; next_v += 1
@@ -340,6 +828,104 @@ def compute_expected_all_waves(cfg, tileInfoA, tileInfoB, kernel, input_A, input
     return all_pairs
 
 
+def compute_expected_mfma_fp8_with_scale(cfg, tileInfoA, tileInfoB,
+                                          tiMXSA, tiMXSB, kernel,
+                                          input_A, input_B,
+                                          flat_a, flat_b, wave_id):
+    """Compute expected float32 MFMA values with MX scale byte selection.
+
+    Each lane carries its own 4-byte scale VGPR loaded via ds_read_b32. The
+    hardware picks one byte per MFMA via op_sel/op_sel_hi (sAsel/sBsel).
+
+    LDS layout (from lraTileAssignmentScaleSwizzled):
+      scale_byte[lane, group, byte] =
+          flat_buf[partition * partition_size + lane*4 + group*lrSubtileSize + byte_sel]
+
+    partition_a = wave_id % 2   (M-wave index for MXSA)
+    partition_b = wave_id // 2  (N-wave index for MXSB)
+    partition_size = lrLocalSubtileGrid[0] * lrSubtileSize
+
+    Returns list of np.ndarray (float32, shape WAVESIZE*ACC_SIZE), one per pair
+    in (mma1, mma0) enumeration order.
+    """
+    mi_wave_group = kernel["MIWaveGroup"]
+
+    A_f32 = np.array(
+        [fp8_e4m3fn_to_float32(b) for b in input_A], dtype=np.float32
+    ).reshape(cfg.mt_a, cfg.stride_a)
+    B_f32 = np.array(
+        [fp8_e4m3fn_to_float32(b) for b in input_B], dtype=np.float32
+    ).reshape(cfg.mt_b, cfg.stride_b)
+
+    wave_a_off = (wave_id % mi_wave_group[0]) * tileInfoA.localMMATileGrid[0] * 16
+    wave_b_off = (wave_id // mi_wave_group[0]) * tileInfoB.localMMATileGrid[0] * 16
+
+    # Scale geometry (mirrors emitMfmaCode)
+    scaleMShapeA = tiMXSA.lrSubtileShape[0]
+    scaleMShapeB = tiMXSB.lrSubtileShape[0]
+    scaleKShapeA = tiMXSA.lrSubtileShape[1]
+    scaleKShapeB = tiMXSB.lrSubtileShape[1]
+    scaleKGridA  = tiMXSA.lrLocalSubtileGrid[1]
+    scaleKGridB  = tiMXSB.lrLocalSubtileGrid[1]
+
+    lrSzA = int(tiMXSA.lrSubtileSize)
+    lrSzB = int(tiMXSB.lrSubtileSize)
+    psSzA = int(tiMXSA.lrLocalSubtileGrid[0]) * lrSzA   # bytes per M-partition
+    psSzB = int(tiMXSB.lrLocalSubtileGrid[0]) * lrSzB
+
+    partition_a = wave_id % 2    # M-wave index
+    partition_b = wave_id // 2   # N-wave index
+
+    results = []
+    for mma1 in range(tileInfoB.localMMATileGrid[0]):
+        for mma0 in range(tileInfoA.localMMATileGrid[0]):
+            lane_data = np.zeros(WAVESIZE * ACC_SIZE, dtype=np.float32)
+
+            for mmak in range(tileInfoA.localMMATileGrid[1]):
+                scaleGroupA = (mma0 // scaleMShapeA) * scaleKGridA + mmak // scaleKShapeA
+                scaleGroupB = (mma1 // scaleMShapeB) * scaleKGridB + mmak // scaleKShapeB
+                sAsel = (mma0 % scaleMShapeA) + scaleMShapeA * (mmak % scaleKShapeA)
+                sBsel = (mma1 % scaleMShapeB) + scaleMShapeB * (mmak % scaleKShapeB)
+
+                k_start = mmak * MATRIX_INST_K
+                A_blk = A_f32[wave_a_off + mma0 * 16 : wave_a_off + mma0 * 16 + 16,
+                               k_start : k_start + MATRIX_INST_K]
+                B_blk = B_f32[wave_b_off + mma1 * 16 : wave_b_off + mma1 * 16 + 16,
+                               k_start : k_start + MATRIX_INST_K]
+                C_blk = (A_blk @ B_blk.T).astype(np.float32)  # 16×16
+
+                for lane in range(WAVESIZE):
+                    m  = lane % 16
+                    ng = lane // 16
+
+                    sa_off = partition_a * psSzA + lane * 4 + scaleGroupA * lrSzA + sAsel
+                    sb_off = partition_b * psSzB + lane * 4 + scaleGroupB * lrSzB + sBsel
+                    scale_a = e8m0_to_float(flat_a[sa_off])
+                    scale_b = e8m0_to_float(flat_b[sb_off])
+
+                    lane_data[lane * ACC_SIZE:(lane + 1) * ACC_SIZE] += (
+                        scale_a * scale_b * C_blk[m, ng * ACC_SIZE:(ng + 1) * ACC_SIZE]
+                    )
+
+            results.append(lane_data)
+
+    return results
+
+
+def compute_expected_all_waves_with_scale(cfg, tileInfoA, tileInfoB,
+                                           tiMXSA, tiMXSB, kernel,
+                                           input_A, input_B, flat_a, flat_b):
+    """Compute scaled expected output for all 4 waves, concatenated in wave order."""
+    all_pairs = []
+    for wave_id in range(NUM_WAVES):
+        all_pairs.extend(
+            compute_expected_mfma_fp8_with_scale(
+                cfg, tileInfoA, tileInfoB, tiMXSA, tiMXSB, kernel,
+                input_A, input_B, flat_a, flat_b, wave_id)
+        )
+    return all_pairs
+
+
 # ---------------------------------------------------------------------------
 # Comparison helper
 # ---------------------------------------------------------------------------
@@ -415,6 +1001,67 @@ class TestMfmaFP8:
         assert errors == 0, (
             f"Config {cfg.label}: {errors} MFMA pair mismatches"
         )
+
+
+# ---------------------------------------------------------------------------
+# FP8 MFMA + scale GR/LR combined test (128×128×256 only)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not HAS_HIP, reason="HIP Python bindings not available")
+class TestMfmaFP8WithScale:
+    """GPU test: FP8 MFMA + scale GR→LDS→LR verification for MT=128×128, DU=256."""
+
+    def test_mfma_and_scale(self, tmp_path):
+        """Verify MX-scaled MFMA accumulators and scale VGPRs after the combined pipeline.
+
+        Uses v_mfma_scale_f32_16x16x128_f8f6f4 with actual scale VGPRs and op_sel
+        byte selection (sAsel/sBsel), exercising the same logic as emitMfmaCode.
+
+        Pipeline:
+          A/B GR→LDS→LR → v_mfma_scale (with scale byte selection via op_sel)
+          scale_A/B GR(DTL)→LDS→LR (exported separately for independent verification)
+        Output:
+          [MX-scaled MFMA results for all 4 waves] + [scale VGPRs for all 4 waves]
+        """
+        cfg = CONFIGS[1]   # TileConfig(mt_a=128, mt_b=128, depth_u=256, ...)
+
+        (kernel_asm, writer, kernel, tileInfoA, tileInfoB, tiMXSA, tiMXSB,
+         mfma_pairs, mfma_output_size, output_size, lds_declared) = \
+            generate_mfma_kernel_fp8_with_scale(cfg)
+
+        # A/B FP8 data inputs
+        input_A = make_fp8_input(cfg.mt_a, cfg.stride_a, seed=42)
+        input_B = make_fp8_input(cfg.mt_b, cfg.stride_b, seed=43)
+
+        # Scale inputs: canonical → pre-swizzled
+        k_scale = cfg.depth_u // _MXBLOCK   # 8 K-scale cols
+        canon_a = make_scale_input(cfg.mt_a, k_scale, seed=10)
+        canon_b = make_scale_input(cfg.mt_b, k_scale, seed=20)
+        flat_a  = pre_swizzle_scales_gfx950(canon_a).flatten()
+        flat_b  = pre_swizzle_scales_gfx950(canon_b).flatten()
+
+        scale_stride = _LR_SUBTILE_SZ   # 256 (elements stride between M-groups)
+
+        output_bytes = assemble_and_run(
+            kernel_asm, tmp_path, "mfma_fp8_with_scale", output_size,
+            inputs=(input_A, input_B, flat_a, flat_b),
+            scalars=(cfg.stride_a, cfg.stride_b, scale_stride, scale_stride),
+            lds_size=lds_declared,
+        )
+
+        # Verify MFMA accumulators with MX scale byte selection
+        expected_pairs = compute_expected_all_waves_with_scale(
+            cfg, tileInfoA, tileInfoB, tiMXSA, tiMXSB, kernel,
+            input_A, input_B, flat_a, flat_b)
+        mfma_errors = compare_mfma_output(output_bytes[:mfma_output_size],
+                                          expected_pairs)
+
+        # Verify scale VGPRs for all 4 waves (data path independent check)
+        scale_errors = compare_scale_output(output_bytes[mfma_output_size:],
+                                            flat_a, flat_b)
+
+        assert mfma_errors  == 0, f"{cfg.label}: {mfma_errors} MX-MFMA mismatches"
+        assert scale_errors == 0, f"{cfg.label}: {scale_errors} scale VGPR mismatches"
 
 
 # ---------------------------------------------------------------------------
