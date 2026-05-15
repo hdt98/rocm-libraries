@@ -809,6 +809,28 @@ namespace TensileLite
             }
         }
 
+        void validate_skip_slow_solution_args(po::variables_map const& args)
+        {
+            float skipSlowSolutionRatio = args["skip-slow-solution-ratio"].as<float>();
+            if(skipSlowSolutionRatio > 1.0 || skipSlowSolutionRatio < 0.0)
+            {
+                std::cout << "Invalid Skip Slow Solution Ratio: " << skipSlowSolutionRatio
+                          << std::endl;
+                std::cout << "Please Set Valid Ratio : (0.0 ~ 1.0)." << std::endl;
+                exit(1);
+            }
+
+            int numWarmups = args["num-warmups"].as<int>();
+            if(skipSlowSolutionRatio && numWarmups <= 1)
+            {
+                std::cout << "Invalid num-warmups for SkipSlowSolutionRatio: " << numWarmups
+                          << std::endl;
+                std::cout << "SkipSlowSolutionRatio warmup timing requires at least 2 warmups "
+                          << "so the first warmup can be discarded." << std::endl;
+                exit(1);
+            }
+        }
+
         po::variables_map parse_args(int argc, const char* argv[])
         {
             auto options = all_options();
@@ -835,6 +857,8 @@ namespace TensileLite
                     po::store(po::parse_config_file(file, options), args);
                 }
             }
+
+            validate_skip_slow_solution_args(args);
 
 #if !(TENSILELITE_CLIENT_ENABLE_ROCPROFSDK)
             if(args["rocprof-counter"].as<std::vector<std::string>>().size())
@@ -946,14 +970,6 @@ int main(int argc, const char* argv[])
     bool        exitOnError      = args["exit-on-error"].as<bool>();
     bool        groupedGemm      = args["grouped-gemm"].as<bool>();
     const auto& icacheFlushArgs  = args["icache-flush-args"].as<std::vector<bool>>();
-
-    float skip_slow_solution_ratio = args["skip-slow-solution-ratio"].as<float>();
-    if(skip_slow_solution_ratio > 1.0 || skip_slow_solution_ratio < 0.0)
-    {
-        std::cout << "Invalid Skip Slow Solution Ratio: " << skip_slow_solution_ratio << std::endl;
-        std::cout << "Please Set Valid Ratio : (0.0 ~ 1.0)." << std::endl;
-        exit(1);
-    }
 
     if(firstSolutionIdx < 0)
         firstSolutionIdx = library->solutions.begin()->first;
@@ -1080,6 +1096,8 @@ int main(int argc, const char* argv[])
                         maxRotatingBufferNum, problem, inputs, stream);
                     static_cast<void>(hipDeviceSynchronize());
                 }
+                std::shared_ptr<ProblemInputs> benchmarkInputs
+                    = inputArr.empty() ? inputs : inputArr[0];
                 bool resetInput = false;
                 while(solutionIterator->moreSolutionsInProblem())
                 {
@@ -1105,7 +1123,10 @@ int main(int argc, const char* argv[])
                                 {
                                     ScopedTimer timer("gpu_input_reset");
                                     auto inputs = dataInit->prepareGPUInputs(problem);
-                                    inputArr[0] = inputs;
+                                    inputArr = dataInit->prepareRotatingGPUOutput(
+                                        maxRotatingBufferNum, problem, inputs, stream);
+                                    static_cast<void>(hipDeviceSynchronize());
+                                    benchmarkInputs = inputArr[0];
                                 }
                                 resetInput = true;
 
@@ -1147,16 +1168,6 @@ int main(int argc, const char* argv[])
                                                                             stream,
                                                                             warmupStartEvents[0],
                                                                             warmupStopEvents[0]));
-                                    }
-
-                                    {
-                                        ScopedTimer timer("validate_warmups");
-                                        listeners.validateWarmups(
-                                            inputs, warmupStartEvents, warmupStopEvents);
-                                    }
-
-                                    {
-                                        ScopedTimer timer("warmup_runs");
                                         for(int i = 1; i < warmupInvocations; i++)
                                         {
                                             size_t kIdx = i % kernels.size();
@@ -1165,6 +1176,16 @@ int main(int argc, const char* argv[])
                                                                                 warmupStartEvents[i],
                                                                                 warmupStopEvents[i]));
                                         }
+                                    }
+
+                                    {
+                                        ScopedTimer timer("validate_warmups");
+                                        listeners.validateWarmups(
+                                            benchmarkInputs, warmupStartEvents, warmupStopEvents);
+                                    }
+
+                                    {
+                                        ScopedTimer timer("post_warmups");
                                         listeners.postWarmup(
                                             warmupStartEvents, warmupStopEvents, stream);
                                     }
@@ -1183,7 +1204,7 @@ int main(int argc, const char* argv[])
 
                                 size_t syncs      = listeners.numSyncs();
                                 size_t enq        = listeners.numEnqueuesPerSync();
-                                size_t eventCount = gpuTimer ? kernels[0].size() : 0;
+                                size_t eventCount = gpuTimer ? 1 : 0;
 
                                 {
                                     ScopedTimer timer("benchmark_runs");
@@ -1191,26 +1212,44 @@ int main(int argc, const char* argv[])
                                     if(enq)
                                         for(int i = 0; i < syncs; i++)
                                         {
-                                            TimingEvents startEvents(enq, eventCount);
-                                            TimingEvents stopEvents(enq, eventCount);
+                                            // Bench-topology alignment: one hipEvent pair per sync
+                                            // wraps all `enq` kernels, so event overhead 2X is
+                                            // amortized across every kernel, matching hipblaslt-bench's
+                                            // single-event-pair-around-hot_iters timing window.
+                                            TimingEvents startEvents(1, eventCount);
+                                            TimingEvents stopEvents(1, eventCount);
 
                                             listeners.preEnqueues(stream);
 
                                             for(int j = 0; j < enq; j++)
                                             {
-                                                size_t kIdx = ((i * enq) + j) % kernels.size();
+                                                size_t kIdx
+                                                    = (static_cast<size_t>(i) * enq + j) % kernels.size();
+                                                bool isLastEnqueue = (j + 1 == enq);
+                                                hipEvent_t startEvent
+                                                    = (eventCount && j == 0)
+                                                          ? startEvents[0].front()
+                                                          : nullptr;
+                                                hipEvent_t stopEvent
+                                                    = (eventCount && isLastEnqueue && !icacheFlush)
+                                                          ? stopEvents[0].front()
+                                                          : nullptr;
                                                 HIP_CHECK_EXC(adapter.launchKernels(
-                                                    kernels[kIdx], stream, nullptr, nullptr));
+                                                    kernels[kIdx], stream, startEvent, stopEvent));
 
                                                 if(icacheFlush)
                                                 {
                                                     hipLaunchKernelGGL(
                                                         flush_icache, flushGridSize, 64, 0, stream);
+                                                    if(eventCount && isLastEnqueue)
+                                                        HIP_CHECK_EXC(
+                                                            hipEventRecord(stopEvents[0].front(), stream));
                                                 }
                                             }
 
                                             listeners.postEnqueues(startEvents, stopEvents, stream);
-                                            listeners.validateEnqueues(inputs, startEvents, stopEvents);
+                                            listeners.validateEnqueues(
+                                                benchmarkInputs, startEvents, stopEvents);
                                         }
 
                                     listeners.postSyncs();

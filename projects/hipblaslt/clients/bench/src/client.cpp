@@ -58,6 +58,16 @@ struct perf_matmul : hipblaslt_test_valid
     }
 };
 
+void validate_skip_slow_solution_args(const Arguments& arg)
+{
+    if(arg.skip_slow_solution_ratio < 0 || arg.skip_slow_solution_ratio > 1)
+        throw std::invalid_argument(
+            "Valid value for --skip_slow_solution_ratio is in range (0.0 ~ 1.0).");
+    if(arg.skip_slow_solution_ratio && arg.cold_iters <= 1)
+        throw std::invalid_argument(
+            "--skip_slow_solution_ratio warmup timing requires --cold_iters > 1 so the first warmup can be discarded.");
+}
+
 int run_bench_test(Arguments&         arg,
                    const std::string& filter,
                    bool               any_stride,
@@ -69,16 +79,6 @@ int run_bench_test(Arguments&         arg,
 
     // disable unit_check in client benchmark, it is only used in gtest unit test
     arg.unit_check = 0;
-
-    // enable timing check,otherwise no performance data collected
-    arg.timing = 1;
-
-    // One stream and one thread (0 indicates to use default behavior)
-    arg.streams = 0;
-    arg.threads = 0;
-
-    // Enable information cout
-    arg.print_solution_found = true;
 
     // Skip past any testing_ prefix in function
     static constexpr char prefix[] = "testing_";
@@ -93,6 +93,18 @@ int run_bench_test(Arguments&         arg,
         if(!strstr(function, filter.c_str()))
             return 0;
     }
+
+    validate_skip_slow_solution_args(arg);
+
+    // enable timing check,otherwise no performance data collected
+    arg.timing = 1;
+
+    // One stream and one thread (0 indicates to use default behavior)
+    arg.streams = 0;
+    arg.threads = 0;
+
+    // Enable information cout
+    arg.print_solution_found = true;
 
     // adjust dimension for GEMM routines
     size_t gemmNum = arg.grouped_gemm == 0 ? 1 : arg.grouped_gemm;
@@ -207,7 +219,17 @@ int hipblaslt_bench_datafile(const std::string& filter, bool any_stride, hipDevi
 {
     int ret = 0;
     for(Arguments arg : HipBlasLt_TestData())
-        ret |= run_bench_test(arg, filter, any_stride, props, true);
+    {
+        try
+        {
+            ret |= run_bench_test(arg, filter, any_stride, props, true);
+        }
+        catch(const std::invalid_argument& exp)
+        {
+            hipblaslt_cerr << exp.what() << std::endl;
+            ret = -1;
+        }
+    }
     test_cleanup::cleanup();
     return ret;
 }
@@ -982,10 +1004,6 @@ try
     int copied = snprintf(arg.function, sizeof(arg.function), "%s", function.c_str());
     if(copied <= 0 || copied >= sizeof(arg.function))
         throw std::invalid_argument("Invalid value for --function");
-
-    if(arg.skip_slow_solution_ratio < 0 || arg.skip_slow_solution_ratio > 1)
-        throw std::invalid_argument(
-            "Valid value for --skip_slow_solution_ratio is in range (0.0 ~ 1.0).");
 
     if(verify)
     {

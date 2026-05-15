@@ -43,6 +43,7 @@
 #include "norm.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
+#include <Tensile/ModifiedZ.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
@@ -50,10 +51,12 @@
 #include <hipblaslt/hipblaslt-ext-op.h>
 #include <hipblaslt/hipblaslt-ext.hpp>
 #include <hipblaslt/hipblaslt.h>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <omp.h>
 #include <set>
+#include <stdexcept>
 
 extern "C" __global__ void flush_icache()
 {
@@ -75,6 +78,24 @@ extern "C" __global__ void flush_icache()
                      "s_nop 0 \n\t"
                      "s_nop 0 \n\t" ::
                          :);
+}
+
+inline int getEnvNonNegativeInt(const char* name, int defaultValue)
+{
+    const char* value = std::getenv(name);
+    if(value == nullptr || *value == '\0')
+        return defaultValue;
+
+    char* end    = nullptr;
+    long  parsed = std::strtol(value, &end, 10);
+    if(end == value || *end != '\0' || parsed < 0
+       || parsed > std::numeric_limits<int>::max())
+    {
+        throw std::runtime_error(std::string("Invalid non-negative integer for ") + name + ": "
+                                 + value);
+    }
+
+    return static_cast<int>(parsed);
 }
 
 bool isSwizzleSupported(hipDataType datatype)
@@ -299,6 +320,36 @@ inline void post_gpu_time(bool         use_gpu_timer,
     {
         gpu_time_used = get_time_us_sync(stream) - gpu_time_used;
     }
+}
+
+inline int warmup_timing_start_iter(int number_cold_calls)
+{
+    if(number_cold_calls <= 1)
+    {
+        throw std::runtime_error(
+            "skip_slow_solution_ratio warmup timing requires at least 2 cold iterations "
+            "so the first warmup can be discarded.");
+    }
+
+    int skipped_warmups = std::max(1, (number_cold_calls + 9) / 10);
+    return std::min(number_cold_calls - 1, skipped_warmups);
+}
+
+inline bool skip_slow_solution_by_warmup(size_t sol,
+                                         double& best_warm_time,
+                                         double  gpu_time_used,
+                                         int     timed_cold_calls,
+                                         float   skip_slow_solution_ratio)
+{
+    best_warm_time = std::min(best_warm_time, gpu_time_used);
+    if((gpu_time_used * skip_slow_solution_ratio) <= best_warm_time)
+        return false;
+
+    hipblaslt_cout << std::setprecision(2) << "Skip solution: " << sol
+                   << " (best warm-up = " << best_warm_time / timed_cold_calls
+                   << " us , warm-up = " << gpu_time_used / timed_cold_calls
+                   << " us, skip ratio = " << skip_slow_solution_ratio << ")" << std::endl;
+    return true;
 }
 
 template <typename Tout>
@@ -1387,6 +1438,14 @@ void testing_matmul_with_bias(const Arguments& arg,
 
     // Need to split into two for loop to calculate the rotating buffer
     int64_t totalRotatingSizeNeeded = 0;
+    const size_t scaleAElementBytes
+        = arg.scaleA == hipblaslt_scaling_format::none
+              ? 0
+              : (isBlockScaling(arg.scaleA) ? 1 : realDataTypeSize(Talpha));
+    const size_t scaleBElementBytes
+        = arg.scaleB == hipblaslt_scaling_format::none
+              ? 0
+              : (isBlockScaling(arg.scaleB) ? 1 : realDataTypeSize(Talpha));
     for(int i = 0; i < gemm_count; i++)
     {
         M[i] = arg.M[i];
@@ -1511,13 +1570,15 @@ void testing_matmul_with_bias(const Arguments& arg,
             size_bias[i] = 0;
         }
         auto    biasSize = size_bias[i] * realDataTypeSize(Tbias);
-        int64_t sizeC    = get_computeInterface(h_beta[i], Tc) == 0 ? 0 : size_C[i] * sizeof(To);
+        int64_t sizeC = get_computeInterface(h_beta[i], Tc) == 0
+                            ? 0
+                            : size_C[i] * realDataTypeSize(To);
         totalRotatingSizeNeeded
             += size_dA[i] * realDataTypeSize(TiA) + size_dB[i] * realDataTypeSize(TiB) + sizeC
-               + size_D[i] * realDataTypeSize(To) + size_E[i] * realDataTypeSize(To) + biasSize
+               + size_D[i] * realDataTypeSize(To) + size_E[i] * realDataTypeSize(Taux) + biasSize
                + size_scaleAlphaVec[i] * realDataTypeSize(Talpha)
-               + size_scaleAVec[i] * realDataTypeSize(Talpha)
-               + size_scaleBVec[i] * realDataTypeSize(Talpha);
+               + size_scaleAVec[i] * scaleAElementBytes
+               + size_scaleBVec[i] * scaleBElementBytes;
     }
 
     gpu_mem_gbytes = static_cast<double>(totalRotatingSizeNeeded) / (1024 * 1024 * 1024);
@@ -1533,6 +1594,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                        << " (Capped to max iters: " << max_iters << ")" << std::endl;
     }
     // Calculating block count end
+
     matmul.resize(block_count, std::vector<hipblasLtMatmulDesc_t>(gemm_count));
 
     for(int i = 0; i < gemm_count; i++)
@@ -2491,6 +2553,135 @@ void testing_matmul_with_bias(const Arguments& arg,
     std::vector<std::vector<void*>> dc(block_count, std::vector<void*>(gemm_count));
     std::vector<std::vector<void*>> dd(block_count, std::vector<void*>(gemm_count));
 
+    std::vector<HipDeviceBuffer>             dRotatingMode0;
+    std::vector<std::vector<unsigned char*>> rotatingA(block_count,
+                                                       std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingB(block_count,
+                                                       std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingC(block_count,
+                                                       std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingD(block_count,
+                                                       std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingE(block_count,
+                                                       std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingBias(block_count,
+                                                          std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingScaleAlpha(
+        block_count, std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingScaleA(block_count,
+                                                            std::vector<unsigned char*>(gemm_count, nullptr));
+    std::vector<std::vector<unsigned char*>> rotatingScaleB(block_count,
+                                                            std::vector<unsigned char*>(gemm_count, nullptr));
+
+    auto mode0_ptr = [](std::vector<std::vector<unsigned char*>>& mode0Ptrs,
+                        auto&                                      buffer,
+                        int32_t                                    block,
+                        int                                        gemmIdx,
+                        int64_t                                    elementOffset,
+                        size_t                                     elementSize) -> unsigned char* {
+        if(mode0Ptrs[block][gemmIdx] != nullptr)
+            return mode0Ptrs[block][gemmIdx];
+        return buffer[gemmIdx].template as<unsigned char>() + block * elementOffset * elementSize;
+    };
+
+    auto mode0_c_ptr = [&](int32_t block, int gemmIdx) -> unsigned char* {
+        if(get_computeInterface(h_beta[gemmIdx], Tc) == 0)
+        {
+            (void)block;
+            if(rotatingD[0][gemmIdx] != nullptr)
+                return rotatingD[0][gemmIdx];
+            return (*dDp)[gemmIdx].as<unsigned char>();
+        }
+        return mode0_ptr(rotatingC, dC, block, gemmIdx, size_C[gemmIdx], realDataTypeSize(To));
+    };
+
+    const bool useCompactMode0Rotating
+        = rotating > 0 && block_count > 1 && !do_grouped_gemm && arg.use_ext_setproblem;
+    if(useCompactMode0Rotating)
+    {
+        const int64_t rotatingMode0Bytes = totalRotatingSizeNeeded * (block_count - 1);
+        dRotatingMode0.emplace_back(HIP_R_8U, rotatingMode0Bytes, HMM);
+        CHECK_DEVICE_ALLOCATION(dRotatingMode0.back().memcheck());
+        unsigned char* rotatingBase = dRotatingMode0.back().as<unsigned char>();
+        int64_t        rotatingOffset = 0;
+        auto copy_rotating_mode0 = [&](const void* src, int64_t bytes) -> unsigned char* {
+            if(src == nullptr || bytes <= 0)
+                return nullptr;
+            if(rotatingOffset + bytes > rotatingMode0Bytes)
+                throw std::runtime_error("Mode0 rotating buffer copy exceeds allocated size");
+            unsigned char* dst = rotatingBase + rotatingOffset;
+            auto copyStatus
+                = hipMemcpyAsync(dst, src, bytes, hipMemcpyDeviceToDevice, stream);
+            if(copyStatus != hipSuccess)
+                throw std::runtime_error("hipMemcpyAsync failed while building mode0 rotating buffer");
+            rotatingOffset += bytes;
+            return dst;
+        };
+
+        for(int32_t b = 1; b < block_count; b++)
+        {
+            for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
+            {
+                rotatingA[b][gemmIdx] = copy_rotating_mode0(
+                    dA[gemmIdx].as<unsigned char>()
+                        + b * size_dA[gemmIdx] * realDataTypeSize(TiA),
+                    size_dA[gemmIdx] * realDataTypeSize(TiA));
+                rotatingB[b][gemmIdx] = copy_rotating_mode0(
+                    dB[gemmIdx].as<unsigned char>()
+                        + b * size_dB[gemmIdx] * realDataTypeSize(TiB),
+                    size_dB[gemmIdx] * realDataTypeSize(TiB));
+                // beta == 0 does not consume C; leave rotatingC null so mode0_c_ptr
+                // keeps using the client-compatible base-D C pointer.
+                if(get_computeInterface(h_beta[gemmIdx], Tc) != 0)
+                    rotatingC[b][gemmIdx] = copy_rotating_mode0(
+                        dC[gemmIdx].as<unsigned char>()
+                            + b * size_C[gemmIdx] * realDataTypeSize(To),
+                        size_C[gemmIdx] * realDataTypeSize(To));
+                if(dDp == &dC && rotatingC[b][gemmIdx] != nullptr)
+                {
+                    rotatingD[b][gemmIdx] = rotatingC[b][gemmIdx];
+                }
+                else
+                {
+                    rotatingD[b][gemmIdx] = copy_rotating_mode0(
+                        (*dDp)[gemmIdx].as<unsigned char>()
+                            + b * size_D[gemmIdx] * realDataTypeSize(To),
+                        size_D[gemmIdx] * realDataTypeSize(To));
+                }
+                rotatingE[b][gemmIdx] = copy_rotating_mode0(
+                    arg.use_e
+                        ? dE[gemmIdx].as<unsigned char>()
+                              + b * size_E[gemmIdx] * realDataTypeSize(Taux)
+                        : nullptr,
+                    size_E[gemmIdx] * realDataTypeSize(Taux));
+                rotatingScaleA[b][gemmIdx] = copy_rotating_mode0(
+                    arg.scaleA != hipblaslt_scaling_format::none
+                        ? dScaleA[gemmIdx].as<unsigned char>()
+                              + b * size_scaleAVec[gemmIdx] * scaleAElementBytes
+                        : nullptr,
+                    size_scaleAVec[gemmIdx] * scaleAElementBytes);
+                rotatingScaleB[b][gemmIdx] = copy_rotating_mode0(
+                    arg.scaleB != hipblaslt_scaling_format::none
+                        ? dScaleB[gemmIdx].as<unsigned char>()
+                              + b * size_scaleBVec[gemmIdx] * scaleBElementBytes
+                        : nullptr,
+                    size_scaleBVec[gemmIdx] * scaleBElementBytes);
+                rotatingBias[b][gemmIdx] = copy_rotating_mode0(
+                    arg.bias_vector
+                        ? dBias[gemmIdx].as<unsigned char>()
+                              + b * size_bias[gemmIdx] * realDataTypeSize(Tbias)
+                        : nullptr,
+                    size_bias[gemmIdx] * realDataTypeSize(Tbias));
+                rotatingScaleAlpha[b][gemmIdx] = copy_rotating_mode0(
+                    arg.scaleAlpha_vector
+                        ? dScaleAlphaVec[gemmIdx].as<unsigned char>()
+                              + b * size_scaleAlphaVec[gemmIdx] * realDataTypeSize(Talpha)
+                        : nullptr,
+                    size_scaleAlphaVec[gemmIdx] * realDataTypeSize(Talpha));
+            }
+        }
+    }
+
     for(int32_t b = 0; b < block_count; b++)
     {
         if(!do_grouped_gemm)
@@ -2530,8 +2721,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                 if(arg.bias_vector)
                 {
                     bias_type = arg.bias_type;
-                    bias_addr = (void*)(dBias[gemmIdx].as<char>()
-                                        + b * size_bias[gemmIdx] * realDataTypeSize(bias_type));
+                    bias_addr = (void*)mode0_ptr(rotatingBias,
+                                                 dBias,
+                                                 b,
+                                                 gemmIdx,
+                                                 size_bias[gemmIdx],
+                                                 realDataTypeSize(bias_type));
                 }
                 if(arg.use_e)
                 {
@@ -2552,26 +2747,27 @@ void testing_matmul_with_bias(const Arguments& arg,
                     extepilogue[gemmIdx].setScalingBType(
                         arg.scaleB == hipblaslt_scaling_format::Vector ? svector : sscale);
                 }
-                extinputs[b][gemmIdx].setA((void*)((dA[gemmIdx].as<char>())
-                                                   + b * size_dA[gemmIdx] * realDataTypeSize(TiA)));
-                extinputs[b][gemmIdx].setB((void*)((dB[gemmIdx].as<char>())
-                                                   + b * size_dB[gemmIdx] * realDataTypeSize(TiB)));
-                extinputs[b][gemmIdx].setC(
-                    (void*)((dC[gemmIdx].as<char>()) + b * size_C[gemmIdx] * realDataTypeSize(To)));
-                extinputs[b][gemmIdx].setD((void*)(((*dDp)[gemmIdx].as<char>())
-                                                   + b * size_D[gemmIdx] * realDataTypeSize(To)));
+                extinputs[b][gemmIdx].setA((void*)mode0_ptr(
+                    rotatingA, dA, b, gemmIdx, size_dA[gemmIdx], realDataTypeSize(TiA)));
+                extinputs[b][gemmIdx].setB((void*)mode0_ptr(
+                    rotatingB, dB, b, gemmIdx, size_dB[gemmIdx], realDataTypeSize(TiB)));
+                extinputs[b][gemmIdx].setC((void*)mode0_c_ptr(b, gemmIdx));
+                extinputs[b][gemmIdx].setD((void*)mode0_ptr(
+                    rotatingD, *dDp, b, gemmIdx, size_D[gemmIdx], realDataTypeSize(To)));
                 extinputs[b][gemmIdx].setAlpha(&h_alpha[gemmIdx]);
                 extinputs[b][gemmIdx].setBeta(&h_beta[gemmIdx]);
                 extinputs[b][gemmIdx].setBias(bias_addr);
                 extinputs[b][gemmIdx].setScaleA(
                     (arg.scaleA == hipblaslt_scaling_format::Scalar
                      || arg.scaleA == hipblaslt_scaling_format::Vector)
-                        ? (void*)((dScaleA[gemmIdx].as<char>()) + b * size_scaleAVec[gemmIdx])
+                        ? (void*)mode0_ptr(
+                              rotatingScaleA, dScaleA, b, gemmIdx, size_scaleAVec[gemmIdx], scaleAElementBytes)
                         : nullptr);
                 extinputs[b][gemmIdx].setScaleB(
                     (arg.scaleB == hipblaslt_scaling_format::Scalar
                      || arg.scaleB == hipblaslt_scaling_format::Vector)
-                        ? (void*)((dScaleB[gemmIdx].as<char>()) + b * size_scaleBVec[gemmIdx])
+                        ? (void*)mode0_ptr(
+                              rotatingScaleB, dScaleB, b, gemmIdx, size_scaleBVec[gemmIdx], scaleBElementBytes)
                         : nullptr);
                 extinputs[b][gemmIdx].setScaleC(arg.scaleC ? dScaleC[gemmIdx].as<char>() : nullptr);
                 extinputs[b][gemmIdx].setScaleD(arg.scaleD ? dScaleD[gemmIdx].as<char>() : nullptr);
@@ -2580,12 +2776,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                 extinputs[b][gemmIdx].setAmaxD(arg.amaxD ? dAmaxD[gemmIdx].as<char>() : nullptr);
                 if(arg.use_e)
                     extinputs[b][gemmIdx].setAux(
-                        (void*)((dE[gemmIdx].as<char>())
-                                + b * size_E[gemmIdx] * realDataTypeSize(Taux)));
+                        (void*)mode0_ptr(
+                            rotatingE, dE, b, gemmIdx, size_E[gemmIdx], realDataTypeSize(Taux)));
                 if(arg.scaleAlpha_vector)
                     extinputs[b][gemmIdx].setScaleAlphaVec(
-                        (void*)((dScaleAlphaVec[gemmIdx].as<char>())
-                                + b * size_scaleAlphaVec[gemmIdx] * realDataTypeSize(Talpha)));
+                        (void*)mode0_ptr(rotatingScaleAlpha,
+                                         dScaleAlphaVec,
+                                         b,
+                                         gemmIdx,
+                                         size_scaleAlphaVec[gemmIdx],
+                                         realDataTypeSize(Talpha)));
             }
         }
         extproblemtype.setOpA(transA);
@@ -2613,14 +2813,13 @@ void testing_matmul_with_bias(const Arguments& arg,
         {
             for(int32_t b = 0; b < block_count; b++)
             {
-                da[b][gemmIdx] = (void*)((dA[gemmIdx].as<char>())
-                                         + b * size_dA[gemmIdx] * realDataTypeSize(TiA));
-                db[b][gemmIdx] = (void*)((dB[gemmIdx].as<char>())
-                                         + b * size_dB[gemmIdx] * realDataTypeSize(TiB));
-                dc[b][gemmIdx] = (void*)((dC[gemmIdx].as<char>())
-                                         + b * size_C[gemmIdx] * realDataTypeSize(To));
-                dd[b][gemmIdx] = (void*)(((*dDp)[gemmIdx].as<char>())
-                                         + b * size_D[gemmIdx] * realDataTypeSize(To));
+                da[b][gemmIdx] = (void*)mode0_ptr(
+                    rotatingA, dA, b, gemmIdx, size_dA[gemmIdx], realDataTypeSize(TiA));
+                db[b][gemmIdx] = (void*)mode0_ptr(
+                    rotatingB, dB, b, gemmIdx, size_dB[gemmIdx], realDataTypeSize(TiB));
+                dc[b][gemmIdx] = (void*)mode0_c_ptr(b, gemmIdx);
+                dd[b][gemmIdx] = (void*)mode0_ptr(
+                    rotatingD, *dDp, b, gemmIdx, size_D[gemmIdx], realDataTypeSize(To));
             }
         }
     }
@@ -2735,7 +2934,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 (dB[0].as<char>()) + b * size_dB[0] * realDataTypeSize(TiB),
                                 matB[0],
                                 &h_beta[0],
-                                (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
+                                get_computeInterface(h_beta[0], Tc) == 0
+                                    ? dC[0].as<char>()
+                                    : (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
                                 matC[0],
                                 ((*dDp)[0].as<char>()) + b * size_D[0] * realDataTypeSize(To),
                                 matD[0]));
@@ -2928,7 +3129,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                             (dB[0].as<char>()) + b * size_dB[0] * realDataTypeSize(TiB),
                             matB[0],
                             &h_beta[0],
-                            (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
+                            get_computeInterface(h_beta[0], Tc) == 0
+                                ? dC[0].as<char>()
+                                : (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
                             matC[0],
                             ((*dDp)[0].as<char>()) + b * size_D[0] * realDataTypeSize(To),
                             matD[0]));
@@ -3110,7 +3313,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                             (dB[0].as<char>()) + b * size_dB[0] * realDataTypeSize(TiB),
                             matB[0],
                             &h_beta[0],
-                            (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
+                            get_computeInterface(h_beta[0], Tc) == 0
+                                ? dC[0].as<char>()
+                                : (dC[0].as<char>()) + b * size_C[0] * realDataTypeSize(To),
                             matC[0],
                             ((*dDp)[0].as<char>()) + b * size_D[0] * realDataTypeSize(To),
                             matD[0]));
@@ -3714,6 +3919,29 @@ void testing_matmul_with_bias(const Arguments& arg,
                   ? 1
                   : arg.cold_iters;
         int number_hot_calls = arg.iters;
+        if(number_hot_calls <= 0)
+            throw std::runtime_error("hipblaslt-bench timing requires iters > 0");
+        // Default to 10 windows to mirror tensilelite-client's SyncsPerBenchmark
+        // shape in Formocast runs. Set HIPBLASLT_BENCH_TIMING_WINDOWS=1 to keep
+        // the legacy single-window hipblaslt-bench timing behavior.
+        int timingWindows = getEnvNonNegativeInt("HIPBLASLT_BENCH_TIMING_WINDOWS", 10);
+        if(timingWindows > 1)
+        {
+            if(!arg.use_gpu_timer)
+                throw std::runtime_error(
+                    "HIPBLASLT_BENCH_TIMING_WINDOWS requires --use_gpu_timer");
+            if(do_grouped_gemm || !arg.use_ext)
+                throw std::runtime_error(
+                    "HIPBLASLT_BENCH_TIMING_WINDOWS supports non-grouped extension GEMM only");
+            if(number_hot_calls % timingWindows != 0)
+                throw std::runtime_error(
+                    "HIPBLASLT_BENCH_TIMING_WINDOWS requires iters to be divisible by the window count");
+        }
+
+        const bool measure_warmup_for_skip = arg.skip_slow_solution_ratio;
+        const int warmup_timing_start
+            = measure_warmup_for_skip ? warmup_timing_start_iter(number_cold_calls) : 0;
+        const int timed_cold_calls = number_cold_calls - warmup_timing_start;
 
         int    flush_iter      = 100000;
         double flush_time_used = 0;
@@ -3722,7 +3950,8 @@ void testing_matmul_with_bias(const Arguments& arg,
             static std::unordered_map<std::string, double> flush_times_cache;
             static std::mutex                              mtx;
             std::lock_guard<std::mutex>                    lock(mtx);
-            std::string                                    device_uuid(deviceProps.uuid.bytes);
+            std::string device_uuid(deviceProps.uuid.bytes,
+                                    deviceProps.uuid.bytes + sizeof(deviceProps.uuid.bytes));
             if(!flush_times_cache.count(device_uuid))
             {
                 for(int i = 0; i < flush_iter; i++)
@@ -3766,52 +3995,124 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                   tuningVec[heuristicTuningIndex[sol]],
                                                   *dWorkspace));
                     }
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                     for(int i = 0; i < number_cold_calls; i++)
                     {
-                        CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
+                        if(measure_warmup_for_skip && !arg.use_gpu_timer
+                           && i == warmup_timing_start)
+                            pre_gpu_time(
+                                arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
+                        hipEvent_t startEvent
+                            = (measure_warmup_for_skip && arg.use_gpu_timer
+                               && i == warmup_timing_start)
+                                  ? event_gpu_time_start
+                                  : nullptr;
+                        hipEvent_t stopEvent
+                            = (arg.skip_slow_solution_ratio && arg.use_gpu_timer
+                               && i + 1 == number_cold_calls)
+                                  ? event_gpu_time_end
+                                  : nullptr;
+                        CHECK_HIPBLASLT_ERROR(
+                            gemmVec[i % block_count].run(stream, startEvent, stopEvent));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
-                    if(arg.skip_slow_solution_ratio)
+                    if(arg.skip_slow_solution_ratio && number_cold_calls > 0)
                     {
-                        post_gpu_time(arg.use_gpu_timer,
-                                      event_gpu_time_start,
-                                      event_gpu_time_end,
-                                      gpu_time_used,
-                                      stream);
-                        best_warm_time
-                            = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
-                        if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
+                        if(arg.use_gpu_timer)
                         {
-                            hipblaslt_cout
-                                << std::setprecision(2) << "Skip solution: " << sol
-                                << " (best warm-up = " << best_warm_time / number_cold_calls
-                                << " us , warm-up = " << gpu_time_used / number_cold_calls
-                                << " us, skip ratio = " << arg.skip_slow_solution_ratio << ")"
-                                << std::endl;
-                            continue;
+                            CHECK_HIP_ERROR(hipEventSynchronize(event_gpu_time_end));
+                            float gpu_time_ms;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(
+                                &gpu_time_ms, event_gpu_time_start, event_gpu_time_end));
+                            gpu_time_used = gpu_time_ms * 1000;
                         }
+                        else
+                        {
+                            post_gpu_time(arg.use_gpu_timer,
+                                          event_gpu_time_start,
+                                          event_gpu_time_end,
+                                          gpu_time_used,
+                                          stream);
+                        }
+                        if(skip_slow_solution_by_warmup(sol,
+                                                        best_warm_time,
+                                                        gpu_time_used,
+                                                        timed_cold_calls,
+                                                        arg.skip_slow_solution_ratio))
+                            continue;
                     }
                     perf_monitor->start();
-                    pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
+                    if(!arg.use_gpu_timer)
+                        pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
 
-                    for(int i = 0; i < number_hot_calls; i++)
+                    if(timingWindows > 1)
                     {
-                        CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
-                        if(arg.flush)
-                            hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                        std::vector<double> hotWindowSamples;
+                        hotWindowSamples.reserve(timingWindows);
+                        const int enqueuesPerWindow = number_hot_calls / timingWindows;
+                        for(int window = 0; window < timingWindows; window++)
+                        {
+                            for(int j = 0; j < enqueuesPerWindow; j++)
+                            {
+                                int  i                  = window * enqueuesPerWindow + j;
+                                bool isFirstInWindow    = j == 0;
+                                bool isLastInWindow     = j + 1 == enqueuesPerWindow;
+                                hipEvent_t startEvent   = isFirstInWindow ? event_gpu_time_start : nullptr;
+                                hipEvent_t stopEvent    = (isLastInWindow && !arg.flush)
+                                                              ? event_gpu_time_end
+                                                              : nullptr;
+                                CHECK_HIPBLASLT_ERROR(
+                                    gemmVec[i % block_count].run(stream, startEvent, stopEvent));
+                                if(arg.flush)
+                                {
+                                    hipLaunchKernelGGL(
+                                        flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                                    if(isLastInWindow)
+                                        CHECK_HIP_ERROR(hipEventRecord(event_gpu_time_end, stream));
+                                }
+                            }
+
+                            CHECK_HIP_ERROR(hipEventSynchronize(event_gpu_time_end));
+                            float windowMs = 0.0f;
+                            CHECK_HIP_ERROR(hipEventElapsedTime(
+                                &windowMs, event_gpu_time_start, event_gpu_time_end));
+                            hotWindowSamples.push_back(
+                                (static_cast<double>(windowMs) * 1000.0) / enqueuesPerWindow);
+                        }
+
+                        gpu_time_used = TensileLite::ModifiedZ::removeOutliersAndGetMean(
+                                            hotWindowSamples, 2.0)
+                                        * number_hot_calls;
+                    }
+                    else
+                    {
+                        for(int i = 0; i < number_hot_calls; i++)
+                        {
+                            bool isLastHotCall = i + 1 == number_hot_calls;
+                            hipEvent_t startEvent
+                                = (arg.use_gpu_timer && i == 0) ? event_gpu_time_start : nullptr;
+                            hipEvent_t stopEvent = (arg.use_gpu_timer && isLastHotCall && !arg.flush)
+                                                       ? event_gpu_time_end
+                                                       : nullptr;
+                            CHECK_HIPBLASLT_ERROR(
+                                gemmVec[i % block_count].run(stream, startEvent, stopEvent));
+                            if(arg.flush)
+                            {
+                                hipLaunchKernelGGL(
+                                    flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
+                                if(arg.use_gpu_timer && isLastHotCall)
+                                    CHECK_HIP_ERROR(hipEventRecord(event_gpu_time_end, stream));
+                            }
+                        }
                     }
                 }
                 else
                 {
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                     for(int i = 0; i < number_cold_calls; i++)
                     {
+                        if(measure_warmup_for_skip && i == warmup_timing_start)
+                            pre_gpu_time(
+                                arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                         auto ptr_matmul = matmul[i % block_count][0];
                         auto ptr_alpha  = arg.scaleAlpha_vector
                                               ? (dScaleAlphaVec[0].as<char>())
@@ -3830,8 +4131,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                     + (i % block_count) * size_dB[0] * realDataTypeSize(TiB),
                                 matB[0],
                                 &(h_beta[0]),
-                                dC[0].as<char>()
-                                    + (i % block_count) * size_C[0] * realDataTypeSize(To),
+                                get_computeInterface(h_beta[0], Tc) == 0
+                                    ? dC[0].as<char>()
+                                    : dC[0].as<char>()
+                                          + (i % block_count) * size_C[0] * realDataTypeSize(To),
                                 matC[0],
                                 (*dDp)[0].as<char>()
                                     + (i % block_count) * size_D[0] * realDataTypeSize(To),
@@ -3844,25 +4147,19 @@ void testing_matmul_with_bias(const Arguments& arg,
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
-                    if(arg.skip_slow_solution_ratio)
+                    if(arg.skip_slow_solution_ratio && number_cold_calls > 0)
                     {
                         post_gpu_time(arg.use_gpu_timer,
                                       event_gpu_time_start,
                                       event_gpu_time_end,
                                       gpu_time_used,
                                       stream);
-                        best_warm_time
-                            = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
-                        if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
-                        {
-                            hipblaslt_cout
-                                << std::setprecision(2) << "Skip solution: " << sol
-                                << " (best warm-up = " << best_warm_time / number_cold_calls
-                                << " us , warm-up = " << gpu_time_used / number_cold_calls
-                                << " us, skip ratio = " << arg.skip_slow_solution_ratio << ")"
-                                << std::endl;
+                        if(skip_slow_solution_by_warmup(sol,
+                                                        best_warm_time,
+                                                        gpu_time_used,
+                                                        timed_cold_calls,
+                                                        arg.skip_slow_solution_ratio))
                             continue;
-                        }
                     }
                     perf_monitor->start();
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
@@ -3886,8 +4183,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                     + (i % block_count) * size_dB[0] * realDataTypeSize(TiB),
                                 matB[0],
                                 &(h_beta[0]),
-                                dC[0].as<char>()
-                                    + (i % block_count) * size_C[0] * realDataTypeSize(To),
+                                get_computeInterface(h_beta[0], Tc) == 0
+                                    ? dC[0].as<char>()
+                                    : dC[0].as<char>()
+                                          + (i % block_count) * size_C[0] * realDataTypeSize(To),
                                 matC[0],
                                 (*dDp)[0].as<char>()
                                     + (i % block_count) * size_D[0] * realDataTypeSize(To),
@@ -3901,11 +4200,26 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
                     }
                 }
-                post_gpu_time(arg.use_gpu_timer,
-                              event_gpu_time_start,
-                              event_gpu_time_end,
-                              gpu_time_used,
-                              stream);
+                if(arg.use_ext && arg.use_gpu_timer && timingWindows <= 1)
+                {
+                    CHECK_HIP_ERROR(hipEventSynchronize(event_gpu_time_end));
+                    float gpu_time_ms;
+                    CHECK_HIP_ERROR(
+                        hipEventElapsedTime(&gpu_time_ms, event_gpu_time_start, event_gpu_time_end));
+                    gpu_time_used = gpu_time_ms * 1000;
+                }
+                else if(arg.use_ext && arg.use_gpu_timer)
+                {
+                    // Already measured per-window above for HIPBLASLT_BENCH_TIMING_WINDOWS.
+                }
+                else
+                {
+                    post_gpu_time(arg.use_gpu_timer,
+                                  event_gpu_time_start,
+                                  event_gpu_time_end,
+                                  gpu_time_used,
+                                  stream);
+                }
                 perf_monitor->stop();
             }
             else
@@ -3931,35 +4245,29 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                   gemm_count * sizeof(hipblaslt_ext::UserArguments),
                                                   hipMemcpyHostToDevice));
                     }
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                     for(int i = 0; i < number_cold_calls; i++)
                     {
+                        if(measure_warmup_for_skip && i == warmup_timing_start)
+                            pre_gpu_time(
+                                arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(
                             d_userArgsVec[i % block_count], stream));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
-                    if(arg.skip_slow_solution_ratio)
+                    if(arg.skip_slow_solution_ratio && number_cold_calls > 0)
                     {
                         post_gpu_time(arg.use_gpu_timer,
                                       event_gpu_time_start,
                                       event_gpu_time_end,
                                       gpu_time_used,
                                       stream);
-                        best_warm_time
-                            = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
-                        if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
-                        {
-                            hipblaslt_cout
-                                << std::setprecision(2) << "Skip solution: " << sol
-                                << " (best warm-up = " << best_warm_time / number_cold_calls
-                                << " us , warm-up = " << gpu_time_used / number_cold_calls
-                                << " us, skip ratio = " << arg.skip_slow_solution_ratio << ")"
-                                << std::endl;
+                        if(skip_slow_solution_by_warmup(sol,
+                                                        best_warm_time,
+                                                        gpu_time_used,
+                                                        timed_cold_calls,
+                                                        arg.skip_slow_solution_ratio))
                             continue;
-                        }
                     }
                     perf_monitor->start();
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
@@ -3989,34 +4297,28 @@ void testing_matmul_with_bias(const Arguments& arg,
                             stream));
                     }
 
-                    if(arg.skip_slow_solution_ratio)
-                        pre_gpu_time(
-                            arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                     for(int i = 0; i < number_cold_calls; i++)
                     {
+                        if(measure_warmup_for_skip && i == warmup_timing_start)
+                            pre_gpu_time(
+                                arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
                         if(i == 0 && (arg.unit_check || arg.norm_check || arg.allclose_check))
                             copy_gemm_to_host(stream, gemm_count, hD_1, (*dDp));
                     }
-                    if(arg.skip_slow_solution_ratio)
+                    if(arg.skip_slow_solution_ratio && number_cold_calls > 0)
                     {
                         post_gpu_time(arg.use_gpu_timer,
                                       event_gpu_time_start,
                                       event_gpu_time_end,
                                       gpu_time_used,
                                       stream);
-                        best_warm_time
-                            = best_warm_time < gpu_time_used ? best_warm_time : gpu_time_used;
-                        if((gpu_time_used * arg.skip_slow_solution_ratio) > best_warm_time)
-                        {
-                            hipblaslt_cout
-                                << std::setprecision(2) << "Skip solution: " << sol
-                                << " (best warm-up = " << best_warm_time / number_cold_calls
-                                << " us , warm-up = " << gpu_time_used / number_cold_calls
-                                << " us, skip ratio = " << arg.skip_slow_solution_ratio << ")"
-                                << std::endl;
+                        if(skip_slow_solution_by_warmup(sol,
+                                                        best_warm_time,
+                                                        gpu_time_used,
+                                                        timed_cold_calls,
+                                                        arg.skip_slow_solution_ratio))
                             continue;
-                        }
                     }
                     perf_monitor->start();
                     pre_gpu_time(arg.use_gpu_timer, event_gpu_time_start, gpu_time_used, stream);
