@@ -1,6 +1,5 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
-# Non-functional: touches projects/hipblaslt so TheRock CI path filter exercises hipSPARSELt (see PR).
 
 cmake_minimum_required(VERSION 3.25.2)
 
