@@ -308,12 +308,9 @@ struct fp8_e5m2
     fp8_e5m2& operator=(const fp8_e5m2&) = default;
     fp8_e5m2& operator=(fp8_e5m2&&) noexcept = default;
 
-    // EXPLICIT constructor from float.
-    // saturate=true (default): out-of-range values clamp to +/-MAX.
-    // saturate=false: out-of-range values produce +/-Inf (and NaN for the
-    // E4M3 NaN-zone collision case in the sister type).
-    explicit fp8_e5m2(float f, bool saturate = true) noexcept
-        : data(detail::float_to_fp8_e5m2_bits(f, saturate))
+    // EXPLICIT constructor from float
+    explicit fp8_e5m2(float f) noexcept
+        : data(detail::float_to_fp8_e5m2_bits(f))
     {
     }
 

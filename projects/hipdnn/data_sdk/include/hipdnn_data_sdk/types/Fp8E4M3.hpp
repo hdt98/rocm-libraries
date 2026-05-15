@@ -291,13 +291,9 @@ struct fp8_e4m3
     fp8_e4m3& operator=(const fp8_e4m3&) = default;
     fp8_e4m3& operator=(fp8_e4m3&&) noexcept = default;
 
-    // EXPLICIT constructor from float.
-    // saturate=true (default): out-of-range values clamp to +/-MAX (and any
-    // finite value that would round to the reserved 0x7F/0xFF NaN bit pattern
-    // also saturates to MAX).
-    // saturate=false: out-of-range values produce NaN (E4M3 OCP has no Inf).
-    explicit fp8_e4m3(float f, bool saturate = true) noexcept
-        : data(detail::float_to_fp8_e4m3_bits(f, saturate))
+    // EXPLICIT constructor from float
+    explicit fp8_e4m3(float f) noexcept
+        : data(detail::float_to_fp8_e4m3_bits(f))
     {
     }
 
