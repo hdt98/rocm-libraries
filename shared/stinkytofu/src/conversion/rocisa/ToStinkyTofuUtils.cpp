@@ -618,6 +618,29 @@ void addModifiersToInstruction(StinkyInstruction* stinkyInst, const rocisa::Inst
             else HANDLE_INST_TYPE(rocisa::SWaitCnt, handleSWaitCntModifiers(stinkyInst, typedInst, asmCaps))
             else HANDLE_INST_TYPE(rocisa::_SWaitDscnt, handleSWaitDscntModifiers(stinkyInst, typedInst, asmCaps))
             else HANDLE_INST_TYPE(rocisa::_SWaitLoadcnt, handleSWaitLoadcntModifiers(stinkyInst, typedInst, asmCaps))
+
+            // global_wb / global_inv: device-scope memory fences with no
+            // register operands. The only encoded modifier is the cache
+            // scope, which we attach as a MUBUFModifiers with `scope` set
+            // and all other flags clear so the StinkyAsmEmitter prints
+            // exactly " scope:SCOPE_DEV" (or whatever scope was supplied)
+            // after the mnemonic.
+            else HANDLE_INST_TYPE(rocisa::GlobalWb,
+                                stinkyInst->addModifier<stinkytofu::MUBUFModifiers>(
+                                    stinkytofu::MUBUFModifiers(
+                                        /*offen=*/false, /*offset12=*/0, /*glc=*/false,
+                                        /*slc=*/false, /*nt=*/false, /*lds=*/false,
+                                        /*isStore=*/false, /*hasMUBUFConst=*/false,
+                                        /*hasGLCModifier=*/false, /*hasSC0Modifier=*/false,
+                                        convertMUBUFScope(typedInst->scope))))
+            else HANDLE_INST_TYPE(rocisa::GlobalInv,
+                                stinkyInst->addModifier<stinkytofu::MUBUFModifiers>(
+                                    stinkytofu::MUBUFModifiers(
+                                        /*offen=*/false, /*offset12=*/0, /*glc=*/false,
+                                        /*slc=*/false, /*nt=*/false, /*lds=*/false,
+                                        /*isStore=*/false, /*hasMUBUFConst=*/false,
+                                        /*hasGLCModifier=*/false, /*hasSC0Modifier=*/false,
+                                        convertMUBUFScope(typedInst->scope))))
         }
     // clang-format on
 
