@@ -272,22 +272,8 @@ pipeline {
                         expression { params.RUN_CPPCHECK.toBoolean() }
                     }
                     agent{ label rocmnode("nogpu") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_cmd = """cd .. && \
-                                find . -type f \\( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.h.in' -o -name '*.hpp.in' -o -name '*.cpp.in' -o -name '*.cl' \\) \
-                                -not -path '*/build/*' -not -path '*/include/rapidjson/*' | \
-                                xargs -P 8 -I{} sh -c 'clang-format-18 -style=file {} | diff -u - {} || (echo "ERROR: {} needs formatting" && exit 1)' && \
-                                /cppcheck/build/bin/cppcheck ../* -v -j \$(nproc) -I ../include -I ../profiler/include -I ../library/include \
-                                -D CK_ENABLE_FP64 -D CK_ENABLE_FP32 -D CK_ENABLE_FP16 -D CK_ENABLE_FP8 -D CK_ENABLE_BF16 -D CK_ENABLE_BF8 -D CK_ENABLE_INT8 \
-                                -D __gfx908__ -D __gfx90a__ -D __gfx942__ -D __gfx1030__ -D __gfx1100__ -D __gfx1101__ -D __gfx1102__ \
-                                -U __gfx803__ -U __gfx900__ -U __gfx906__ -U CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 \
-                                --file-filter=*.cpp --force --enable=all --output-file=ck_cppcheck.log"""
-                    }
                     steps{
-                        script {
-                            ck.buildHipClangJobAndReboot(setup_args:setup_args, setup_cmd: "", build_cmd: "", execute_cmd: execute_cmd)
-                        }
+                        script { ck.runClangFormatAndCppcheck() }
                         archiveArtifacts "build/ck_cppcheck.log"
                         cleanWs()
                     }
@@ -298,17 +284,8 @@ pipeline {
                         expression { !params.RUN_CPPCHECK.toBoolean() }
                     }
                     agent{ label rocmnode("nogpu") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_cmd = """cd .. && \
-                                find . -type f \\( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.h.in' -o -name '*.hpp.in' -o -name '*.cpp.in' -o -name '*.cl' \\) \
-                                -not -path '*/build/*' -not -path '*/include/rapidjson/*' | \
-                                xargs -P 8 -I{} sh -c 'clang-format-18 -style=file {} | diff -u - {} || (echo "ERROR: {} needs formatting" && exit 1)'"""
-                    }
                     steps{
-                        script {
-                            ck.buildHipClangJobAndReboot(setup_args:setup_args, setup_cmd: "", build_cmd: "", execute_cmd: execute_cmd)
-                        }
+                        script { ck.runClangFormat() }
                         cleanWs()
                     }
                 }
@@ -409,18 +386,8 @@ pipeline {
                         expression { params.RUN_FULL_CONV_TILE_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx90a")}
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ python3 ../experimental/grouped_convolution_tile_instances/generate_instances.py --mode=profiler && \
-                                           cmake .. --preset dev-gfx90a -D CK_EXPERIMENTAL_BUILDER=ON && \
-                                           make -j64 test_grouped_convnd_fwd_tile test_grouped_convnd_bwd_weight_tile && \
-                                           ./bin/test_grouped_convnd_bwd_weight_tile && \
-                                           ./bin/test_grouped_convnd_fwd_tile"""
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runFullGroupedConvTileTests() }
                         cleanWs()
                     }
                 }
@@ -441,16 +408,8 @@ pipeline {
                         expression { params.RUN_GROUPED_CONV_LARGE_CASES_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx90a")}
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cmake .. --preset dev-gfx90a && \
-                                           make -j64 test_grouped_convnd_fwd_large_cases test_grouped_convnd_bwd_data_large_cases test_grouped_convnd_fwd_bias_clamp_large_cases && \
-                                           ./bin/test_grouped_convnd_fwd_large_cases && ./bin/test_grouped_convnd_bwd_data_large_cases && ./bin/test_grouped_convnd_fwd_bias_clamp_large_cases"""
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runGroupedConvLargeCaseTests() }
                         cleanWs()
                     }
                 }
@@ -471,28 +430,8 @@ pipeline {
                         expression { params.RUN_CONV_COMPREHENSIVE_DATASET.toBoolean() }
                     }
                     agent{ label rocmnode("gfx90a")}
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cd ../build && \
-                                           cmake .. --preset dev-gfx90a && \
-                                           make -j64 test_grouped_convnd_fwd_dataset_xdl && \
-                                           test_grouped_convnd_bwd_data_dataset_xdl \
-                                           test_grouped_convnd_bwd_weight_dataset_xdl && \
-                                           cd ../test_data && \
-                                           # Dataset generation modes:
-                                           # - small: ~60 test cases (minimal, quick testing - 3 models, 2 batch sizes, 2 image sizes)
-                                           # - half: ~300 test cases (moderate coverage - 16 models, 3 batch sizes, 5 image sizes), ~ 17 hours testing time
-                                           # - full: ~600 test cases (comprehensive - 16 models, 5 batch sizes, 9 image sizes), ~ 40 hours testing time
-                                           ./generate_test_dataset.sh small && \
-                                           cd ../build && \
-                                           ./bin/test_grouped_convnd_fwd_dataset_xdl && \
-                                           ./bin/test_grouped_convnd_bwd_data_dataset_xdl && \
-                                           ./bin/test_grouped_convnd_bwd_weight_dataset_xdl"""
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runComprehensiveConvDatasetTests() }
                         cleanWs()
                     }
                 }
@@ -595,31 +534,8 @@ pipeline {
                         expression { params.RUN_TILE_ENGINE_BASIC_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx942") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-                                            -D BUILD_CK_TILE_ENGINE="ON" \
-                                            -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-                                            -D CMAKE_BUILD_TYPE=Release \
-                                            -D GPU_TARGETS="gfx942" \
-                                            -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16" \
-                                            -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
-                                            -D GEMM_UNIVERSAL_CONFIG_FILE="default_ci_config.json" \
-                                            -D GEMM_MULTI_D_DATATYPE="fp16" \
-                                            -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
-                                            -D GEMM_MULTI_D_CONFIG_FILE="default_ci_config.json" \
-                                            -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
-                                            -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
-                                            -D GEMM_PRESHUFFLE_CONFIG_FILE="default_ci_config.json" .. && \
-                                           ninja -j${ck.nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all && \
-                                           python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/gemm_preshuffle/gemm_preshuffle_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runTileEngineBasicTests(params.BUILD_COMPILER) }
                         cleanWs()
                     }
                 }
@@ -640,33 +556,8 @@ pipeline {
                         expression { params.RUN_TILE_ENGINE_GEMM_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx942") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-                                            -D BUILD_CK_TILE_ENGINE="ON" \
-                                            -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-                                            -D CMAKE_BUILD_TYPE=Release \
-                                            -D GPU_TARGETS="gfx942" \
-                                            -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16;bf8;bf16" \
-                                            -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
-                                            -D GEMM_STREAMK_DATATYPE="fp8;fp16" \
-                                            -D GEMM_STREAMK_LAYOUT="rcr" \
-                                            -D GEMM_MULTI_D_DATATYPE="fp16" \
-                                            -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
-                                            -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
-                                            -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
-                                            -D GROUPED_GEMM_DATATYPE="fp8;fp16" \
-                                            -D GROUPED_GEMM_LAYOUT="rcr;rrr;crr;ccr" .. && \
-                                           ninja -j${ck.nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all benchmark_gemm_streamk_all benchmark_grouped_gemm_all && \
-                                           python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/gemm_preshuffle/gemm_preshuffle_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/grouped_gemm/grouped_gemm_benchmark.py . --problem-sizes "1024,1024,1024" --group-counts 8 --warmup 5 --repeat 5 --verbose --json grouped_gemm_results.json """
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runTileEngineGemmTests("gfx942", params.BUILD_COMPILER) }
                         cleanWs()
                     }
                 }
@@ -677,28 +568,8 @@ pipeline {
                         expression { params.RUN_TILE_ENGINE_GEMM_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx950") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-                                            -D BUILD_CK_TILE_ENGINE="ON" \
-                                            -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-                                            -D CMAKE_BUILD_TYPE=Release \
-                                            -D GPU_TARGETS="gfx950" \
-                                            -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16" \
-                                            -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
-                                            -D GEMM_MULTI_D_DATATYPE="fp16" \
-                                            -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
-                                            -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
-                                            -D GEMM_PRESHUFFLE_LAYOUT="rcr" .. && \
-                                           ninja -j${ck.nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all && \
-                                           python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/gemm_preshuffle/gemm_preshuffle_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
-                                           python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runTileEngineGemmTests("gfx950", params.BUILD_COMPILER) }
                         cleanWs()
                     }
                 }
@@ -709,22 +580,8 @@ pipeline {
                         expression { params.RUN_TILE_ENGINE_GEMM_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx1201") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-                                            -D BUILD_CK_TILE_ENGINE="ON" \
-                                            -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-                                            -D CMAKE_BUILD_TYPE=Release \
-                                            -D GPU_TARGETS="gfx1201" \
-                                            -D GEMM_UNIVERSAL_DATATYPE="fp16" \
-                                            -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" .. && \
-                                           ninja -j${ck.nthreads()} benchmark_gemm_universal_all && \
-                                           python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
-                    }
                     steps{
-                        script {
-                        ck.buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runTileEngineGemmTests("gfx1201", params.BUILD_COMPILER) }
                         cleanWs()
                     }
                 }
@@ -746,14 +603,8 @@ pipeline {
                         expression { (params.BUILD_GFX942.toBoolean() || params.RUN_FULL_QA.toBoolean()) && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx942") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx942" """
-                        execute_args = ck.build_client_examples("gfx942")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx942") }
                         cleanWs()
                     }
                 }
@@ -764,14 +615,8 @@ pipeline {
                         expression { params.BUILD_GFX950.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx950") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx950" """
-                        execute_args = ck.build_client_examples("gfx950")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx950") }
                         cleanWs()
                     }
                 }
@@ -783,14 +628,8 @@ pipeline {
                         expression { params.BUILD_GFX908.toBoolean() && !params.RUN_FULL_QA.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx908") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx908" """
-                        execute_args = ck.build_client_examples("gfx908")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx908") }
                         cleanWs()
                     }
                 }
@@ -802,14 +641,8 @@ pipeline {
                         expression { params.BUILD_GFX90A.toBoolean() && !params.RUN_FULL_QA.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx90a") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx90a" -DCK_CXX_STANDARD="17" """
-                        execute_args = ck.build_client_examples_and_codegen_tests("gfx90a")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx90a") }
                         cleanWs()
                     }
                 }
@@ -821,14 +654,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
-                        script {
-                            def execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-                                                -DCMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-                                                -DCMAKE_HIP_COMPILER="${params.BUILD_COMPILER}" \
-                                                -D CMAKE_BUILD_TYPE=Release .. && ninja -j64 """
-
-                            ck.buildHipClangJobAndReboot(setup_cmd: "",  build_cmd: "", build_type: 'Release', execute_cmd: execute_args)
-                        }
+                        script { ck.runBuildInstancesOnly(params.BUILD_COMPILER) }
                         cleanWs()
                     }
                 }
@@ -839,14 +665,8 @@ pipeline {
                         expression { params.BUILD_GFX101.toBoolean() && !params.RUN_FULL_QA.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx1010") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx10-1-generic" """
-                        execute_args = ck.build_client_examples("gfx10-1-generic")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx10-1-generic") }
                         cleanWs()
                     }
                 }
@@ -857,14 +677,8 @@ pipeline {
                         expression { params.BUILD_GFX103.toBoolean() && !params.RUN_FULL_QA.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx1030") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx10-3-generic" """
-                        execute_args = ck.build_client_examples("gfx10-3-generic")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx10-3-generic") }
                         cleanWs()
                     }
                 }
@@ -875,14 +689,8 @@ pipeline {
                         expression { params.BUILD_GFX11.toBoolean() && !params.RUN_FULL_QA.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label 'miopen && (gfx1101 || gfx1100)' }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx11-generic" """
-                        execute_args = ck.build_client_examples("gfx11-generic")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx11-generic") }
                         cleanWs()
                     }
                 }
@@ -893,14 +701,8 @@ pipeline {
                         expression { params.BUILD_GFX12.toBoolean() && !params.RUN_FULL_QA.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
                     }
                     agent{ label rocmnode("gfx1201") }
-                    environment{
-                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx12-generic" """
-                        execute_args = ck.build_client_examples("gfx12-generic")
-                    }
                     steps{
-                        script {
-                        ck.Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
-                        }
+                        script { ck.runBuildCKAndTests("gfx12-generic") }
                         cleanWs()
                     }
                 }

@@ -1260,4 +1260,209 @@ def getFaTestsCmds() {
     ]
 }
 
+def runClangFormat() {
+    buildHipClangJobAndReboot(
+        setup_args: "NO_CK_BUILD",
+        setup_cmd: "",
+        build_cmd: "",
+        execute_cmd: """cd .. && \
+            find . -type f \\( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.h.in' -o -name '*.hpp.in' -o -name '*.cpp.in' -o -name '*.cl' \\) \
+            -not -path '*/build/*' -not -path '*/include/rapidjson/*' | \
+            xargs -P 8 -I{} sh -c 'clang-format-18 -style=file {} | diff -u - {} || (echo "ERROR: {} needs formatting" && exit 1)'"""
+    )
+}
+
+def runClangFormatAndCppcheck() {
+    buildHipClangJobAndReboot(
+        setup_args: "NO_CK_BUILD",
+        setup_cmd: "",
+        build_cmd: "",
+        execute_cmd: """cd .. && \
+            find . -type f \\( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.h.in' -o -name '*.hpp.in' -o -name '*.cpp.in' -o -name '*.cl' \\) \
+            -not -path '*/build/*' -not -path '*/include/rapidjson/*' | \
+            xargs -P 8 -I{} sh -c 'clang-format-18 -style=file {} | diff -u - {} || (echo "ERROR: {} needs formatting" && exit 1)' && \
+            /cppcheck/build/bin/cppcheck ../* -v -j \$(nproc) -I ../include -I ../profiler/include -I ../library/include \
+            -D CK_ENABLE_FP64 -D CK_ENABLE_FP32 -D CK_ENABLE_FP16 -D CK_ENABLE_FP8 -D CK_ENABLE_BF16 -D CK_ENABLE_BF8 -D CK_ENABLE_INT8 \
+            -D __gfx908__ -D __gfx90a__ -D __gfx942__ -D __gfx1030__ -D __gfx1100__ -D __gfx1101__ -D __gfx1102__ \
+            -U __gfx803__ -U __gfx900__ -U __gfx906__ -U CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 \
+            --file-filter=*.cpp --force --enable=all --output-file=ck_cppcheck.log"""
+    )
+}
+
+def runFullGroupedConvTileTests() {
+    buildHipClangJobAndReboot(
+        setup_args: "NO_CK_BUILD",
+        build_type: 'Release',
+        execute_cmd: """
+            python3 ../experimental/grouped_convolution_tile_instances/generate_instances.py --mode=profiler && \
+            cmake .. --preset dev-gfx90a -D CK_EXPERIMENTAL_BUILDER=ON && \
+            make -j64 test_grouped_convnd_fwd_tile test_grouped_convnd_bwd_weight_tile && \
+            ./bin/test_grouped_convnd_bwd_weight_tile && \
+            ./bin/test_grouped_convnd_fwd_tile"""
+    )
+}
+
+def runGroupedConvLargeCaseTests() {
+    buildHipClangJobAndReboot(
+        setup_args: "NO_CK_BUILD",
+        build_type: 'Release',
+        execute_cmd: """
+            cmake .. --preset dev-gfx90a && \
+            make -j64 test_grouped_convnd_fwd_large_cases test_grouped_convnd_bwd_data_large_cases test_grouped_convnd_fwd_bias_clamp_large_cases && \
+            ./bin/test_grouped_convnd_fwd_large_cases && \
+            ./bin/test_grouped_convnd_bwd_data_large_cases && \
+            ./bin/test_grouped_convnd_fwd_bias_clamp_large_cases"""
+    )
+}
+
+def runComprehensiveConvDatasetTests() {
+    buildHipClangJobAndReboot(
+        setup_args: "NO_CK_BUILD",
+        build_type: 'Release',
+        execute_cmd: """
+            cd ../build && \
+            cmake .. --preset dev-gfx90a && \
+            make -j64 test_grouped_convnd_fwd_dataset_xdl \
+                      test_grouped_convnd_bwd_data_dataset_xdl \
+                      test_grouped_convnd_bwd_weight_dataset_xdl && \
+            cd ../test_data && \
+            ./generate_test_dataset.sh small && \
+            cd ../build && \
+            ./bin/test_grouped_convnd_fwd_dataset_xdl && \
+            ./bin/test_grouped_convnd_bwd_data_dataset_xdl && \
+            ./bin/test_grouped_convnd_bwd_weight_dataset_xdl"""
+    )
+}
+
+def runTileEngineBasicTests(String compiler) {
+    buildHipClangJobAndReboot(
+        setup_args: "NO_CK_BUILD",
+        build_type: 'Release',
+        execute_cmd: """
+            cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
+                -D BUILD_CK_TILE_ENGINE="ON" \
+                -D CMAKE_CXX_COMPILER="${compiler}" \
+                -D CMAKE_BUILD_TYPE=Release \
+                -D GPU_TARGETS="gfx942" \
+                -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16" \
+                -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
+                -D GEMM_UNIVERSAL_CONFIG_FILE="default_ci_config.json" \
+                -D GEMM_MULTI_D_DATATYPE="fp16" \
+                -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
+                -D GEMM_MULTI_D_CONFIG_FILE="default_ci_config.json" \
+                -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
+                -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
+                -D GEMM_PRESHUFFLE_CONFIG_FILE="default_ci_config.json" .. && \
+            ninja -j${nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all && \
+            python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/gemm_preshuffle/gemm_preshuffle_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json"""
+    )
+}
+
+def runTileEngineGemmTests(String arch, String compiler) {
+    def execute_cmd
+    if (arch == "gfx942") {
+        execute_cmd = """
+            cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
+                -D BUILD_CK_TILE_ENGINE="ON" \
+                -D CMAKE_CXX_COMPILER="${compiler}" \
+                -D CMAKE_BUILD_TYPE=Release \
+                -D GPU_TARGETS="gfx942" \
+                -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16;bf8;bf16" \
+                -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
+                -D GEMM_STREAMK_DATATYPE="fp8;fp16" \
+                -D GEMM_STREAMK_LAYOUT="rcr" \
+                -D GEMM_MULTI_D_DATATYPE="fp16" \
+                -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
+                -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
+                -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
+                -D GROUPED_GEMM_DATATYPE="fp8;fp16" \
+                -D GROUPED_GEMM_LAYOUT="rcr;rrr;crr;ccr" .. && \
+            ninja -j${nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all benchmark_gemm_streamk_all benchmark_grouped_gemm_all && \
+            python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/gemm_preshuffle/gemm_preshuffle_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/grouped_gemm/grouped_gemm_benchmark.py . --problem-sizes "1024,1024,1024" --group-counts 8 --warmup 5 --repeat 5 --verbose --json grouped_gemm_results.json"""
+    } else if (arch == "gfx950") {
+        execute_cmd = """
+            cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
+                -D BUILD_CK_TILE_ENGINE="ON" \
+                -D CMAKE_CXX_COMPILER="${compiler}" \
+                -D CMAKE_BUILD_TYPE=Release \
+                -D GPU_TARGETS="gfx950" \
+                -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16" \
+                -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
+                -D GEMM_MULTI_D_DATATYPE="fp16" \
+                -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
+                -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
+                -D GEMM_PRESHUFFLE_LAYOUT="rcr" .. && \
+            ninja -j${nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all && \
+            python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/gemm_preshuffle/gemm_preshuffle_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json && \
+            python3 ../tile_engine/ops/gemm/gemm_multi_d/gemm_multi_d_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json"""
+    } else if (arch == "gfx1201") {
+        execute_cmd = """
+            cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
+                -D BUILD_CK_TILE_ENGINE="ON" \
+                -D CMAKE_CXX_COMPILER="${compiler}" \
+                -D CMAKE_BUILD_TYPE=Release \
+                -D GPU_TARGETS="gfx1201" \
+                -D GEMM_UNIVERSAL_DATATYPE="fp16" \
+                -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" .. && \
+            ninja -j${nthreads()} benchmark_gemm_universal_all && \
+            python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json"""
+    }
+    buildHipClangJobAndReboot(setup_args: "NO_CK_BUILD", build_type: 'Release', execute_cmd: execute_cmd)
+}
+
+def runBuildCKAndTests(String arch) {
+    def gpuTarget
+    def extraSetupArgs = ""
+    def execute_cmd
+
+    switch (arch) {
+        case "gfx90a":
+            gpuTarget = "gfx90a"
+            extraSetupArgs = " -DCK_CXX_STANDARD=\"17\""
+            execute_cmd = build_client_examples_and_codegen_tests(gpuTarget)
+            break
+        case "gfx10-1-generic":
+            gpuTarget = "gfx10-1-generic"
+            execute_cmd = build_client_examples(gpuTarget)
+            break
+        case "gfx10-3-generic":
+            gpuTarget = "gfx10-3-generic"
+            execute_cmd = build_client_examples(gpuTarget)
+            break
+        case "gfx11-generic":
+            gpuTarget = "gfx11-generic"
+            execute_cmd = build_client_examples(gpuTarget)
+            break
+        case "gfx12-generic":
+            gpuTarget = "gfx12-generic"
+            execute_cmd = build_client_examples(gpuTarget)
+            break
+        default:
+            gpuTarget = arch
+            execute_cmd = build_client_examples(gpuTarget)
+    }
+
+    def setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="${gpuTarget}"${extraSetupArgs} """
+    Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_cmd, prefixpath: '/usr/local')
+}
+
+def runBuildInstancesOnly(String compiler) {
+    buildHipClangJobAndReboot(
+        setup_cmd: "",
+        build_cmd: "",
+        build_type: 'Release',
+        execute_cmd: """
+            cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
+                -DCMAKE_CXX_COMPILER="${compiler}" \
+                -DCMAKE_HIP_COMPILER="${compiler}" \
+                -D CMAKE_BUILD_TYPE=Release .. && ninja -j64"""
+    )
+}
+
 return this
