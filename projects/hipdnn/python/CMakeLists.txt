@@ -85,6 +85,9 @@ else()
                 -C \"cmake.define.FETCHCONTENT_SOURCE_DIR_NANOBIND=${nanobind_SOURCE_DIR}\"
                 -C \"cmake.define.FETCHCONTENT_SOURCE_DIR_TSL-ROBIN-MAP=${tsl-robin-map_SOURCE_DIR}\"
                 -C \"cmake.define.hip_DIR=${hip_DIR}\"
+                -C \"cmake.define.AMDDeviceLibs_DIR=${AMDDeviceLibs_DIR}\"
+                -C \"cmake.define.amd_comgr_DIR=${amd_comgr_DIR}\"
+                -C \"cmake.define.hsa-runtime64_DIR=${hsa-runtime64_DIR}\"
             RESULT_VARIABLE _result
         )
         if(_result)
