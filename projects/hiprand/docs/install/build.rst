@@ -54,7 +54,7 @@ The hipRAND source code can be cloned in two different ways.
 
    .. code-block:: shell
 
-      git clone -b release/rocm-rel-7.0 https://github.com/ROCm/rocm-libraries.git
+      git clone -b release/rocm-rel-x.y https://github.com/ROCm/rocm-libraries.git
 
 *  Clone the individual hipRAND project folder. This option only fetches the hipRAND source code,
    without any additional ROCm libraries. This significantly reduces the amount of time required
