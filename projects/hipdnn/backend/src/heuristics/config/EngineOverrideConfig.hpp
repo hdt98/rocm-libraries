@@ -56,8 +56,11 @@ struct TensorPattern
         if(!stride.empty())
         {
             const auto& tstride = *tensor.stride;
-            const size_t rank = std::min(stride.size(), tstride.size());
-            for(size_t i = 0; i < rank; ++i)
+            if(stride.size() != tstride.size())
+            {
+                return false;
+            }
+            for(size_t i = 0; i < stride.size(); ++i)
             {
                 if(stride[i] != WILDCARD_DIM && stride[i] != tstride[i])
                 {
