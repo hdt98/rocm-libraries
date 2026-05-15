@@ -84,8 +84,14 @@ struct ConverterLoader
             else
             {
                 auto tmp = load_tile(src_window);
-                sweep_tile<WarpTile>([&](auto i) {
-                    dst(i) = type_convert<DstDataType>(type_convert<float>(tmp(i)));
+                constexpr index_t thread_buffer_size =
+                    WarpTile::get_thread_buffer_size() / UnaryOpSize;
+                using SrcVectorType = ext_vector_t<SrcDataType, UnaryOpSize>;
+                using DstVectorType = ext_vector_t<DstDataType, UnaryOpSize>;
+                static_for<0, thread_buffer_size, 1>{}([&](auto i) {
+                    constexpr typename PassThroughPackSelector<UnaryOpSize>::type elementwise_op{};
+                    elementwise_op(dst.get_thread_buffer().template get_as<DstVectorType>()(i),
+                                   tmp.get_thread_buffer().template get_as<SrcVectorType>()[i]);
                 });
             }
         }
