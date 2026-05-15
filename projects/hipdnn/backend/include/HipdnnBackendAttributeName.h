@@ -92,9 +92,12 @@ typedef enum
      * Hashing is performed by the caller before the C ABI; the backend stores and dispatches
      * by ID only.
      *
-     * Overrides handle-level and environment variable defaults. If not set, the descriptor uses
-     * the handle's policy order, then HIPDNN_HEUR_POLICY_ORDER env var (parsed as
-     * comma-separated names and hashed at parse time), then the built-in default.
+     * Resolution priority at finalize time (highest first):
+     *   1. HIPDNN_HEUR_POLICY_ORDER env var (comma-separated tokens; each token is
+     *      either a policy name, which is hashed via policyNameToId, or a raw
+     *      decimal int64 policy ID).
+     *   2. This descriptor attribute, if set.
+     *   3. Built-in default: [SelectionHeuristic::Config, SelectionHeuristic::StaticOrdering].
      *
      * Type: HIPDNN_TYPE_INT64
      */
