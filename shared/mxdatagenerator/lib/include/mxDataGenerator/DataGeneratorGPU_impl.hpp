@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -48,8 +49,62 @@ namespace DGen
             }
         }
 
-#define DGEN_GPU_CHECK_HIP(call) \
+// Macros aren't namespaced even when defined inside a namespace block. This
+// detail name is `#undef`-ed at the bottom of this file so it doesn't leak
+// to includers; trailing underscore signals "private to this TU".
+#define DGEN_DETAIL_CHECK_HIP_(call) \
     ::DGen::gpu_detail::checkHipStatus((call), #call)
+
+        // RAII guard for a hipMalloc'd device buffer. Releases on
+        // destruction unless `release()` has been called to transfer
+        // ownership. Used by the pre-swizzle paths so a launch failure
+        // after hipMalloc doesn't leak the temporaries.
+        class DeviceBuffer
+        {
+        public:
+            DeviceBuffer() = default;
+            explicit DeviceBuffer(size_t bytes)
+            {
+                DGEN_DETAIL_CHECK_HIP_(hipMalloc(&m_ptr, bytes));
+            }
+            ~DeviceBuffer()
+            {
+                if(m_ptr)
+                    (void)hipFree(m_ptr);
+            }
+            DeviceBuffer(DeviceBuffer const&)            = delete;
+            DeviceBuffer& operator=(DeviceBuffer const&) = delete;
+            DeviceBuffer(DeviceBuffer&& other) noexcept
+                : m_ptr(other.m_ptr)
+            {
+                other.m_ptr = nullptr;
+            }
+            DeviceBuffer& operator=(DeviceBuffer&& other) noexcept
+            {
+                if(this != &other)
+                {
+                    if(m_ptr)
+                        (void)hipFree(m_ptr);
+                    m_ptr       = other.m_ptr;
+                    other.m_ptr = nullptr;
+                }
+                return *this;
+            }
+
+            uint8_t* get() const noexcept
+            {
+                return m_ptr;
+            }
+            uint8_t* release() noexcept
+            {
+                uint8_t* p = m_ptr;
+                m_ptr      = nullptr;
+                return p;
+            }
+
+        private:
+            uint8_t* m_ptr = nullptr;
+        };
 
         // ----------------------------------------------------------------------
         // Device-side init mode tags
@@ -128,10 +183,34 @@ namespace DGen
                         cfg.mean   = static_cast<float>(mode.mean);
                         cfg.stdDev = static_cast<float>(mode.std_dev);
                     }
-                    // Note: the constant-fill / pathological modes (Twos,
-                    // NegOnes, MaxVals, DenormMins, DenormMaxs, NaNs, Infs)
-                    // and RandInt are handled by the host-fallback path in
-                    // `generateInto` and never reach this visitor.
+                    else
+                    {
+                        // The constant-fill / pathological modes (Twos,
+                        // NegOnes, MaxVals, DenormMins, DenormMaxs, NaNs,
+                        // Infs) and RandInt are routed through the host
+                        // fallback in `generateInto` and never reach this
+                        // visitor for the types we currently support.
+                        //
+                        // Compile-time enforcement isn't an option here:
+                        // std::visit deduces the visitor's return type via
+                        // std::invoke_result, which instantiates the lambda
+                        // body for every variant alternative regardless of
+                        // `if constexpr`. A static_assert in this branch
+                        // therefore fires for the host-fallback types too.
+                        //
+                        // Runtime throw instead - if a new MXInitMethod
+                        // alternative is added and someone forgets to
+                        // extend either requiresHostFallback (so it stays
+                        // device-side) or this visitor (so it gets a real
+                        // mapping), we hit this on the first generate
+                        // rather than silently behaving as Bounded[-1, 1].
+                        throw std::logic_error(
+                            std::string("DataGeneratorGPU::makeConfig: unhandled "
+                                        "MXInitMethod alternative '")
+                            + mode.toString()
+                            + "'; either add it to gpu_detail::requiresHostFallback "
+                              "or extend this visitor.");
+                    }
                 },
                 options.initMode);
 
@@ -171,99 +250,92 @@ namespace DGen
         template <>
         struct GpuTraits<ocp_e2m1_mxfp4>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 2;
-            static constexpr int   mantBits     = 1;
-            static constexpr int   bias         = 1;
-            static constexpr float maxNormal    = 6.0f;
-            static constexpr float minSubnormal = 0.5f;
-            static constexpr int   bitsPerElem  = 4;
-            using Scale                         = ScaleInfo<ScaleType::E8M0>;
-            static constexpr ScaleType scaleKind = ScaleType::E8M0;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 2;
+            static constexpr int       mantBits     = 1;
+            static constexpr int       bias         = 1;
+            static constexpr float     maxNormal    = 6.0f;
+            static constexpr float     minSubnormal = 0.5f;
+            static constexpr int       bitsPerElem  = 4;
+            static constexpr ScaleType scaleKind    = ScaleType::E8M0;
         };
 
         template <>
         struct GpuTraits<ocp_e2m1_mxfp4_e4m3>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 2;
-            static constexpr int   mantBits     = 1;
-            static constexpr int   bias         = 1;
-            static constexpr float maxNormal    = 6.0f;
-            static constexpr float minSubnormal = 0.5f;
-            static constexpr int   bitsPerElem  = 4;
-            using Scale                         = ScaleInfo<ScaleType::E4M3>;
-            static constexpr ScaleType scaleKind = ScaleType::E4M3;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 2;
+            static constexpr int       mantBits     = 1;
+            static constexpr int       bias         = 1;
+            static constexpr float     maxNormal    = 6.0f;
+            static constexpr float     minSubnormal = 0.5f;
+            static constexpr int       bitsPerElem  = 4;
+            static constexpr ScaleType scaleKind    = ScaleType::E4M3;
         };
 
         template <>
         struct GpuTraits<ocp_e2m1_mxfp4_e5m3>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 2;
-            static constexpr int   mantBits     = 1;
-            static constexpr int   bias         = 1;
-            static constexpr float maxNormal    = 6.0f;
-            static constexpr float minSubnormal = 0.5f;
-            static constexpr int   bitsPerElem  = 4;
-            using Scale                         = ScaleInfo<ScaleType::E5M3>;
-            static constexpr ScaleType scaleKind = ScaleType::E5M3;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 2;
+            static constexpr int       mantBits     = 1;
+            static constexpr int       bias         = 1;
+            static constexpr float     maxNormal    = 6.0f;
+            static constexpr float     minSubnormal = 0.5f;
+            static constexpr int       bitsPerElem  = 4;
+            static constexpr ScaleType scaleKind    = ScaleType::E5M3;
         };
 
         template <>
         struct GpuTraits<ocp_e2m3_mxfp6>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 2;
-            static constexpr int   mantBits     = 3;
-            static constexpr int   bias         = 1;
-            static constexpr float maxNormal    = 7.5f;
-            static constexpr float minSubnormal = 0.125f;
-            static constexpr int   bitsPerElem  = 6;
-            using Scale                         = ScaleInfo<ScaleType::E8M0>;
-            static constexpr ScaleType scaleKind = ScaleType::E8M0;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 2;
+            static constexpr int       mantBits     = 3;
+            static constexpr int       bias         = 1;
+            static constexpr float     maxNormal    = 7.5f;
+            static constexpr float     minSubnormal = 0.125f;
+            static constexpr int       bitsPerElem  = 6;
+            static constexpr ScaleType scaleKind    = ScaleType::E8M0;
         };
 
         template <>
         struct GpuTraits<ocp_e3m2_mxfp6>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 3;
-            static constexpr int   mantBits     = 2;
-            static constexpr int   bias         = 3;
-            static constexpr float maxNormal    = 28.0f;
-            static constexpr float minSubnormal = 0.0625f;
-            static constexpr int   bitsPerElem  = 6;
-            using Scale                         = ScaleInfo<ScaleType::E8M0>;
-            static constexpr ScaleType scaleKind = ScaleType::E8M0;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 3;
+            static constexpr int       mantBits     = 2;
+            static constexpr int       bias         = 3;
+            static constexpr float     maxNormal    = 28.0f;
+            static constexpr float     minSubnormal = 0.0625f;
+            static constexpr int       bitsPerElem  = 6;
+            static constexpr ScaleType scaleKind    = ScaleType::E8M0;
         };
 
         template <>
         struct GpuTraits<ocp_e4m3_mxfp8>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 4;
-            static constexpr int   mantBits     = 3;
-            static constexpr int   bias         = 7;
-            static constexpr float maxNormal    = 448.0f;
-            static constexpr float minSubnormal = 0.001953125f;
-            static constexpr int   bitsPerElem  = 8;
-            using Scale                         = ScaleInfo<ScaleType::E8M0>;
-            static constexpr ScaleType scaleKind = ScaleType::E8M0;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 4;
+            static constexpr int       mantBits     = 3;
+            static constexpr int       bias         = 7;
+            static constexpr float     maxNormal    = 448.0f;
+            static constexpr float     minSubnormal = 0.001953125f;
+            static constexpr int       bitsPerElem  = 8;
+            static constexpr ScaleType scaleKind    = ScaleType::E8M0;
         };
 
         template <>
         struct GpuTraits<ocp_e5m2_mxfp8>
         {
-            static constexpr int   signBits     = 1;
-            static constexpr int   expBits      = 5;
-            static constexpr int   mantBits     = 2;
-            static constexpr int   bias         = 15;
-            static constexpr float maxNormal    = 57344.0f;
-            static constexpr float minSubnormal = 1.52587890625e-05f;
-            static constexpr int   bitsPerElem  = 8;
-            using Scale                         = ScaleInfo<ScaleType::E8M0>;
-            static constexpr ScaleType scaleKind = ScaleType::E8M0;
+            static constexpr int       signBits     = 1;
+            static constexpr int       expBits      = 5;
+            static constexpr int       mantBits     = 2;
+            static constexpr int       bias         = 15;
+            static constexpr float     maxNormal    = 57344.0f;
+            static constexpr float     minSubnormal = 1.52587890625e-05f;
+            static constexpr int       bitsPerElem  = 8;
+            static constexpr ScaleType scaleKind    = ScaleType::E8M0;
         };
 
         // ----------------------------------------------------------------------
@@ -781,6 +853,44 @@ namespace DGen
         }
 
         // ----------------------------------------------------------------------
+        // gfx1250 dimk swizzle kernel: mirrors the host
+        // `preSwizzleScalesGFX1250` algorithm.
+        //
+        // Input view:  {slowDim, fastDim} (natural-layout column-major scales).
+        // Output view: {numTiles, slowDim, dimk}, where
+        //   dimk       = 128 / mxBlock,
+        //   numTiles   = ceil(fastDim / dimk),
+        //   paddedFast = numTiles * dimk.
+        // For each output index (tile, s, j) in [0, numTiles) x [0, slowDim) x
+        // [0, dimk):
+        //   srcFast = tile * dimk + j
+        //   out[tile, s, j] = (srcFast < fastDim) ? src[s * fastDim + srcFast]
+        //                                         : 0   // padded slot
+        // One thread per output byte.
+        // ----------------------------------------------------------------------
+        __global__ void preSwizzleScalesGFX1250Kernel(uint8_t*       dst,
+                                                      uint8_t const* src,
+                                                      size_t         slowDim,
+                                                      size_t         fastDim,
+                                                      size_t         dimk,
+                                                      size_t         numTiles)
+        {
+            size_t total = numTiles * slowDim * dimk;
+            size_t tid   = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+            if(tid >= total)
+                return;
+
+            size_t j    = tid % dimk;
+            size_t rest = tid / dimk;
+            size_t s    = rest % slowDim;
+            size_t tile = rest / slowDim;
+
+            size_t srcFast = tile * dimk + j;
+            dst[tid]       = (srcFast < fastDim) ? src[s * fastDim + srcFast]
+                                                 : static_cast<uint8_t>(0);
+        }
+
+        // ----------------------------------------------------------------------
         // Generic host-side build helpers
         // ----------------------------------------------------------------------
         template <typename DTYPE>
@@ -788,10 +898,7 @@ namespace DGen
                                 std::vector<index_t> const& strides)
         {
             // Mirror DataGenerator::generate logic: array_size =
-            // strides[N-1] * sizes[N-1] (after sorting by stride).
-            std::vector<size_t> sortedStrides(strides.begin(), strides.end());
-            std::vector<size_t> sortedSizes(sizes.begin(), sizes.end());
-            // Sort by stride ascending.
+            // strides[N-1] * sizes[N-1] after sorting dims by stride.
             std::vector<size_t> perm(sizes.size());
             for(size_t i = 0; i < perm.size(); ++i)
                 perm[i] = i;
@@ -874,9 +981,9 @@ namespace DGen
             m_scaleDevice = nullptr;
         }
 
-        DGEN_GPU_CHECK_HIP(hipMalloc(&m_dataDevice, m_dataBufferBytes));
+        DGEN_DETAIL_CHECK_HIP_(hipMalloc(&m_dataDevice, m_dataBufferBytes));
         if(m_scaleBufferBytes > 0)
-            DGEN_GPU_CHECK_HIP(hipMalloc(&m_scaleDevice, m_scaleBufferBytes));
+            DGEN_DETAIL_CHECK_HIP_(hipMalloc(&m_scaleDevice, m_scaleBufferBytes));
         m_ownsBuffers = true;
 
         generateInto(m_dataDevice, m_scaleDevice, sizes, strides, options, stream);
@@ -900,6 +1007,12 @@ namespace DGen
         if(options.blockScaling <= 0)
             throw std::invalid_argument(
                 "DataGeneratorGPU::generateInto: blockScaling must be > 0 for MX types");
+        // The kernel allocates `float values[32]` on the stack per block.
+        // Anything larger reads/writes past the buffer.
+        if(options.blockScaling > 32)
+            throw std::invalid_argument(
+                "DataGeneratorGPU::generateInto: blockScaling must be <= 32 "
+                "(kernel stack buffer is sized for the OCP MX max block size)");
 
         size_t arraySize = gpu_detail::computeArraySize<DTYPE>(sizes, strides);
         if(arraySize % static_cast<size_t>(options.blockScaling) != 0)
@@ -920,17 +1033,17 @@ namespace DGen
             hostGen.generate(sizes, strides, options);
             auto hostData  = hostGen.getDataBytes();
             auto hostScale = hostGen.getScaleBytes();
-            DGEN_GPU_CHECK_HIP(hipMemcpyAsync(
+            DGEN_DETAIL_CHECK_HIP_(hipMemcpyAsync(
                 devData, hostData.data(), hostData.size(), hipMemcpyHostToDevice, stream));
             if(devScale != nullptr && !hostScale.empty())
             {
-                DGEN_GPU_CHECK_HIP(hipMemcpyAsync(devScale,
+                DGEN_DETAIL_CHECK_HIP_(hipMemcpyAsync(devScale,
                                                   hostScale.data(),
                                                   hostScale.size(),
                                                   hipMemcpyHostToDevice,
                                                   stream));
             }
-            DGEN_GPU_CHECK_HIP(hipStreamSynchronize(stream));
+            DGEN_DETAIL_CHECK_HIP_(hipStreamSynchronize(stream));
             return;
         }
 
@@ -941,6 +1054,13 @@ namespace DGen
         constexpr int kThreadsPerBlock = 256;
         size_t        gridDimX
             = (numBlocks + kThreadsPerBlock - 1) / kThreadsPerBlock;
+        // hipLaunchKernelGGL takes `dim3` (uint32 components); silently
+        // truncating gridDimX would launch too few blocks and corrupt the
+        // tail of the output. Catch it explicitly.
+        if(gridDimX > static_cast<size_t>(std::numeric_limits<unsigned>::max()))
+            throw std::invalid_argument(
+                "DataGeneratorGPU::generateInto: numBlocks exceeds the gridDim.x limit "
+                "(2^32-1 thread blocks); split the generate or use a 2D grid");
 
         if(devScale == nullptr && m_scaleBufferBytes == 0)
             throw std::invalid_argument(
@@ -957,7 +1077,7 @@ namespace DGen
                            static_cast<int>(options.blockScaling),
                            m_seed,
                            cfg);
-        DGEN_GPU_CHECK_HIP(hipGetLastError());
+        DGEN_DETAIL_CHECK_HIP_(hipGetLastError());
     }
 
     template <typename DTYPE>
@@ -966,7 +1086,7 @@ namespace DGen
         std::vector<uint8_t> host(m_dataBufferBytes);
         if(m_dataBufferBytes == 0 || m_dataDevice == nullptr)
             return host;
-        DGEN_GPU_CHECK_HIP(
+        DGEN_DETAIL_CHECK_HIP_(
             hipMemcpy(host.data(), m_dataDevice, m_dataBufferBytes, hipMemcpyDeviceToHost));
         return host;
     }
@@ -977,7 +1097,7 @@ namespace DGen
         std::vector<uint8_t> host(m_scaleBufferBytes);
         if(m_scaleBufferBytes == 0 || m_scaleDevice == nullptr)
             return host;
-        DGEN_GPU_CHECK_HIP(
+        DGEN_DETAIL_CHECK_HIP_(
             hipMemcpy(host.data(), m_scaleDevice, m_scaleBufferBytes, hipMemcpyDeviceToHost));
         return host;
     }
@@ -1026,32 +1146,32 @@ namespace DGen
         size_t paddedCols = ((numCols + 7) / 8) * 8;
         size_t paddedSize = paddedRows * paddedCols;
 
-        // Source buffer needs padded dimensions; if the existing buffer is
-        // already padded, alias it; otherwise pad in a temporary.
-        uint8_t* src = nullptr;
-        bool     ownsSrc = false;
+        // Source buffer needs padded dimensions. If the existing scale buffer
+        // is already padded, alias it; otherwise pad into a temporary
+        // (RAII-owned so a later throw doesn't leak it).
+        gpu_detail::DeviceBuffer srcBuf;
+        uint8_t*                 src = nullptr;
         if(paddedRows == numRows && paddedCols == numCols)
         {
             src = m_scaleDevice;
         }
         else
         {
-            DGEN_GPU_CHECK_HIP(hipMalloc(&src, paddedSize));
-            DGEN_GPU_CHECK_HIP(hipMemsetAsync(src, 0, paddedSize, stream));
-            // Copy each row of the original into the padded buffer.
-            for(size_t r = 0; r < numRows; ++r)
-            {
-                DGEN_GPU_CHECK_HIP(hipMemcpyAsync(src + r * paddedCols,
-                                                  m_scaleDevice + r * numCols,
-                                                  numCols,
-                                                  hipMemcpyDeviceToDevice,
-                                                  stream));
-            }
-            ownsSrc = true;
+            srcBuf = gpu_detail::DeviceBuffer(paddedSize);
+            src    = srcBuf.get();
+            DGEN_DETAIL_CHECK_HIP_(hipMemsetAsync(src, 0, paddedSize, stream));
+            // One 2-D copy replaces N row-by-row hipMemcpyAsyncs.
+            DGEN_DETAIL_CHECK_HIP_(hipMemcpy2DAsync(src,
+                                                    paddedCols,
+                                                    m_scaleDevice,
+                                                    numCols,
+                                                    numCols,
+                                                    numRows,
+                                                    hipMemcpyDeviceToDevice,
+                                                    stream));
         }
 
-        uint8_t* dst = nullptr;
-        DGEN_GPU_CHECK_HIP(hipMalloc(&dst, paddedSize));
+        gpu_detail::DeviceBuffer dstBuf(paddedSize);
 
         constexpr int kThreadsPerBlock = 256;
         size_t        gridDimX = (paddedSize + kThreadsPerBlock - 1) / kThreadsPerBlock;
@@ -1061,23 +1181,70 @@ namespace DGen
                            dim3(kThreadsPerBlock),
                            0,
                            stream,
-                           dst,
+                           dstBuf.get(),
                            src,
                            paddedRows,
                            paddedCols);
-        DGEN_GPU_CHECK_HIP(hipGetLastError());
+        DGEN_DETAIL_CHECK_HIP_(hipGetLastError());
 
-        // Replace the owned scale buffer with the swizzled (padded) one.
+        // Past the throw points: take ownership of the new buffer.
         if(m_ownsBuffers && m_scaleDevice)
             (void)hipFree(m_scaleDevice);
-        m_scaleDevice      = dst;
+        m_scaleDevice      = dstBuf.release();
         m_scaleBufferBytes = paddedSize;
         m_ownsBuffers      = true;
+    }
 
-        if(ownsSrc)
-            (void)hipFree(src);
+    template <typename DTYPE>
+    void DataGeneratorGPU<DTYPE>::preSwizzleScalesGFX1250Device(size_t      slowDim,
+                                                                size_t      fastDim,
+                                                                size_t      mxBlock,
+                                                                hipStream_t stream)
+    {
+        if(mxBlock == 0)
+            throw std::invalid_argument(
+                "DataGeneratorGPU::preSwizzleScalesGFX1250Device: mxBlock must be > 0");
+        size_t const dimk = 128 / mxBlock;
+        if(dimk == 0)
+            throw std::invalid_argument(
+                "DataGeneratorGPU::preSwizzleScalesGFX1250Device: dimk = 128/mxBlock must be > 0");
+        if(m_scaleDevice == nullptr)
+            throw std::runtime_error(
+                "DataGeneratorGPU::preSwizzleScalesGFX1250Device: no scale buffer allocated");
+
+        size_t const paddedFast = ((fastDim + dimk - 1) / dimk) * dimk;
+        size_t const numTiles   = paddedFast / dimk;
+        size_t const paddedSize = slowDim * paddedFast;
+
+        gpu_detail::DeviceBuffer dstBuf(paddedSize);
+
+        constexpr int kThreadsPerBlock = 256;
+        size_t        gridDimX
+            = (paddedSize + kThreadsPerBlock - 1) / kThreadsPerBlock;
+
+        hipLaunchKernelGGL(gpu_detail::preSwizzleScalesGFX1250Kernel,
+                           dim3(static_cast<unsigned>(gridDimX)),
+                           dim3(kThreadsPerBlock),
+                           0,
+                           stream,
+                           dstBuf.get(),
+                           m_scaleDevice,
+                           slowDim,
+                           fastDim,
+                           dimk,
+                           numTiles);
+        DGEN_DETAIL_CHECK_HIP_(hipGetLastError());
+
+        if(m_ownsBuffers && m_scaleDevice)
+            (void)hipFree(m_scaleDevice);
+        m_scaleDevice      = dstBuf.release();
+        m_scaleBufferBytes = paddedSize;
+        m_ownsBuffers      = true;
     }
 
 } // namespace DGen
+
+// Tear down the file-scoped detail macro so includers don't see it.
+#undef DGEN_DETAIL_CHECK_HIP_
 
 #endif // HIP guard

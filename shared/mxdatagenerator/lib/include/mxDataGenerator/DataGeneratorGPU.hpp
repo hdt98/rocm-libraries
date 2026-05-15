@@ -104,14 +104,34 @@ namespace DGen
         std::vector<float> getReferenceFloat() const;
 
         /**
-         * @brief Apply `preSwizzleScalesGFX950` to the scale buffer in-place.
+         * @brief Apply `preSwizzleScalesGFX950` to the scale buffer.
          *
          * `scaleSizes` is `{numScaleRows, numScaleCols}` (the same arguments
-         * as the host helper of the same name). After this call,
-         * `getScaleBytesDevice()` refers to the swizzled layout.
+         * as the host helper of the same name). NOT in-place: the scale
+         * buffer is replaced with a fresh allocation of the swizzled
+         * (padded) layout. After this call:
+         *   - `getScaleBytesDevice()` points at a new device pointer.
+         *   - `m_scaleBufferBytes` may be larger than the value
+         *     `getScaleBufferBytes(sizes, options)` would return for the
+         *     pre-swizzle (unpadded) layout.
+         * Callers that cached the pre-call pointer must re-query it.
          */
         void preSwizzleScalesGFX950Device(std::vector<size_t> const& scaleSizes,
                                           hipStream_t                stream = nullptr);
+
+        /**
+         * @brief Apply `preSwizzleScalesGFX1250` to the scale buffer.
+         *
+         * Same buffer-replacement semantics as `preSwizzleScalesGFX950Device`
+         * (NOT in-place). `slowDim` and `fastDim` are the natural-layout
+         * scale dimensions (see the host `preSwizzleScalesGFX1250` doc for
+         * how these map to A / B and trans flags); `mxBlock` is the MX
+         * block size (16 or 32).
+         */
+        void preSwizzleScalesGFX1250Device(size_t      slowDim,
+                                           size_t      fastDim,
+                                           size_t      mxBlock,
+                                           hipStream_t stream = nullptr);
 
         /// Compute the byte size of the packed data buffer for given sizes/options.
         static size_t getDataBufferBytes(std::vector<index_t> const& sizes,
@@ -122,7 +142,7 @@ namespace DGen
                                           DataGeneratorOptions const& options);
 
     private:
-        uint32_t m_seed = 1713573848;
+        uint32_t m_seed = kDefaultSeed;
 
         DataGeneratorOptions m_options;
         std::vector<index_t> m_sizes;

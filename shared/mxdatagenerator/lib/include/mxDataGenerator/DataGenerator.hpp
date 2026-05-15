@@ -14,6 +14,13 @@
 #include <type_traits>
 #include <variant>
 
+// `<bit>` provides std::endian (C++20). Used by read_data_bits_le's
+// little-endian static_assert. Guarded so this header still compiles
+// against pre-C++20 toolchains that don't ship the header.
+#if __has_include(<bit>)
+#    include <bit>
+#endif
+
 #include <omp.h>
 
 namespace DGen
@@ -22,6 +29,11 @@ namespace DGen
 
     constexpr index_t SPRINKLE_BLOCK_MIN = 3;
     constexpr index_t SPRINKLE_BLOCK_MAX = 15;
+
+    // Default PRNG seed shared by every DataGenerator backend (CPU and GPU)
+    // so equivalent generates with no explicit setSeed produce reproducible
+    // streams. Single source of truth - bumping this changes both backends.
+    inline constexpr uint32_t kDefaultSeed = 1713573848u;
 
     //
     // Defining Data Initialization Modes
@@ -293,7 +305,7 @@ namespace DGen
     private:
         DataGeneratorOptions m_options;
 
-        uint                   m_seed = 1713573848;
+        uint                   m_seed = kDefaultSeed;
         std::vector<Generator> m_gen;
         const int              m_num_threads = std::min(32, omp_get_max_threads());
 
@@ -1373,9 +1385,17 @@ namespace DGen
     }
 
     // Reads the low `byte_size` bytes of `src` into a uint64_t (little-endian).
-    template <typename DTYPE>
+    // The memcpy-into-low-bytes idiom only matches the byte order in `src`
+    // when the host is little-endian; ROCm targets all are, but make the
+    // assumption explicit so a future big-endian port doesn't quietly
+    // miscompile.
     inline uint64_t read_data_bits_le(uint8_t const* src, index_t byte_size)
     {
+#if __cpp_lib_endian >= 201907L
+        static_assert(std::endian::native == std::endian::little,
+                      "read_data_bits_le: implementation assumes a "
+                      "little-endian host (matches all current ROCm targets).");
+#endif
         uint64_t bits = 0;
         std::memcpy(&bits, src, byte_size);
         return bits;
@@ -1386,7 +1406,7 @@ namespace DGen
     {
         std::vector<uint8_t> d_max(m_dataDesc.byte_size, 0x00);
         setDataMax<DTYPE>(d_max.data(), 0, /*subNormal=*/false, /*positive=*/true);
-        generate_data_constant_bits(read_data_bits_le<DTYPE>(d_max.data(), m_dataDesc.byte_size));
+        generate_data_constant_bits(read_data_bits_le(d_max.data(), m_dataDesc.byte_size));
     }
 
     template <typename DTYPE>
@@ -1394,7 +1414,7 @@ namespace DGen
     {
         std::vector<uint8_t> d_max(m_dataDesc.byte_size, 0x00);
         setDataMax<DTYPE>(d_max.data(), 0, /*subNormal=*/true, /*positive=*/true);
-        generate_data_constant_bits(read_data_bits_le<DTYPE>(d_max.data(), m_dataDesc.byte_size));
+        generate_data_constant_bits(read_data_bits_le(d_max.data(), m_dataDesc.byte_size));
     }
 
     template <typename DTYPE>
@@ -1429,14 +1449,15 @@ namespace DGen
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::generate_data_infs()
     {
-        // Only F8 E5M2 data has an Inf representation; every other supported
-        // MX data/scale type lacks one, so throw rather than silently produce
-        // ones via setInf's documented no-op.
+        // Throw rather than silently produce ones via setInf's documented
+        // no-op for types that lack an Inf encoding. (bf16/fp16/f32 and
+        // F8 E5M2 do have one; F8 E4M3 and the MX FP4 / FP6 variants
+        // don't.)
         if constexpr(!DTYPE::dataInfo.hasInf)
         {
             throw std::runtime_error(
-                "DataGenerator: Inf init mode is not supported for this data type "
-                "(only F8 E5M2 data has an Inf representation).");
+                "DataGenerator: Inf init mode is not supported because this "
+                "data type has no Inf representation.");
         }
         else
         {
@@ -1479,13 +1500,16 @@ namespace DGen
         }
 
         // satConvertToType saturates out-of-range values rather than wrapping.
+        // `uniform_int_distribution<int>` is stateless across calls so it's
+        // shared between threads (operator() takes the per-thread engine by
+        // ref). Hoisting matches generate_data_rand etc.
+        std::uniform_int_distribution<int> dist(lo, hi);
 #pragma omp parallel for num_threads(m_num_threads)
         for(index_t i = 0; i < m_dataDesc.array_size; i++)
         {
-            int const                          tid = omp_get_thread_num();
-            std::uniform_int_distribution<int> dist(lo, hi);
-            int const                          v    = dist(m_gen[tid]);
-            uint64_t const                     bits = satConvertToType<DTYPE>(static_cast<float>(v));
+            int const      tid  = omp_get_thread_num();
+            int const      v    = dist(m_gen[tid]);
+            uint64_t const bits = satConvertToType<DTYPE>(static_cast<float>(v));
             std::memcpy(&m_dataBytes[i * m_dataDesc.byte_size], &bits, m_dataDesc.byte_size);
         }
     }
