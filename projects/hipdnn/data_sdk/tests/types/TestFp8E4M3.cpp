@@ -179,22 +179,6 @@ INSTANTIATE_TEST_SUITE_P(
         // Negative mirror of NaN-zone collision: -481.0 -> 0xFF -> saturate to -448.
         RoundingTestCase{-481.0f, -448.0f}));
 
-// NaN-zone collision with saturate=false: inputs in [480, 488) that encode to (exp=15, mant=7)
-// must return NaN (0x7F / 0xFF) rather than a finite value, since saturate=false means "do not
-// clamp to MAX; use the natural NaN encoding instead".
-TEST(TestFp8E4M3, NanZoneCollisionSaturateFalse)
-{
-    // Positive input in the NaN zone: saturate=false returns 0x7F (positive NaN)
-    const uint8_t posBits = detail::float_to_fp8_e4m3_bits(481.0f, /*saturate=*/false);
-    EXPECT_EQ(posBits, static_cast<uint8_t>(0x7F));
-    EXPECT_TRUE(std::isnan(detail::fp8_e4m3_bits_to_float(posBits)));
-
-    // Negative input in the NaN zone: saturate=false returns 0xFF (negative NaN)
-    const uint8_t negBits = detail::float_to_fp8_e4m3_bits(-481.0f, /*saturate=*/false);
-    EXPECT_EQ(negBits, static_cast<uint8_t>(0xFF));
-    EXPECT_TRUE(std::isnan(detail::fp8_e4m3_bits_to_float(negBits)));
-}
-
 // ============================================================================
 // Saturation Tests
 // ============================================================================
@@ -216,12 +200,6 @@ TEST(TestFp8E4M3, SaturationPositive)
     // Rounding-into-saturation: 480.0 midpoint with mant=6 (even) -> round down to MAX=448.
     const fp8_e4m3 val5(480.0f);
     EXPECT_EQ(static_cast<float>(val5), 448.0f);
-
-    // saturate=false: values beyond 448 return NaN (0x7F), since OCP E4M3 has no Inf.
-    EXPECT_EQ(detail::float_to_fp8_e4m3_bits(1000.0f, /*saturate=*/false),
-              static_cast<uint8_t>(0x7F));
-    EXPECT_EQ(detail::float_to_fp8_e4m3_bits(-1000.0f, /*saturate=*/false),
-              static_cast<uint8_t>(0xFF));
 }
 
 TEST(TestFp8E4M3, SaturationNegative)
@@ -247,14 +225,6 @@ TEST(TestFp8E4M3, SaturationInfinity)
 
     const fp8_e4m3 negInf(-std::numeric_limits<float>::infinity());
     EXPECT_EQ(static_cast<float>(negInf), -448.0f);
-
-    // saturate=false: Inf becomes NaN (0x7F / 0xFF), since OCP E4M3 has no Inf encoding.
-    EXPECT_EQ(detail::float_to_fp8_e4m3_bits(std::numeric_limits<float>::infinity(),
-                                             /*saturate=*/false),
-              static_cast<uint8_t>(0x7F));
-    EXPECT_EQ(detail::float_to_fp8_e4m3_bits(-std::numeric_limits<float>::infinity(),
-                                             /*saturate=*/false),
-              static_cast<uint8_t>(0xFF));
 }
 
 // ============================================================================

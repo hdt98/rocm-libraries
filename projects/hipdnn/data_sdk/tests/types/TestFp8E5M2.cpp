@@ -197,16 +197,9 @@ TEST(TestFp8E5M2, SaturationPositive)
     const fp8_e5m2 val4(std::nextafter(57344.0f, 1e9f));
     EXPECT_EQ(static_cast<float>(val4), 57344.0f);
 
-    // Rounding-into-saturation: 61440.0 (midpoint, mant=3 odd) -> rounds up -> MAX (saturate=true).
+    // Rounding-into-saturation: 61440.0 (midpoint, mant=3 odd) -> rounds up -> MAX.
     const fp8_e5m2 val5(61440.0f);
     EXPECT_EQ(static_cast<float>(val5), 57344.0f);
-
-    // saturate=false: values beyond 57344 return +Inf (0x7C).
-    EXPECT_EQ(detail::float_to_fp8_e5m2_bits(65536.0f, /*saturate=*/false),
-              static_cast<uint8_t>(0x7C));
-    // saturate=false with rounding-into-overflow: 61440.0 rounds to Inf.
-    EXPECT_EQ(detail::float_to_fp8_e5m2_bits(61440.0f, /*saturate=*/false),
-              static_cast<uint8_t>(0x7C));
 }
 
 TEST(TestFp8E5M2, SaturationNegative)
@@ -223,10 +216,6 @@ TEST(TestFp8E5M2, SaturationNegative)
     // Rounding-into-saturation mirrors positive case
     const fp8_e5m2 val4(-61440.0f);
     EXPECT_EQ(static_cast<float>(val4), -57344.0f);
-
-    // saturate=false: returns -Inf (0xFC).
-    EXPECT_EQ(detail::float_to_fp8_e5m2_bits(-65536.0f, /*saturate=*/false),
-              static_cast<uint8_t>(0xFC));
 }
 
 TEST(TestFp8E5M2, SaturationInfinity)
@@ -236,14 +225,6 @@ TEST(TestFp8E5M2, SaturationInfinity)
 
     const fp8_e5m2 negInf(-std::numeric_limits<float>::infinity());
     EXPECT_EQ(static_cast<float>(negInf), -57344.0f);
-
-    // saturate=false: +/-Inf passes through to +/-Inf encodings (0x7C / 0xFC).
-    EXPECT_EQ(detail::float_to_fp8_e5m2_bits(std::numeric_limits<float>::infinity(),
-                                             /*saturate=*/false),
-              static_cast<uint8_t>(detail::FP8_E5M2_POS_INF));
-    EXPECT_EQ(detail::float_to_fp8_e5m2_bits(-std::numeric_limits<float>::infinity(),
-                                             /*saturate=*/false),
-              static_cast<uint8_t>(detail::FP8_E5M2_NEG_INF));
 }
 
 // ============================================================================
@@ -291,8 +272,9 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
     // For every bit pattern: decode to float via the lookup table, re-encode back,
     // and verify that the resulting bit pattern is identical.
     // OCP E5M2 NaN: any pattern with (bits & 0x7C) == 0x7C && (bits & 0x03) != 0.
-    // OCP E5M2 Inf: 0x7C and 0xFC.
-    // NaN round-trips: a float NaN re-encodes to canonical 0x7F or 0xFF (sign preserved).
+    // OCP E5M2 Inf: 0x7C and 0xFC. The default-saturating constructor cannot round-trip
+    // Inf back to its bit pattern (it saturates to MAX), so Inf patterns are checked
+    // for decode only.
     for(int bits = 0; bits <= 0xFF; ++bits)
     {
         const auto pattern = static_cast<uint8_t>(bits);
@@ -311,13 +293,12 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
             continue;
         }
 
-        // Inf patterns (0x7C, 0xFC): decode to ±Inf; re-encode with saturate=false to preserve.
+        // Inf patterns (0x7C, 0xFC): decode-only check (round-trip not possible via the
+        // default-saturating constructor).
         if(pattern == 0x7C || pattern == 0xFC)
         {
             EXPECT_TRUE(std::isinf(f))
                 << "Inf pattern 0x" << std::hex << bits << " should decode to float Inf";
-            const uint8_t reencoded = detail::float_to_fp8_e5m2_bits(f, /*saturate=*/false);
-            EXPECT_EQ(reencoded, pattern) << "Inf round-trip failed for 0x" << std::hex << bits;
             continue;
         }
 
@@ -465,14 +446,14 @@ TEST(TestFp8E5M2, NumericLimitsSpecificValues)
     EXPECT_EQ(static_cast<float>(L::denorm_min()), 1.52587890625e-5f);
 
     // infinity() = 0x7C (OCP E5M2 has infinity).
-    EXPECT_EQ(L::infinity().data, static_cast<uint8_t>(detail::FP8_E5M2_POS_INF));
+    EXPECT_EQ(L::infinity().data, static_cast<uint8_t>(0x7C));
     EXPECT_TRUE(isinf(L::infinity()));
     EXPECT_FALSE(signbit(L::infinity()));
 
     // quiet_NaN() and signaling_NaN() both return 0x7F (canonical NaN).
     // (OCP E5M2 does not distinguish between signaling and quiet NaN.)
-    EXPECT_EQ(L::quiet_NaN().data, static_cast<uint8_t>(detail::FP8_E5M2_NAN));
-    EXPECT_EQ(L::signaling_NaN().data, static_cast<uint8_t>(detail::FP8_E5M2_NAN));
+    EXPECT_EQ(L::quiet_NaN().data, static_cast<uint8_t>(0x7F));
+    EXPECT_EQ(L::signaling_NaN().data, static_cast<uint8_t>(0x7F));
     EXPECT_TRUE(isnan(L::quiet_NaN()));
     EXPECT_TRUE(isnan(L::signaling_NaN()));
 
@@ -495,18 +476,15 @@ TEST(TestFp8E5M2, NamedConstants)
 {
     using L = std::numeric_limits<fp8_e5m2>;
 
-    // OCP E5M2 has infinity at 0x7C / 0xFC.
-    EXPECT_EQ(detail::FP8_E5M2_POS_INF, static_cast<uint8_t>(0x7C));
-    EXPECT_EQ(detail::FP8_E5M2_NEG_INF, static_cast<uint8_t>(0xFC));
+    // OCP E5M2 has infinity at 0x7C (+Inf) / 0xFC (-Inf).
     EXPECT_TRUE(L::has_infinity);
+    EXPECT_EQ(L::infinity().data, static_cast<uint8_t>(0x7C));
     EXPECT_TRUE(isinf(L::infinity()));
-    EXPECT_EQ(L::infinity().data, static_cast<uint8_t>(detail::FP8_E5M2_POS_INF));
 
     // OCP E5M2 NaN family (exp=31, mant!=0); canonical encoding is 0x7F.
     // OCP E5M2 does not distinguish signaling NaN from quiet NaN.
-    EXPECT_EQ(detail::FP8_E5M2_NAN, static_cast<uint8_t>(0x7F));
-    EXPECT_EQ(L::quiet_NaN().data, static_cast<uint8_t>(detail::FP8_E5M2_NAN));
-    EXPECT_EQ(L::signaling_NaN().data, static_cast<uint8_t>(detail::FP8_E5M2_NAN));
+    EXPECT_EQ(L::quiet_NaN().data, static_cast<uint8_t>(0x7F));
+    EXPECT_EQ(L::signaling_NaN().data, static_cast<uint8_t>(0x7F));
     EXPECT_TRUE(L::has_quiet_NaN);
     EXPECT_FALSE(L::has_signaling_NaN);
 
