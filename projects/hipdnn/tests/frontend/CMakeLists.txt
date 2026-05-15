@@ -16,6 +16,7 @@ add_executable(
     IntegrationBatchnormForwardInferenceVarianceExt.cpp
     IntegrationBatchnormInferenceDescriptorLifting.cpp
     IntegrationBatchnormInferenceDescriptorLowering.cpp
+    IntegrationBatchnormInferenceNodeVarianceExtDescriptorLifting.cpp
     IntegrationBatchnormInferenceNodeVarianceExtDescriptorLowering.cpp
     IntegrationBlockScaleDequantize.cpp
     IntegrationBlockScaleDequantizeDescriptorLifting.cpp
@@ -32,10 +33,13 @@ add_executable(
     IntegrationConvolutionDgradDescriptorLifting.cpp
     IntegrationConvolutionWgradDescriptorLifting.cpp
     IntegrationConvolutionWgradDescriptorLowering.cpp
+    IntegrationCustomOpDescriptorLifting.cpp
+    IntegrationCustomOpDescriptorLowering.cpp
     IntegrationFrontendUserLogging.cpp
     IntegrationGraphEngineFiltering.cpp
     IntegrationGraphKnobsApi.cpp
-    IntegrationCustomOpDescriptorLowering.cpp
+    IntegrationGraphKnobSettingsDescriptorLowering.cpp
+    IntegrationGraphKnobsDescriptorLifting.cpp
     IntegrationGraphLifting.cpp
     IntegrationGraphSupportCheck.cpp
     IntegrationLayerNormDescriptorLifting.cpp
@@ -46,14 +50,20 @@ add_executable(
     IntegrationMatmulDescriptorLowering.cpp
     IntegrationPointwiseDescriptorLifting.cpp
     IntegrationPointwiseDescriptorLowering.cpp
+    IntegrationResampleFwdDescriptorLifting.cpp
+    IntegrationResampleFwdDescriptorLowering.cpp
+    IntegrationReductionDescriptorLifting.cpp
+    IntegrationReductionDescriptorLowering.cpp
     IntegrationRMSNormDescriptorLifting.cpp
     IntegrationRMSNormDescriptorLowering.cpp
     IntegrationRMSNormForward.cpp
+    IntegrationRMSNormBackwardDescriptorLowering.cpp
+    IntegrationRMSNormBackwardDescriptorLifting.cpp
     IntegrationSetPluginPathsExt.cpp
-    IntegrationSdpaBpropDescriptorLowering.cpp
-    IntegrationSdpaBpropLifting.cpp
-    IntegrationSdpaFpropDescriptorLifting.cpp
-    IntegrationSdpaFpropDescriptorLowering.cpp
+    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdDescriptorLowering.cpp>
+    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdLifting.cpp>
+    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLifting.cpp>
+    $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLowering.cpp>
 )
 
 target_compile_options(hipdnn_public_frontend_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
@@ -65,6 +75,7 @@ target_link_libraries(
     hipdnn_test_sdk
     hipdnn_backend
     hip::host
+    ${CMAKE_DL_LIBS}
 )
 
 target_include_directories(hipdnn_public_frontend_tests PRIVATE ${HIPDNN_TEST_INCLUDE_DIRS})

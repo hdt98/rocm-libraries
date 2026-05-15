@@ -29,6 +29,9 @@ namespace ckt = ck_tile::builder::test;
 #include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ndhwgc_fp32.inc"
 #include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ndhwgc_bf16.inc"
 #include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ndhwgc_fp16.inc"
+#include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ngchw_depthwise_fp32.inc"
+#include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ngchw_depthwise_fp16.inc"
+#include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ngchw_depthwise_bf16.inc"
 
 template <auto SIGNATURE>
 void run_cpu_validation(const ckt::Args<SIGNATURE>& args,
@@ -86,15 +89,16 @@ run_grouped_conv_forward_tile_algs(const ckt::Args<SIGNATURE>& args,
     auto ref_conv   = ReferenceInstance{};
     auto ref_result = ckt::run(ref_conv, args, inputs, reference.get());
     auto run_alg    = [&](auto&& run_alg_func) {
-        if(!dummy_run_executed)
-        {
-            // Run first instance twice
-            std::tie(is_supported, avg_time, op_name) = run_alg_func(args, inputs, outputs, s_conf);
-            dummy_run_executed                        = true;
-        }
         std::tie(is_supported, avg_time, op_name) = run_alg_func(args, inputs, outputs, s_conf);
         if(is_supported)
         {
+            if((s_conf.time_kernel_ || s_conf.flush_cache_) && !dummy_run_executed)
+            {
+                // Run first instance twice
+                std::tie(is_supported, avg_time, op_name) =
+                    run_alg_func(args, inputs, outputs, s_conf);
+                dummy_run_executed = true;
+            }
             best_avg_time = std::min(best_avg_time, avg_time);
             best_op_name  = best_avg_time < avg_time ? best_op_name : op_name;
             std::cout << "Perf: " << std::setw(10) << avg_time << " ms," << " " << op_name
@@ -151,6 +155,18 @@ run_grouped_conv_forward_tile_algs(const ckt::Args<SIGNATURE>& args,
     else if constexpr(SIGNATURE == SIGNATURE_NDHWGC_FP32_FWD)
     {
 #include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ndhwgc_fp32_calls.inc"
+    }
+    else if constexpr(SIGNATURE == SIGNATURE_NGCHW_FP16_FWD)
+    {
+#include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ngchw_depthwise_fp16_calls.inc"
+    }
+    else if constexpr(SIGNATURE == SIGNATURE_NGCHW_BF16_FWD)
+    {
+#include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ngchw_depthwise_bf16_calls.inc"
+    }
+    else if constexpr(SIGNATURE == SIGNATURE_NGCHW_FP32_FWD)
+    {
+#include "../../experimental/grouped_convolution_tile_instances/instances/forward/grouped_convolution_forward_tile_ngchw_depthwise_fp32_calls.inc"
     }
     else
     {

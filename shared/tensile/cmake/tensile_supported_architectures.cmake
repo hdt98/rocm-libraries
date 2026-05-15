@@ -32,6 +32,7 @@ if(NOT TENSILE_ENABLE_ASAN)
     list(APPEND BASE_ARCHITECTURES
         "gfx803"
         "gfx900"
+        "gfx90c"
         "gfx906"
         "gfx908"
         "gfx90a"
@@ -56,7 +57,8 @@ if(NOT TENSILE_ENABLE_ASAN)
         "gfx1152"
         "gfx1153"
         "gfx1200"
-        "gfx1201")
+        "gfx1201"
+        "gfx1250")
 
     set(SUPPORTED_ARCHITECTURES ${BASE_ARCHITECTURES})
     list(APPEND SUPPORTED_ARCHITECTURES

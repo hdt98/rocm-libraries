@@ -13,6 +13,7 @@
 #include "ck/utility/math.hpp"
 
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck {
@@ -403,8 +404,15 @@ struct index_array
 {
     index_t data[N > 0 ? N : 1];
 
-    __host__ __device__ constexpr index_t& operator[](index_t i) { return data[i]; }
-    __host__ __device__ constexpr const index_t& operator[](index_t i) const { return data[i]; }
+    __host__ __device__ constexpr index_t& operator[](index_t i) [[clang::lifetimebound]]
+    {
+        return data[i];
+    }
+    __host__ __device__ constexpr const index_t& operator[](index_t i) const
+        [[clang::lifetimebound]]
+    {
+        return data[i];
+    }
 };
 
 /**

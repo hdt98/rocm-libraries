@@ -11,6 +11,7 @@
 #include "ck/tensor_description/tensor_adaptor.hpp"
 
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wno-unknown-warning-option"
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck {
@@ -24,6 +25,7 @@ struct IndexLookupTable
     MultiIndex<nDim> data[NumAccesses > 0 ? NumAccesses : 1];
 
     __host__ __device__ constexpr const MultiIndex<nDim>& operator[](index_t i) const
+        [[clang::lifetimebound]]
     {
         return data[i];
     }

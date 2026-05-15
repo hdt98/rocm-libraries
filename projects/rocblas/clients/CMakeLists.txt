@@ -59,6 +59,33 @@ if(ROCBLAS_ENABLE_BENCHMARKS OR ROCBLAS_BUILD_TESTING OR BUILD_TESTING)
         target_link_libraries(rocblas-testing-common PRIVATE ${BLAS_LIBRARIES})
         if(TARGET cblas)
             target_link_libraries(rocblas-testing-common PRIVATE cblas)
+# === MERGE: develop additions, resolve later ===
+# # Client tests/benchmarks with LINK_BLIS=OFF: default to ILP64 OpenBLAS via find_package(BLAS) + BLA_SIZEOF_INTEGER=8
+# # (TheRock / bundled OpenBLAS64). When OFF, Linux uses generic find_package(BLAS) (LP64); Windows uses legacy OPENBLAS_DIR + LP64.
+# if( (BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS) AND NOT LINK_BLIS )
+#   set( _rocblas_clients_ref_ilp64_default ON )
+# else()
+#   set( _rocblas_clients_ref_ilp64_default OFF )
+# endif()
+# option( ROCBLAS_CLIENTS_REFERENCE_ILP64
+#   "Use ILP64 OpenBLAS for client tests/benchmarks (find_package(BLAS) with BLA_SIZEOF_INTEGER=8). When OFF, Linux uses LP64 BLAS; Windows may use legacy OPENBLAS_DIR / LP64."
+#   ${_rocblas_clients_ref_ilp64_default} )
+#
+# if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
+#   if ( NOT WIN32 )
+#     unset( ROCBLAS_REFERENCE_BLAS_DEFINES )
+#     if (LINK_BLIS)
+#       set(BLAS_LIBRARY)
+#       set(BLIS_INCLUDE_DIR)
+#
+#       # Try AOCL 5.x unified library (static only)
+#       if(NOT BLAS_LIBRARY)
+#         # Check build dependencies
+#         if(EXISTS "${BUILD_DIR}/deps/aocl/install_package/lib/libaocl.a")
+#           set(BLAS_LIBRARY "${BUILD_DIR}/deps/aocl/install_package/lib/libaocl.a")
+#           set(BLIS_INCLUDE_DIR "${BUILD_DIR}/deps/aocl/install_package/include")
+#           message(STATUS "Found AOCL 5.x unified library at: ${BLAS_LIBRARY}")
+# === END MERGE ===
         endif()
         if(BLAS_INCLUDE_DIRS)
             target_include_directories(rocblas-testing-common SYSTEM PRIVATE ${BLAS_INCLUDE_DIRS})
@@ -67,6 +94,96 @@ if(ROCBLAS_ENABLE_BENCHMARKS OR ROCBLAS_BUILD_TESTING OR BUILD_TESTING)
 
     if(ROCBLAS_ENABLE_FORTRAN)
         target_link_libraries(rocblas-testing-common PRIVATE rocblas-fortran-client)
+# === MERGE: develop additions, resolve later ===
+#       endif()
+#     elseif( ROCBLAS_CLIENTS_REFERENCE_ILP64 )
+#       # ILP64 OpenBLAS via CMake FindBLAS (TheRock finders: OpenBLAS64 when BLA_SIZEOF_INTEGER=8).
+#       set( WARN_NOT_ILP64_PREFERRED false )
+#       set( BLA_SIZEOF_INTEGER 8 )
+#       set( BLA_VENDOR OpenBLAS )
+#       find_package( BLAS REQUIRED )
+#       if( TARGET BLAS::BLAS )
+#         set( BLAS_LIBRARY BLAS::BLAS )
+#       else()
+#         set( BLAS_LIBRARY "${BLAS_LIBRARIES}" )
+#       endif()
+#       set( BLAS_INCLUDE_DIR "" )
+#       if( TARGET OpenBLAS64::OpenBLAS )
+#         get_target_property( BLAS_INCLUDE_DIR OpenBLAS64::OpenBLAS INTERFACE_INCLUDE_DIRECTORIES )
+#       elseif( TARGET OpenBLAS::OpenBLAS )
+#         get_target_property( BLAS_INCLUDE_DIR OpenBLAS::OpenBLAS INTERFACE_INCLUDE_DIRECTORIES )
+#       elseif( TARGET BLAS::BLAS )
+#         get_target_property( BLAS_INCLUDE_DIR BLAS::BLAS INTERFACE_INCLUDE_DIRECTORIES )
+#       endif()
+#       if( BLAS_INCLUDE_DIR MATCHES "-NOTFOUND$" )
+#         set( BLAS_INCLUDE_DIR "" )
+#       endif()
+#       if( NOT BLAS_INCLUDE_DIR AND DEFINED BLAS_INCLUDE_DIRS )
+#         set( BLAS_INCLUDE_DIR "${BLAS_INCLUDE_DIRS}" )
+#       endif()
+#       if( NOT BLAS_INCLUDE_DIR AND DEFINED OpenBLAS64_DIR )
+#         set( BLAS_INCLUDE_DIR "${OpenBLAS64_DIR}/include" )
+#       elseif( NOT BLAS_INCLUDE_DIR AND DEFINED OpenBLAS_DIR )
+#         set( BLAS_INCLUDE_DIR "${OpenBLAS_DIR}/include" )
+#       endif()
+#       set( ROCBLAS_REFERENCE_BLAS_DEFINES "LAPACK_ILP64" "USE64BITINT" "OPENBLAS_USE64BITINT" )
+#     else()
+#       find_package( BLAS REQUIRED )
+#       set( BLAS_LIBRARY "${BLAS_LIBRARIES}" )
+#     endif()
+#   else() # WIN32
+#     unset( ROCBLAS_REFERENCE_BLAS_DEFINES )
+#     file(TO_CMAKE_PATH "C:/Program\ Files/AMD/AOCL-Windows" AOCL_ROOT)
+#     file(TO_CMAKE_PATH "${AOCL_ROOT}/amd-blis/lib/ILP64/AOCL-LibBlis-Win-MT.lib" AOCL_BLAS_LIBRARY)
+#     if (LINK_BLIS AND EXISTS ${AOCL_BLAS_LIBRARY})
+#       set( BLAS_LIBRARY "-l\"${AOCL_ROOT}/amd-blis/lib/ILP64/AOCL-LibBlis-Win-MT\"" )
+#       set( BLIS_INCLUDE_DIR "${AOCL_ROOT}/amd-blis/include/ILP64" )
+#       set( BLIS_DEFINES BLIS_ENABLE_NO_UNDERSCORE_API BLIS_ENABLE_CBLAS )
+#     elseif( NOT LINK_BLIS AND ROCBLAS_CLIENTS_REFERENCE_ILP64 )
+#       # ILP64 OpenBLAS via CMake FindBLAS (CMAKE_MODULE_PATH / CMAKE_PREFIX_PATH unchanged so TheRock finders apply).
+#       set( WARN_NOT_ILP64_PREFERRED false )
+#       set( BLA_SIZEOF_INTEGER 8 )
+#       set( BLA_VENDOR OpenBLAS )
+#       find_package( BLAS REQUIRED )
+#       if( TARGET BLAS::BLAS )
+#         set( BLAS_LIBRARY BLAS::BLAS )
+#       else()
+#         set( BLAS_LIBRARY "${BLAS_LIBRARIES}" )
+#       endif()
+#       set( BLAS_INCLUDE_DIR "" )
+#       if( TARGET OpenBLAS64::OpenBLAS )
+#         get_target_property( BLAS_INCLUDE_DIR OpenBLAS64::OpenBLAS INTERFACE_INCLUDE_DIRECTORIES )
+#       elseif( TARGET OpenBLAS::OpenBLAS )
+#         get_target_property( BLAS_INCLUDE_DIR OpenBLAS::OpenBLAS INTERFACE_INCLUDE_DIRECTORIES )
+#       elseif( TARGET BLAS::BLAS )
+#         get_target_property( BLAS_INCLUDE_DIR BLAS::BLAS INTERFACE_INCLUDE_DIRECTORIES )
+#       endif()
+#       if( BLAS_INCLUDE_DIR MATCHES "-NOTFOUND$" )
+#         set( BLAS_INCLUDE_DIR "" )
+#       endif()
+#       if( NOT BLAS_INCLUDE_DIR AND DEFINED BLAS_INCLUDE_DIRS )
+#         set( BLAS_INCLUDE_DIR "${BLAS_INCLUDE_DIRS}" )
+#       endif()
+#       if( NOT BLAS_INCLUDE_DIR AND DEFINED OpenBLAS64_DIR )
+#         set( BLAS_INCLUDE_DIR "${OpenBLAS64_DIR}/include" )
+#       elseif( NOT BLAS_INCLUDE_DIR AND DEFINED OpenBLAS_DIR )
+#         set( BLAS_INCLUDE_DIR "${OpenBLAS_DIR}/include" )
+#       endif()
+#       set( ROCBLAS_REFERENCE_BLAS_DEFINES "LAPACK_ILP64" "USE64BITINT" "OPENBLAS_USE64BITINT" )
+#     else()
+#       # Legacy: LP64 OpenBLAS via OPENBLAS_DIR / vcpkg (may warn about 64-bit stress tests).
+#       set( BLAS_INCLUDE_DIR ${OPENBLAS_DIR}/include CACHE PATH "OpenBLAS library include path" )
+#       find_library( BLAS_LIBRARY libopenblas
+#                     PATHS ${OPENBLAS_DIR}/lib
+#                     NO_DEFAULT_PATH
+#                   )
+#       if (NOT BLAS_LIBRARY)
+#         find_package( OpenBLAS CONFIG REQUIRED )
+#         set( BLAS_LIBRARY OpenBLAS::OpenBLAS )
+#         set( BLAS_INCLUDE_DIR "" )
+#       endif()
+#       set( WARN_NOT_ILP64_PREFERRED true )
+# === END MERGE ===
     endif()
 
     target_include_directories(rocblas-testing-common
@@ -88,6 +205,20 @@ if(ROCBLAS_ENABLE_BENCHMARKS OR ROCBLAS_BUILD_TESTING OR BUILD_TESTING)
             ROCM_USE_FLOAT16
             __HIP_HCC_COMPAT_MODE__=1
     )
+# === MERGE: develop additions, resolve later ===
+#   # One token for ROCBLAS_REFERENCE_LIB (runtime log stringification). BLAS_LIBRARY may be an
+#   # imported target or a CMake list when falling back to BLAS_LIBRARIES; the latter breaks
+#   # target_compile_definitions if passed through verbatim.
+#   if( TARGET "${BLAS_LIBRARY}" )
+#     set( ROCBLAS_REFERENCE_LIB_LABEL "${BLAS_LIBRARY}" )
+#   elseif( BLAS_LIBRARIES )
+#     list( GET BLAS_LIBRARIES 0 ROCBLAS_REFERENCE_LIB_LABEL )
+#   else()
+#     set( ROCBLAS_REFERENCE_LIB_LABEL "${BLAS_LIBRARY}" )
+#   endif()
+#
+#   message(STATUS "Linking reference BLAS LIB: ${BLAS_LIBRARY}")
+# === END MERGE ===
 
     if(ROCBLAS_ENABLE_TENSILE OR ROCBLAS_ENABLE_HIPBLASLT)
         target_compile_definitions(rocblas-testing-common

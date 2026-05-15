@@ -47,6 +47,55 @@ rocm_setup_version(VERSION "5.3.0")
 if(ROCBLAS_BUILD_TESTING OR BUILD_TESTING OR ROCBLAS_ENABLE_BENCHMARKS OR ROCBLAS_ENABLE_SAMPLES)
   if(NOT DEFINED ROCBLAS_ENABLE_CLIENT OR NOT ROCBLAS_ENABLE_CLIENT)
     set(ROCBLAS_ENABLE_CLIENT ON CACHE BOOL "Build rocBLAS clients." FORCE)
+# === MERGE: develop additions, resolve later ===
+#
+# include (os-detection)
+# get_os_id(OS_ID)
+# message (STATUS "OS detected is ${OS_ID}")
+#
+# # Versioning via rocm-cmake
+# set ( VERSION_STRING "5.4.0" )
+# rocm_setup_version( VERSION ${VERSION_STRING} )
+#
+# # Users may override HIP path by specifying their own in CMAKE_MODULE_PATH
+# # NOTE:  workaround until llvm & hip cmake modules fixes symlink logic in their config files; remove when fixed
+# list( APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/llvm ${ROCM_PATH} ${ROCM_PATH}/hip /opt/rocm/llvm /opt/rocm /opt/rocm/hip )
+#
+# # setting target list based on ROCm version
+# if (NOT BUILD_ADDRESS_SANITIZER)
+#   set( TARGET_LIST_ROCM_5.6 "gfx803;gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a:xnack+;gfx90a:xnack-;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102")
+#   set( TARGET_LIST_ROCM_5.7 "gfx803;gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a:xnack+;gfx90a:xnack-;gfx942;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102")
+#   set( TARGET_LIST_ROCM_6.0 "gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a:xnack+;gfx90a:xnack-;gfx942;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102")
+#   set( TARGET_LIST_ROCM_6.3 "gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a;gfx942;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102;gfx1151;gfx1200;gfx1201")
+#   set( TARGET_LIST_ROCM_7.0 "gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a;gfx942;gfx950;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102;gfx1150;gfx1151;gfx1200;gfx1201")
+#   set( TARGET_LIST_ROCM_7.1 "gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a;gfx942;gfx950;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151;gfx1200;gfx1201")
+#   set( TARGET_LIST_ROCM_7.13 "gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a;gfx942;gfx950;gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102;gfx1103;gfx1150;gfx1151;gfx1200;gfx1201;gfx1250")
+# else()
+#   set( TARGET_LIST_ROCM_5.6 "gfx908:xnack+;gfx90a:xnack+")
+#   set( TARGET_LIST_ROCM_5.7 "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+")
+#   set( TARGET_LIST_ROCM_6.0 "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+")
+#   set( TARGET_LIST_ROCM_6.3 "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+")
+#   set( TARGET_LIST_ROCM_7.0 "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+")
+#   set( TARGET_LIST_ROCM_7.1 "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+")
+#   set( TARGET_LIST_ROCM_7.13 "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+;gfx1250:xnack+")
+# endif()
+#
+# if(ROCM_PLATFORM_VERSION)
+#   if(${ROCM_PLATFORM_VERSION} VERSION_LESS 5.7.0)
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_5.6}")
+#   elseif(${ROCM_PLATFORM_VERSION} VERSION_LESS 6.0.0)
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_5.7}")
+#   elseif(${ROCM_PLATFORM_VERSION} VERSION_LESS 6.3.0)
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_6.0}")
+#   elseif(${ROCM_PLATFORM_VERSION} VERSION_LESS 7.0.0)
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_6.3}")
+#   elseif(${ROCM_PLATFORM_VERSION} VERSION_LESS 7.1.0)
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_7.0}")
+#   elseif(${ROCM_PLATFORM_VERSION} VERSION_LESS 7.13.0)
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_7.1}")
+#   else()
+#     set(SUPPORTED_TARGETS "${TARGET_LIST_ROCM_7.13}")
+# === END MERGE ===
   endif()
 endif()
 
@@ -194,6 +243,19 @@ endif()
 
 if(ROCBLAS_ENABLE_CLIENT OR ROCBLAS_BUILD_TESTING OR BUILD_TESTING OR ROCBLAS_ENABLE_BENCHMARKS OR ROCBLAS_ENABLE_SAMPLES)
   add_subdirectory(clients)
+# === MERGE: develop additions, resolve later ===
+#
+# if( BUILD_WITH_HIPBLASLT )
+#   list( APPEND HIPBLASLT_DEFINES BUILD_WITH_HIPBLASLT )
+#   rocm_package_add_dependencies(DEPENDS "hipblaslt >= ${HIPBLASLT_VERSION}")
+# endif()
+#
+# if(BUILD_CLIENTS_TESTS)
+#   enable_testing()
+# endif()
+#
+# if( BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
+# === END MERGE ===
   if(NOT CLIENTS_OS)
     rocm_set_os_id(CLIENTS_OS)
     string(TOLOWER "${CLIENTS_OS}" CLIENTS_OS)
