@@ -926,7 +926,23 @@ class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
             is_v3_pipeline = kernel_ctx.pipeline.tag == "qr_async_trload_v3"
             return is_v3_dedicated_tile == is_v3_pipeline
 
-        rules.extend([check_tile_pipeline])
+        def check_qr_ks_vs_mfma_alignment(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # BlockFmhaPipelineQRKSVS::schedule_gemm_0 requires
+            # NumMfmaInsts % 8 == 0 (block_fmha_pipeline_qr_ks_vs.hpp:494).
+            # NumMfmaInsts per warp = (bm0/rm0/wm0) * (bn0/rn0/wn0) * (bk0/wk0)
+            if kernel_ctx.pipeline.tag != "qr":
+                return True
+            t = kernel_ctx.tile
+            n_mfma = (
+                (t.F_bm0 // t.F_rm0 // t.F_wm0)
+                * (t.F_bn0 // t.F_rn0 // t.F_wn0)
+                * (t.F_bk0 // t.F_wk0)
+            )
+            return n_mfma % 8 == 0
+
+        rules.extend([check_tile_pipeline, check_qr_ks_vs_mfma_alignment])
         return rules
 
 
@@ -1115,11 +1131,8 @@ class KernelComponentFactoryGfx950(
     def get_pipelines(
         cls, dtype, hdim, hdim_v, receipt, mask_impl
     ) -> List[FmhaFwdPipeline]:
-        if hdim == 256 and hdim_v == 256:
-            pipelines = []
-        else:
-            pipelines = KernelComponentFactoryGfx9.get_pipelines(
-                dtype, hdim, hdim_v, receipt, mask_impl
+        pipelines = KernelComponentFactoryGfx9.get_pipelines(
+            dtype, hdim, hdim_v, receipt, mask_impl
         )
         if dtype in cls._DT_FP16_BF16:
             qscale = "no"
