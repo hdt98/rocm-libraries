@@ -38,6 +38,28 @@ namespace TensileLite
 {
     namespace Client
     {
+        namespace
+        {
+            // For 0 <= threshold <= 1, keep a strict top-K slice by count rather
+            // than admitting every solution tied at the cutoff value.
+            size_t predictionThresholdKeepCount(size_t totalSolutions, double predictionThreshold)
+            {
+                if(totalSolutions == 0)
+                    return 0;
+                if(predictionThreshold == 0.0)
+                    return 1;
+                if(!std::isfinite(predictionThreshold))
+                    return totalSolutions;
+                if(predictionThreshold < 0.0 || predictionThreshold >= 1.0)
+                    return totalSolutions;
+
+                return std::max<size_t>(
+                    1,
+                    std::min(totalSolutions,
+                             static_cast<size_t>(std::ceil(totalSolutions * predictionThreshold))));
+            }
+        }
+
         std::shared_ptr<SolutionIterator> SolutionIterator::Default(
             std::shared_ptr<MasterSolutionLibrary<ContractionProblemGemm>> library,
             std::shared_ptr<Hardware>                                      hardware,
@@ -332,34 +354,26 @@ namespace TensileLite
 
                 auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
                 std::stable_sort(performance.begin(),performance.end(),comp);
-                // TODO: This is the simple threshold method.
-                // May use the best perf * 1.x as threshold in the future.
-                size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
-                auto threshhold = performance[index].second;
+                if(performance.empty())
+                {
+                    throw std::runtime_error(
+                        "[AllSolutionsIterator::preProblem] No valid solutions after prediction filtering");
+                }
 
-                // push content
+                const size_t totalSolutions = performance.size();
+                const size_t keepCount
+                    = predictionThresholdKeepCount(totalSolutions, m_predictionThreshold);
+
+                // Keep a strict top-K slice by count for 0 <= predictionThreshold <= 1.
                 if(!m_qSolutionIdx.empty())
                 {
                     throw std::runtime_error(
                         "[AllSolutionsIterator::preProblem] Solution queue is not empty");
                 }
 
-                for (int i=0; i<performance.size(); i++)
+                for(size_t i = 0; i < keepCount; i++)
                 {
-                    if(m_predictionThreshold == 0.0)
-                    {   
-                        auto bestIdx = 0;
-                        m_qSolutionIdx.push(performance[bestIdx]);
-                        break;
-                    }
-                    else if(performance[i].second <= threshhold)
-                    {
-                        m_qSolutionIdx.push(performance[i]);
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    m_qSolutionIdx.push(performance[i]);
                 }
                 m_currentSolutionIdx = m_qSolutionIdx.front().first;
                 m_currentPrediction  = m_qSolutionIdx.front().second;
@@ -584,22 +598,26 @@ namespace TensileLite
 
                 auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
                 std::stable_sort(performance.begin(),performance.end(),comp);
-                size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));
-                auto threshhold = performance[index].second;
-                // push content
+                if(performance.empty())
+                {
+                    throw std::runtime_error(
+                        "[TopSolutionIterator::preProblem] No valid solutions after prediction filtering");
+                }
+
+                const size_t totalSolutions = performance.size();
+                const size_t keepCount
+                    = predictionThresholdKeepCount(totalSolutions, m_predictionThreshold);
+
+                // Keep a strict top-K slice by count for 0 <= predictionThreshold <= 1.
                 if(!m_qSolutionIdx.empty())
                 {
                     throw std::runtime_error(
                         "[TopSolutionIterator::preProblem] Solution queue is not empty");
                 }
 
-                for (int i=0; i<performance.size(); i++)
+                for(size_t i = 0; i < keepCount; i++)
                 {
-                    if(performance[i].second <= threshhold)
-                    {
-                        m_qSolutionIdx.push(performance[i]);
-                        break;
-                    }
+                    m_qSolutionIdx.push(performance[i]);
                 }
                 m_currentSolutionIdx = m_qSolutionIdx.front().first;
                 m_currentPrediction  = m_qSolutionIdx.front().second;

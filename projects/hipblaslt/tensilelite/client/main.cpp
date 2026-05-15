@@ -351,7 +351,7 @@ namespace TensileLite
                 ("selection-only",           po::value<bool>()->default_value(false), "Don't run any solutions, only print kernel selections.")
                 ("max-workspace-size",       po::value<size_t>()->default_value(32*1024*1024), "Max workspace for training")
                 ("granularity-threshold",    po::value<double>()->default_value(0.0), "Don't run a solution if total granularity is below")
-                ("prediction-threshold",     po::value<double>()->default_value(2.0), "Don't run a solution if predicted performance is low")
+                ("prediction-threshold",     po::value<double>()->default_value(2.0), "Prediction gating: >1 disables prediction sorting, 1 runs all sorted, 0<x<1 keeps top ceil(N*x), 0 keeps best only")
 
                 ("activation-type",           po::value<ActivationType>()->default_value(ActivationType::None), "An activation type")
                 ("activation-hpa",            po::value<bool>()->default_value(false), "Use the same data type as high precision accumulate.")

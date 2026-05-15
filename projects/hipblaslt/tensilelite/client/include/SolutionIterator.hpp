@@ -31,9 +31,10 @@
 #include "ProgramOptions.hpp"
 
 #include <functional>
-#include <vector>
 #include <map>
 #include <queue>
+#include <unordered_map>
+#include <vector>
 
 #include "RunListener.hpp"
 
