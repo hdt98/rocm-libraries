@@ -26,8 +26,8 @@ Covers the three new gfx1250 instructions used by the StreamK release/acquire
 fence sequences:
 
 * ``SWaitXCnt``  -> ``s_wait_xcnt N``      (SOPP_WAIT16, immediate via getSrcParams)
-* ``GlobalWb``   -> ``global_wb scope:*``  (SOPP, scope carried via MUBUFModifiers)
-* ``GlobalInv``  -> ``global_inv scope:*`` (SOPP, scope carried via MUBUFModifiers)
+* ``GlobalWb``   -> ``global_wb scope:*``  (SOPP, scope carried via CacheScopeModifiers)
+* ``GlobalInv``  -> ``global_inv scope:*`` (SOPP, scope carried via CacheScopeModifiers)
 
 The boilerplate (ISA init fixture, SignatureBase setup, toStinkyTofuModule
 invocation) mirrors ``test_mubuf.py`` so that a regression in either the
@@ -151,7 +151,7 @@ def test_global_inv_scope_dev_emits_to_stinkytofu():
     (CacheScope.SCOPE_SYS, "SCOPE_SYS"),
 ])
 def test_global_wb_non_dev_scope_emits_to_stinkytofu(scope_enum, scope_text):
-    """Non-DEV scopes flow through the same MUBUFModifiers path used by SCOPE_DEV.
+    """Non-DEV scopes flow through the same CacheScopeModifiers path used by SCOPE_DEV.
 
     Locks the rocisa->stinkytofu scope mapping so a future regression in either
     `convertMUBUFScope` or `addModifiersToInstruction` is caught here.
