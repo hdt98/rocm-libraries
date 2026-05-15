@@ -269,7 +269,7 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
         const auto f = static_cast<float>(decoded);
 
         // NaN patterns: OCP E5M2 NaN has exp=31 and mant != 0
-        if(((pattern & 0x7Cu) == 0x7Cu) && ((pattern & 0x03u) != 0u))
+        if(((pattern & 0x7C) == 0x7C) && ((pattern & 0x03) != 0))
         {
             EXPECT_TRUE(std::isnan(f))
                 << "NaN pattern 0x" << std::hex << bits << " should decode to float NaN";
@@ -281,7 +281,7 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
         }
 
         // Inf patterns (exp=31, mant=0): decode-only check.
-        if((pattern & 0x7Fu) == 0x7Cu)
+        if((pattern & 0x7F) == 0x7C)
         {
             EXPECT_TRUE(std::isinf(f))
                 << "Inf pattern 0x" << std::hex << bits << " should decode to float Inf";
@@ -362,7 +362,7 @@ TEST(TestFp8E5M2, NanTruthTable)
     for(int bits = 0; bits <= 0xFF; ++bits)
     {
         const auto pattern = static_cast<uint8_t>(bits);
-        const bool expectedNan = ((pattern & 0x7Cu) == 0x7Cu) && ((pattern & 0x03u) != 0u);
+        const bool expectedNan = ((pattern & 0x7C) == 0x7C) && ((pattern & 0x03) != 0);
         EXPECT_EQ(isnan(fp8_e5m2::from_bits(pattern)), expectedNan)
             << "isnan wrong for bit pattern 0x" << std::hex << bits;
     }
