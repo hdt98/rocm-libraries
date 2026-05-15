@@ -34,6 +34,10 @@
 namespace TensileLite
 {
 
+    // Defined in ContractionSolution.cpp. Maps rocisa::DataType -> origami::data_type_t
+    // so FP8/BF8/Int4 indices stay aligned across the two enums (see ROCM-24181, GH #7056).
+    origami::data_type_t datatypeToAnalyticalDatatype(rocisa::DataType type);
+
     /**
      * \ingroup SolutionLibrary
      *
@@ -170,7 +174,7 @@ namespace TensileLite
                 analytical_hardware.print();
             }
             int defaultWGM = std::ceil(std::sqrt(analytical_hardware.N_CU / analytical_hardware.NUM_XCD));
-            origami::data_type_t miDataType = static_cast<origami::data_type_t>(problem.computeInputType());
+            origami::data_type_t miDataType = datatypeToAnalyticalDatatype(problem.computeInputType());
             if(problem.f32XdlMathOp() == rocisa::DataType::XFloat32) // Check F32 compute type
                 miDataType = origami::data_type_t::XFloat32;
             auto selected_tiles = origami::select_best_macro_tile_size(
