@@ -1367,10 +1367,6 @@ struct tile_window_with_static_distribution
                                                    number<i_access_unsupport_>          = {},
                                                    bool_constant<oob_conditional_check> = {}) const
     {
-        static_assert(core::amdgcn_compiler_target_state::CK_TILE_ARCH_GFX950,
-                      "load_transpose requires amd_transpose_load_to_vgpr (gfx950 only). "
-                      "This must not be instantiated on other targets.");
-
         using Traits   = typename Base::Traits;
         using vector_t = typename Traits::vector_t;
         using SFC_Ys   = typename Traits::SFC_Ys;
