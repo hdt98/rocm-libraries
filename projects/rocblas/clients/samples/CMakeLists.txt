@@ -14,6 +14,13 @@ target_link_libraries(rocblas-samples-common
         rocblas::warnings
 )
 
+if(ROCBLAS_ENABLE_THREADS)
+    # rocblas-clients-common references std::thread (pthread_create/join via libstdc++).
+    # Propagate Threads::Threads through the samples interface so each sample
+    # executable that links the static archive resolves those symbols.
+    target_link_libraries(rocblas-samples-common INTERFACE Threads::Threads)
+endif()
+
 target_include_directories(rocblas-samples-common INTERFACE "${PROJECT_SOURCE_DIR}/clients/include")
 
 target_compile_definitions(rocblas-samples-common

@@ -101,7 +101,7 @@ option(ROCBLAS_ENABLE_COVERAGE "Build tests with coverage enabled." OFF)
 set(ROCBLAS_COVERAGE_GTEST_FILTER "*quick*:*pre_checkin*:*ILP64*-*known_bug*" CACHE STRING "GTest filter for coverage tests.")
 
 option(ROCBLAS_ENABLE_BLIS "Enable BLIS support." ON)
-option(ROCBLAS_ENABLE_MARKER "Enable rocTracer marker support." ON)
+cmake_dependent_option(ROCBLAS_ENABLE_MARKER "Enable rocTracer marker support." ON "NOT WIN32" OFF)
 option(ROCBLAS_ENABLE_OPENMP "Enable OpenMP for parallel reference implementations in clients." ON)
 option(ROCBLAS_ENABLE_THREADS "Enable threading support in clients." ON)
 option(ROCBLAS_ENABLE_ASAN "Build with address sanitizer enabled." OFF)
@@ -110,6 +110,12 @@ option(ROCBLAS_ENABLE_THEROCK "Use find_package to pull in 1st party deps." OFF)
 option(CMAKE_VERBOSE_MAKEFILE "Enable verbose output from Makefile builds." ON)
 
 if(ROCBLAS_ENABLE_FORTRAN)
+  # Match develop's behavior: default to gfortran rather than the toolchain's
+  # default Fortran compiler, since flang is stricter about valid Fortran in the
+  # sample sources (e.g. `result(c_int)` shadowing the iso_c_binding import).
+  if(NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC})
+    set(CMAKE_Fortran_COMPILER "gfortran")
+  endif()
   enable_language(Fortran)
 endif()
 
