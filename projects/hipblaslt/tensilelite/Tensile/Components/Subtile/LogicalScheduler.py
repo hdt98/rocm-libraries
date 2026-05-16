@@ -30,6 +30,13 @@ import copy
 import io
 import math
 
+from .ScheduleTypes import (
+    AnnotatedSchedule,
+    AugmentedSchedule,
+    EmittedSchedule,
+    LogicalSchedule,
+)
+
 
 class Pass(IntEnum):
     """Scheduler passes in dependency order.
@@ -394,11 +401,13 @@ class LogicalScheduler:
         self.config = config
         self.tensors: List[str] = ['A', 'B'] + (['SA', 'SB'] if config.hasScale else [])
         self._completed: set = set()   # tracks which passes have run (Pass enum members)
-        self._partitions: Optional[List[List[SubIterKSlot]]] = None  # shared mutable state across passes
-        self._emitted: Optional[List[List[EmittedModule]]] = None
-        self._preloop_emitted: Optional[List[List[List[EmittedModule]]]] = None
-        self._ngll_emitted: Optional[List[List[List[EmittedModule]]]] = None
-        self._nll_emitted: Optional[List[List[List[EmittedModule]]]] = None
+        # Shared mutable state across passes. The same field holds different
+        # stage representations over time; see ScheduleTypes for stage meanings.
+        self._partitions: Optional[Union[LogicalSchedule, AnnotatedSchedule, AugmentedSchedule]] = None
+        self._emitted: Optional[EmittedSchedule] = None
+        self._preloop_emitted: Optional[EmittedSchedule] = None
+        self._ngll_emitted: Optional[EmittedSchedule] = None
+        self._nll_emitted: Optional[EmittedSchedule] = None
 
     def _ensure_pass(self, *prerequisites: Pass) -> None:
         for p in prerequisites:
@@ -421,7 +430,7 @@ class LogicalScheduler:
         return {'A': (a0, a0 + cfg.partitionSizeM),
                 'B': (b0, b0 + cfg.partitionSizeN)}
 
-    def place_LRs(self) -> List[List[SubIterKSlot]]:
+    def place_LRs(self) -> LogicalSchedule:
         """Place MFMAs and LRs based on read granularities.
 
         Returns a list of partitions, each containing a list of SubIterKSlots.
@@ -1614,7 +1623,7 @@ class LogicalScheduler:
                 cross.append(dep)
         return same, cross
 
-    def emit(self) -> List[List[List[EmittedModule]]]:
+    def emit(self) -> EmittedSchedule:
         """Convert placements into EmittedModule chains per partition per subIterK.
 
         Returns [partition][subIterK][EmittedModule].
@@ -1756,7 +1765,7 @@ class LogicalScheduler:
             em.before = b
         return [em for em in emitted if em.moduleId not in removed_ids]
 
-    def build_ngll(self) -> List[List[List[EmittedModule]]]:
+    def build_ngll(self) -> EmittedSchedule:
         """NGLL (No Global Load Loop): mainloop without GR(n+2), GR_INC.
 
         WaitGR inflight counts are zeroed since no new GRs are in flight.
@@ -1784,7 +1793,7 @@ class LogicalScheduler:
         self._ngll_emitted = ngll
         return ngll
 
-    def build_nll(self) -> List[List[List[EmittedModule]]]:
+    def build_nll(self) -> EmittedSchedule:
         """NLL (No Load Loop): mainloop without GR, LR(n+1), GR_INC, LR_INC,
         WaitGR(n+1)+Sync. Keeps LR(n), MFMAs, WaitGR(n) with zeroed counts."""
         self._ensure_pass(Pass.EMIT)
@@ -1870,7 +1879,7 @@ class LogicalScheduler:
         """Create a BaseOp subclass instance for each tensor."""
         return [cls(tensor=tensor) for tensor in self.tensors]
 
-    def build_preloop(self) -> List[List[List[EmittedModule]]]:
+    def build_preloop(self) -> EmittedSchedule:
         """Build preloop: pipeline initialization sequence before mainloop.
 
         High-level sequence (waits/syncs auto-inserted by _insert_preloop_waits):
@@ -2204,7 +2213,7 @@ class LogicalScheduler:
         return tensor.ljust(2)
 
 
-    def print_lr(self, partitions: List[List[SubIterKSlot]] = None) -> str:
+    def print_lr(self, partitions: Optional[LogicalSchedule] = None) -> str:
         """Print place_LRs output in design doc format."""
         if partitions is None:
             partitions = self._partitions
@@ -2375,7 +2384,7 @@ class LogicalScheduler:
         return f"{kind} {p.tensor} @P{part}:subIterK={slot}{mt}"
 
 
-    def print_emit(self, all_partitions: List[List[List[EmittedModule]]] = None) -> str:
+    def print_emit(self, all_partitions: Optional[EmittedSchedule] = None) -> str:
         """Print emit output: EmittedModule list with before-links."""
         if all_partitions is None:
             all_partitions = self._emitted
@@ -2390,7 +2399,7 @@ class LogicalScheduler:
                     buf.write(f"      [{em.moduleId:2d}] {em.opType:10s} {em.source}{before_str}\n")
         return buf.getvalue()
 
-    def print_emit_dep_order(self, all_partitions: List[List[List[EmittedModule]]] = None) -> str:
+    def print_emit_dep_order(self, all_partitions: Optional[EmittedSchedule] = None) -> str:
         """Print emit output as dependency paths (same decomposition as _extractPathsFromBeforeDeps)."""
         from Tensile.Components.Subtile.InstructionScheduler import extractPathsFromBeforeDeps
         if all_partitions is None:
