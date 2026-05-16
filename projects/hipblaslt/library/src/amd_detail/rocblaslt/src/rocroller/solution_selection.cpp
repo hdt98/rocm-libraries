@@ -1,17 +1,10 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-<<<<<<< HEAD:projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller_host/solution_selection.cpp
-#include "rocroller_host/analytical_utils.hpp"
-#include "rocroller_host/kernel_type.hpp"
-#include "rocroller_host/runtime_args_selection.hpp"
-#include "rocroller_host/solution_selection.hpp"
-=======
 #include "solution_selection.hpp"
 #include "analytical_utils.hpp"
 #include "kernel_type.hpp"
 #include "runtime_args_selection.hpp"
->>>>>>> origin/develop:projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller/solution_selection.cpp
 
 #include "origami/origami.hpp"
 

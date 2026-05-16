@@ -1,9 +1,9 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocroller_host/analytical_utils.hpp"
-#include "rocroller_host/gemm.hpp"
-#include "rocroller_host/runtime_args_selection.hpp"
+#include "analytical_utils.hpp"
+#include "gemm.hpp"
+#include "runtime_args_selection.hpp"
 
 #include "origami/streamk.hpp"
 

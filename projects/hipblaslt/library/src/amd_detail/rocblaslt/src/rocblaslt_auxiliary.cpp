@@ -46,7 +46,7 @@
 #include "rocblaslt/handle.h"
 #include "rocblaslt.h"
 #include "rocblaslt/rocblaslt_mat_utils.hpp"
-#include "rocroller_host/rocroller_host.hpp"
+#include "rocroller_host.hpp"
 #include "rocblaslt/tensile_host.hpp"
 #include "rocblaslt/utility.hpp"
 

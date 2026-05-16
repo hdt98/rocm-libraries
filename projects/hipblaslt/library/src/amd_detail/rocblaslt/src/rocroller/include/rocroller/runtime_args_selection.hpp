@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "rocroller_host/gemm.hpp"
+#include "gemm.hpp"
 #include "rocblaslt.h"
 
 const int DEFAULT_WGM = 2;

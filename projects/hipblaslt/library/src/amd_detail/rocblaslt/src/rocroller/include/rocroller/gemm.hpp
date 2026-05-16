@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "rocroller_host/parameter_selection.hpp"
+#include "parameter_selection.hpp"
 
 #include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Expression.hpp>

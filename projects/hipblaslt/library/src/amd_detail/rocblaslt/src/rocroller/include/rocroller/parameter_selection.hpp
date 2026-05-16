@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "rocroller_host/kernel_type.hpp"
-#include "rocroller_host/solution_selection.hpp"
+#include "kernel_type.hpp"
+#include "solution_selection.hpp"
 
 #include <optional>
 

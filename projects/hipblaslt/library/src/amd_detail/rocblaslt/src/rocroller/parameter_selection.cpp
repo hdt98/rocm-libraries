@@ -1,7 +1,7 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocroller_host/parameter_selection.hpp"
+#include "parameter_selection.hpp"
 
 const int SWIZZLE_BLOCK_SIZE = 64;
 

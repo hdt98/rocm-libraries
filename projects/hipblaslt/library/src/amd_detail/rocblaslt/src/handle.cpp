@@ -28,7 +28,7 @@
 #include "rocblaslt/check_numerics_matrix.hpp"
 #include "rocblaslt/definitions.h"
 #include "rocblaslt/logging.h"
-#include "rocroller_host/rocroller_host.hpp"
+#include "rocroller_host.hpp"
 
 #include <hip/hip_runtime.h>
 #include <algorithm>

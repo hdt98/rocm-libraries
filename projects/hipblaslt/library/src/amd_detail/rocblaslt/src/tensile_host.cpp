@@ -40,7 +40,7 @@
 #include "rocblaslt/tensile_host.hpp"
 
 #ifdef HIPBLASLT_USE_ROCROLLER
-#include "rocroller_host/rocroller_host.hpp"
+#include "rocroller_host.hpp"
 #endif
 
 #include <Tensile/Contractions.hpp>

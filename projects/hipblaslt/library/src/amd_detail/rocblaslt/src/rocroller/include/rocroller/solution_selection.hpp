@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "rocroller_host/kernel_type.hpp"
+#include "kernel_type.hpp"
 #include "rocblaslt.h"
 
 /**
