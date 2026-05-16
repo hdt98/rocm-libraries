@@ -70,13 +70,6 @@ if(ROCBLAS_ENABLE_BLIS)
             BLIS_ENABLE_NO_UNDERSCORE_API
     )
 endif()
-# === MERGE: develop additions, resolve later ===
-# if ( ROCBLAS_REFERENCE_BLAS_DEFINES )
-#   target_compile_definitions( rocblas_clients_common PRIVATE ${ROCBLAS_REFERENCE_BLAS_DEFINES} )
-#   target_compile_definitions( rocblas_clients_testing_common PRIVATE ${ROCBLAS_REFERENCE_BLAS_DEFINES} )
-# endif()
-# target_compile_definitions( rocblas_clients_common PRIVATE ROCBLAS_REFERENCE_LIB=${ROCBLAS_REFERENCE_LIB_LABEL} )
-# === END MERGE ===
 
 target_sources(rocblas-clients-common
     PRIVATE

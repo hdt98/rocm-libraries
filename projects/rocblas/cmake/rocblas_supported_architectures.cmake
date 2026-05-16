@@ -17,12 +17,12 @@ if(NOT ROCBLAS_ENABLE_ASAN)
   set(SUPPORTED_TARGETS
     "gfx900;gfx906:xnack-;gfx908:xnack-;gfx90a:xnack+;gfx90a:xnack-"
     "gfx1010;gfx1012;gfx1030;gfx1100;gfx1101;gfx1102"
-    "gfx942;gfx950;gfx1103;gfx1150;gfx1151;gfx1200;gfx1201"
+    "gfx942;gfx950;gfx1103;gfx1150;gfx1151;gfx1200;gfx1201;gfx1250"
   )
 else()
   # Address sanitizer builds: architectures with xnack+ support
   set(SUPPORTED_TARGETS
-    "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+"
+    "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+;gfx1250:xnack+"
   )
 endif()
 

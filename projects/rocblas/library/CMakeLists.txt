@@ -14,15 +14,6 @@ target_link_libraries(rocblas64
 if(ROCBLAS_ENABLE_TENSILE)
     target_link_libraries(rocblas64 PRIVATE roc::tensile-host)
 endif()
-# === MERGE: develop additions, resolve later ===
-# # Configure Windows version resource file
-# if(WIN32)
-#   string(TIMESTAMP ROCBLAS_COPYRIGHT_YEAR "%Y")
-#   configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/version.rc.in"
-#     "${PROJECT_BINARY_DIR}/version.rc" @ONLY )
-# endif()
-#
-# === END MERGE ===
 
 target_include_directories(rocblas64
     PRIVATE
