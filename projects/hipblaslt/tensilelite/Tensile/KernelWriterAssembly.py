@@ -89,6 +89,7 @@ from Tensile.SolutionStructs.Naming import getKernelFileBase
 from Tensile.Toolchain.Component import Assembler
 
 from math import ceil, floor, log, prod
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -16477,29 +16478,47 @@ class KernelWriterAssembly(KernelWriter):
   # persistent tile to compute next-tile addresses, but current NLL/tail code
   # resumes immediately after the prefetch. Keep tile identity borrowed.
   ##############################################################################
-  def papCheckpointCurrentTileIdentity(self, kernel):
-    module = Module("papCheckpointCurrentTileIdentity")
-    module.add(SMovB32(dst=sgpr("PrevWorkGroup0"), src=sgpr("WorkGroup0"), comment="checkpoint WG0 for PAP restore"))
-    module.add(SMovB32(dst=sgpr("PrevWorkGroup1"), src=sgpr("WorkGroup1"), comment="checkpoint WG1 for PAP restore"))
-    module.add(SMovB32(dst=sgpr("PrevWorkGroup2"), src=sgpr("WorkGroup2"), comment="checkpoint WG2 for PAP restore"))
-    module.add(SMovB32(dst=sgpr("PrevStreamKLocalStart"), src=sgpr("StreamKLocalStart"), comment="checkpoint LocalStart for PAP restore"))
-    module.add(SMovB32(dst=sgpr("PrevStreamKLocalEnd"), src=sgpr("StreamKLocalEnd"), comment="checkpoint LocalEnd for PAP restore"))
+  def papTileIdentityNames(self, kernel):
+    names = [
+      "WorkGroup0",
+      "WorkGroup1",
+      "WorkGroup2",
+      "StreamKLocalStart",
+      "StreamKLocalEnd",
+    ]
     if len(kernel["SpaceFillingAlgo"]):
-      module.add(SMovB32(dst=sgpr("PrevStreamKTileID"), src=sgpr("StreamKTileID"), comment="checkpoint TileID for PAP restore"))
+      names.append("StreamKTileID")
+    return names
+
+  @contextmanager
+  def allocPapTileIdentitySgprs(self, kernel):
+    names = self.papTileIdentityNames(kernel)
+    with self.allocTmpSgpr(len(names), alignment=1, tag="PAP tile identity") as papTileIdentitySgpr:
+      yield {name: papTileIdentitySgpr.idx + i for i, name in enumerate(names)}
+
+  def papCheckpointCurrentTileIdentity(self, kernel, prevTile):
+    module = Module("papCheckpointCurrentTileIdentity")
+    module.add(SMovB32(dst=sgpr(prevTile["WorkGroup0"]), src=sgpr("WorkGroup0"), comment="checkpoint WG0 for PAP restore"))
+    module.add(SMovB32(dst=sgpr(prevTile["WorkGroup1"]), src=sgpr("WorkGroup1"), comment="checkpoint WG1 for PAP restore"))
+    module.add(SMovB32(dst=sgpr(prevTile["WorkGroup2"]), src=sgpr("WorkGroup2"), comment="checkpoint WG2 for PAP restore"))
+    module.add(SMovB32(dst=sgpr(prevTile["StreamKLocalStart"]), src=sgpr("StreamKLocalStart"), comment="checkpoint LocalStart for PAP restore"))
+    module.add(SMovB32(dst=sgpr(prevTile["StreamKLocalEnd"]), src=sgpr("StreamKLocalEnd"), comment="checkpoint LocalEnd for PAP restore"))
+    if len(kernel["SpaceFillingAlgo"]):
+      module.add(SMovB32(dst=sgpr(prevTile["StreamKTileID"]), src=sgpr("StreamKTileID"), comment="checkpoint TileID for PAP restore"))
     return module
 
-  def papRestoreCurrentTileIdentity(self, kernel):
+  def papRestoreCurrentTileIdentity(self, kernel, prevTile):
     module = Module("papRestoreCurrentTileIdentity")
     # PAP temporarily maps WorkGroup*/StreamKLocal* to the next persistent tile
     # so it can issue the first PGR early. Restore the current tile for the
     # remaining NLL/tail code; StreamKIter already points at the next chunk.
-    module.add(SMovB32(dst=sgpr("WorkGroup0"), src=sgpr("PrevWorkGroup0"), comment="restore current WG0 after PAP"))
-    module.add(SMovB32(dst=sgpr("WorkGroup1"), src=sgpr("PrevWorkGroup1"), comment="restore current WG1 after PAP"))
-    module.add(SMovB32(dst=sgpr("WorkGroup2"), src=sgpr("PrevWorkGroup2"), comment="restore current WG2 after PAP"))
-    module.add(SMovB32(dst=sgpr("StreamKLocalStart"), src=sgpr("PrevStreamKLocalStart"), comment="restore current LocalStart after PAP"))
-    module.add(SMovB32(dst=sgpr("StreamKLocalEnd"), src=sgpr("PrevStreamKLocalEnd"), comment="restore current LocalEnd after PAP"))
+    module.add(SMovB32(dst=sgpr("WorkGroup0"), src=sgpr(prevTile["WorkGroup0"]), comment="restore current WG0 after PAP"))
+    module.add(SMovB32(dst=sgpr("WorkGroup1"), src=sgpr(prevTile["WorkGroup1"]), comment="restore current WG1 after PAP"))
+    module.add(SMovB32(dst=sgpr("WorkGroup2"), src=sgpr(prevTile["WorkGroup2"]), comment="restore current WG2 after PAP"))
+    module.add(SMovB32(dst=sgpr("StreamKLocalStart"), src=sgpr(prevTile["StreamKLocalStart"]), comment="restore current LocalStart after PAP"))
+    module.add(SMovB32(dst=sgpr("StreamKLocalEnd"), src=sgpr(prevTile["StreamKLocalEnd"]), comment="restore current LocalEnd after PAP"))
     if len(kernel["SpaceFillingAlgo"]):
-      module.add(SMovB32(dst=sgpr("StreamKTileID"), src=sgpr("PrevStreamKTileID"), comment="restore current TileID after PAP"))
+      module.add(SMovB32(dst=sgpr("StreamKTileID"), src=sgpr(prevTile["StreamKTileID"]), comment="restore current TileID after PAP"))
     return module
 
   ##############################################################################
@@ -16525,16 +16544,17 @@ class KernelWriterAssembly(KernelWriter):
     module.add(SBarrier(comment="PAP: sync before next-tile prefetch"))
 
     skComponent = Component.StreamK.find(self)
-    module.add(self.papCheckpointCurrentTileIdentity(kernel))
-    module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
-    if kernel["enableTDMA"] and kernel["enableTDMB"]:
-      module.add(self.papTdmUpdateDescriptor(kernel, tensorParametersA, tensorParametersB))
-      if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
-        module.add(self.papTdmUpdateDescriptor(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
-    module.add(self.setupPrefetchAcrossPersistentLoads(kernel, tensorParametersA, tensorParametersB, isOptNLL=True))
-    if kernel["enableTDMA"] and kernel["enableTDMB"]:
-      module.add(self.papTdmSaveLdsBank(kernel))
-    module.add(self.papRestoreCurrentTileIdentity(kernel))
+    with self.allocPapTileIdentitySgprs(kernel) as prevTile:
+      module.add(self.papCheckpointCurrentTileIdentity(kernel, prevTile))
+      module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
+      if kernel["enableTDMA"] and kernel["enableTDMB"]:
+        module.add(self.papTdmUpdateDescriptor(kernel, tensorParametersA, tensorParametersB))
+        if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
+          module.add(self.papTdmUpdateDescriptor(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
+      module.add(self.setupPrefetchAcrossPersistentLoads(kernel, tensorParametersA, tensorParametersB, isOptNLL=True))
+      if kernel["enableTDMA"] and kernel["enableTDMB"]:
+        module.add(self.papTdmSaveLdsBank(kernel))
+      module.add(self.papRestoreCurrentTileIdentity(kernel, prevTile))
     if kernel["enableTDMA"] and kernel["enableTDMB"]:
       module.add(self.papTdmUpdateDescriptor(kernel, tensorParametersA, tensorParametersB, preservePapBank=False))
       if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:

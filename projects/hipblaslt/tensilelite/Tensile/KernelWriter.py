@@ -8590,16 +8590,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel.get("PrefetchAcrossPersistent"):
         requiredUnalignedSgprVar.append("SkPrefetchPrimed")
         self.states.numSgprStreamK += 1
-      if kernel["StreamK"] == 3 and kernel.get("PrefetchAcrossPersistent"):
-        requiredUnalignedSgprVar += [
-          "PrevWorkGroup0",
-          "PrevWorkGroup1",
-          "PrevWorkGroup2",
-          "PrevStreamKLocalStart",
-          "PrevStreamKLocalEnd",
-        ]
-        if len(kernel["SpaceFillingAlgo"]):
-          requiredUnalignedSgprVar.append("PrevStreamKTileID")
       if kernel["StreamKAtomic"] == 0:
         requiredAligned4SgprVar.append("SrdWS")
 
