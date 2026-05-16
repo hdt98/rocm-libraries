@@ -31,6 +31,7 @@ from Tensile.Components.Subtile.LogicalScheduler import (
     fmt_mt,
 )
 from unittest.mock import MagicMock
+from rocisa.code import Module
 
 
 def makeTileInfo(tc, kernel):
@@ -1521,6 +1522,53 @@ class TestIntegration:
                 assert "NGLL" in asm
                 assert "NLL" in asm
 
+        finally:
+            sched.deallocVgprTiles(writer)
+
+    def test_emitAllLoops_pap_mx_inserts_preloop_skip_and_nll_hooks(self):
+        """Subtile PAP is scheduler-owned and applies to MX PRELOOP/NLL paths."""
+        kernel = create_kernel(256, 256, fp4=True)
+        kernel.update({
+            "UseSubtileImpl": True,
+            "PrefetchAcrossPersistent": 1,
+            "PrefetchGlobalRead": 2,
+            "StreamK": 3,
+        })
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = make_writer_and_tileinfos(kernel, fp4=True)
+
+        def _pap_hook(_kernel, _tPA, _tPB, _preloop_gr):
+            module = Module("Subtile PAP test hook")
+            module.addComment0("Subtile PAP test hook")
+            return module
+
+        writer.prefetchAcrossPersistentSubtile = MagicMock(side_effect=_pap_hook)
+
+        cfg = make_cfg_256x256_fp4()
+        sched = LogicalScheduler(cfg)
+        sched.build()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                              scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+
+            module = sched.emitAllLoops(writer, kernel)
+            asm = str(module)
+            expected_pap_hooks = 1 if sched.unroll_factor == 1 else sched.unroll_factor + 1
+
+            assert "Subtile PAP: first PRELOOP GR already issued?" in asm
+            assert "SubtilePAPPreloopFirstGRMerge" in asm
+            assert "Subtile PAP test hook" in asm
+            assert writer.prefetchAcrossPersistentSubtile.call_count == expected_pap_hooks
+
+            pap_idx = asm.index("Subtile PAP test hook")
+            assert asm.rfind("NGLL", 0, pap_idx) != -1
+            assert pap_idx < asm.index("NLL", pap_idx)
         finally:
             sched.deallocVgprTiles(writer)
 

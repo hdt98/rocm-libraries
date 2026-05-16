@@ -25,7 +25,7 @@
 from rocisa import rocIsa, countInstruction, countGlobalRead, \
             countLocalRead, countLocalWrite, countWeightedLocalRead, countWeightedLocalWrite, getMFMAs
 from rocisa.code import Module, TextBlock, StructuredModule, KernelBody, RegSet
-from rocisa.container import RegisterContainer, replaceHolder, HWRegContainer, VCC, MemTokenData
+from rocisa.container import RegisterContainer, replaceHolder, HWRegContainer, VCC, MemTokenData, sgpr, vgpr
 from rocisa.label import LabelManager
 from rocisa.asmpass import rocIsaPass, rocIsaPassOption
 from rocisa.instruction import BufferLoadB128, BufferLoadB192, BufferLoadB32, BufferLoadB64, BufferLoadB96, \
@@ -35,9 +35,9 @@ from rocisa.instruction import BufferLoadB128, BufferLoadB192, BufferLoadB32, Bu
   DSLoadU8, DSStore2B32, DSStore2B64, DSStoreB128, DSStoreB16, DSStoreB96, DSStoreB256, \
   DSStoreB32, DSStoreB64, DSStoreB8, DSStoreInstruction, FlatLoadB128, FlatLoadB192, FlatLoadB32, \
   FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, MacroInstruction, \
-  MFMAInstruction, MXMFMAInstruction, SAndB32, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpEQU32, SCmpLeU32, \
-  SCSelectB32, SLShiftLeftB32, SLShiftRightB32, SMFMAInstruction, SNop, SEndpgm, SOrB32, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
-  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, VNop, Instruction
+  MFMAInstruction, MXMFMAInstruction, SAndB32, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpEQU32, SCmpEQU64, SCmpGeU32, SCmpLeU32, \
+  SCSelectB32, SLShiftLeftB32, SLShiftRightB32, SMFMAInstruction, SMovB32, SMovB64, SNop, SEndpgm, SOrB32, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
+  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, VReadfirstlaneB32, VNop, Instruction
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType, DataTypeEnum
 
@@ -3116,6 +3116,87 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     module.addComment2("End setupPrefetchAcrossPersistentLoads")
     return module
+
+  ##############################################################################
+  # Setup next-tile PAP loads for Subtile scheduler kernels.
+  ##############################################################################
+  def papCheckpointCurrentTileIdentityVgprs(self, kernel, prevTile):
+    module = Module("papCheckpointCurrentTileIdentityVgprs")
+    for name in self.papTileIdentityNames(kernel):
+      module.add(VMovB32(dst=vgpr(prevTile[name]), src=sgpr(name),
+                         comment="checkpoint %s for Subtile PAP restore" % name))
+    return module
+
+  def papRestoreCurrentTileIdentityVgprs(self, kernel, prevTile):
+    module = Module("papRestoreCurrentTileIdentityVgprs")
+    for name in self.papTileIdentityNames(kernel):
+      module.add(VReadfirstlaneB32(dst=sgpr(name), src=vgpr(prevTile[name]),
+                                   comment="restore current %s after Subtile PAP" % name))
+    return module
+
+  def prefetchAcrossPersistentSubtile(self, kernel, tensorParametersA, tensorParametersB, preloopGrModule=None):
+    module = Module("prefetchAcrossPersistentSubtile")
+    if not (kernel.get("UseSubtileImpl") and self.isPrefetchAcrossPersistentEnabled(kernel)):
+      return module
+    if tensorParametersA is None or tensorParametersB is None:
+      return module
+
+    skipLabel = Label(self.labels.getNameInc("SK_SkipNllSubtilePAP"), "")
+    module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Parallel reduction: skip Subtile PAP"))
+    module.add(SCBranchSCC1(labelName=skipLabel.getLabelName(), comment=""))
+    module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr("StreamKIterEnd"), comment="No next persistent iteration"))
+    module.add(SCBranchSCC1(labelName=skipLabel.getLabelName(), comment=""))
+    module.add(SBarrier(comment="Subtile PAP: sync before next-tile prefetch"))
+
+    skComponent = Component.StreamK.find(self)
+    tileIdentityNames = self.papTileIdentityNames(kernel)
+    prevTileBase = self.vgprPool.checkOutAligned(len(tileIdentityNames), 1, "Subtile PAP tile identity")
+    prevTile = {name: prevTileBase + i for i, name in enumerate(tileIdentityNames)}
+    module.add(self.papCheckpointCurrentTileIdentityVgprs(kernel, prevTile))
+    module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
+    module.add(self.setupPrefetchAcrossPersistentSubtileLoads(kernel, tensorParametersA, tensorParametersB, preloopGrModule))
+    module.add(self.papRestoreCurrentTileIdentityVgprs(kernel, prevTile))
+    self.vgprPool.checkIn(prevTileBase)
+
+    module.add(skipLabel)
+    return module
+
+  def setupPrefetchAcrossPersistentSubtileLoads(self, kernel, tensorParametersA, tensorParametersB, preloopGrModule=None):
+    module = Module("setupPrefetchAcrossPersistentSubtileLoads")
+    module.addComment2("Begin setupPrefetchAcrossPersistentSubtileLoads")
+
+    def emitTensorLoad(tP):
+      tc = tP["tensorChar"]
+      module.addComment1("Subtile PAP: first-PGR load %s" % tc)
+      if tc in ["A", "B"]:
+        module.add(globalReadDoSubtile(tc, self, kernel))
+      else:
+        module.add(globalReadDoScaleSubtile(tc, self, kernel))
+
+    module.add(globalReadDTLInitCommonSgpr(self, kernel))
+    if kernel["ProblemType"].get("MXBlockA", 0) or kernel["ProblemType"].get("MXBlockB", 0):
+      module.add(globalReadScaleSwizzledDTLInitCommonSgpr(self, kernel))
+
+    module.add(self.graAddresses(kernel, tensorParametersA))
+    if kernel["ProblemType"].get("MXBlockA", 0) and "MX" in tensorParametersA:
+      module.add(self.graAddresses(kernel, tensorParametersA["MX"]))
+    module.add(self.graAddresses(kernel, tensorParametersB))
+    if kernel["ProblemType"].get("MXBlockB", 0) and "MX" in tensorParametersB:
+      module.add(self.graAddresses(kernel, tensorParametersB["MX"]))
+
+    if preloopGrModule is not None:
+      module.add(preloopGrModule)
+    else:
+      emitTensorLoad(tensorParametersA)
+      emitTensorLoad(tensorParametersB)
+      if kernel["ProblemType"].get("MXBlockA", 0) and "MX" in tensorParametersA:
+        emitTensorLoad(tensorParametersA["MX"])
+      if kernel["ProblemType"].get("MXBlockB", 0) and "MX" in tensorParametersB:
+        emitTensorLoad(tensorParametersB["MX"])
+    module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="Subtile PAP: first PRELOOP GR group prefetched"))
+
+    module.addComment2("End setupPrefetchAcrossPersistentSubtileLoads")
+    return module
   ##############################################################################
   # get conditions to skip local read write wait
   ##############################################################################
@@ -4503,6 +4584,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.preLoop(self, kernel))
+    if kernel.get("PrefetchAcrossPersistent"):
+      module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=0, comment="PrefetchAcrossPersistent: not primed at kernel entry"))
 
     # Should check for is swizzled instead of usesubtileimpl
     # TODO: Move this calculation to host-side?
@@ -4516,20 +4599,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     module.add(loopComponent.openPersistentLoop(self, kernel))
 
-    module.addComment0("Number of subtiles for A: %u"%(len(self.states.a.tileInfo.localSubtiles)))
-    module.addComment0("Number of subtiles for B: %u"%(len(self.states.b.tileInfo.localSubtiles)))
-
-    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False))
-    module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
-    #self.removeSgprVarFromPool("SrdD")
-    #self.removeSgprVarFromPool("SrdC")
-
     atileInfo = self.states.a.tileInfo
     btileInfo = self.states.b.tileInfo
     # TODO: Need corresponding ctileInfo for GSU/StreamK
     dtileInfo = self.states.d.tileInfo
     mxsatileInfo = self.states.mxsa.tileInfo if kernel["ProblemType"].get("MXBlockA", 0) else None
     mxsbtileInfo = self.states.mxsb.tileInfo if kernel["ProblemType"].get("MXBlockB", 0) else None
+
+    module.addComment0("Number of subtiles for A: %u"%(len(atileInfo.localSubtiles)))
+    module.addComment0("Number of subtiles for B: %u"%(len(btileInfo.localSubtiles)))
+
+    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False))
+    module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
+    #self.removeSgprVarFromPool("SrdD")
+    #self.removeSgprVarFromPool("SrdC")
 
     ##
     # TODOBS: need to add init c code, and also init sum unroll code.
@@ -4620,7 +4703,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self.functionEnd(kernel, addLabel=False))
 
     #module.add(preLoop(self, kernel))
-    module.add(mainLoop(self, kernel))
+    module.add(mainLoop(self, kernel, tensorParametersA, tensorParametersB))
 
     # Deallocate offset registers
     for tileInfo in [atileInfo, btileInfo, mxsatileInfo, mxsbtileInfo]:

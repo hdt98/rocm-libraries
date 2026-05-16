@@ -1270,7 +1270,7 @@ def preLoop(writer, kernel):
 # Subroutine entry point for main loop
 #
 #
-def mainLoop(writer, kernel):
+def mainLoop(writer, kernel, tensorParametersA=None, tensorParametersB=None):
   module = Module()
   pgr = kernel["PrefetchGlobalRead"]
   assert pgr in (0, 2), "SubtileBasedKernel only supports PGR=0 and PGR=2, got PGR=%d" % pgr
@@ -1321,7 +1321,7 @@ def mainLoop(writer, kernel):
         tileInfoA=tiA, tileInfoB=tiB, dtileInfo=dtileInfo,
         scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
 
-    module.add(scheduler.emitAllLoops(writer, kernel))
+    module.add(scheduler.emitAllLoops(writer, kernel, tensorParametersA, tensorParametersB))
     scheduler.deallocVgprTiles(writer)
 
   else:

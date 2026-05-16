@@ -1929,10 +1929,21 @@ class LogicalScheduler:
         For subIterKs without MFMAs (preloop): emits instructions sequentially.
         """
         from Tensile.Components.Subtile.InstructionScheduler import instructionSchedule
-        from rocisa.code import Module
+        from rocisa.code import Module, Label
+        from rocisa.container import sgpr
+        from rocisa.instruction import SCmpEQU32, SCBranchSCC0, SMovB32
 
         module = Module(label)
         module.addComment0(f"{label} start")
+        use_pap_preloop_skip = (
+            label == "PRELOOP"
+            and kernel.get("UseSubtileImpl")
+            and kernel.get("PrefetchAcrossPersistent")
+            and kernel.get("StreamK") == 3
+        )
+        pap_merge_label = Label("SubtilePAPPreloopFirstGRMerge", "") if use_pap_preloop_skip else None
+        skipping_first_gr_group = False
+        first_gr_group_done = False
         for pi, partition_emitted in enumerate(emitted_3d):
             for k, em_list in enumerate(partition_emitted):
                 module.addComment0(f"partition={pi} subIterK={k}")
@@ -1942,12 +1953,29 @@ class LogicalScheduler:
                     module.add(scheduled)
                 else:
                     for em in em_list:
+                        if use_pap_preloop_skip and not first_gr_group_done:
+                            if em.opType == 'gr':
+                                if not skipping_first_gr_group:
+                                    module.add(SCmpEQU32(src0=sgpr("SkPrefetchPrimed"), src1=0,
+                                                         comment="Subtile PAP: first PRELOOP GR already issued?"))
+                                    module.add(SCBranchSCC0(labelName=pap_merge_label.getLabelName(),
+                                                            comment="skip first PRELOOP GR group if primed"))
+                                    skipping_first_gr_group = True
+                            elif skipping_first_gr_group:
+                                module.add(pap_merge_label)
+                                module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=0,
+                                                   comment="Subtile PAP: clear after first PRELOOP GR merge"))
+                                first_gr_group_done = True
                         for inst in em.instructions:
                             module.add(inst)
+        if use_pap_preloop_skip and skipping_first_gr_group and not first_gr_group_done:
+            module.add(pap_merge_label)
+            module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=0,
+                               comment="Subtile PAP: clear after first PRELOOP GR merge"))
         module.addComment0(f"{label} end")
         return module
 
-    def emitAllLoops(self, writer, kernel):
+    def emitAllLoops(self, writer, kernel, tensorParametersA=None, tensorParametersB=None):
         """Emit complete loop structure: preloop + mainloop + NGLL + NLL.
 
         Owns all control flow (labels, branches, counter management).
@@ -1964,6 +1992,20 @@ class LogicalScheduler:
 
         module = Module("AllLoops")
         uf = self.unroll_factor
+
+        def emit_pap_before_nll():
+            if (kernel.get("UseSubtileImpl")
+                and kernel.get("PrefetchAcrossPersistent")
+                and kernel.get("StreamK") == 3
+                and hasattr(writer, "prefetchAcrossPersistentSubtile")):
+                preloop_gr = Module("Subtile PAP first PRELOOP GR")
+                for em in self._preloop_emitted[0][0]:
+                    if em.opType != 'gr':
+                        break
+                    for inst in em.instructions:
+                        preloop_gr.add(copy.deepcopy(inst))
+                module.add(writer.prefetchAcrossPersistentSubtile(
+                    kernel, tensorParametersA, tensorParametersB, preloop_gr))
 
         # ── Preloop ──
         module.add(self._emitLoop(writer, kernel, "PRELOOP",
@@ -2015,6 +2057,7 @@ class LogicalScheduler:
                                       self._ngll_per_unroll[0]))
             module.addComment0("NLL")
             module.add(Label("SkipToNLL", ""))
+            emit_pap_before_nll()
             module.add(self._emitLoop(writer, kernel, "NLL",
                                       self._nll_per_unroll[0]))
         else:
@@ -2023,6 +2066,7 @@ class LogicalScheduler:
             module.addComment0(f"NGLL_C{last}")
             module.add(self._emitLoop(writer, kernel, f"NGLL_C{last}",
                                       self._ngll_per_unroll[last]))
+            emit_pap_before_nll()
             module.addComment0(f"NLL_C{last}")
             module.add(self._emitLoop(writer, kernel, f"NLL_C{last}",
                                       self._nll_per_unroll[last]))
@@ -2034,6 +2078,7 @@ class LogicalScheduler:
                 module.addComment0(f"NGLL_C{ui}")
                 module.add(self._emitLoop(writer, kernel, f"NGLL_C{ui}",
                                           self._ngll_per_unroll[ui]))
+                emit_pap_before_nll()
                 module.addComment0(f"NLL_C{ui}")
                 module.add(self._emitLoop(writer, kernel, f"NLL_C{ui}",
                                           self._nll_per_unroll[ui]))
@@ -2046,6 +2091,7 @@ class LogicalScheduler:
                                comment="skip NLLEarly"))
             module.addComment0("NLLEarly")
             module.add(Label("SkipToNLL", ""))
+            emit_pap_before_nll()
             module.add(self._emitLoop(writer, kernel, "NLLEarly",
                                       self._nll_per_unroll[0]))
             module.add(endLabel)

@@ -753,7 +753,12 @@ class Solution(collections.abc.Mapping):
       if state["StreamK"] == 0:
         reject(state, printRejectionReason, "UseSubtileImpl=1 supports StreamK only (no support for GSU)")
       if state["PrefetchAcrossPersistent"]:
-        reject(state, printRejectionReason, "UseSubtileImpl=1 does not support PrefetchAcrossPersistent")
+        if state["ISA"] != (9, 5, 0):
+          reject(state, printRejectionReason, "UseSubtileImpl=1 PrefetchAcrossPersistent is currently audited only for gfx950")
+        if state["PrefetchGlobalRead"] != 2:
+          reject(state, printRejectionReason, "UseSubtileImpl=1 PrefetchAcrossPersistent requires PrefetchGlobalRead=2")
+        if state["DirectToVgprMXSA"] or state["DirectToVgprMXSB"]:
+          reject(state, printRejectionReason, "UseSubtileImpl=1 PrefetchAcrossPersistent not supported with DirectToVgpr MX scale tensors")
 
     # TODO: Support other LdsBlockSizePerPadMXSA/B for gfx1250.
     if state["ISA"] == (12, 5, 0):
