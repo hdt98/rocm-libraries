@@ -1,9 +1,6 @@
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-# hipDNN dev container version (version number set arbitrarily, update if/when needed)
-ENV HIPDNN_DEV_CONTAINER_VERSION=1
-
 # Build type selection - must be declared before first use in FROM
 ARG BUILD_TYPE=prebuilt
 
@@ -14,6 +11,9 @@ ARG ASAN_MODE=unknown
 # Common base image with all dependencies
 # ============================================================================
 FROM ubuntu:24.04 AS base
+
+# hipDNN dev container version (version number set arbitrarily, update if/when needed)
+ENV HIPDNN_DEV_CONTAINER_VERSION=1
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HIP_PLATFORM=amd
