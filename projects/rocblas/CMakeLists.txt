@@ -78,7 +78,7 @@ set(ROCBLAS_TENSILE_LIBPATH "${PROJECT_BINARY_DIR}/Tensile" CACHE STRING "Path t
 if(ROCBLAS_ENABLE_CLIENT)
   option(ROCBLAS_ENABLE_BENCHMARKS "Build benchmark client." ON)
   option(ROCBLAS_ENABLE_SAMPLES "Build client samples." ON)
-  option(ROCBLAS_ENABLE_FORTRAN "Build Fortran clients." ON)
+  cmake_dependent_option(ROCBLAS_ENABLE_FORTRAN "Build Fortran clients." ON "NOT WIN32" OFF)
   cmake_dependent_option(ROCBLAS_ENABLE_AMD_SMI "Require amd_smi." ON "NOT WIN32" OFF)
 endif()
 

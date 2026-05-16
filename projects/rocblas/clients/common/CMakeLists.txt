@@ -52,6 +52,7 @@ endif()
 
 if(ROCBLAS_ENABLE_HIPBLASLT)
     target_compile_definitions(rocblas-clients-common PRIVATE BUILD_WITH_HIPBLASLT)
+    target_link_libraries(rocblas-clients-common PRIVATE roc::hipblaslt)
 endif()
 
 if(NOT ROCBLAS_ENABLE_FORTRAN)
