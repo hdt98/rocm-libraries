@@ -1402,15 +1402,12 @@ class Solution(collections.abc.Mapping):
           reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with DirectToVgpr")
         if state["ProblemType"]["NumIndicesSummation"] > 1:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with multiple summation indices")
-      if state["StreamK"] == 3 and state.get("PrefetchAcrossPersistent", 0):
         if not state["BufferStore"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path requires BufferStore")
         if state.get("SuppressNoLoadLoop", False):
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path requires NoLoadLoop")
         if state["ProblemType"]["Sparse"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with sparse")
-        if state.get("UseCustomMainLoopSchedule", 0) == 1:
-          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with custom main-loop scheduling")
         if state["StoreRemapVectorWidth"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with StoreRemap")
       if not state["Valid"]:
@@ -2228,6 +2225,8 @@ class Solution(collections.abc.Mapping):
     # UseSubtileImpl has its own main loop scheduler; CMS is not compatible.
     if state["UseSubtileImpl"] and state["UseCustomMainLoopSchedule"] == 1:
         reject(state, printRejectionReason, "UseCustomMainLoopSchedule=1 is incompatible with UseSubtileImpl")
+    if state.get("PrefetchAcrossPersistent", 0) and state["UseCustomMainLoopSchedule"] == 1:
+      reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with custom main-loop scheduling")
 
     # additional setting for non CMS
     if state["UseCustomMainLoopSchedule"] == 0:
