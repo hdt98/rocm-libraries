@@ -105,7 +105,21 @@ if(TENSILE_ENABLE_HOST)
 
   add_library(roc::tensile-host ALIAS tensile-host)
 
-  target_link_libraries(tensile-host PRIVATE hip::device)
+  # Hide TensileLite-internal C++ symbols from any consumer DSO that statically
+  # composes tensile-host. CXX_VISIBILITY_PRESET hidden governs the symbols
+  # emitted by tensile-host's own TUs; header-level visibility attributes
+  # (Tensile/Macros.hpp) govern what consumer TUs emit.
+  set_target_properties(tensile-host PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+  )
+
+  target_link_libraries(tensile-host
+    PRIVATE
+      hip::device
+    PUBLIC
+      $<$<PLATFORM_ID:Windows>:Shlwapi>
+  )
 
   target_include_directories(tensile-host
     PUBLIC
