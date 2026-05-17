@@ -47,7 +47,7 @@
 class Timer
 {
 public:
-    Timer(){};
+    Timer() {};
     void start(const bool enabled = true)
     {
         if(!enabled)
@@ -80,7 +80,7 @@ private:
 class Timer2
 {
 public:
-    Timer2(){};
+    Timer2() {};
     void start(const bool enabled = true)
     {
         if(!enabled)
@@ -258,8 +258,8 @@ public:
         if(n_iter == 1)
             (void)hipEventElapsedTime(&gpu_time, startEvent[0].get(), endEvent[0].get());
 
-        std::cout << "GPU Kernel Time Elapsed: "
-                  << (n_iter > 1 ? gpu_avg / (n_iter - 1) : gpu_time) << " ms\n";
+        std::cout << "GPU Kernel Time Elapsed: " << (n_iter > 1 ? gpu_avg / (n_iter - 1) : gpu_time)
+                  << " ms\n";
         std::cout << "Wall-clock Time Elapsed: "
                   << (n_iter > 1 ? host_avg / (n_iter - 1) : hostTimePerLaunch[0]) << " ms\n";
     }

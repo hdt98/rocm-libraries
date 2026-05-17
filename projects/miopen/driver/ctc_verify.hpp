@@ -39,13 +39,12 @@
 template <typename T>
 T logaddexp(T x, T y)
 {
-    T a = std::max(x, y);
-    T b = std::min(x, y);
+    T a    = std::max(x, y);
+    T b    = std::min(x, y);
     auto c = double(b - a);
 
-    return c <= NEGATIVE_CUTOFF_VAL
-               ? std::max(a, T(NEGATIVE_CUTOFF_VAL))
-               : std::max(a + T(log(1.0 + exp(c))), T(NEGATIVE_CUTOFF_VAL));
+    return c <= NEGATIVE_CUTOFF_VAL ? std::max(a, T(NEGATIVE_CUTOFF_VAL))
+                                    : std::max(a + T(log(1.0 + exp(c))), T(NEGATIVE_CUTOFF_VAL));
 }
 
 template <typename T>
@@ -320,7 +319,8 @@ void ctc_softmaxlayer_gradient_log(std::vector<int>& label,
             gradients_logits[gidx] -= prob_lx_log;
             gradients_logits[gidx] = std::max(gradients_logits[gidx], T(NEGATIVE_CUTOFF_VAL));
 
-            gradients_logits[gidx] = exp(double(probs_logits[pidx])) - exp(double(gradients_logits[gidx]));
+            gradients_logits[gidx] =
+                exp(double(probs_logits[pidx])) - exp(double(gradients_logits[gidx]));
         }
 }
 

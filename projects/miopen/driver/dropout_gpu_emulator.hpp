@@ -388,8 +388,9 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
                               i1 * in_len[2] * in_len[3] * in_len[4] + i2 * in_len[3] * in_len[4] +
                               i3 * in_len[4] + i4;
 
-            din[ii] = static_cast<Tref>(
-                bool(reservespace[ri]) && !bound_dropout_rate ? dout[oi] / Tgpu(1.f - dropout_rate) : 0);
+            din[ii] = static_cast<Tref>(bool(reservespace[ri]) && !bound_dropout_rate
+                                            ? dout[oi] / Tgpu(1.f - dropout_rate)
+                                            : 0);
             ind.step(i0, i1, i2, i3, i4);
         }
     };

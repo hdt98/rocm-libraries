@@ -362,7 +362,7 @@ int KthvalueDriver<TIO>::VerifyForward()
 {
     RunForwardCPU();
 
-    auto tolerance = std::numeric_limits<TIO>::epsilon() * 10;
+    auto tolerance   = std::numeric_limits<TIO>::epsilon() * 10;
     auto errorOutput = TIO(miopen::rms_range(outputHost, output));
 
     if(!std::isfinite(errorOutput) || errorOutput > tolerance)

@@ -369,8 +369,8 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
     {
         std::cout << "GPU Kernel Min Time Forward Activation Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
-            std::cout << "GPU Kernel Avg Time Forward Activation Elapsed: "
-                      << avgtime / (iters - 1) << " ms, "
+            std::cout << "GPU Kernel Avg Time Forward Activation Elapsed: " << avgtime / (iters - 1)
+                      << " ms, "
                       << "for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
@@ -380,8 +380,7 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
         // layer, readbytes, writebytes, BG/s, timeMS
         std::cout << "stats: name, bytesRead, bytesWritten, GB/s, timeMs\n";
         std::cout << "stats: fwd-activ, " << dataSz ", " << dataSz << ", "
-                  << (2 * dataSz / lowtime / 1e6f) << " ,"
-                  << (avgtime / (iters - 1)) << '\n';
+                  << (2 * dataSz / lowtime / 1e6f) << " ," << (avgtime / (iters - 1)) << '\n';
     }
 
     out_dev->FromGPU(GetStream(), out.data());
@@ -481,8 +480,7 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
         // layer, readbytes, writebytes, BG/s, timeMS
         std::cout << "stats: name, bytesRead, bytesWritten, GB/s, timeMs\n";
         std::cout << "stats: bwd-activ, " << dataSz << ", " << dataSz << ", "
-                  << (2 * dataSz / lowtime / 1e6f) << ", "
-                  << (avgtime / (iters - 1)) << '\n';
+                  << (2 * dataSz / lowtime / 1e6f) << ", " << (avgtime / (iters - 1)) << '\n';
     }
 
     din_dev->FromGPU(GetStream(), din.data());
