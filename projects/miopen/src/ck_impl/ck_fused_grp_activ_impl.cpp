@@ -307,7 +307,7 @@ struct CKArgs
                                   nullptr,
                                   1.0f,
                                   0.0f,
-                                  OutElementOp{0, ck::NumericLimits<DataType>::Max()});
+                                  OutElementOp{0, float(ck::NumericLimits<DataType>::Max())});
         return conv_ptr->IsSupportedArgument(arg_ptr.get());
     }
 

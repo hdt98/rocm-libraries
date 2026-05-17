@@ -693,7 +693,7 @@ OutElemOp GetOutElementOp(const miopen::fusion::ActivationOpInvokeParam& activat
     auto activationMode = activationOp.activMode;
     switch(activationMode)
     {
-    case miopenActivationRELU: return OutElemOp{0, ck::NumericLimits<DataType>::Max()};
+    case miopenActivationRELU: return OutElemOp{0, float(ck::NumericLimits<DataType>::Max())};
     case miopenActivationCLIPPEDRELU: return OutElemOp{0, activationOp.activAlpha};
     case miopenActivationCLAMP: return OutElemOp{activationOp.activAlpha, activationOp.activBeta};
     default:
