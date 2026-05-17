@@ -619,21 +619,43 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
 }
 
 
+// double accumulator (GPU reference mode)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, double, float, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, double, float, 1)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, half, double, half, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, float, float, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, half, float, half, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, ushort, float, ushort, 0)
+
+// double accumulator (GPU reference mode)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, float, double, float, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, float, double, float, 1)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, half, double, half, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, float, float, float, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, half, float, half, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, ushort, float, ushort, 0)
 
+// double accumulator (GPU reference mode)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, float, double, float, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, float, double, float, 1)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, half, double, half, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, float, float, float, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, half, float, half, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, ushort, float, ushort, 0)
+
+// double accumulator (GPU reference mode)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, double, float, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, double, float, 1)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, half, double, half, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, float, float, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, half, float, half, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, ushort, float, ushort, 0)
 

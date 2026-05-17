@@ -96,6 +96,29 @@ inline __device__ __host__ double cast_to(const half& val)
 {
     return static_cast<double>(__half2float(val));
 }
+// bfloat16 (ushort) ↔ float
+template <>
+inline __device__ __host__ ushort cast_to(const float& val)
+{
+    return convert_fp32_to_bf16(val);
+}
+template <>
+inline __device__ __host__ float cast_to(const ushort& val)
+{
+    return convert_bf16_to_fp32(val);
+}
+// half ↔ float
+template <>
+inline __device__ __host__ half cast_to(const float& val)
+{
+    return __float2half(val);
+}
+template <>
+inline __device__ __host__ float cast_to(const half& val)
+{
+    return __half2float(val);
+}
+
 template <>
 inline __device__ __host__ int8_t cast_to(const int32_t& val)
 {

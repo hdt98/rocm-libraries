@@ -600,31 +600,57 @@ inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
 }
 
 
+// double accumulator (GPU reference mode)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, double, float, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, double, float, 1)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, half, double, half, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, float, float, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, half, float, half, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, ushort, float, ushort, 0)
+// int8
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, int8_t, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, int32_t, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, float, 0)
+
+// double accumulator (GPU reference mode)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, float, double, float, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, float, double, float, 1)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, half, double, half, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, float, float, float, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, half, float, half, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, ushort, float, ushort, 0)
+// int8
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, int8_t, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, int32_t, 0)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, float, 0)
 
+// double accumulator (GPU reference mode)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, float, double, float, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, float, double, float, 1)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, half, double, half, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, float, float, float, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, half, float, half, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, ushort, float, ushort, 0)
+// int8
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, int8_t, int32_t, int32_t, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, int8_t, int32_t, float, 0)
+
+// double accumulator (GPU reference mode)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, float, double, float, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, float, double, float, 1)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, half, double, half, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, ushort, double, ushort, 0)
+// float accumulator (normal solver mode)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, float, float, float, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, half, float, half, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, ushort, float, ushort, 0)
+// int8
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, int32_t, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, float, 0)
 

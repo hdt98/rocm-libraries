@@ -93,6 +93,8 @@ bool IsInputInt8(const ProblemDescription& problem)
 
 bool IsAccFp64(const ProblemDescription& problem)
 {
+    if(!miopen::debug::AlwaysEnableConvDirectNaive)
+        return false;
     return IsInputFp32(problem) || IsInputFp16(problem) || IsInputBfp16(problem);
 }
 
@@ -199,6 +201,8 @@ std::string ConvDirectNaiveConvKernelName(const ProblemDescription& problem)
         kernel_name << "int32_t_";
     else if(IsAccFp64(problem))
         kernel_name << "double_";
+    else if(IsInputFp32(problem) || IsInputFp16(problem) || IsInputBfp16(problem))
+        kernel_name << "float_";
     else
         MIOPEN_THROW("unsupported data type:");
 
