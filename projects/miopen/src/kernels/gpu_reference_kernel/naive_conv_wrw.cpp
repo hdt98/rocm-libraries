@@ -70,6 +70,11 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
     int spatial_length = n * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    bool use_atomic    = (gridDim.y > 1);
+
+    // Spatial tile range for cross-block tiling (gridDim.y > 1)
+    int tile_start = static_cast<int>(blockIdx.y) * bdx;
+    int tile_end   = min(tile_start + bdx, spatial_length);
 
     if(num_weights <= bdx / 2)
     {
@@ -87,43 +92,93 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
         acc_data_t value = 0;
         if(worker_id < workers)
         {
-            for(int s = worker_id; s < spatial_length; s += workers)
+            if(use_atomic)
             {
-                int iwo = s % wo;
-                int iho = (s / wo) % ho;
-                int in  = s / (ho * wo);
-
-                int cur_h = sy * iho - py + dy * iy;
-                int cur_w = sx * iwo - px + dx * ix;
-
-                if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start + worker_id; s < tile_end; s += workers)
                 {
-                    if constexpr(ASSUME_PACKED)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int in  = s / (ho * wo);
+
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * c * hi * wi +
-                                       static_cast<size_t>(ic) * hi * wi +
-                                       static_cast<size_t>(cur_h) * wi +
-                                       static_cast<size_t>(cur_w);
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * c * hi * wi +
+                                           static_cast<size_t>(ic) * hi * wi +
+                                           static_cast<size_t>(cur_h) * wi +
+                                           static_cast<size_t>(cur_w);
 
-                        size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
-                                       static_cast<size_t>(iho) * wo + static_cast<size_t>(iwo);
+                            size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
+                                           static_cast<size_t>(iho) * wo +
+                                           static_cast<size_t>(iwo);
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                           static_cast<size_t>(ic) * in_strides[2] +
+                                           static_cast<size_t>(cur_h) * in_strides[1] +
+                                           static_cast<size_t>(cur_w) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[1] +
+                                           static_cast<size_t>(iwo) * out_strides[0];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
-                    else
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int s = worker_id; s < spatial_length; s += workers)
+                {
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int in  = s / (ho * wo);
+
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
-                                       static_cast<size_t>(ic) * in_strides[2] +
-                                       static_cast<size_t>(cur_h) * in_strides[1] +
-                                       static_cast<size_t>(cur_w) * in_strides[0];
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * c * hi * wi +
+                                           static_cast<size_t>(ic) * hi * wi +
+                                           static_cast<size_t>(cur_h) * wi +
+                                           static_cast<size_t>(cur_w);
 
-                        size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
-                                       static_cast<size_t>(iho) * out_strides[1] +
-                                       static_cast<size_t>(iwo) * out_strides[0];
+                            size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
+                                           static_cast<size_t>(iho) * wo +
+                                           static_cast<size_t>(iwo);
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                           static_cast<size_t>(ic) * in_strides[2] +
+                                           static_cast<size_t>(cur_h) * in_strides[1] +
+                                           static_cast<size_t>(cur_w) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[1] +
+                                           static_cast<size_t>(iwo) * out_strides[0];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
                 }
             }
@@ -146,20 +201,26 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(ic) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(ic) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
         }
     }
     else
     {
-        // Original path: one thread per weight element, serial spatial loop
+        // Fallback path: one thread per weight element
         for(int tid = tx; tid < thread_length; tid += bdx)
         {
             int ix = tid % fx;
@@ -168,52 +229,103 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
 
             acc_data_t value = 0;
 
-            for(int in = 0; in < n; in++)
+            if(use_atomic)
             {
-                for(int iho = 0; iho < ho; iho++)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start; s < tile_end; s++)
                 {
-                    int valid_h = 1;
-                    int cur_h   = sy * iho - py + dy * iy;
-                    if(cur_h < 0 || cur_h >= hi)
-                        valid_h &= 0;
-                    for(int iwo = 0; iwo < wo; iwo++)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int in  = s / (ho * wo);
+
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
                     {
-                        int valid_w = 1;
-                        int cur_w   = sx * iwo - px + dx * ix;
-                        if(cur_w < 0 || cur_w >= wi)
-                            valid_w &= 0;
-
-                        if(valid_h & valid_w)
+                        if constexpr(ASSUME_PACKED)
                         {
-                            if constexpr(ASSUME_PACKED)
+                            size_t i_idx = static_cast<size_t>(in) * c * hi * wi +
+                                           static_cast<size_t>(ic) * hi * wi +
+                                           static_cast<size_t>(cur_h) * wi +
+                                           static_cast<size_t>(cur_w);
+
+                            size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
+                                           static_cast<size_t>(iho) * wo +
+                                           static_cast<size_t>(iwo);
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                           static_cast<size_t>(ic) * in_strides[2] +
+                                           static_cast<size_t>(cur_h) * in_strides[1] +
+                                           static_cast<size_t>(cur_w) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[1] +
+                                           static_cast<size_t>(iwo) * out_strides[0];
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int in = 0; in < n; in++)
+                {
+                    for(int iho = 0; iho < ho; iho++)
+                    {
+                        int valid_h = 1;
+                        int cur_h   = sy * iho - py + dy * iy;
+                        if(cur_h < 0 || cur_h >= hi)
+                            valid_h &= 0;
+                        for(int iwo = 0; iwo < wo; iwo++)
+                        {
+                            int valid_w = 1;
+                            int cur_w   = sx * iwo - px + dx * ix;
+                            if(cur_w < 0 || cur_w >= wi)
+                                valid_w &= 0;
+
+                            if(valid_h & valid_w)
                             {
-                                size_t i_idx = static_cast<size_t>(in) * c * hi * wi +
-                                               static_cast<size_t>(ic) * hi * wi +
-                                               static_cast<size_t>(cur_h) * wi +
-                                               static_cast<size_t>(cur_w);
+                                if constexpr(ASSUME_PACKED)
+                                {
+                                    size_t i_idx = static_cast<size_t>(in) * c * hi * wi +
+                                                   static_cast<size_t>(ic) * hi * wi +
+                                                   static_cast<size_t>(cur_h) * wi +
+                                                   static_cast<size_t>(cur_w);
 
-                                size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
-                                               static_cast<size_t>(iho) * wo +
-                                               static_cast<size_t>(iwo);
+                                    size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
+                                                   static_cast<size_t>(iho) * wo +
+                                                   static_cast<size_t>(iwo);
 
-                                value +=
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
-                            }
-                            else
-                            {
-                                size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
-                                               static_cast<size_t>(ic) * in_strides[2] +
-                                               static_cast<size_t>(cur_h) * in_strides[1] +
-                                               static_cast<size_t>(cur_w) * in_strides[0];
+                                    value +=
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                }
+                                else
+                                {
+                                    size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                                   static_cast<size_t>(ic) * in_strides[2] +
+                                                   static_cast<size_t>(cur_h) * in_strides[1] +
+                                                   static_cast<size_t>(cur_w) * in_strides[0];
 
-                                size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
-                                               static_cast<size_t>(iho) * out_strides[1] +
-                                               static_cast<size_t>(iwo) * out_strides[0];
+                                    size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                                   static_cast<size_t>(iho) * out_strides[1] +
+                                                   static_cast<size_t>(iwo) * out_strides[0];
 
-                                value +=
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                    value +=
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                }
                             }
                         }
                     }
@@ -224,14 +336,20 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(ic) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(ic) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
         }
     }
@@ -312,6 +430,11 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
     int spatial_length = n * do_ * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    bool use_atomic    = (gridDim.y > 1);
+
+    // Spatial tile range for cross-block tiling (gridDim.y > 1)
+    int tile_start = static_cast<int>(blockIdx.y) * bdx;
+    int tile_end   = min(tile_start + bdx, spatial_length);
 
     if(num_weights <= bdx / 2)
     {
@@ -329,51 +452,107 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
         acc_data_t value = 0;
         if(worker_id < workers)
         {
-            for(int s = worker_id; s < spatial_length; s += workers)
+            if(use_atomic)
             {
-                int iwo = s % wo;
-                int iho = (s / wo) % ho;
-                int ido = (s / (wo * ho)) % do_;
-                int in  = s / (do_ * ho * wo);
-
-                int cur_d = sz * ido - pz + dz * iz;
-                int cur_h = sy * iho - py + dy * iy;
-                int cur_w = sx * iwo - px + dx * ix;
-
-                if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
-                   cur_w >= 0 && cur_w < wi)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start + worker_id; s < tile_end; s += workers)
                 {
-                    if constexpr(ASSUME_PACKED)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int ido = (s / (wo * ho)) % do_;
+                    int in  = s / (do_ * ho * wo);
+
+                    int cur_d = sz * ido - pz + dz * iz;
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
+                       cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * c * di * hi * wi +
-                                       static_cast<size_t>(ic) * di * hi * wi +
-                                       static_cast<size_t>(cur_d) * hi * wi +
-                                       static_cast<size_t>(cur_h) * wi +
-                                       static_cast<size_t>(cur_w);
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * c * di * hi * wi +
+                                           static_cast<size_t>(ic) * di * hi * wi +
+                                           static_cast<size_t>(cur_d) * hi * wi +
+                                           static_cast<size_t>(cur_h) * wi +
+                                           static_cast<size_t>(cur_w);
 
-                        size_t o_idx = static_cast<size_t>(in) * k * do_ * ho * wo +
-                                       static_cast<size_t>(ido) * ho * wo +
-                                       static_cast<size_t>(iho) * wo +
-                                       static_cast<size_t>(iwo);
+                            size_t o_idx = static_cast<size_t>(in) * k * do_ * ho * wo +
+                                           static_cast<size_t>(ido) * ho * wo +
+                                           static_cast<size_t>(iho) * wo +
+                                           static_cast<size_t>(iwo);
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
+                                           static_cast<size_t>(ic) * in_strides[3] +
+                                           static_cast<size_t>(cur_d) * in_strides[2] +
+                                           static_cast<size_t>(cur_h) * in_strides[1] +
+                                           static_cast<size_t>(cur_w) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
+                                           static_cast<size_t>(ido) * out_strides[2] +
+                                           static_cast<size_t>(iho) * out_strides[1] +
+                                           static_cast<size_t>(iwo) * out_strides[0];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
-                    else
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int s = worker_id; s < spatial_length; s += workers)
+                {
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int ido = (s / (wo * ho)) % do_;
+                    int in  = s / (do_ * ho * wo);
+
+                    int cur_d = sz * ido - pz + dz * iz;
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
+                       cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
-                                       static_cast<size_t>(ic) * in_strides[3] +
-                                       static_cast<size_t>(cur_d) * in_strides[2] +
-                                       static_cast<size_t>(cur_h) * in_strides[1] +
-                                       static_cast<size_t>(cur_w) * in_strides[0];
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * c * di * hi * wi +
+                                           static_cast<size_t>(ic) * di * hi * wi +
+                                           static_cast<size_t>(cur_d) * hi * wi +
+                                           static_cast<size_t>(cur_h) * wi +
+                                           static_cast<size_t>(cur_w);
 
-                        size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
-                                       static_cast<size_t>(ido) * out_strides[2] +
-                                       static_cast<size_t>(iho) * out_strides[1] +
-                                       static_cast<size_t>(iwo) * out_strides[0];
+                            size_t o_idx = static_cast<size_t>(in) * k * do_ * ho * wo +
+                                           static_cast<size_t>(ido) * ho * wo +
+                                           static_cast<size_t>(iho) * wo +
+                                           static_cast<size_t>(iwo);
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
+                                           static_cast<size_t>(ic) * in_strides[3] +
+                                           static_cast<size_t>(cur_d) * in_strides[2] +
+                                           static_cast<size_t>(cur_h) * in_strides[1] +
+                                           static_cast<size_t>(cur_w) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
+                                           static_cast<size_t>(ido) * out_strides[2] +
+                                           static_cast<size_t>(iho) * out_strides[1] +
+                                           static_cast<size_t>(iwo) * out_strides[0];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
                 }
             }
@@ -397,7 +576,10 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(ic) * fz * fy * fx +
                                static_cast<size_t>(iz) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
             else
             {
@@ -405,12 +587,16 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iz) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
         }
     }
     else
     {
+        // Fallback path: one thread per weight element
         for(int tid = tx; tid < thread_length; tid += bdx)
         {
             int ix = tid % fx;
@@ -420,62 +606,128 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
 
             acc_data_t value = 0;
 
-            for(int in = 0; in < n; in++)
+            if(use_atomic)
             {
-                for(int ido = 0; ido < do_; ido++)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start; s < tile_end; s++)
                 {
-                    int valid_d = 1;
-                    int cur_d   = sz * ido - pz + dz * iz;
-                    if(cur_d < 0 || cur_d >= di)
-                        valid_d &= 0;
-                    for(int iho = 0; iho < ho; iho++)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int ido = (s / (wo * ho)) % do_;
+                    int in  = s / (do_ * ho * wo);
+
+                    int cur_d = sz * ido - pz + dz * iz;
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
+                       cur_w >= 0 && cur_w < wi)
                     {
-                        int valid_h = 1;
-                        int cur_h   = sy * iho - py + dy * iy;
-                        if(cur_h < 0 || cur_h >= hi)
-                            valid_h &= 0;
-                        for(int iwo = 0; iwo < wo; iwo++)
+                        if constexpr(ASSUME_PACKED)
                         {
-                            int valid_w = 1;
-                            int cur_w   = sx * iwo - px + dx * ix;
-                            if(cur_w < 0 || cur_w >= wi)
-                                valid_w &= 0;
+                            size_t i_idx = static_cast<size_t>(in) * c * di * hi * wi +
+                                           static_cast<size_t>(ic) * di * hi * wi +
+                                           static_cast<size_t>(cur_d) * hi * wi +
+                                           static_cast<size_t>(cur_h) * wi +
+                                           static_cast<size_t>(cur_w);
 
-                            if(valid_d & valid_h & valid_w)
+                            size_t o_idx = static_cast<size_t>(in) * k * do_ * ho * wo +
+                                           static_cast<size_t>(ido) * ho * wo +
+                                           static_cast<size_t>(iho) * wo +
+                                           static_cast<size_t>(iwo);
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
+                                           static_cast<size_t>(ic) * in_strides[3] +
+                                           static_cast<size_t>(cur_d) * in_strides[2] +
+                                           static_cast<size_t>(cur_h) * in_strides[1] +
+                                           static_cast<size_t>(cur_w) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
+                                           static_cast<size_t>(ido) * out_strides[2] +
+                                           static_cast<size_t>(iho) * out_strides[1] +
+                                           static_cast<size_t>(iwo) * out_strides[0];
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int in = 0; in < n; in++)
+                {
+                    for(int ido = 0; ido < do_; ido++)
+                    {
+                        int valid_d = 1;
+                        int cur_d   = sz * ido - pz + dz * iz;
+                        if(cur_d < 0 || cur_d >= di)
+                            valid_d &= 0;
+                        for(int iho = 0; iho < ho; iho++)
+                        {
+                            int valid_h = 1;
+                            int cur_h   = sy * iho - py + dy * iy;
+                            if(cur_h < 0 || cur_h >= hi)
+                                valid_h &= 0;
+                            for(int iwo = 0; iwo < wo; iwo++)
                             {
-                                if constexpr(ASSUME_PACKED)
+                                int valid_w = 1;
+                                int cur_w   = sx * iwo - px + dx * ix;
+                                if(cur_w < 0 || cur_w >= wi)
+                                    valid_w &= 0;
+
+                                if(valid_d & valid_h & valid_w)
                                 {
-                                    size_t i_idx = static_cast<size_t>(in) * c * di * hi * wi +
-                                                   static_cast<size_t>(ic) * di * hi * wi +
-                                                   static_cast<size_t>(cur_d) * hi * wi +
-                                                   static_cast<size_t>(cur_h) * wi +
-                                                   static_cast<size_t>(cur_w);
+                                    if constexpr(ASSUME_PACKED)
+                                    {
+                                        size_t i_idx =
+                                            static_cast<size_t>(in) * c * di * hi * wi +
+                                            static_cast<size_t>(ic) * di * hi * wi +
+                                            static_cast<size_t>(cur_d) * hi * wi +
+                                            static_cast<size_t>(cur_h) * wi +
+                                            static_cast<size_t>(cur_w);
 
-                                    size_t o_idx = static_cast<size_t>(in) * k * do_ * ho * wo +
-                                                   static_cast<size_t>(ido) * ho * wo +
-                                                   static_cast<size_t>(iho) * wo +
-                                                   static_cast<size_t>(iwo);
+                                        size_t o_idx =
+                                            static_cast<size_t>(in) * k * do_ * ho * wo +
+                                            static_cast<size_t>(ido) * ho * wo +
+                                            static_cast<size_t>(iho) * wo +
+                                            static_cast<size_t>(iwo);
 
-                                    value +=
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
-                                }
-                                else
-                                {
-                                    size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
-                                                   static_cast<size_t>(ic) * in_strides[3] +
-                                                   static_cast<size_t>(cur_d) * in_strides[2] +
-                                                   static_cast<size_t>(cur_h) * in_strides[1] +
-                                                   static_cast<size_t>(cur_w) * in_strides[0];
+                                        value +=
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_in[i_idx]) *
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_out[o_idx]);
+                                    }
+                                    else
+                                    {
+                                        size_t i_idx =
+                                            static_cast<size_t>(in) * in_strides[5] +
+                                            static_cast<size_t>(ic) * in_strides[3] +
+                                            static_cast<size_t>(cur_d) * in_strides[2] +
+                                            static_cast<size_t>(cur_h) * in_strides[1] +
+                                            static_cast<size_t>(cur_w) * in_strides[0];
 
-                                    size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
-                                                   static_cast<size_t>(ido) * out_strides[2] +
-                                                   static_cast<size_t>(iho) * out_strides[1] +
-                                                   static_cast<size_t>(iwo) * out_strides[0];
+                                        size_t o_idx =
+                                            static_cast<size_t>(in) * out_strides[5] +
+                                            static_cast<size_t>(ido) * out_strides[2] +
+                                            static_cast<size_t>(iho) * out_strides[1] +
+                                            static_cast<size_t>(iwo) * out_strides[0];
 
-                                    value +=
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                        value +=
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_in[i_idx]) *
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_out[o_idx]);
+                                    }
                                 }
                             }
                         }
@@ -488,7 +740,10 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(ic) * fz * fy * fx +
                                static_cast<size_t>(iz) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
             else
             {
@@ -496,7 +751,10 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iz) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
         }
     }
@@ -570,6 +828,11 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
     int spatial_length = n * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    bool use_atomic    = (gridDim.y > 1);
+
+    // Spatial tile range for cross-block tiling (gridDim.y > 1)
+    int tile_start = static_cast<int>(blockIdx.y) * bdx;
+    int tile_end   = min(tile_start + bdx, spatial_length);
 
     if(num_weights <= bdx / 2)
     {
@@ -586,43 +849,93 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
         acc_data_t value = 0;
         if(worker_id < workers)
         {
-            for(int s = worker_id; s < spatial_length; s += workers)
+            if(use_atomic)
             {
-                int iwo = s % wo;
-                int iho = (s / wo) % ho;
-                int in  = s / (ho * wo);
-
-                int cur_h = sy * iho - py + dy * iy;
-                int cur_w = sx * iwo - px + dx * ix;
-
-                if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start + worker_id; s < tile_end; s += workers)
                 {
-                    if constexpr(ASSUME_PACKED)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int in  = s / (ho * wo);
+
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * hi * wi * c +
-                                       static_cast<size_t>(cur_h) * wi * c +
-                                       static_cast<size_t>(cur_w) * c + static_cast<size_t>(ic);
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * hi * wi * c +
+                                           static_cast<size_t>(cur_h) * wi * c +
+                                           static_cast<size_t>(cur_w) * c +
+                                           static_cast<size_t>(ic);
 
-                        size_t o_idx = static_cast<size_t>(in) * ho * wo * k +
-                                       static_cast<size_t>(iho) * wo * k +
-                                       static_cast<size_t>(iwo) * k;
+                            size_t o_idx = static_cast<size_t>(in) * ho * wo * k +
+                                           static_cast<size_t>(iho) * wo * k +
+                                           static_cast<size_t>(iwo) * k;
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                           static_cast<size_t>(cur_h) * in_strides[3] +
+                                           static_cast<size_t>(cur_w) * in_strides[2] +
+                                           static_cast<size_t>(ic) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[3] +
+                                           static_cast<size_t>(iwo) * out_strides[2];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
-                    else
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int s = worker_id; s < spatial_length; s += workers)
+                {
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int in  = s / (ho * wo);
+
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
-                                       static_cast<size_t>(cur_h) * in_strides[3] +
-                                       static_cast<size_t>(cur_w) * in_strides[2] +
-                                       static_cast<size_t>(ic) * in_strides[0];
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * hi * wi * c +
+                                           static_cast<size_t>(cur_h) * wi * c +
+                                           static_cast<size_t>(cur_w) * c +
+                                           static_cast<size_t>(ic);
 
-                        size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
-                                       static_cast<size_t>(iho) * out_strides[3] +
-                                       static_cast<size_t>(iwo) * out_strides[2];
+                            size_t o_idx = static_cast<size_t>(in) * ho * wo * k +
+                                           static_cast<size_t>(iho) * wo * k +
+                                           static_cast<size_t>(iwo) * k;
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                           static_cast<size_t>(cur_h) * in_strides[3] +
+                                           static_cast<size_t>(cur_w) * in_strides[2] +
+                                           static_cast<size_t>(ic) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[3] +
+                                           static_cast<size_t>(iwo) * out_strides[2];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
                 }
             }
@@ -645,19 +958,26 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
         }
     }
     else
     {
+        // Fallback path: one thread per weight element
         for(int tid = tx; tid < thread_length; tid += bdx)
         {
             int ic = tid % c_per_group;
@@ -666,52 +986,103 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
 
             acc_data_t value = 0;
 
-            for(int in = 0; in < n; in++)
+            if(use_atomic)
             {
-                for(int iho = 0; iho < ho; iho++)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start; s < tile_end; s++)
                 {
-                    int valid_h = 1;
-                    int cur_h   = sy * iho - py + dy * iy;
-                    if(cur_h < 0 || cur_h >= hi)
-                        valid_h &= 0;
-                    for(int iwo = 0; iwo < wo; iwo++)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int in  = s / (ho * wo);
+
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_h >= 0 && cur_h < hi && cur_w >= 0 && cur_w < wi)
                     {
-                        int valid_w = 1;
-                        int cur_w   = sx * iwo - px + dx * ix;
-                        if(cur_w < 0 || cur_w >= wi)
-                            valid_w &= 0;
-
-                        if(valid_h & valid_w)
+                        if constexpr(ASSUME_PACKED)
                         {
-                            if constexpr(ASSUME_PACKED)
+                            size_t i_idx = static_cast<size_t>(in) * hi * wi * c +
+                                           static_cast<size_t>(cur_h) * wi * c +
+                                           static_cast<size_t>(cur_w) * c +
+                                           static_cast<size_t>(ic);
+
+                            size_t o_idx = static_cast<size_t>(in) * ho * wo * k +
+                                           static_cast<size_t>(iho) * wo * k +
+                                           static_cast<size_t>(iwo) * k;
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                           static_cast<size_t>(cur_h) * in_strides[3] +
+                                           static_cast<size_t>(cur_w) * in_strides[2] +
+                                           static_cast<size_t>(ic) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[3] +
+                                           static_cast<size_t>(iwo) * out_strides[2];
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int in = 0; in < n; in++)
+                {
+                    for(int iho = 0; iho < ho; iho++)
+                    {
+                        int valid_h = 1;
+                        int cur_h   = sy * iho - py + dy * iy;
+                        if(cur_h < 0 || cur_h >= hi)
+                            valid_h &= 0;
+                        for(int iwo = 0; iwo < wo; iwo++)
+                        {
+                            int valid_w = 1;
+                            int cur_w   = sx * iwo - px + dx * ix;
+                            if(cur_w < 0 || cur_w >= wi)
+                                valid_w &= 0;
+
+                            if(valid_h & valid_w)
                             {
-                                size_t i_idx = static_cast<size_t>(in) * hi * wi * c +
-                                               static_cast<size_t>(cur_h) * wi * c +
-                                               static_cast<size_t>(cur_w) * c +
-                                               static_cast<size_t>(ic);
+                                if constexpr(ASSUME_PACKED)
+                                {
+                                    size_t i_idx = static_cast<size_t>(in) * hi * wi * c +
+                                                   static_cast<size_t>(cur_h) * wi * c +
+                                                   static_cast<size_t>(cur_w) * c +
+                                                   static_cast<size_t>(ic);
 
-                                size_t o_idx = static_cast<size_t>(in) * ho * wo * k +
-                                               static_cast<size_t>(iho) * wo * k +
-                                               static_cast<size_t>(iwo) * k;
+                                    size_t o_idx = static_cast<size_t>(in) * ho * wo * k +
+                                                   static_cast<size_t>(iho) * wo * k +
+                                                   static_cast<size_t>(iwo) * k;
 
-                                value +=
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
-                            }
-                            else
-                            {
-                                size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
-                                               static_cast<size_t>(cur_h) * in_strides[3] +
-                                               static_cast<size_t>(cur_w) * in_strides[2] +
-                                               static_cast<size_t>(ic) * in_strides[0];
+                                    value +=
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                }
+                                else
+                                {
+                                    size_t i_idx = static_cast<size_t>(in) * in_strides[4] +
+                                                   static_cast<size_t>(cur_h) * in_strides[3] +
+                                                   static_cast<size_t>(cur_w) * in_strides[2] +
+                                                   static_cast<size_t>(ic) * in_strides[0];
 
-                                size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
-                                               static_cast<size_t>(iho) * out_strides[3] +
-                                               static_cast<size_t>(iwo) * out_strides[2];
+                                    size_t o_idx = static_cast<size_t>(in) * out_strides[4] +
+                                                   static_cast<size_t>(iho) * out_strides[3] +
+                                                   static_cast<size_t>(iwo) * out_strides[2];
 
-                                value +=
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                    cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                    value +=
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                }
                             }
                         }
                     }
@@ -722,14 +1093,20 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
         }
     }
@@ -809,6 +1186,11 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
     int spatial_length = n * do_ * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    bool use_atomic    = (gridDim.y > 1);
+
+    // Spatial tile range for cross-block tiling (gridDim.y > 1)
+    int tile_start = static_cast<int>(blockIdx.y) * bdx;
+    int tile_end   = min(tile_start + bdx, spatial_length);
 
     if(num_weights <= bdx / 2)
     {
@@ -826,51 +1208,107 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
         acc_data_t value = 0;
         if(worker_id < workers)
         {
-            for(int s = worker_id; s < spatial_length; s += workers)
+            if(use_atomic)
             {
-                int iwo = s % wo;
-                int iho = (s / wo) % ho;
-                int ido = (s / (wo * ho)) % do_;
-                int in  = s / (do_ * ho * wo);
-
-                int cur_d = sz * ido - pz + dz * iz;
-                int cur_h = sy * iho - py + dy * iy;
-                int cur_w = sx * iwo - px + dx * ix;
-
-                if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
-                   cur_w >= 0 && cur_w < wi)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start + worker_id; s < tile_end; s += workers)
                 {
-                    if constexpr(ASSUME_PACKED)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int ido = (s / (wo * ho)) % do_;
+                    int in  = s / (do_ * ho * wo);
+
+                    int cur_d = sz * ido - pz + dz * iz;
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
+                       cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * di * hi * wi * c +
-                                       static_cast<size_t>(cur_d) * hi * wi * c +
-                                       static_cast<size_t>(cur_h) * wi * c +
-                                       static_cast<size_t>(cur_w) * c +
-                                       static_cast<size_t>(ic);
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * di * hi * wi * c +
+                                           static_cast<size_t>(cur_d) * hi * wi * c +
+                                           static_cast<size_t>(cur_h) * wi * c +
+                                           static_cast<size_t>(cur_w) * c +
+                                           static_cast<size_t>(ic);
 
-                        size_t o_idx = static_cast<size_t>(in) * do_ * ho * wo * k +
-                                       static_cast<size_t>(ido) * ho * wo * k +
-                                       static_cast<size_t>(iho) * wo * k +
-                                       static_cast<size_t>(iwo) * k;
+                            size_t o_idx = static_cast<size_t>(in) * do_ * ho * wo * k +
+                                           static_cast<size_t>(ido) * ho * wo * k +
+                                           static_cast<size_t>(iho) * wo * k +
+                                           static_cast<size_t>(iwo) * k;
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
+                                           static_cast<size_t>(cur_d) * in_strides[4] +
+                                           static_cast<size_t>(cur_h) * in_strides[3] +
+                                           static_cast<size_t>(cur_w) * in_strides[2] +
+                                           static_cast<size_t>(ic) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
+                                           static_cast<size_t>(ido) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[3] +
+                                           static_cast<size_t>(iwo) * out_strides[2];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
-                    else
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int s = worker_id; s < spatial_length; s += workers)
+                {
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int ido = (s / (wo * ho)) % do_;
+                    int in  = s / (do_ * ho * wo);
+
+                    int cur_d = sz * ido - pz + dz * iz;
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
+                       cur_w >= 0 && cur_w < wi)
                     {
-                        size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
-                                       static_cast<size_t>(cur_d) * in_strides[4] +
-                                       static_cast<size_t>(cur_h) * in_strides[3] +
-                                       static_cast<size_t>(cur_w) * in_strides[2] +
-                                       static_cast<size_t>(ic) * in_strides[0];
+                        if constexpr(ASSUME_PACKED)
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * di * hi * wi * c +
+                                           static_cast<size_t>(cur_d) * hi * wi * c +
+                                           static_cast<size_t>(cur_h) * wi * c +
+                                           static_cast<size_t>(cur_w) * c +
+                                           static_cast<size_t>(ic);
 
-                        size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
-                                       static_cast<size_t>(ido) * out_strides[4] +
-                                       static_cast<size_t>(iho) * out_strides[3] +
-                                       static_cast<size_t>(iwo) * out_strides[2];
+                            size_t o_idx = static_cast<size_t>(in) * do_ * ho * wo * k +
+                                           static_cast<size_t>(ido) * ho * wo * k +
+                                           static_cast<size_t>(iho) * wo * k +
+                                           static_cast<size_t>(iwo) * k;
 
-                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
+                                           static_cast<size_t>(cur_d) * in_strides[4] +
+                                           static_cast<size_t>(cur_h) * in_strides[3] +
+                                           static_cast<size_t>(cur_w) * in_strides[2] +
+                                           static_cast<size_t>(ic) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
+                                           static_cast<size_t>(ido) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[3] +
+                                           static_cast<size_t>(iwo) * out_strides[2];
+
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
                     }
                 }
             }
@@ -894,7 +1332,10 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(iz) * fy * fx * c_per_group +
                                static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
             else
             {
@@ -902,12 +1343,16 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
             }
         }
     }
     else
     {
+        // Fallback path: one thread per weight element
         for(int tid = tx; tid < thread_length; tid += bdx)
         {
             int ic = tid % c_per_group;
@@ -917,62 +1362,128 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
 
             acc_data_t value = 0;
 
-            for(int in = 0; in < n; in++)
+            if(use_atomic)
             {
-                for(int ido = 0; ido < do_; ido++)
+                // Cross-block tiling: iterate over this block's spatial tile
+                for(int s = tile_start; s < tile_end; s++)
                 {
-                    int valid_d = 1;
-                    int cur_d   = sz * ido - pz + dz * iz;
-                    if(cur_d < 0 || cur_d >= di)
-                        valid_d &= 0;
-                    for(int iho = 0; iho < ho; iho++)
+                    int iwo = s % wo;
+                    int iho = (s / wo) % ho;
+                    int ido = (s / (wo * ho)) % do_;
+                    int in  = s / (do_ * ho * wo);
+
+                    int cur_d = sz * ido - pz + dz * iz;
+                    int cur_h = sy * iho - py + dy * iy;
+                    int cur_w = sx * iwo - px + dx * ix;
+
+                    if(cur_d >= 0 && cur_d < di && cur_h >= 0 && cur_h < hi &&
+                       cur_w >= 0 && cur_w < wi)
                     {
-                        int valid_h = 1;
-                        int cur_h   = sy * iho - py + dy * iy;
-                        if(cur_h < 0 || cur_h >= hi)
-                            valid_h &= 0;
-                        for(int iwo = 0; iwo < wo; iwo++)
+                        if constexpr(ASSUME_PACKED)
                         {
-                            int valid_w = 1;
-                            int cur_w   = sx * iwo - px + dx * ix;
-                            if(cur_w < 0 || cur_w >= wi)
-                                valid_w &= 0;
+                            size_t i_idx = static_cast<size_t>(in) * di * hi * wi * c +
+                                           static_cast<size_t>(cur_d) * hi * wi * c +
+                                           static_cast<size_t>(cur_h) * wi * c +
+                                           static_cast<size_t>(cur_w) * c +
+                                           static_cast<size_t>(ic);
 
-                            if(valid_d & valid_h & valid_w)
+                            size_t o_idx = static_cast<size_t>(in) * do_ * ho * wo * k +
+                                           static_cast<size_t>(ido) * ho * wo * k +
+                                           static_cast<size_t>(iho) * wo * k +
+                                           static_cast<size_t>(iwo) * k;
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                        else
+                        {
+                            size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
+                                           static_cast<size_t>(cur_d) * in_strides[4] +
+                                           static_cast<size_t>(cur_h) * in_strides[3] +
+                                           static_cast<size_t>(cur_w) * in_strides[2] +
+                                           static_cast<size_t>(ic) * in_strides[0];
+
+                            size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
+                                           static_cast<size_t>(ido) * out_strides[4] +
+                                           static_cast<size_t>(iho) * out_strides[3] +
+                                           static_cast<size_t>(iwo) * out_strides[2];
+
+                            value +=
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
+                                cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Single-block: iterate over all spatial positions
+                for(int in = 0; in < n; in++)
+                {
+                    for(int ido = 0; ido < do_; ido++)
+                    {
+                        int valid_d = 1;
+                        int cur_d   = sz * ido - pz + dz * iz;
+                        if(cur_d < 0 || cur_d >= di)
+                            valid_d &= 0;
+                        for(int iho = 0; iho < ho; iho++)
+                        {
+                            int valid_h = 1;
+                            int cur_h   = sy * iho - py + dy * iy;
+                            if(cur_h < 0 || cur_h >= hi)
+                                valid_h &= 0;
+                            for(int iwo = 0; iwo < wo; iwo++)
                             {
-                                if constexpr(ASSUME_PACKED)
+                                int valid_w = 1;
+                                int cur_w   = sx * iwo - px + dx * ix;
+                                if(cur_w < 0 || cur_w >= wi)
+                                    valid_w &= 0;
+
+                                if(valid_d & valid_h & valid_w)
                                 {
-                                    size_t i_idx = static_cast<size_t>(in) * di * hi * wi * c +
-                                                   static_cast<size_t>(cur_d) * hi * wi * c +
-                                                   static_cast<size_t>(cur_h) * wi * c +
-                                                   static_cast<size_t>(cur_w) * c +
-                                                   static_cast<size_t>(ic);
+                                    if constexpr(ASSUME_PACKED)
+                                    {
+                                        size_t i_idx =
+                                            static_cast<size_t>(in) * di * hi * wi * c +
+                                            static_cast<size_t>(cur_d) * hi * wi * c +
+                                            static_cast<size_t>(cur_h) * wi * c +
+                                            static_cast<size_t>(cur_w) * c +
+                                            static_cast<size_t>(ic);
 
-                                    size_t o_idx = static_cast<size_t>(in) * do_ * ho * wo * k +
-                                                   static_cast<size_t>(ido) * ho * wo * k +
-                                                   static_cast<size_t>(iho) * wo * k +
-                                                   static_cast<size_t>(iwo) * k;
+                                        size_t o_idx =
+                                            static_cast<size_t>(in) * do_ * ho * wo * k +
+                                            static_cast<size_t>(ido) * ho * wo * k +
+                                            static_cast<size_t>(iho) * wo * k +
+                                            static_cast<size_t>(iwo) * k;
 
-                                    value +=
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
-                                }
-                                else
-                                {
-                                    size_t i_idx = static_cast<size_t>(in) * in_strides[5] +
-                                                   static_cast<size_t>(cur_d) * in_strides[4] +
-                                                   static_cast<size_t>(cur_h) * in_strides[3] +
-                                                   static_cast<size_t>(cur_w) * in_strides[2] +
-                                                   static_cast<size_t>(ic) * in_strides[0];
+                                        value +=
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_in[i_idx]) *
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_out[o_idx]);
+                                    }
+                                    else
+                                    {
+                                        size_t i_idx =
+                                            static_cast<size_t>(in) * in_strides[5] +
+                                            static_cast<size_t>(cur_d) * in_strides[4] +
+                                            static_cast<size_t>(cur_h) * in_strides[3] +
+                                            static_cast<size_t>(cur_w) * in_strides[2] +
+                                            static_cast<size_t>(ic) * in_strides[0];
 
-                                    size_t o_idx = static_cast<size_t>(in) * out_strides[5] +
-                                                   static_cast<size_t>(ido) * out_strides[4] +
-                                                   static_cast<size_t>(iho) * out_strides[3] +
-                                                   static_cast<size_t>(iwo) * out_strides[2];
+                                        size_t o_idx =
+                                            static_cast<size_t>(in) * out_strides[5] +
+                                            static_cast<size_t>(ido) * out_strides[4] +
+                                            static_cast<size_t>(iho) * out_strides[3] +
+                                            static_cast<size_t>(iwo) * out_strides[2];
 
-                                    value +=
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                        cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                        value +=
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_in[i_idx]) *
+                                            cast_to<src_data_t, acc_data_t, use_tf32>(
+                                                p_out[o_idx]);
+                                    }
                                 }
                             }
                         }
@@ -985,7 +1496,10 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(iz) * fy * fx * c_per_group +
                                static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
             else
             {
@@ -993,7 +1507,10 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                if(use_atomic)
+                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                else
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
             }
         }
     }

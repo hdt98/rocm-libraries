@@ -811,6 +811,14 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     size_t block_size = 256;
     size_t grid_size  = static_cast<size_t>(k);
 
+    // Cross-block spatial tiling for WRW (float-acc solver mode only).
+    // Only worthwhile for large spatial dimensions where within-block
+    // parallelism alone can't keep the GPU busy.
+    size_t spatial           = static_cast<size_t>(n) * ho * wo;
+    size_t num_spatial_tiles = 1;
+    if(!IsAccFp64(problem) && !IsAccInt32(problem) && spatial > 262144)
+        num_spatial_tiles = (spatial + block_size - 1) / block_size;
+
     KernelInfo kernel;
 
     kernel.kernel_file = ConvDirectNaiveConvKernelFile(ctx, problem);
@@ -818,7 +826,7 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     kernel.g_wk.clear();
 
     kernel.g_wk.push_back(grid_size * block_size);
-    kernel.g_wk.push_back(1);
+    kernel.g_wk.push_back(num_spatial_tiles);
     kernel.g_wk.push_back(1);
     kernel.l_wk.clear();
     kernel.l_wk.push_back(block_size);
@@ -876,7 +884,24 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
             {
                 double alpha_val = data_ctx.alpha.GetAsDouble();
                 double beta_val  = data_ctx.beta.GetAsDouble();
-                handle.Run(kern)(tensors.x,
+
+                auto kern_copy = kern;
+                if(num_spatial_tiles > 1)
+                {
+                    if(beta_val == 0.0)
+                    {
+                        // Zero weight buffer before atomicAdd accumulation
+                        hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
+                                       handle.GetStream());
+                    }
+                    else
+                    {
+                        // Can't use atomicAdd with beta != 0; fall back to serial
+                        kern_copy.gdims[1] = 1;
+                    }
+                }
+
+                handle.Run(kern_copy)(tensors.x,
                                  tensors.dw,
                                  alpha_val,
                                  beta_val,
@@ -948,6 +973,12 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     size_t block_size = 256;
     size_t grid_size  = static_cast<size_t>(k);
 
+    // Cross-block spatial tiling for WRW (float-acc solver mode only).
+    size_t spatial           = static_cast<size_t>(n) * do_ * ho * wo;
+    size_t num_spatial_tiles = 1;
+    if(!IsAccFp64(problem) && !IsAccInt32(problem) && spatial > 262144)
+        num_spatial_tiles = (spatial + block_size - 1) / block_size;
+
     KernelInfo kernel;
 
     kernel.kernel_file = ConvDirectNaiveConvKernelFile(ctx, problem);
@@ -955,7 +986,7 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     kernel.g_wk.clear();
 
     kernel.g_wk.push_back(grid_size * block_size);
-    kernel.g_wk.push_back(1);
+    kernel.g_wk.push_back(num_spatial_tiles);
     kernel.g_wk.push_back(1);
     kernel.l_wk.clear();
     kernel.l_wk.push_back(block_size);
@@ -982,7 +1013,22 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
 
             double alpha_val = data_ctx.alpha.GetAsDouble();
             double beta_val  = data_ctx.beta.GetAsDouble();
-            handle.Run(kern)(tensors.x,
+
+            auto kern_copy = kern;
+            if(num_spatial_tiles > 1)
+            {
+                if(beta_val == 0.0)
+                {
+                    hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
+                                   handle.GetStream());
+                }
+                else
+                {
+                    kern_copy.gdims[1] = 1;
+                }
+            }
+
+            handle.Run(kern_copy)(tensors.x,
                              tensors.dw,
                              alpha_val,
                              beta_val,
