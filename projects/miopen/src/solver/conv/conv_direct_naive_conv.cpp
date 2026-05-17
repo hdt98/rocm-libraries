@@ -281,6 +281,17 @@ std::string ConvDirectNaiveConvCompileOption(const ExecutionContext& ctx,
         ss << " -DMIOPEN_FP8_IEEE_EXPONENT_BIAS=" << MIOPEN_FP8_IEEE_EXPONENT_BIAS;
         //     Let the kernel choose its accumulator (double for naive kernels )
     }
+
+    // 16-bit float atomicAdd (half, __hip_bfloat16) is available on
+    // CDNA2+ (gfx90a, gfx94x, gfx95x) and RDNA3+ (gfx110x, gfx115x, gfx120x).
+    const auto device_name = ctx.GetStream().GetDeviceName();
+    if(StartsWith(device_name, "gfx90a") || StartsWith(device_name, "gfx94") ||
+       StartsWith(device_name, "gfx95") || StartsWith(device_name, "gfx110") ||
+       StartsWith(device_name, "gfx115") || StartsWith(device_name, "gfx120"))
+    {
+        ss << " -DNAIVE_CONV_HAS_16BIT_FLOAT_ATOMIC=1";
+    }
+
     return ss.str();
 }
 

@@ -113,6 +113,40 @@ inline __device__ __host__ bool IsZero(double val) { return val == 0.0; }
 
 inline __device__ __host__ bool IsOne(double val) { return val == 1.0; }
 
+// Type trait: does the target GPU provide a native atomicAdd for this type?
+// float/double are universally supported. half/__hip_bfloat16 require gfx90a+
+// (CDNA2) or RDNA3+. The solver passes -DNAIVE_CONV_HAS_16BIT_FLOAT_ATOMIC=1
+// when the target GPU supports 16-bit float atomics. Using if constexpr on
+// this trait prevents the compiler from instantiating atomicAdd for
+// unsupported types.
+template <typename T>
+struct has_native_atomic_add
+{
+    static constexpr bool value = false;
+};
+template <>
+struct has_native_atomic_add<float>
+{
+    static constexpr bool value = true;
+};
+template <>
+struct has_native_atomic_add<double>
+{
+    static constexpr bool value = true;
+};
+#if NAIVE_CONV_HAS_16BIT_FLOAT_ATOMIC
+template <>
+struct has_native_atomic_add<half>
+{
+    static constexpr bool value = true;
+};
+template <>
+struct has_native_atomic_add<__hip_bfloat16>
+{
+    static constexpr bool value = true;
+};
+#endif
+
 // Precompute valid filter range for FWD (and WRW spatial checks).
 //
 // For FWD: cur = stride * o_pos - pad + dil * iy, need 0 <= cur < i_size.

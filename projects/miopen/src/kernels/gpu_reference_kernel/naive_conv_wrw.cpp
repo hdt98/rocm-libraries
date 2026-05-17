@@ -201,20 +201,38 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(ic) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(ic) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -336,20 +354,38 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(ic) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(ic) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -576,10 +612,19 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(ic) * fz * fy * fx +
                                static_cast<size_t>(iz) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
             else
             {
@@ -587,10 +632,19 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iz) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -740,10 +794,19 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(ic) * fz * fy * fx +
                                static_cast<size_t>(iz) * fy * fx +
                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
             else
             {
@@ -751,10 +814,19 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iz) * wei_strides[2] +
                                static_cast<size_t>(iy) * wei_strides[1] +
                                static_cast<size_t>(ix) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -958,20 +1030,38 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -1093,20 +1183,38 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
             {
                 size_t f_idx = static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
             else
             {
                 size_t f_idx = static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -1332,10 +1440,19 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(iz) * fy * fx * c_per_group +
                                static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
             else
             {
@@ -1343,10 +1460,19 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(sum));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, sum, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, sum, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, sum, alpha, beta, f_idx);
+                }
             }
         }
     }
@@ -1496,10 +1622,19 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                 size_t f_idx = static_cast<size_t>(iz) * fy * fx * c_per_group +
                                static_cast<size_t>(iy) * fx * c_per_group +
                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
             else
             {
@@ -1507,10 +1642,19 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                static_cast<size_t>(iy) * wei_strides[2] +
                                static_cast<size_t>(ix) * wei_strides[1] +
                                static_cast<size_t>(ic) * wei_strides[0];
-                if(use_atomic)
-                    atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                if constexpr(has_native_atomic_add<dst_data_t>::value)
+                {
+                    if(use_atomic)
+                        atomicAdd(&p_wei[f_idx], cast_to<acc_data_t, dst_data_t>(value));
+                    else
+                        applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                            p_wei, value, alpha, beta, f_idx);
+                }
                 else
-                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_wei, value, alpha, beta, f_idx);
+                {
+                    applyalphaBetaUpdate<dst_data_t, acc_data_t>(
+                        p_wei, value, alpha, beta, f_idx);
+                }
             }
         }
     }
