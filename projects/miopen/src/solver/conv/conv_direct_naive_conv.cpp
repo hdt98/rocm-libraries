@@ -923,8 +923,8 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
                     if(alpha_val == 1.0 && beta_val == 0.0)
                     {
                         // Zero weight buffer before atomicAdd accumulation
-                        hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
-                                       handle.GetStream());
+                        (void)hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
+                                             handle.GetStream());
                     }
                     else
                     {
