@@ -238,7 +238,11 @@ std::string ConvDirectNaiveConvKernelFile(const ExecutionContext& ctx,
     // }
     if(problem.IsFp8() || problem.IsTensorsCasted() || problem.IsBfp8())
         return "fp8_naive_conv.cpp";
-    return "naive_conv.cpp";
+    if(problem.IsDirectionForward())
+        return "naive_conv_fwd.cpp";
+    if(problem.IsDirectionBackwardData())
+        return "naive_conv_bwd.cpp";
+    return "naive_conv_wrw.cpp";
 }
 
 std::string ConvDirectNaiveConvCompileOption(const ExecutionContext& ctx,
