@@ -28,7 +28,7 @@
 #include "rocblaslt/UserDrivenTuningParser.hpp"
 #include "rocblaslt/check_numerics_matrix.hpp"
 #include "exceptions.hpp"
-#include "handle.h"
+#include "rocblaslt/handle.h"
 #include "hipblaslt/hipblaslt-ext-op.h"
 #include "hipblaslt_internal.hpp"
 
