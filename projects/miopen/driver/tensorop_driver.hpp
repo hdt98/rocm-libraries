@@ -415,8 +415,8 @@ int TensorOpDriver<Tgpu, Tref>::VerifyForward()
         (!is_set && !is_scale) ? c_verif : a_verif, (!is_set && !is_scale) ? c : a, allowedEps);
 
     if(match)
-    std:;
-        cout << "Tensor Op verifies on CPU and GPU\n";
+        std::cout << "Tensor Op verifies on CPU and GPU\n";
+
     return miopenStatusSuccess;
 }
 

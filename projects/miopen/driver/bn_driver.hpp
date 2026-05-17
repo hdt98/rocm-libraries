@@ -1340,19 +1340,18 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
 
     if(WALL_CLOCK)
     {
-        printf("Wall-clock Time Forward GPU Batch Norm Elapsed: %f ms, for %d iterations.\n",
-               (iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)),
-               (iters > 1) ? iters - 1 : 1);
+        std::cout << "Wall-clock Time Forward GPU Batch Norm Elapsed: "
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, for "
+                  << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueStr("time") == "1")
     {
-        printf("GPU Kernel Min Time Forward Batch Normalization Elapsed: %f ms\n", lowtime);
+        std::cout << "GPU Kernel Min Time Forward Batch Normalization Elapsed: " << lowtime
+                  << " ms\n";
         if(iters > 1)
-            printf("GPU Kernel Avg Time Forward Batch Normalization Elapsed: %f ms, for %d "
-                   "iterations.\n",
-                   avgtime / (iters - 1),
-                   iters - 1);
+            std::cout << "GPU Kernel Avg Time Forward Batch Normalization Elapsed: "
+                      << avgtime / (iters - 1) << " ms, for " << (iters - 1) << "iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(in.GetTensor().desc.GetLengths());
         size_t M                         = in_n * in_c * in_h * in_w;
@@ -1368,11 +1367,8 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
             rdCnt = 1;
         }
         // layer, flopCnt, reads, writes, GFLOPS, GB/s, timeMs
-        printf("stats: bnormf, 0, %zu, %zu, 0, %f, %f\n",
-               dataSz,
-               dataSz,
-               (rdCnt * dataSz + wrCnt * dataSz) / lowtime / 1e6,
-               lowtime);
+        std::cout << "stats: bnormf, 0, " << dataSz << ", " << dataSz << ", 0, "
+                  << (rdCnt * dataSz + wrCnt * dataSz) / lowtime / 1e6f << ", " << lowtime << '\n';
     }
     return miopenStatusSuccess;
 }
