@@ -49,6 +49,10 @@ namespace conv {
 
 using ProblemDescription = miopen::conv::ProblemDescription;
 
+// Block size for naive conv kernels. Passed to kernels via -DNAIVE_CONV_BLOCK_SIZE
+// so shared memory arrays match the launch configuration.
+constexpr size_t NAIVE_CONV_BLOCK_SIZE = 256;
+
 bool ConvDirectNaiveConvIsAssemblyKernel(const ExecutionContext& ctx,
                                          const ProblemDescription& problem)
 {
@@ -282,6 +286,8 @@ std::string ConvDirectNaiveConvCompileOption(const ExecutionContext& ctx,
         //     Let the kernel choose its accumulator (double for naive kernels )
     }
 
+    ss << " -DNAIVE_CONV_BLOCK_SIZE=" << NAIVE_CONV_BLOCK_SIZE;
+
     // 16-bit float atomicAdd (half, __hip_bfloat16) is available on
     // CDNA2+ (gfx90a, gfx94x, gfx95x) and RDNA3+ (gfx110x, gfx115x, gfx120x).
     const auto device_name = ctx.GetStream().GetDeviceName();
@@ -435,7 +441,7 @@ GetConv2DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size          = 256;
+    size_t block_size          = NAIVE_CONV_BLOCK_SIZE;
     int batch_chunk_size       = 1;
     size_t grid_size_per_batch = 1;
     size_t grid_size           = 1;
@@ -667,7 +673,7 @@ GetConv3DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size          = 256;
+    size_t block_size          = NAIVE_CONV_BLOCK_SIZE;
     int batch_chunk_size       = 1;
     size_t grid_size_per_batch = 1;
     size_t grid_size           = 1;
@@ -834,7 +840,7 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size = 256;
+    size_t block_size = NAIVE_CONV_BLOCK_SIZE;
     size_t grid_size  = static_cast<size_t>(k);
 
     // Cross-block spatial tiling for WRW (float-acc solver mode only).
@@ -996,7 +1002,7 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size = 256;
+    size_t block_size = NAIVE_CONV_BLOCK_SIZE;
     size_t grid_size  = static_cast<size_t>(k);
 
     // Cross-block spatial tiling for WRW (float-acc solver mode only).
@@ -1123,7 +1129,7 @@ GetConv2DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size = 256;
+    size_t block_size = NAIVE_CONV_BLOCK_SIZE;
     size_t grid_size  = 1;
     size_t thread_length = 1;
     if(problem.IsLayoutDefault())
@@ -1277,7 +1283,7 @@ GetConv3DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size = 256;
+    size_t block_size = NAIVE_CONV_BLOCK_SIZE;
     size_t grid_size  = 1;
     size_t thread_length = 1;
     if(problem.IsLayoutDefault())

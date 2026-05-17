@@ -79,7 +79,7 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
     if(num_weights <= bdx / 2)
     {
         // Fast path: multiple workers per weight element, shared-memory reduction
-        __shared__ acc_data_t smem[256];
+        __shared__ acc_data_t smem[NAIVE_CONV_BLOCK_SIZE];
 
         int workers    = bdx / num_weights;
         int weight_idx = tx % num_weights;
@@ -474,7 +474,7 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
 
     if(num_weights <= bdx / 2)
     {
-        __shared__ acc_data_t smem_ncdhw[256];
+        __shared__ acc_data_t smem_ncdhw[NAIVE_CONV_BLOCK_SIZE];
 
         int workers    = bdx / num_weights;
         int weight_idx = tx % num_weights;
@@ -908,7 +908,7 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
 
     if(num_weights <= bdx / 2)
     {
-        __shared__ acc_data_t smem_nhwc[256];
+        __shared__ acc_data_t smem_nhwc[NAIVE_CONV_BLOCK_SIZE];
 
         int workers    = bdx / num_weights;
         int weight_idx = tx % num_weights;
@@ -1302,7 +1302,7 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
 
     if(num_weights <= bdx / 2)
     {
-        __shared__ acc_data_t smem_ndhwc[256];
+        __shared__ acc_data_t smem_ndhwc[NAIVE_CONV_BLOCK_SIZE];
 
         int workers    = bdx / num_weights;
         int weight_idx = tx % num_weights;
