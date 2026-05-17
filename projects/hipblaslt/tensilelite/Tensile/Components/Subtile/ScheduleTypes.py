@@ -32,7 +32,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, TypeAlias
 
 if TYPE_CHECKING:
-    from .LogicalScheduler import EmittedModule, SubIterKSlot
+    from ._types import EmittedModule, SubIterKSlot
 
 LogicalSchedule:   TypeAlias = "List[List[SubIterKSlot]]"
 AnnotatedSchedule: TypeAlias = "List[List[SubIterKSlot]]"

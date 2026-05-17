@@ -30,6 +30,7 @@ from Tensile.Components.Subtile.LogicalScheduler import (
     WaitGRCounts,
     fmt_mt,
 )
+from Tensile.Components.Subtile.passes import place_lrs, assign_vgpr_tiles, place_grs
 from unittest.mock import MagicMock
 
 
@@ -288,7 +289,7 @@ class TestPlaceLRs:
         assert cfg.hasScale
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         slots = partitions[0]
 
         assert len(slots) == 2
@@ -322,7 +323,7 @@ class TestPlaceLRs:
         assert cfg.numSubIterK == 2
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         slots = partitions[0]
         assert len(slots) == 2
 
@@ -347,7 +348,7 @@ class TestPlaceLRs:
         assert cfg.hasScale
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         slots = partitions[0]
         assert len(slots) == 4
 
@@ -380,7 +381,7 @@ class TestPlaceLRs:
         assert cfg.numSubIterK == 4
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         slots = partitions[0]
         assert len(slots) == 4
 
@@ -408,7 +409,7 @@ class TestPlaceLRs:
         assert cfg.partitionSizeN == 4
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         assert len(partitions) == 4
 
         # P0: A[0-3],B[0-3]
@@ -467,7 +468,7 @@ class TestPlaceLRs:
         assert cfg.numSubIterK == 4
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         assert len(partitions) == 4
 
         # P0: 4 subIterKs with K-prefetch and wrapping
@@ -499,7 +500,7 @@ class TestPlaceLRs:
         assert cfg.numPartitions == 4
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         assert len(partitions) == 4
 
         # P0: A+SA at s0 (A changes for P1)
@@ -532,7 +533,7 @@ class TestPlaceLRs:
         assert cfg.numPartitions == 10
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         assert len(partitions) == 10
 
         # P0: A+B K-prefetch, then A wrapping
@@ -561,7 +562,7 @@ class TestPlaceLRs:
         assert cfg.numSubIterK == 2
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         slots = partitions[0]
         assert len(slots) == 2
         assert slots[0].mfma.tileA.tileId_end == 12
@@ -1291,7 +1292,7 @@ class TestFromTileInfo:
         assert cfg.hasScale
 
         sched = LogicalScheduler(cfg)
-        partitions = sched.place_LRs()
+        partitions = place_lrs(sched.config)
         assert len(partitions[0]) == 2
         assert partitions[0][0].mfma.tileA.tileId_end == 2
 
@@ -1593,9 +1594,9 @@ if __name__ == "__main__":
         return (result, print_fn(schedule))
 
     steps = [
-        ("Place LRs",                     lambda: run_step(lambda: sched.place_LRs(), sched.print_lr)),
-        ("Assign VGPR tiles",             lambda: run_step(lambda: sched.assign_vgpr_tiles(schedule), sched.print_vgpr)),
-        ("Place GRs",                     lambda: run_step(lambda: sched.place_GRs(schedule), sched.print_gr)),
+        ("Place LRs",                     lambda: run_step(lambda: place_lrs(sched.config), sched.print_lr)),
+        ("Assign VGPR tiles",             lambda: run_step(lambda: (assign_vgpr_tiles(sched.config, schedule), schedule)[1], sched.print_vgpr)),
+        ("Place GRs",                     lambda: run_step(lambda: place_grs(sched.config, schedule), sched.print_gr)),
         ("Annotate deps",                 lambda: run_step(lambda: sched.annotate_deps(schedule), sched.print_deps)),
         ("Remove unnecessary GR deps",    lambda: run_step(lambda: sched.remove_unnecessary_gr_deps(schedule), sched.print_deps)),
         ("Remove unnecessary LR deps",    lambda: run_step(lambda: sched.remove_unnecessary_lr_deps(schedule), sched.print_deps)),
