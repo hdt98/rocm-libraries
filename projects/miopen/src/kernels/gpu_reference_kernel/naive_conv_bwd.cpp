@@ -73,54 +73,45 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
 
         acc_data_t value = 0;
 
+        // Precompute valid filter ranges — eliminates per-iteration modulo/division
+        int iy_start, iy_end, iy_step;
+        bwd_filter_range(ihi, py, dy, sy, fy, ho, iy_start, iy_end, iy_step);
+        int ix_start, ix_end, ix_step;
+        bwd_filter_range(iwi, px, dx, sx, fx, wo, ix_start, ix_end, ix_step);
+
         for(int ik = 0; ik < k_per_group; ik++)
         {
-            for(int iy = 0; iy < fy; iy++)
+            for(int iy = iy_start; iy <= iy_end; iy += iy_step)
             {
-                int valid_h = 1;
-                int cur_ho  = ihi + py - dy * iy; // cur_h = sy*iho-py+dy*iy;
-                if(cur_ho < 0 || cur_ho % sy)
-                    valid_h &= 0;
-                cur_ho /= sy;
-                if(cur_ho >= ho)
-                    valid_h &= 0;
-                for(int ix = 0; ix < fx; ix++)
+                int cur_ho = (ihi + py - dy * iy) / sy;
+                for(int ix = ix_start; ix <= ix_end; ix += ix_step)
                 {
-                    int valid_w = 1;
-                    int cur_wo  = iwi + px - dx * ix; // cur_w = sx*iwo-px+dx*ix;
-                    if(cur_wo < 0 || cur_wo % sx)
-                        valid_w &= 0;
-                    cur_wo /= sx;
-                    if(cur_wo >= wo)
-                        valid_w &= 0;
+                    int cur_wo = (iwi + px - dx * ix) / sx;
 
-                    if(valid_h & valid_w)
+                    if constexpr(ASSUME_PACKED)
                     {
-                        if constexpr(ASSUME_PACKED)
-                        {
-                            size_t o_idx = static_cast<size_t>(ik) * ho * wo +
-                                           static_cast<size_t>(cur_ho) * wo +
-                                           static_cast<size_t>(cur_wo);
+                        size_t o_idx = static_cast<size_t>(ik) * ho * wo +
+                                       static_cast<size_t>(cur_ho) * wo +
+                                       static_cast<size_t>(cur_wo);
 
-                            size_t f_idx = static_cast<size_t>(ik) * c_per_group * fy * fx +
-                                           static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
+                        size_t f_idx = static_cast<size_t>(ik) * c_per_group * fy * fx +
+                                       static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                        }
-                        else
-                        {
-                            size_t o_idx = static_cast<size_t>(ik) * out_strides[2] +
-                                           static_cast<size_t>(cur_ho) * out_strides[1] +
-                                           static_cast<size_t>(cur_wo) * out_strides[0];
+                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                    }
+                    else
+                    {
+                        size_t o_idx = static_cast<size_t>(ik) * out_strides[2] +
+                                       static_cast<size_t>(cur_ho) * out_strides[1] +
+                                       static_cast<size_t>(cur_wo) * out_strides[0];
 
-                            size_t f_idx = static_cast<size_t>(ik) * wei_strides[3] +
-                                           static_cast<size_t>(iy) * wei_strides[1] +
-                                           static_cast<size_t>(ix) * wei_strides[0];
+                        size_t f_idx = static_cast<size_t>(ik) * wei_strides[3] +
+                                       static_cast<size_t>(iy) * wei_strides[1] +
+                                       static_cast<size_t>(ix) * wei_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                        }
+                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
                     }
                 }
             }
@@ -222,68 +213,55 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
 
         acc_data_t value = 0;
 
+        // Precompute valid filter ranges
+        int iz_start, iz_end, iz_step;
+        bwd_filter_range(idi, pz, dz, sz, fz, do_, iz_start, iz_end, iz_step);
+        int iy_start, iy_end, iy_step;
+        bwd_filter_range(ihi, py, dy, sy, fy, ho, iy_start, iy_end, iy_step);
+        int ix_start, ix_end, ix_step;
+        bwd_filter_range(iwi, px, dx, sx, fx, wo, ix_start, ix_end, ix_step);
+
         for(int ik = 0; ik < k_per_group; ik++)
         {
-            for(int iz = 0; iz < fz; iz++)
+            for(int iz = iz_start; iz <= iz_end; iz += iz_step)
             {
-                int valid_d = 1;
-                int cur_do  = idi + pz - dz * iz;
-                if(cur_do < 0 || cur_do % sz)
-                    valid_d &= 0;
-                cur_do /= sz;
-                if(cur_do >= do_)
-                    valid_d &= 0;
-                for(int iy = 0; iy < fy; iy++)
+                int cur_do = (idi + pz - dz * iz) / sz;
+                for(int iy = iy_start; iy <= iy_end; iy += iy_step)
                 {
-                    int valid_h = 1;
-                    int cur_ho  = ihi + py - dy * iy; // cur_h = sy*iho-py+dy*iy;
-                    if(cur_ho < 0 || cur_ho % sy)
-                        valid_h &= 0;
-                    cur_ho /= sy;
-                    if(cur_ho >= ho)
-                        valid_h &= 0;
-                    for(int ix = 0; ix < fx; ix++)
+                    int cur_ho = (ihi + py - dy * iy) / sy;
+                    for(int ix = ix_start; ix <= ix_end; ix += ix_step)
                     {
-                        int valid_w = 1;
-                        int cur_wo  = iwi + px - dx * ix; // cur_w = sx*iwo-px+dx*ix;
-                        if(cur_wo < 0 || cur_wo % sx)
-                            valid_w &= 0;
-                        cur_wo /= sx;
-                        if(cur_wo >= wo)
-                            valid_w &= 0;
+                        int cur_wo = (iwi + px - dx * ix) / sx;
 
-                        if(valid_d & valid_h & valid_w)
+                        if constexpr(ASSUME_PACKED)
                         {
-                            if constexpr(ASSUME_PACKED)
-                            {
-                                size_t o_idx = static_cast<size_t>(ik) * do_ * ho * wo +
-                                               static_cast<size_t>(cur_do) * ho * wo +
-                                               static_cast<size_t>(cur_ho) * wo +
-                                               static_cast<size_t>(cur_wo);
+                            size_t o_idx = static_cast<size_t>(ik) * do_ * ho * wo +
+                                           static_cast<size_t>(cur_do) * ho * wo +
+                                           static_cast<size_t>(cur_ho) * wo +
+                                           static_cast<size_t>(cur_wo);
 
-                                size_t f_idx =
-                                    static_cast<size_t>(ik) * c_per_group * fz * fy * fx +
-                                    static_cast<size_t>(iz) * fy * fx +
-                                    static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
+                            size_t f_idx =
+                                static_cast<size_t>(ik) * c_per_group * fz * fy * fx +
+                                static_cast<size_t>(iz) * fy * fx +
+                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                            }
-                            else
-                            {
-                                size_t o_idx = static_cast<size_t>(ik) * out_strides[3] +
-                                               static_cast<size_t>(cur_do) * out_strides[2] +
-                                               static_cast<size_t>(cur_ho) * out_strides[1] +
-                                               static_cast<size_t>(cur_wo) * out_strides[0];
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                        }
+                        else
+                        {
+                            size_t o_idx = static_cast<size_t>(ik) * out_strides[3] +
+                                           static_cast<size_t>(cur_do) * out_strides[2] +
+                                           static_cast<size_t>(cur_ho) * out_strides[1] +
+                                           static_cast<size_t>(cur_wo) * out_strides[0];
 
-                                size_t f_idx = static_cast<size_t>(ik) * wei_strides[4] +
-                                               static_cast<size_t>(iz) * wei_strides[2] +
-                                               static_cast<size_t>(iy) * wei_strides[1] +
-                                               static_cast<size_t>(ix) * wei_strides[0];
+                            size_t f_idx = static_cast<size_t>(ik) * wei_strides[4] +
+                                           static_cast<size_t>(iz) * wei_strides[2] +
+                                           static_cast<size_t>(iy) * wei_strides[1] +
+                                           static_cast<size_t>(ix) * wei_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                            }
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
                         }
                     }
                 }
@@ -377,60 +355,51 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
 
         acc_data_t value = 0;
 
-        for(int iy = 0; iy < fy; iy++)
+        // Precompute valid filter ranges
+        int iy_start, iy_end, iy_step;
+        bwd_filter_range(ihi, py, dy, sy, fy, ho, iy_start, iy_end, iy_step);
+        int ix_start, ix_end, ix_step;
+        bwd_filter_range(iwi, px, dx, sx, fx, wo, ix_start, ix_end, ix_step);
+
+        for(int iy = iy_start; iy <= iy_end; iy += iy_step)
         {
-            int valid_h = 1;
-            int cur_ho  = ihi + py - dy * iy; // cur_h = sy*iho-py+dy*iy;
-            if(cur_ho < 0 || cur_ho % sy)
-                valid_h &= 0;
-            cur_ho /= sy;
-            if(cur_ho >= ho)
-                valid_h &= 0;
-            for(int ix = 0; ix < fx; ix++)
+            int cur_ho = (ihi + py - dy * iy) / sy;
+            for(int ix = ix_start; ix <= ix_end; ix += ix_step)
             {
-                int valid_w = 1;
-                int cur_wo  = iwi + px - dx * ix; // cur_w = sx*iwo-px+dx*ix;
-                if(cur_wo < 0 || cur_wo % sx)
-                    valid_w &= 0;
-                cur_wo /= sx;
-                if(cur_wo >= wo)
-                    valid_w &= 0;
+                int cur_wo = (iwi + px - dx * ix) / sx;
                 for(int ik = 0; ik < k_per_group; ik++)
                 {
-                    if(valid_h & valid_w)
+                    if constexpr(ASSUME_PACKED)
                     {
-                        if constexpr(ASSUME_PACKED)
-                        {
-                            size_t o_idx = static_cast<size_t>(cur_ho) * wo * k +
-                                           static_cast<size_t>(cur_wo) * k +
-                                           static_cast<size_t>(ig) * k_per_group +
-                                           static_cast<size_t>(ik);
+                        size_t o_idx = static_cast<size_t>(cur_ho) * wo * k +
+                                       static_cast<size_t>(cur_wo) * k +
+                                       static_cast<size_t>(ig) * k_per_group +
+                                       static_cast<size_t>(ik);
 
-                            size_t f_idx =
-                                static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group +
-                                static_cast<size_t>(ik) * fy * fx * c_per_group +
-                                static_cast<size_t>(iy) * fx * c_per_group +
-                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
+                        size_t f_idx =
+                            static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group +
+                            static_cast<size_t>(ik) * fy * fx * c_per_group +
+                            static_cast<size_t>(iy) * fx * c_per_group +
+                            static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                        }
-                        else
-                        {
-                            size_t o_idx = static_cast<size_t>(cur_ho) * out_strides[3] +
-                                           static_cast<size_t>(cur_wo) * out_strides[2] +
-                                           static_cast<size_t>(ig) * out_strides[1] +
-                                           static_cast<size_t>(ik) * out_strides[0];
+                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                    }
+                    else
+                    {
+                        size_t o_idx = static_cast<size_t>(cur_ho) * out_strides[3] +
+                                       static_cast<size_t>(cur_wo) * out_strides[2] +
+                                       static_cast<size_t>(ig) * out_strides[1] +
+                                       static_cast<size_t>(ik) * out_strides[0];
 
-                            size_t f_idx = static_cast<size_t>(ig) * wei_strides[4] +
-                                           static_cast<size_t>(ik) * wei_strides[3] +
-                                           static_cast<size_t>(iy) * wei_strides[2] +
-                                           static_cast<size_t>(ix) * wei_strides[1] +
-                                           static_cast<size_t>(ic) * wei_strides[0];
+                        size_t f_idx = static_cast<size_t>(ig) * wei_strides[4] +
+                                       static_cast<size_t>(ik) * wei_strides[3] +
+                                       static_cast<size_t>(iy) * wei_strides[2] +
+                                       static_cast<size_t>(ix) * wei_strides[1] +
+                                       static_cast<size_t>(ic) * wei_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                        }
+                        value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                 cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
                     }
                 }
             }
@@ -533,69 +502,56 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
 
         acc_data_t value = 0;
 
-        for(int iz = 0; iz < fz; iz++)
+        // Precompute valid filter ranges
+        int iz_start, iz_end, iz_step;
+        bwd_filter_range(idi, pz, dz, sz, fz, do_, iz_start, iz_end, iz_step);
+        int iy_start, iy_end, iy_step;
+        bwd_filter_range(ihi, py, dy, sy, fy, ho, iy_start, iy_end, iy_step);
+        int ix_start, ix_end, ix_step;
+        bwd_filter_range(iwi, px, dx, sx, fx, wo, ix_start, ix_end, ix_step);
+
+        for(int iz = iz_start; iz <= iz_end; iz += iz_step)
         {
-            int valid_d = 1;
-            int cur_do  = idi + pz - dz * iz;
-            if(cur_do < 0 || cur_do % sz)
-                valid_d &= 0;
-            cur_do /= sz;
-            if(cur_do >= do_)
-                valid_d &= 0;
-            for(int iy = 0; iy < fy; iy++)
+            int cur_do = (idi + pz - dz * iz) / sz;
+            for(int iy = iy_start; iy <= iy_end; iy += iy_step)
             {
-                int valid_h = 1;
-                int cur_ho  = ihi + py - dy * iy; // cur_h = sy*iho-py+dy*iy;
-                if(cur_ho < 0 || cur_ho % sy)
-                    valid_h &= 0;
-                cur_ho /= sy;
-                if(cur_ho >= ho)
-                    valid_h &= 0;
-                for(int ix = 0; ix < fx; ix++)
+                int cur_ho = (ihi + py - dy * iy) / sy;
+                for(int ix = ix_start; ix <= ix_end; ix += ix_step)
                 {
-                    int valid_w = 1;
-                    int cur_wo  = iwi + px - dx * ix; // cur_w = sx*iwo-px+dx*ix;
-                    if(cur_wo < 0 || cur_wo % sx)
-                        valid_w &= 0;
-                    cur_wo /= sx;
-                    if(cur_wo >= wo)
-                        valid_w &= 0;
+                    int cur_wo = (iwi + px - dx * ix) / sx;
                     for(int ik = 0; ik < k_per_group; ik++)
                     {
-                        if(valid_d & valid_h & valid_w)
+                        if constexpr(ASSUME_PACKED)
                         {
-                            if constexpr(ASSUME_PACKED)
-                            {
-                                size_t o_idx = static_cast<size_t>(cur_do) * ho * wo * k +
-                                               static_cast<size_t>(cur_ho) * wo * k +
-                                               static_cast<size_t>(cur_wo) * k +
-                                               static_cast<size_t>(ik);
+                            size_t o_idx = static_cast<size_t>(cur_do) * ho * wo * k +
+                                           static_cast<size_t>(cur_ho) * wo * k +
+                                           static_cast<size_t>(cur_wo) * k +
+                                           static_cast<size_t>(ik);
 
-                                size_t f_idx =
-                                    static_cast<size_t>(ik) * fz * fy * fx * c_per_group +
-                                    static_cast<size_t>(iz) * fy * fx * c_per_group +
-                                    static_cast<size_t>(iy) * fx * c_per_group +
-                                    static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
+                            size_t f_idx =
+                                static_cast<size_t>(ik) * fz * fy * fx * c_per_group +
+                                static_cast<size_t>(iz) * fy * fx * c_per_group +
+                                static_cast<size_t>(iy) * fx * c_per_group +
+                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                            }
-                            else
-                            {
-                                size_t o_idx = static_cast<size_t>(cur_do) * out_strides[4] +
-                                               static_cast<size_t>(cur_ho) * out_strides[3] +
-                                               static_cast<size_t>(cur_wo) * out_strides[2] +
-                                               static_cast<size_t>(ik) * out_strides[0];
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                        }
+                        else
+                        {
+                            size_t o_idx = static_cast<size_t>(cur_do) * out_strides[4] +
+                                           static_cast<size_t>(cur_ho) * out_strides[3] +
+                                           static_cast<size_t>(cur_wo) * out_strides[2] +
+                                           static_cast<size_t>(ik) * out_strides[0];
 
-                                size_t f_idx = static_cast<size_t>(ik) * wei_strides[4] +
-                                               static_cast<size_t>(iz) * wei_strides[3] +
-                                               static_cast<size_t>(iy) * wei_strides[2] +
-                                               static_cast<size_t>(ix) * wei_strides[1] +
-                                               static_cast<size_t>(ic) * wei_strides[0];
+                            size_t f_idx = static_cast<size_t>(ik) * wei_strides[4] +
+                                           static_cast<size_t>(iz) * wei_strides[3] +
+                                           static_cast<size_t>(iy) * wei_strides[2] +
+                                           static_cast<size_t>(ix) * wei_strides[1] +
+                                           static_cast<size_t>(ic) * wei_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
-                            }
+                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
                         }
                     }
                 }

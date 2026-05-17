@@ -148,6 +148,93 @@ inline __device__ __host__ bool IsZero(double val) { return val == 0.0; }
 
 inline __device__ __host__ bool IsOne(double val) { return val == 1.0; }
 
+// Compute gcd for BWD-d filter range precomputation
+inline __device__ __host__ int device_gcd(int a, int b)
+{
+    while(b != 0)
+    {
+        int t = b;
+        b     = a % b;
+        a     = t;
+    }
+    return a;
+}
+
+// Precompute the valid filter range for one spatial dimension in BWD-d.
+//
+// For BWD-d, given input position `i_pos`, padding `pad`, dilation `dil`,
+// stride `s`, filter size `f`, and output size `o`, we need filter positions
+// `iy` such that:
+//   (1) cur_o = (i_pos + pad - dil * iy)  is non-negative
+//   (2) cur_o % s == 0                    (stride alignment)
+//   (3) cur_o / s < o                     (within output bounds)
+//
+// Returns: iy_start, iy_end (inclusive), iy_step — loop as:
+//   for(int iy = iy_start; iy <= iy_end; iy += iy_step)
+//       cur_o = (tmp - dil * iy) / s;    // guaranteed valid, no checks needed
+//
+// If no valid positions exist, iy_start > iy_end.
+inline __device__ __host__ void
+bwd_filter_range(int i_pos, int pad, int dil, int s, int f, int o,
+                 int& iy_start, int& iy_end, int& iy_step)
+{
+    int tmp = i_pos + pad;
+
+    // Raw bounds from non-negativity and output-range constraints
+    // (1) tmp - dil*iy >= 0            → iy <= tmp / dil
+    // (3) (tmp - dil*iy) / s <= o - 1  → tmp - dil*iy <= (o-1)*s → iy >= (tmp - (o-1)*s) / dil
+    int iy_lo = (tmp - (o - 1) * s);
+    // Ceiling division for positive result: ceil(a/b) when a may be negative
+    iy_lo = (iy_lo > 0) ? (iy_lo + dil - 1) / dil : 0;
+    iy_lo = (iy_lo < 0) ? 0 : iy_lo;
+
+    int iy_hi = tmp / dil;
+    if(iy_hi >= f)
+        iy_hi = f - 1;
+
+    // (2) Stride alignment: need (tmp - dil * iy) % s == 0
+    int g = device_gcd(dil, s);
+    iy_step = s / g;
+
+    // Find first iy >= iy_lo that satisfies (tmp - dil * iy) % s == 0
+    int remainder = tmp % s;
+    // We need dil * iy ≡ remainder (mod s)
+    // Since g = gcd(dil, s), this has a solution iff g | remainder
+    if(remainder % g != 0)
+    {
+        // No valid positions at all
+        iy_start = 1;
+        iy_end   = 0;
+        return;
+    }
+
+    // Find the smallest non-negative iy satisfying the congruence
+    // dil * iy ≡ remainder (mod s)
+    // → (dil/g) * iy ≡ (remainder/g) (mod s/g)
+    int s_red = s / g;
+    int d_red = (dil / g) % s_red;
+    int r_red = (remainder / g) % s_red;
+    // Brute force for small s_red (s is typically 1-4)
+    int base = 0;
+    for(int t = 0; t < s_red; t++)
+    {
+        if((d_red * t) % s_red == r_red)
+        {
+            base = t;
+            break;
+        }
+    }
+
+    // First valid iy at or above iy_lo
+    if(base < iy_lo)
+    {
+        int skip = (iy_lo - base + iy_step - 1) / iy_step;
+        base += skip * iy_step;
+    }
+    iy_start = base;
+    iy_end   = iy_hi;
+}
+
 template <typename dst_data_t, typename acc_data_t>
 inline __device__ void applyalphaBetaUpdate(dst_data_t* __restrict__ p_array,
                                             const acc_data_t value,
