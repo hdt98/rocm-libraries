@@ -914,7 +914,7 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
                 auto kern_copy = kern;
                 if(num_spatial_tiles > 1)
                 {
-                    if(beta_val == 0.0)
+                    if(alpha_val == 1.0 && beta_val == 0.0)
                     {
                         // Zero weight buffer before atomicAdd accumulation
                         hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
@@ -922,7 +922,7 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
                     }
                     else
                     {
-                        // Can't use atomicAdd with beta != 0; fall back to serial
+                        // atomicAdd bypasses alpha/beta; fall back to serial
                         kern_copy.gdims[1] = 1;
                     }
                 }
@@ -1043,13 +1043,14 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
             auto kern_copy = kern;
             if(num_spatial_tiles > 1)
             {
-                if(beta_val == 0.0)
+                if(alpha_val == 1.0 && beta_val == 0.0)
                 {
                     hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
                                    handle.GetStream());
                 }
                 else
                 {
+                    // atomicAdd bypasses alpha/beta; fall back to serial
                     kern_copy.gdims[1] = 1;
                 }
             }
