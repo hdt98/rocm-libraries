@@ -160,7 +160,7 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
             // size of the ib-th diagonal block is n by n
             // ------------------------------------------
             bool const is_last_block = (ib == (nblocks - 1));
-            I const n = (is_last_block) ? (n - (nblocks - 1) * nb) : nb;
+            I const n = (is_last_block) ? (n_arg - (nblocks - 1) * nb) : nb;
 
             for(I j = 0 + j_start; j < n; j += j_inc)
             {
