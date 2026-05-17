@@ -113,6 +113,32 @@ inline __device__ __host__ bool IsZero(double val) { return val == 0.0; }
 
 inline __device__ __host__ bool IsOne(double val) { return val == 1.0; }
 
+// Precompute valid filter range for FWD (and WRW spatial checks).
+//
+// For FWD: cur = stride * o_pos - pad + dil * iy, need 0 <= cur < i_size.
+// Returns iy_start, iy_end (inclusive). Loop: for(iy = iy_start; iy <= iy_end; iy++)
+// If no valid positions, iy_start > iy_end.
+inline __device__ __host__ void
+fwd_filter_range(int o_pos, int pad, int dil, int stride, int f, int i_size,
+                 int& iy_start, int& iy_end)
+{
+    int tmp = stride * o_pos - pad;
+    // cur = tmp + dil * iy >= 0  →  iy >= ceil(-tmp / dil) when tmp < 0
+    if(tmp >= 0)
+        iy_start = 0;
+    else
+        iy_start = (-tmp + dil - 1) / dil;
+
+    // cur = tmp + dil * iy < i_size  →  iy <= (i_size - 1 - tmp) / dil
+    int upper = i_size - 1 - tmp;
+    if(upper < 0)
+        iy_end = -1;
+    else
+        iy_end = upper / dil;
+    if(iy_end >= f)
+        iy_end = f - 1;
+}
+
 // Compute gcd for BWD-d filter range precomputation
 inline __device__ __host__ int device_gcd(int a, int b)
 {

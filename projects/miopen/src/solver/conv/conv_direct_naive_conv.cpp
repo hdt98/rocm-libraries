@@ -428,22 +428,31 @@ GetConv2DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int batch_chunk_size       = 1;
     size_t grid_size_per_batch = 1;
     size_t grid_size           = 1;
+    size_t thread_length       = 1;
     bool is_layout_default     = problem.IsLayoutDefault();
 
     if(is_layout_default)
     {
         grid_size_per_batch = static_cast<size_t>(k);
+        thread_length       = static_cast<size_t>(ho) * wo;
         CalculateBatchChunkSize(grid_size_per_batch, n, batch_chunk_size, grid_size);
     }
     else if(problem.IsLayoutNHWC())
     {
         grid_size_per_batch = static_cast<size_t>(ho);
+        thread_length       = static_cast<size_t>(wo) * k;
         CalculateBatchChunkSize(grid_size_per_batch, n, batch_chunk_size, grid_size);
     }
     else
     {
         MIOPEN_THROW("Unsupported layout");
     }
+    // Spatial tiling: only tile when grid_size is too small to keep the GPU busy.
+    // When grid_size is already large enough (e.g., NHWC with ho blocks), tiling
+    // adds overhead without benefit.
+    size_t num_spatial_tiles = 1;
+    if(grid_size < 32)
+        num_spatial_tiles = (thread_length + block_size - 1) / block_size;
 
     KernelInfo kernel;
 
@@ -452,7 +461,7 @@ GetConv2DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     kernel.g_wk.clear();
 
     kernel.g_wk.push_back(grid_size * block_size);
-    kernel.g_wk.push_back(1);
+    kernel.g_wk.push_back(num_spatial_tiles);
     kernel.g_wk.push_back(1);
     kernel.l_wk.clear();
     kernel.l_wk.push_back(block_size);
@@ -651,22 +660,28 @@ GetConv3DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int batch_chunk_size       = 1;
     size_t grid_size_per_batch = 1;
     size_t grid_size           = 1;
+    size_t thread_length       = 1;
     bool is_layout_default     = problem.IsLayoutDefault();
 
     if(is_layout_default)
     {
         grid_size_per_batch = static_cast<size_t>(k);
+        thread_length       = static_cast<size_t>(do_) * ho * wo;
         CalculateBatchChunkSize(grid_size_per_batch, n, batch_chunk_size, grid_size);
     }
     else if(problem.IsLayoutNHWC())
     {
         grid_size_per_batch = static_cast<size_t>(group) * do_;
+        thread_length       = static_cast<size_t>(ho) * wo * k;
         CalculateBatchChunkSize(grid_size_per_batch, n, batch_chunk_size, grid_size);
     }
     else
     {
         MIOPEN_THROW("Unsupported layout");
     }
+    size_t num_spatial_tiles = 1;
+    if(grid_size < 32)
+        num_spatial_tiles = (thread_length + block_size - 1) / block_size;
 
     KernelInfo kernel;
 
@@ -675,7 +690,7 @@ GetConv3DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     kernel.g_wk.clear();
 
     kernel.g_wk.push_back(grid_size * block_size);
-    kernel.g_wk.push_back(1);
+    kernel.g_wk.push_back(num_spatial_tiles);
     kernel.g_wk.push_back(1);
     kernel.l_wk.clear();
     kernel.l_wk.push_back(block_size);
