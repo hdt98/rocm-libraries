@@ -162,6 +162,18 @@ struct WaveWiseMmaPipeline : public MmaPipelineBase<dense::wavewise::detail::get
     using BThreadBufType = thread_buffer<typename MmaOp::BVecType, FragsN * FragsK>;
     using CThreadBufType = thread_buffer<typename MmaOp::CVecType, FragsM * FragsN>;
 
+    // Old types only for pipeline tests. TODO: Remove and update pipeline tests with newer
+    // definitions.
+    // --------------------------------------------------------------------------------------------
+    using AVecType = typename MmaOp::AVecType[FragsM][FragsK];
+    using BVecType = typename MmaOp::BVecType[FragsN][FragsK];
+    using CVecType = typename MmaOp::CVecType[FragsM][FragsN];
+
+    static constexpr uint32_t FragM = MmaOp::kM;
+    static constexpr uint32_t FragN = MmaOp::kM;
+    static constexpr uint32_t FragK = MmaOp::kM;
+    // --------------------------------------------------------------------------------------------
+
     // Transforms
     using ATransform = typename MmaTransforms::ATransform;
     using BTransform = typename MmaTransforms::BTransform;

@@ -55,6 +55,9 @@ struct MfmaDefaultSelector
                    CompilerTarget,
                    MmaOpFamily::DENSE>;
 
+    static_assert(CandidateOp::kK != 16 || std::is_same_v<typename CandidateOp::ADataType, fp16_t>);
+    static_assert(CandidateOp::kK != 16 || MmaOpTraits<CandidateOp>::IsSupported);
+
     public:
     // If the candidate is supported (e.g., a backend implementation exists), then select it.
     // Otherwise, test another smaller WaveTileK. If no existing implementations, we will get
@@ -174,6 +177,8 @@ struct MmaDefaultSelector<ADataType,
     public:
     // Select the largest supported MFMA operation for the given WaveTile shape
     using SelectedOp = std::conditional_t<IsSupported, CandidateOp, DefaultOp>;
+
+    static_assert(std::is_same_v<typename SelectedOp::ADataType, fp16_t>);
 };
 
 } // namespace ck_tile::core::arch::mma
