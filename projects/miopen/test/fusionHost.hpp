@@ -192,8 +192,9 @@ void batchNormPerActivHostInference(const tensor<T>& input,
                 for(int bidx = 0; bidx < n_batches; bidx++)
                 { // via mini_batch
                     // per (x-dims) channel load a block of data into LDS
-                    double elemStd                  = input(bidx, cidx, row, column) - mean;
-                    double inhat                    = elemStd * elemInvVar;
+                    double elemStd = double(input(bidx, cidx, row, column)) - mean;
+                    double inhat   = elemStd * elemInvVar;
+
                     output(bidx, cidx, row, column) = double(scale(0, cidx, row, column)) * inhat +
                                                       double(bias(0, cidx, row, column));
                     // printf("output: %f\n", output(bidx, cidx, row, column));
