@@ -11,30 +11,29 @@ GlobalParameters:
   DataInitTypeMXSA: 3
   DataInitTypeMXSB: 3
   DataInitTypeAlpha: 1
-  DataInitTypeBeta: 0
+  DataInitTypeBeta: 1
   Architecture: gfx1250
   PrintLevel: 2
   PrintSolutionRejectionReason: True
   ForceGenerateKernel: True
   ISA: [[12, 5, 0]]
 
-
 BenchmarkProblems:
   #######################################
-  # NN - standard
+  # TN - TDM + PrefetchAcrossPersistent
   #######################################
   -
-    - # ProblemType, NN
+    - # ProblemType, TN
       OperationType: GEMM
       DataType: F8
       DestDataType: s
       ComputeDataType: s
-      HighPrecisionAccumulate:  True
-      TransposeA: False
+      HighPrecisionAccumulate: True
+      TransposeA: True
       TransposeB: False
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
       MXBlockA: 32
@@ -48,15 +47,23 @@ BenchmarkProblems:
         - UseSgprForGRO: [0]
         - ForceDisableShadowInit: [1]
         - MatrixInstruction:
-          - [16, 16, 128, 1,  1,  1, 1,  1, 2]
+          - [16, 16, 128, 1,  1,  1, 1,  2, 2]
+          - [16, 16, 128, 1,  1,  2, 2,  2, 2]
+          - [16, 16, 128, 1,  1,  4, 4,  2, 2]
         - DepthU: [256]
+        - ClusterLocalRead: [0]
         - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadMXSA: [-1]
+        - LdsPadMXSB: [-1]
+        - LdsBlockSizePerPadMXSA: [-1]
+        - LdsBlockSizePerPadMXSB: [-1]
         - LdsPadMetadata: [0]
-        - LDSTrInst: [True, False]
+        - LDSTrInst: [False]
+        - TDMInst: [3]
         - PrefetchAcrossPersistent: [1]
         - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
@@ -78,37 +85,18 @@ BenchmarkProblems:
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 1024]
+          - Exact: [128, 128, 1, 2048]
+          - Exact: [512, 512, 1, 2048]
         - ActivationArgs:
           - [Enum: none]
 
-  #######################################
-  # TN - focused StreamK PAP coverage
-  #######################################
-  -
-    - # ProblemType, TN
-      OperationType: GEMM
-      DataType: F8
-      DestDataType: s
-      ComputeDataType: s
-      HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
-      UseBeta: True
-      Batched: True
-      Activation: False
-      SupportUserArgs: True
-      UseBias: 0
-      MXBlockA: 32
-      MXBlockB: 32
-
-    - # Default fixup, K-tail, small tile
+    - # K-tail
       InitialSolutionParameters:
       BenchmarkCommonParameters:
         - KernelLanguage: ["Assembly"]
@@ -116,17 +104,23 @@ BenchmarkProblems:
         - UseSgprForGRO: [0]
         - ForceDisableShadowInit: [1]
         - MatrixInstruction:
-          - [16,  16,  128,  1,  1,  1,  1,  1,  2]
+          - [16, 16, 128, 1, 1, 1, 1, 2, 2]
         - DepthU: [256]
+        - ClusterLocalRead: [0]
         - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadMXSA: [-1]
+        - LdsPadMXSB: [-1]
+        - LdsBlockSizePerPadMXSA: [-1]
+        - LdsBlockSizePerPadMXSB: [-1]
         - LdsPadMetadata: [0]
-        - LDSTrInst: [True]
+        - LDSTrInst: [False]
+        - TDMInst: [3]
         - PrefetchAcrossPersistent: [1]
-        - PrefetchGlobalRead: [2]
+        - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
         - SourceSwap: [0]
@@ -147,17 +141,17 @@ BenchmarkProblems:
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 2176]
+          - Exact: [128, 128, 1, 2112]
         - ActivationArgs:
           - [Enum: none]
 
-    - # Tree fixup, clean K and K-tail, small tile
+    - # Tree fixup, clean K and K-tail
       InitialSolutionParameters:
       BenchmarkCommonParameters:
         - KernelLanguage: ["Assembly"]
@@ -165,119 +159,21 @@ BenchmarkProblems:
         - UseSgprForGRO: [0]
         - ForceDisableShadowInit: [1]
         - MatrixInstruction:
-          - [16,  16,  128,  1,  1,  1,  1,  1,  2]
+          - [16, 16, 128, 1, 1, 1, 1, 2, 2]
         - DepthU: [256]
+        - ClusterLocalRead: [0]
         - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadMXSA: [-1]
+        - LdsPadMXSB: [-1]
+        - LdsBlockSizePerPadMXSA: [-1]
+        - LdsBlockSizePerPadMXSB: [-1]
         - LdsPadMetadata: [0]
-        - LDSTrInst: [True]
-        - PrefetchAcrossPersistent: [1]
-        - PrefetchGlobalRead: [2]
-        - PrefetchLocalRead: [1]
-        - ScheduleIterAlg: [3]
-        - SourceSwap: [0]
-        - StoreRemapVectorWidth: [0]
-        - GlobalSplitU: [0]
-        - GlobalReadVectorWidthA: [-1]
-        - GlobalReadVectorWidthB: [-1]
-        - ExpandPointerSwap: [0]
-        - VectorWidthA: [-1]
-        - VectorWidthB: [-1]
-        - LocalReadVectorWidth: [-1]
-        - 1LDSBuffer: [0]
-        - DirectToVgprSparseMetadata: [0]
-        - StoreVectorWidth: [-1]
-        - StreamK: [3]
-        - StreamKFixupTreeReduction: [1]
-        - StaggerU: [0]
-        - DirectToVgprA: [False]
-        - DirectToVgprB: [False]
-        - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [128, 128, 1, 2048]
-          - Exact: [128, 128, 1, 2176]
-        - ActivationArgs:
-          - [Enum: none]
-
-    - # Tree fixup, K-tail, larger tile
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - UseSgprForGRO: [0]
-        - ForceDisableShadowInit: [1]
-        - MatrixInstruction:
-          - [16,  16,  128,  1,  1,  8,  4,  2,  2]
-        - DepthU: [256]
-        - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
-        - LdsPadMetadata: [0]
-        - LDSTrInst: [True]
-        - PrefetchAcrossPersistent: [1]
-        - PrefetchGlobalRead: [2]
-        - PrefetchLocalRead: [1]
-        - ScheduleIterAlg: [3]
-        - SourceSwap: [0]
-        - StoreRemapVectorWidth: [0]
-        - GlobalSplitU: [0]
-        - GlobalReadVectorWidthA: [-1]
-        - GlobalReadVectorWidthB: [-1]
-        - ExpandPointerSwap: [0]
-        - VectorWidthA: [-1]
-        - VectorWidthB: [-1]
-        - LocalReadVectorWidth: [-1]
-        - 1LDSBuffer: [0]
-        - DirectToVgprSparseMetadata: [0]
-        - StoreVectorWidth: [-1]
-        - StreamK: [3]
-        - StreamKFixupTreeReduction: [1]
-        - StaggerU: [0]
-        - DirectToVgprA: [False]
-        - DirectToVgprB: [False]
-        - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [512, 512, 1, 2176]
-        - ActivationArgs:
-          - [Enum: none]
-
-    #######################################
-    # TN - standard
-    #######################################
-    - # BenchmarkProblemSizeGroup - Standard
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - UseSgprForGRO: [0]
-        - ForceDisableShadowInit: [1]
-        - MatrixInstruction:
-          - [16, 16, 128, 1,  1,  1, 1,  1, 2]
-          - [16, 16, 128, 1,  1,  2, 2,  2, 2]
-          - [16, 16, 128, 1,  1,  8, 4,  2, 2]
-        - DepthU: [256]
-        - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
-        - LdsPadMetadata: [0]
-        - LDSTrInst: [True, False]
+        - LDSTrInst: [False]
+        - TDMInst: [3]
         - PrefetchAcrossPersistent: [1]
         - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
@@ -295,21 +191,149 @@ BenchmarkProblems:
         - DirectToVgprSparseMetadata: [0]
         - StoreVectorWidth: [-1]
         - StreamK: [3]
+        - StreamKFixupTreeReduction: [1]
         - StaggerU: [0]
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 2048]
+          - Exact: [128, 128, 1, 2112]
         - ActivationArgs:
           - [Enum: none]
+
+    - # Tree fixup, K-tail, large tile
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - UseSgprForGRO: [0]
+        - ForceDisableShadowInit: [1]
+        - MatrixInstruction:
+          - [16, 16, 128, 1, 1, 4, 4, 2, 2]
+        - DepthU: [256]
+        - ClusterLocalRead: [0]
+        - TransposeLDS: [-1]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadMXSA: [-1]
+        - LdsPadMXSB: [-1]
+        - LdsBlockSizePerPadMXSA: [-1]
+        - LdsBlockSizePerPadMXSB: [-1]
+        - LdsPadMetadata: [0]
+        - LDSTrInst: [False]
+        - TDMInst: [3]
+        - PrefetchAcrossPersistent: [1]
+        - PrefetchGlobalRead: [1, 2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [0]
+        - StoreRemapVectorWidth: [0]
+        - GlobalSplitU: [0]
+        - GlobalReadVectorWidthA: [-1]
+        - GlobalReadVectorWidthB: [-1]
+        - ExpandPointerSwap: [0]
+        - VectorWidthA: [-1]
+        - VectorWidthB: [-1]
+        - LocalReadVectorWidth: [-1]
+        - 1LDSBuffer: [0]
+        - DirectToVgprSparseMetadata: [0]
+        - StoreVectorWidth: [-1]
+        - StreamK: [3]
+        - StreamKFixupTreeReduction: [1]
+        - StaggerU: [0]
+        - DirectToVgprA: [False]
+        - DirectToVgprB: [False]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [1, 8]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [512, 512, 1, 2112]
+        - ActivationArgs:
+          - [Enum: none]
+
   #######################################
-  # NT - standard
+  # NN - TDM + PrefetchAcrossPersistent
+  #######################################
+  -
+    - # ProblemType, NN
+      OperationType: GEMM
+      DataType: F8
+      DestDataType: s
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: False
+      TransposeB: False
+      UseBeta: True
+      Batched: True
+      Activation: True
+      SupportUserArgs: True
+      UseBias: 0
+
+    - # Tree fixup, clean K and K-tail
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - UseSgprForGRO: [0]
+        - ForceDisableShadowInit: [1]
+        - MatrixInstruction:
+          - [16, 16, 128, 1, 1, 1, 1, 1, 2]
+        - DepthU: [256]
+        - ClusterLocalRead: [0]
+        - TransposeLDS: [-1]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadMetadata: [0]
+        - LDSTrInst: [True]
+        - TDMInst: [3]
+        - PrefetchAcrossPersistent: [1]
+        - PrefetchGlobalRead: [1, 2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [0]
+        - StoreRemapVectorWidth: [0]
+        - GlobalSplitU: [0]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
+        - ExpandPointerSwap: [0]
+        - VectorWidthA: [-1]
+        - VectorWidthB: [-1]
+        - LocalReadVectorWidth: [-1]
+        - 1LDSBuffer: [0]
+        - DirectToVgprSparseMetadata: [0]
+        - StoreVectorWidth: [-1]
+        - StreamK: [3]
+        - StreamKFixupTreeReduction: [0, 1]
+        - StaggerU: [0]
+        - DirectToVgprA: [False]
+        - DirectToVgprB: [False]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [1, 8]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [128, 128, 1, 2048]
+          - Exact: [128, 128, 1, 2112]
+        - ActivationArgs:
+          - [Enum: none]
+
+  #######################################
+  # NT - TDM + PrefetchAcrossPersistent
   #######################################
   -
     - # ProblemType, NT
@@ -317,18 +341,16 @@ BenchmarkProblems:
       DataType: F8
       DestDataType: s
       ComputeDataType: s
-      HighPrecisionAccumulate:  True
+      HighPrecisionAccumulate: True
       TransposeA: False
       TransposeB: True
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
-      MXBlockA: 32
-      MXBlockB: 32
 
-    - # BenchmarkProblemSizeGroup - Standard
+    - # Tree fixup, clean K and K-tail
       InitialSolutionParameters:
       BenchmarkCommonParameters:
         - KernelLanguage: ["Assembly"]
@@ -336,15 +358,17 @@ BenchmarkProblems:
         - UseSgprForGRO: [0]
         - ForceDisableShadowInit: [1]
         - MatrixInstruction:
-          - [16, 16, 128, 1,  1,  1, 1,  1, 2]
+          - [16, 16, 128, 1, 1, 1, 1, 1, 2]
         - DepthU: [256]
+        - ClusterLocalRead: [0]
         - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
         - LdsPadMetadata: [0]
-        - LDSTrInst: [True, False]
+        - LDSTrInst: [True]
+        - TDMInst: [3]
         - PrefetchAcrossPersistent: [1]
         - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
@@ -352,8 +376,8 @@ BenchmarkProblems:
         - SourceSwap: [0]
         - StoreRemapVectorWidth: [0]
         - GlobalSplitU: [0]
-        - GlobalReadVectorWidthA: [-1]
-        - GlobalReadVectorWidthB: [-1]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
         - ExpandPointerSwap: [0]
         - VectorWidthA: [-1]
         - VectorWidthB: [-1]
@@ -362,21 +386,24 @@ BenchmarkProblems:
         - DirectToVgprSparseMetadata: [0]
         - StoreVectorWidth: [-1]
         - StreamK: [3]
+        - StreamKFixupTreeReduction: [0, 1]
         - StaggerU: [0]
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 1024]
+          - Exact: [128, 128, 1, 2048]
+          - Exact: [128, 128, 1, 2112]
         - ActivationArgs:
           - [Enum: none]
+
   #######################################
-  # TT - standard
+  # TT - TDM + PrefetchAcrossPersistent
   #######################################
   -
     - # ProblemType, TT
@@ -384,18 +411,16 @@ BenchmarkProblems:
       DataType: F8
       DestDataType: s
       ComputeDataType: s
-      HighPrecisionAccumulate:  True
+      HighPrecisionAccumulate: True
       TransposeA: True
       TransposeB: True
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
-      MXBlockA: 32
-      MXBlockB: 32
 
-    - # BenchmarkProblemSizeGroup - Standard
+    - # Tree fixup, clean K and K-tail
       InitialSolutionParameters:
       BenchmarkCommonParameters:
         - KernelLanguage: ["Assembly"]
@@ -403,15 +428,17 @@ BenchmarkProblems:
         - UseSgprForGRO: [0]
         - ForceDisableShadowInit: [1]
         - MatrixInstruction:
-          - [16, 16, 128, 1,  1,  1, 1,  1, 2]
+          - [16, 16, 128, 1, 1, 1, 1, 1, 2]
         - DepthU: [256]
+        - ClusterLocalRead: [0]
         - TransposeLDS: [-1]
-        - LdsPadA: [0]
-        - LdsPadB: [0]
-        - LdsBlockSizePerPadA: [0]
-        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
         - LdsPadMetadata: [0]
-        - LDSTrInst: [True, False]
+        - LDSTrInst: [True]
+        - TDMInst: [3]
         - PrefetchAcrossPersistent: [1]
         - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
@@ -419,8 +446,8 @@ BenchmarkProblems:
         - SourceSwap: [0]
         - StoreRemapVectorWidth: [0]
         - GlobalSplitU: [0]
-        - GlobalReadVectorWidthA: [-1]
-        - GlobalReadVectorWidthB: [-1]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
         - ExpandPointerSwap: [0]
         - VectorWidthA: [-1]
         - VectorWidthB: [-1]
@@ -429,16 +456,18 @@ BenchmarkProblems:
         - DirectToVgprSparseMetadata: [0]
         - StoreVectorWidth: [-1]
         - StreamK: [3]
+        - StreamKFixupTreeReduction: [0, 1]
         - StaggerU: [0]
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 1024]
+          - Exact: [128, 128, 1, 2048]
+          - Exact: [128, 128, 1, 2112]
         - ActivationArgs:
           - [Enum: none]

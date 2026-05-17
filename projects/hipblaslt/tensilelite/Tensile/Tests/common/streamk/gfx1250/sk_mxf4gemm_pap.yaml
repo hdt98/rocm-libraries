@@ -85,7 +85,7 @@ BenchmarkProblems:
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
@@ -117,9 +117,10 @@ BenchmarkProblems:
         - LdsBlockSizePerPadB: [0]
         - LdsPadMetadata: [0]
         - LDSTrInst: [True]
-        - PrefetchAcrossPersistent: [1]
+        - PrefetchAcrossPersistent: [0, 1]
         - PrefetchGlobalRead: [2]
         - PrefetchLocalRead: [1]
+        - Use64bShadowLimitMX: [0, 1]
         - ScheduleIterAlg: [3]
         - SourceSwap: [0]
         - StoreRemapVectorWidth: [0]
@@ -139,7 +140,7 @@ BenchmarkProblems:
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
@@ -166,7 +167,7 @@ BenchmarkProblems:
         - LdsBlockSizePerPadB: [0]
         - LdsPadMetadata: [0]
         - LDSTrInst: [True]
-        - PrefetchAcrossPersistent: [1]
+        - PrefetchAcrossPersistent: [0, 1]
         - PrefetchGlobalRead: [2]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
@@ -188,7 +189,7 @@ BenchmarkProblems:
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
@@ -216,7 +217,7 @@ BenchmarkProblems:
         - LdsBlockSizePerPadB: [0]
         - LdsPadMetadata: [0]
         - LDSTrInst: [True]
-        - PrefetchAcrossPersistent: [1]
+        - PrefetchAcrossPersistent: [0, 1]
         - PrefetchGlobalRead: [2]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
@@ -238,7 +239,7 @@ BenchmarkProblems:
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - WavefrontSize: [32]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:

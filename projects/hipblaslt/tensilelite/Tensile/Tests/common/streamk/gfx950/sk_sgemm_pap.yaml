@@ -17,21 +17,18 @@ GlobalParameters:
 
 BenchmarkProblems:
   #######################################
-  # BF16 NT - StreamK PrefetchAcrossPersistent
+  # SGEMM NT - StreamK PrefetchAcrossPersistent
   #######################################
   -
     - # ProblemType
       OperationType: GEMM
-      DataType: b
-      DestDataType: b
-      ComputeDataType: s
-      HighPrecisionAccumulate: True
+      DataType: s
       TransposeA: False
       TransposeB: True
       UseBeta: True
       Batched: True
 
-    - # BenchmarkProblemSizeGroup - non-MX PAP smoke coverage
+    - # BenchmarkProblemSizeGroup - stagger, DTL, and PGR coverage
       InitialSolutionParameters:
       BenchmarkCommonParameters:
         - KernelLanguage: ["Assembly"]
@@ -39,16 +36,16 @@ BenchmarkProblems:
         - StreamK: [3]
         - GlobalSplitU: [0]
         - WavefrontSize: [64]
-        - DepthU: [64]
+        - DepthU: [16]
         - 1LDSBuffer: [0]
-        - DirectToLds: [0]
+        - DirectToLds: [0, 1]
         - ExpandPointerSwap: [False]
         - GlobalReadVectorWidthA: [4]
         - GlobalReadVectorWidthB: [4]
         - MatrixInstruction:
-          - [16, 16, 16, 1, 1, 4, 4, 2, 2]
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2]
         - MIArchVgpr: [0]
-        - PrefetchAcrossPersistent: [1]
+        - PrefetchAcrossPersistent: [0, 1]
         - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
@@ -58,12 +55,53 @@ BenchmarkProblems:
         - TransposeLDS: [0]
         - VectorWidthA: [4]
         - VectorWidthB: [4]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [1, 8]
+        - DirectToVgprA: [False]
+        - DirectToVgprB: [False]
+        - UseSgprForGRO: [0, 1]
+        - StaggerU: [0, 32]
+        - StaggerUStride: [256]
+        - Use64bShadowLimit: [False]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [512, 512, 1, 512]
+
+    - # BenchmarkProblemSizeGroup - 64-bit shadow-limit restore path
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - StreamK: [3]
+        - GlobalSplitU: [0]
+        - WavefrontSize: [64]
+        - DepthU: [16]
+        - 1LDSBuffer: [0]
+        - DirectToLds: [0]
+        - ExpandPointerSwap: [False]
+        - GlobalReadVectorWidthA: [4]
+        - GlobalReadVectorWidthB: [4]
+        - MatrixInstruction:
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2]
+        - MIArchVgpr: [0]
+        - PrefetchAcrossPersistent: [0, 1]
+        - PrefetchGlobalRead: [1]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [True]
+        - StoreRemapVectorWidth: [0]
+        - StoreVectorWidth: [4]
+        - TransposeLDS: [0]
+        - VectorWidthA: [4]
+        - VectorWidthB: [4]
+        - WorkGroupMapping: [1, 8]
         - DirectToVgprA: [False]
         - DirectToVgprB: [False]
         - StaggerU: [32]
         - StaggerUStride: [256]
-        - Use64bShadowLimit: [False]
+        - Use64bShadowLimit: [True]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:

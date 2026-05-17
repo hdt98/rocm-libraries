@@ -303,18 +303,25 @@ class StreamK(Component):
 
         After each persistent iteration's main body, ``StreamKIter`` already holds the starting
         global iteration index for the next chunk (set at the beginning of ``graWorkGroup``).
-        Running ``skTileIndex`` + ``skIndexToWG`` here matches the start of the next
-        ``setupNewTile`` / ``graWorkGroup`` (without advancing ``StreamKIter`` again), so SGPRs
-        are warm before the persistent back-edge.
+        Running ``skTileIndex`` + ``skIndexToWG`` + WGM remapping here matches the start of the
+        next ``setupNewTile`` / ``graWorkGroup`` (without advancing ``StreamKIter`` again), so
+        SGPRs are warm before the persistent back-edge.
 
         When ``skipLroReset`` is True the local-read-offset reset inside
         ``skTileIndex`` is suppressed.  This is needed when PAP runs *before*
         the NLL body: the NLL still needs the current tile's read pointers."""
+        from Tensile.Components.WorkGroupMappingAlgos import DefaultWGM, SpaceFillingCurveWalk
+
         module = Module("StreamK prefetchAcrossPersistentSetupNextTile")
         sTmp = writer.sgprPool.checkOutAligned(4, 2, "SKPrefetchTemp")
         module.add(self.skTileIndex(writer, kernel, sTmp, tPA, tPB, skipLroReset=skipLroReset))
         module.add(self.skIndexToWG(writer, kernel, sTmp))
         writer.sgprPool.checkIn(sTmp)
+        if len(kernel["SpaceFillingAlgo"]):
+            writer.states.WGMTransformLevels = len(kernel["SpaceFillingAlgo"])
+            module.add(SpaceFillingCurveWalk(writer, kernel, "WGM"))
+        else:
+            module.add(DefaultWGM(writer, kernel, "WGM"))
         return module
 
     def computeTotalTiles(self, writer, kernel, dstSgpr):
