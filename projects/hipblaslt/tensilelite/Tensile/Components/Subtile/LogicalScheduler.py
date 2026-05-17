@@ -360,9 +360,6 @@ class LogicalScheduler:
     def __init__(self, config: SchedulerConfig):
         self.config = config
         self.tensors: List[str] = ['A', 'B'] + (['SA', 'SB'] if config.hasScale else [])
-        # Shared mutable state across passes. The same field holds different
-        # stage representations over time; see ScheduleTypes for stage meanings.
-        self._partitions: Optional[Union[LogicalSchedule, AnnotatedSchedule, AugmentedSchedule]] = None
         self._emitted: Optional[EmittedSchedule] = None
         self._preloop_emitted: Optional[EmittedSchedule] = None
         self._ngll_emitted: Optional[EmittedSchedule] = None
@@ -430,7 +427,6 @@ class LogicalScheduler:
                 if load[side]:
                     loaded_ranges[side] = {cur[side], nxt[side]}
 
-        self._partitions = partitions
         return partitions
 
     def _place_LRs_for_partition(self, cur: tuple, nxt: tuple,
@@ -526,7 +522,7 @@ class LogicalScheduler:
 
     # ── Assign VGPR tile IDs (free-list allocation) ──────
 
-    def assign_vgpr_tiles(self):
+    def assign_vgpr_tiles(self, schedule: LogicalSchedule) -> LogicalSchedule:
         """Assign physical vgprTileIds to all placements (A, B, SA, SB).
 
         Free-list allocator with per-tensor FIFO queues, iterated until
@@ -558,7 +554,7 @@ class LogicalScheduler:
 
         # ── Phase 1: find last MFMA read for each key ──
         last_read = {}  # key -> flat position
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 if not slot.mfma:
                     continue
@@ -615,7 +611,7 @@ class LogicalScheduler:
 
             next_iter = {}
 
-            for pi, slots in enumerate(self._partitions):
+            for pi, slots in enumerate(schedule):
                 for slot in slots:
                     pos = pi * numK + slot.subIterK
                     k = slot.subIterK
@@ -680,7 +676,7 @@ class LogicalScheduler:
             for prev_idx, prev_ni in enumerate(all_next_iters):
                 if next_iter == prev_ni:
                     # Strip tile maps from the redundant convergence iteration.
-                    for pi2, slots2 in enumerate(self._partitions):
+                    for pi2, slots2 in enumerate(schedule):
                         for slot2 in slots2:
                             if slot2.mfma:
                                 for tensor in self.tensors:
@@ -705,10 +701,11 @@ class LogicalScheduler:
         self.unroll_factor = unroll_iter
         self.needs_unrolling = self.unroll_factor > 1
         self.tile_peaks = max_peaks
+        return schedule
 
     # ── Place GRs ─────────────────────────────────────────
 
-    def _build_gr_list(self, part_ranges, offsetMT, offsetPartition,
+    def _build_gr_list(self, schedule: LogicalSchedule, part_ranges, offsetMT, offsetPartition,
                              debug=False):
         """Phase 1: Build ordered GR list from placed MFMAs.
 
@@ -729,7 +726,7 @@ class LogicalScheduler:
         gr_list = []
 
         for pi in range(numP):
-            partition_slots = self._partitions[pi]
+            partition_slots = schedule[pi]
 
             target_pi = (pi + offsetPartition) % numP
             wraps = (pi + offsetPartition) >= numP
@@ -786,14 +783,14 @@ class LogicalScheduler:
 
         return gr_list
 
-    def _build_lr_conflict_map(self):
+    def _build_lr_conflict_map(self, schedule: LogicalSchedule):
         """Build per-partition LR(MT n) info for LDS conflict checking.
 
         Returns dict: (partition_idx, tensor) -> list of
                       (subIterK_slot, k_start, k_end).
         """
         lr_mt_n_info = {}
-        for pi, partition_slots in enumerate(self._partitions):
+        for pi, partition_slots in enumerate(schedule):
             for slot in partition_slots:
                 for lr in slot.lrs:
                     if lr.mtIteration == 0:
@@ -819,7 +816,7 @@ class LogicalScheduler:
                 return True
         return False
 
-    def _distribute_grs(self, gr_list, lr_mt_n_info, debug=False):
+    def _distribute_grs(self, schedule: LogicalSchedule, gr_list, lr_mt_n_info, debug=False):
         """Phase 2: Distribute GR atoms across partition × subIterK slots.
 
         Explodes GR entries into atomic loads, distributes them into flat
@@ -874,7 +871,7 @@ class LogicalScheduler:
         for flat, bucket in enumerate(buckets):
             pi = flat // numK
             si = flat % numK
-            target_slot = self._partitions[pi][si]
+            target_slot = schedule[pi][si]
             for atom in bucket:
                 tensor, mt_val, ts, te, ks, ke = atom
                 if target_slot.grs:
@@ -892,7 +889,7 @@ class LogicalScheduler:
                     subIterK_slot=si,
                     partition=pi))
 
-    def place_GRs(self) -> LogicalSchedule:
+    def place_GRs(self, schedule: LogicalSchedule) -> LogicalSchedule:
         """Place Global Reads by iterating MFMAs across partitions.
 
         Phase 1: Build ordered GR list from partition traversal respecting gr granularities.
@@ -911,20 +908,20 @@ class LogicalScheduler:
         offsetMT = 1
         offsetPartition = 1
         # Build ordered list of GRs to place for the entire MT based on the partitioning ordering and the GR granularities.
-        gr_list = self._build_gr_list(part_ranges, offsetMT, offsetPartition)
+        gr_list = self._build_gr_list(schedule, part_ranges, offsetMT, offsetPartition)
         # Map to keep track of LR(MT n) for each partiion and tensor, used for LDS double buffer conflict checking when placing GRs.
-        lr_mt_n_info = self._build_lr_conflict_map()
+        lr_mt_n_info = self._build_lr_conflict_map(schedule)
         # Distribute GRs accross partition.
-        self._distribute_grs(gr_list, lr_mt_n_info)
-        return self._partitions
+        self._distribute_grs(schedule, gr_list, lr_mt_n_info)
+        return schedule
 
     # ── Annotate dependencies ─────────────────────────────
 
-    def annotate_deps(self) -> AnnotatedSchedule:
+    def annotate_deps(self, schedule: LogicalSchedule) -> AnnotatedSchedule:
         """Annotate each placement with its raw before-dependencies.
 
         Populates the `before` field on MFMAPlacement, LRPlacement, and
-        GRPlacement objects in self._partitions. Each lr_ref/gr_ref BaseOp
+        GRPlacement objects in schedule. Each lr_ref/gr_ref BaseOp
         is resolved to point at the specific placement it depends on.
 
         Iterates all partitions. Two-pass per partition:
@@ -947,7 +944,7 @@ class LogicalScheduler:
         gr_by_tensor = {}
         # lr_by_tensor[tensor] → list of all LRPlacements (GR→LR collision is cross-partition)
         lr_by_tensor = {}
-        for slots in self._partitions:
+        for slots in schedule:
             for slot in slots:
                 for lr in slot.lrs:
                     for data_k in lr.tiles.subIterK_list:
@@ -956,10 +953,10 @@ class LogicalScheduler:
                 for gr in slot.grs:
                     gr_by_tensor.setdefault(gr.tensor, []).append(gr)
 
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             self._annotate_deps_partition(pi, slots, cfg, lr_by_data,
                                           gr_by_tensor, lr_by_tensor)
-        return self._partitions
+        return schedule
 
     def _annotate_deps_partition(self, pi: int, slots: List[SubIterKSlot],
                                  cfg: SchedulerConfig, lr_by_data: list,
@@ -1096,7 +1093,7 @@ class LogicalScheduler:
 
     # ── Remove unnecessary GR deps ────────────────────────
 
-    def remove_unnecessary_gr_deps(self) -> AnnotatedSchedule:
+    def remove_unnecessary_gr_deps(self, schedule: AnnotatedSchedule) -> AnnotatedSchedule:
         """Remove GR deps on LRs that are already guaranteed by an earlier LR's wait.
 
         Per tensor, walks LR placements in execution order. If an earlier LR
@@ -1111,7 +1108,7 @@ class LogicalScheduler:
 
         for tensor in self.tensors:
             lr_with_gr_deps = []
-            for pi, slots in enumerate(self._partitions):
+            for pi, slots in enumerate(schedule):
                 for slot in slots:
                     for lr in slot.lrs:
                         if lr.tensor == tensor and lr.deps:
@@ -1131,11 +1128,11 @@ class LogicalScheduler:
                     lr.deps.clear()
                 else:
                     max_guaranteed = eo
-        return self._partitions
+        return schedule
 
     # ── Remove unnecessary LR deps ────────────────────────
 
-    def remove_unnecessary_lr_deps(self) -> AnnotatedSchedule:
+    def remove_unnecessary_lr_deps(self, schedule: AnnotatedSchedule) -> AnnotatedSchedule:
         """Remove GR→LR collision deps already covered by an earlier sync.
 
         A GR with an LR dep creates a sync point. 
@@ -1153,7 +1150,7 @@ class LogicalScheduler:
             return (dep.mt_offset, dep.ref.partition, dep.ref.subIterK_slot)
 
         gr_with_lr_deps = []
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 for gr in slot.grs:
                     if gr.deps:
@@ -1162,10 +1159,10 @@ class LogicalScheduler:
                             gr_with_lr_deps.append((pi, slot.subIterK, gr, dep))
 
         if len(gr_with_lr_deps) <= 1:
-            return
+            return schedule
 
         mfma_by_pos = {}
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 if slot.mfma:
                     mfma_by_pos[(pi, slot.subIterK)] = slot.mfma
@@ -1208,7 +1205,7 @@ class LogicalScheduler:
             # The GR's own dep is also a sync point at this slot.
             if tensor not in last_sync_eo or curr_eo > last_sync_eo[tensor]:
                 last_sync_eo[tensor] = curr_eo
-        return self._partitions
+        return schedule
 
     # ── Remove cross-subIterK deps ─────────────────────────
 
@@ -1217,7 +1214,7 @@ class LogicalScheduler:
         return {'A': self.config.grA, 'B': self.config.grB,
                 'SA': self.config.grSA, 'SB': self.config.grSB}[tensor]
 
-    def _compute_inflight_loads(self, consumer_pi: int, consumer_slot: int,
+    def _compute_inflight_loads(self, schedule: AnnotatedSchedule, consumer_pi: int, consumer_slot: int,
                                 tensor: str, dep_ref: Dep) -> WaitGRCounts:
         """Count inflight GR atomic loads between a dep GR and the consumer.
 
@@ -1228,8 +1225,8 @@ class LogicalScheduler:
 
         Returns per-tensor inflight load counts.
         """
-        numP = len(self._partitions)
-        numK = len(self._partitions[0])
+        numP = len(schedule)
+        numK = len(schedule[0])
         flat_len = numP * numK
 
         consumer_flat = consumer_pi * numK + consumer_slot
@@ -1248,7 +1245,7 @@ class LogicalScheduler:
 
             pi = pos // numK
             slot_k = pos % numK
-            slot = self._partitions[pi][slot_k]
+            slot = schedule[pi][slot_k]
 
             for gr in slot.grs:
                 if gr.tensor == tensor and gr is dep_ref.ref and wraps_completed >= wraps_needed:
@@ -1262,7 +1259,7 @@ class LogicalScheduler:
 
         return counts
 
-    def remove_cross_deps(self) -> AnnotatedSchedule:
+    def remove_cross_deps(self, schedule: AnnotatedSchedule) -> AnnotatedSchedule:
         """Replace cross-subIterK deps with wait preOps.
 
         For each placement, separates deps into same-subIterK (kept) and
@@ -1271,7 +1268,7 @@ class LogicalScheduler:
           - GR depending on LRs   → single wait_lr_sync
           - LR depending on GRs   → single wait_gr_sync with per-tensor inflight counts
         """
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 # ── MFMA ──
                 if slot.mfma:
@@ -1289,7 +1286,7 @@ class LogicalScheduler:
                     if cross:
                         dep = cross[0]
                         counts = self._compute_inflight_loads(
-                            pi, lr.subIterK_slot, dep.ref.tensor, dep)
+                            schedule, pi, lr.subIterK_slot, dep.ref.tensor, dep)
                         lr.preOps.append(WaitGROp(wait_gr_counts=counts,
                                                   has_sync=True))
 
@@ -1301,8 +1298,9 @@ class LogicalScheduler:
                         isinstance(d.ref, LRPlacement)
                         for d in same + cross)
                     gr.preOps = [WaitLROp(has_sync=True)] if has_lr_dep else []
+        return schedule
 
-    def insert_gr_lr_inc(self) -> AugmentedSchedule:
+    def insert_gr_lr_inc(self, schedule: AnnotatedSchedule) -> AugmentedSchedule:
         """Insert gr_inc/lr_inc preOps at MacroTile iteration transitions.
 
         Walks all LR and GR placements in global execution order
@@ -1317,7 +1315,7 @@ class LogicalScheduler:
         first_lr = {}  # tensor -> first LR placement seen
         lr_inc_tensors = set()  # tensors that already received lr_inc
 
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 for lr in slot.lrs:
                     tensor = lr.tensor
@@ -1346,6 +1344,7 @@ class LogicalScheduler:
                 last = last_gr_mt.get(tensor, last_lr_mt.get(tensor))
                 if last is not None and last != lr.mtIteration:
                     lr.preOps.append(LRIncOp(tensor=tensor))
+        return schedule
 
     # ── Group LR/GR chains ─────────────────────────────────────
 
@@ -1384,7 +1383,7 @@ class LogicalScheduler:
         result.extend(others)
         return result
 
-    def group_lr_gr(self) -> AugmentedSchedule:
+    def group_lr_gr(self, schedule: AugmentedSchedule) -> AugmentedSchedule:
         """Group LR and GR placements into chains within each subIterK.
 
         Phase 1 — LR chain:
@@ -1401,7 +1400,7 @@ class LogicalScheduler:
         """
         order = self._LR_GR_ORDER
 
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 # ── Phase 1: LR chain ──
                 ordered_lrs = sorted(
@@ -1459,9 +1458,9 @@ class LogicalScheduler:
                     if ordered_grs[0].deps and last_lr is not None:
                         ordered_grs[0].deps = [
                             Dep(ref=last_lr, mt_offset=0)]
-        return self._partitions
+        return schedule
 
-    def remove_unnecessary_wait_lr_sync(self) -> AugmentedSchedule:
+    def remove_unnecessary_wait_lr_sync(self, schedule: AugmentedSchedule) -> AugmentedSchedule:
         """Remove redundant wait_lr_sync from GRs after grouping.
         Given that we always use wait_lr cnt=0, grouping can guarantee future wait_lr_sync.
 
@@ -1479,7 +1478,7 @@ class LogicalScheduler:
         to just sync — the wait_lr is already guaranteed by the MFMA op in the
         same subIterK.
         """
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for si, slot in enumerate(slots):
                 if not slot.grs:
                     continue
@@ -1508,7 +1507,7 @@ class LogicalScheduler:
 
         # Downgrade remaining wait_lr_sync → sync on GRs with no LR deps.
         # The MFMA in the same subIterK already ensures wait_lr.
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             for slot in slots:
                 for gr in slot.grs:
                     if not any(isinstance(op, WaitLROp) and op.has_sync for op in gr.preOps):
@@ -1526,7 +1525,7 @@ class LogicalScheduler:
                     gr.preOps = [
                         SyncOp() if (isinstance(op, WaitLROp) and op.has_sync) else op
                         for op in gr.preOps]
-        return self._partitions
+        return schedule
 
     def _split_deps(self, deps: List[Dep], consumer_pi: int,
                     consumer_slot: int) -> Tuple[List[Dep], List[Dep]]:
@@ -1545,7 +1544,7 @@ class LogicalScheduler:
                 cross.append(dep)
         return same, cross
 
-    def emit(self) -> EmittedSchedule:
+    def emit(self, schedule: AugmentedSchedule) -> EmittedSchedule:
         """Convert placements into EmittedModule chains per partition per subIterK.
 
         Returns [partition][subIterK][EmittedModule].
@@ -1562,7 +1561,7 @@ class LogicalScheduler:
           - Same-subIterK Dep deps become ordering constraints (no new module)
         """
         all_partitions = []
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             partition_emitted = []
             for slot in slots:
                 emitted: List[EmittedModule] = []
@@ -1668,26 +1667,27 @@ class LogicalScheduler:
         """
         schedule: LogicalSchedule = self.place_LRs()
         if stop_after == 'place_LRs': return schedule
-        self.assign_vgpr_tiles()
+        self.assign_vgpr_tiles(schedule)
         if stop_after == 'assign_vgpr_tiles': return schedule
-        schedule = self.place_GRs()
+        schedule = self.place_GRs(schedule)
         if stop_after == 'place_GRs': return schedule
-        annotated: AnnotatedSchedule = self.annotate_deps()
+        annotated: AnnotatedSchedule = self.annotate_deps(schedule)
         if stop_after == 'annotate_deps': return annotated
-        annotated = self.remove_unnecessary_gr_deps()
+        annotated = self.remove_unnecessary_gr_deps(annotated)
         if stop_after == 'remove_unnecessary_gr_deps': return annotated
-        annotated = self.remove_unnecessary_lr_deps()
+        annotated = self.remove_unnecessary_lr_deps(annotated)
         if stop_after == 'remove_unnecessary_lr_deps': return annotated
-        annotated = self.remove_cross_deps()
+        annotated = self.remove_cross_deps(annotated)
         if stop_after == 'remove_cross_deps': return annotated
-        augmented: AugmentedSchedule = self.insert_gr_lr_inc()
+        augmented: AugmentedSchedule = self.insert_gr_lr_inc(annotated)
         if stop_after == 'insert_gr_lr_inc': return augmented
-        augmented = self.group_lr_gr()
+        augmented = self.group_lr_gr(augmented)
         if stop_after == 'group_lr_gr': return augmented
-        augmented = self.remove_unnecessary_wait_lr_sync()
+        augmented = self.remove_unnecessary_wait_lr_sync(augmented)
         if stop_after == 'remove_unnecessary_wait_lr_sync': return augmented
-        self.emit()
-        return self._emitted
+        self._augmented = augmented # needed for build_preloop()
+        emitted: EmittedSchedule = self.emit(augmented)
+        return emitted
 
     # ── Loop variant derivation ────────────────────────────
 
@@ -1794,7 +1794,7 @@ class LogicalScheduler:
                             subIterK_slot=0)
                 for tensor in self.tensors]
 
-    def _preloop_make_lr(self, tiles: dict) -> List[LRPlacement]:
+    def _preloop_make_lr(self, tiles: dict, schedule: AugmentedSchedule) -> List[LRPlacement]:
         """Create LR placements for first partition.
 
         tiles: per-tensor MFMATileRange, e.g. {'A': MFMATileRange(0, k, mn0, mn1), ...}
@@ -1802,7 +1802,7 @@ class LogicalScheduler:
         Uses the first MFMA's vgpr tile maps (the preloop loads data consumed
         by the first MFMA, not the next subIterK like mainloop LRs).
         """
-        first_mfma = self._partitions[0][0].mfma
+        first_mfma = schedule[0][0].mfma
 
         placements = []
         for tensor in self.tensors:
@@ -1819,7 +1819,7 @@ class LogicalScheduler:
         """Create a BaseOp subclass instance for each tensor."""
         return [cls(tensor=tensor) for tensor in self.tensors]
 
-    def build_preloop(self) -> EmittedSchedule:
+    def build_preloop(self, schedule: AugmentedSchedule) -> EmittedSchedule:
         """Build preloop: pipeline initialization sequence before mainloop.
 
         High-level sequence (waits/syncs auto-inserted by _insert_preloop_waits):
@@ -1858,7 +1858,7 @@ class LogicalScheduler:
             *self._make_tensor_depops(GRIncOp),
             WaitGROp(wait_gr_counts=WaitGRCounts()),
             SyncOp(),
-            *self._preloop_make_lr(lr_tiles),
+            *self._preloop_make_lr(lr_tiles, schedule),
             WaitLROp(),
             SkipOp(compare='LE', value=1, target='NLL'),
             *self._preloop_make_gr(1, part0_tiles),
@@ -2114,7 +2114,7 @@ class LogicalScheduler:
         # Rebuild all loop variants from current _emitted (which now has
         # vgpr_tile_maps populated by assign_vgpr_tiles, unlike the stale
         # copies from build()).
-        self.build_preloop()
+        self.build_preloop(self._augmented)
         self.build_ngll()
         self.build_nll()
 
@@ -2146,10 +2146,8 @@ class LogicalScheduler:
         return tensor.ljust(2)
 
 
-    def print_lr(self, partitions: Optional[LogicalSchedule] = None) -> str:
+    def print_lr(self, partitions: LogicalSchedule) -> str:
         """Print place_LRs output in design doc format."""
-        if partitions is None:
-            partitions = self._partitions
         buf = io.StringIO()
         buf.write("MAINLOOP:\n")
         for pi, slots in enumerate(partitions):
@@ -2171,9 +2169,8 @@ class LogicalScheduler:
                           f"{lr.tiles.fmt_tiles()}\n")
         return buf.getvalue()
 
-    def print_vgpr(self) -> str:
+    def print_vgpr(self, partitions: LogicalSchedule) -> str:
         """Print assign_vgpr_tiles output: LRs + MFMAs with vgprTileId annotations."""
-        partitions = self._partitions
         buf = io.StringIO()
         buf.write(f"needsUnrolling: {self.needs_unrolling}, "
                   f"unrollFactor: {self.unroll_factor}\n")
@@ -2211,9 +2208,8 @@ class LogicalScheduler:
                                   f"{lr.tiles.fmt_tiles()}{tile_str}\n")
         return buf.getvalue()
 
-    def print_gr(self) -> str:
+    def print_gr(self, partitions: LogicalSchedule) -> str:
         """Print place_GRs output: LRs + MFMAs + GR placements, all partitions."""
-        partitions = self._partitions
         buf = io.StringIO()
         buf.write("MAINLOOP:\n")
         for pi, slots in enumerate(partitions):
@@ -2236,11 +2232,11 @@ class LogicalScheduler:
                               f"ids {gr.tiles.fmt_tiles()}\n")
         return buf.getvalue()
 
-    def print_deps(self) -> str:
+    def print_deps(self, schedule: AnnotatedSchedule) -> str:
         """Print annotate_deps output: placements with their before-dependencies."""
         buf = io.StringIO()
         buf.write("MAINLOOP:\n")
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             buf.write(f"  Partition {pi}:\n")
             for slot in slots:
                 buf.write(f"    subIterK={slot.subIterK}:\n")
@@ -2261,11 +2257,11 @@ class LogicalScheduler:
                 dep_str = self._format_dep_ref(dep)
                 buf.write(f"            - {dep_str}\n")
 
-    def print_remove_deps(self) -> str:
+    def print_remove_deps(self, schedule: AnnotatedSchedule) -> str:
         """Print remove_cross_deps output: placements with preOps and remaining deps."""
         buf = io.StringIO()
         buf.write("MAINLOOP:\n")
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             buf.write(f"  Partition {pi}:\n")
             for slot in slots:
                 buf.write(f"    subIterK={slot.subIterK}:\n")
@@ -2277,11 +2273,11 @@ class LogicalScheduler:
                     self._print_placement_with_preops(buf, gr, slot)
         return buf.getvalue()
 
-    def print_group_lr_gr(self) -> str:
+    def print_group_lr_gr(self, schedule: AugmentedSchedule) -> str:
         """Print group_lr_gr output: placements with chained deps and merged preOps."""
         buf = io.StringIO()
         buf.write("MAINLOOP:\n")
-        for pi, slots in enumerate(self._partitions):
+        for pi, slots in enumerate(schedule):
             buf.write(f"  Partition {pi}:\n")
             for slot in slots:
                 buf.write(f"    subIterK={slot.subIterK}:\n")
