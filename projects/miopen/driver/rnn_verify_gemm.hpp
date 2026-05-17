@@ -90,7 +90,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
     {
         for(int w = 0; w < in_h; w++)
         {
-            in_state.at(h * in_h + w) = in.at(h * in_h + w);
+            in_state.at(h * in_h + w) = Tref(in.at(h * in_h + w));
         }
     }
 
@@ -99,7 +99,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
     std::vector<Tref> hx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state.at(h) = hx.at(h);
+        hx_state.at(h) = Tref(hx.at(h));
     }
 
     if(inputMode == 1)
@@ -124,7 +124,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
     std::vector<Tref> wei_state(wei_len, static_cast<Tref>(0));
     for(int h = 0; h < wei_len; h++)
     {
-        wei_state.at(h) = wei[h];
+        wei_state.at(h) = Tref(wei[h]);
     }
 
     int wei_shift_bias = ((in_h + hy_h) * bi + (bi * hy_h + hy_h) * bi * (numlayer - 1)) * hy_h;
@@ -195,7 +195,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < hy_stride; h++)
                         {
                             hid_state.at(hid_shift + bs * hy_stride + h) +=
-                                wei.at(wei_shift_bias + h);
+                                Tref(wei.at(wei_shift_bias + h));
                         }
                     }
                 }
@@ -227,7 +227,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < hy_stride; h++)
                         {
                             hid_state.at(hid_shift + bs * hy_stride + h) +=
-                                wei.at(wei_shift_bias + h);
+                                Tref(wei.at(wei_shift_bias + h));
                         }
                     }
                 }
@@ -286,7 +286,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                     for(int h = 0; h < hy_stride; h++)
                     {
                         hid_state.at(hid_shift + bs * hy_stride + h) +=
-                            wei.at(wei_shift_bias_temp + h);
+                            Tref(wei.at(wei_shift_bias_temp + h));
                     }
                 }
             }
@@ -335,7 +335,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                             for(int h = 0; h < hy_h; h++)
                             {
                                 hid_state.at(hid_shift + bacc * hy_stride + bs * hy_stride + h) +=
-                                    wei.at(wei_shift_bias_temp + h);
+                                    Tref(wei.at(wei_shift_bias_temp + h));
                             }
                         }
                     }
@@ -370,7 +370,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state.at(hid_shift + baccbi * hy_stride + hy_h +
                                                  bs * hy_stride + h) +=
-                                        wei.at(wei_shift_bias_temp + hy_h + h);
+                                        Tref(wei.at(wei_shift_bias_temp + hy_h + h));
                                 }
                             }
                         }
@@ -406,7 +406,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < hy_h; h++)
                         {
                             hid_state.at(hid_shift + bacc * hy_stride + bs * hy_stride + h) +=
-                                wei.at(wei_shift_bias_temp + h);
+                                Tref(wei.at(wei_shift_bias_temp + h));
                         }
                     }
                 }
@@ -447,7 +447,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state.at(hid_shift + baccbi * hy_stride + hy_h +
                                                  bs * hy_stride + h) +=
-                                        wei.at(wei_shift_bias_temp + hy_h + h);
+                                        Tref(wei.at(wei_shift_bias_temp + hy_h + h));
                                 }
                             }
                         }
@@ -481,7 +481,7 @@ void RunRNNForwardGEMMCPUVerify(miopenHandle_t handle,
                             {
                                 hid_state.at(hid_shift + baccbi * hy_stride + hy_h +
                                              bs * hy_stride + h) +=
-                                    wei.at(wei_shift_bias_temp + hy_h + h);
+                                    Tref(wei.at(wei_shift_bias_temp + hy_h + h));
                             }
                         }
                     }
@@ -633,7 +633,7 @@ void RunRNNBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
     {
         for(int w = 0; w < out_h; w++)
         {
-            dout_state.at(h * out_h + w) = dout.at(h * out_h + w);
+            dout_state.at(h * out_h + w) = Tref(dout.at(h * out_h + w));
         }
     }
 
@@ -642,7 +642,7 @@ void RunRNNBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
     std::vector<Tref> dhy_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        dhy_state.at(h) = dhy.at(h);
+        dhy_state.at(h) = Tref(dhy.at(h));
     }
 
     if(inputMode == 1)
@@ -667,7 +667,7 @@ void RunRNNBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
     std::vector<Tref> wei_state(wei_len, static_cast<Tref>(0));
     for(int h = 0; h < wei_len; h++)
     {
-        wei_state.at(h) = wei.at(h);
+        wei_state.at(h) = Tref(wei.at(h));
     }
 
     // initial dropoput
@@ -1004,7 +1004,7 @@ void RunRNNBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     {
         for(int w = 0; w < in_h; w++)
         {
-            in_state.at(h * in_h + w) = in.at(h * in_h + w);
+            in_state.at(h * in_h + w) = Tref(in.at(h * in_h + w));
         }
     }
 
@@ -1014,7 +1014,7 @@ void RunRNNBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     {
         for(int w = 0; w < out_h; w++)
         {
-            dout_state.at(h * out_h + w) = dout.at(h * out_h + w);
+            dout_state.at(h * out_h + w) = Tref(dout.at(h * out_h + w));
         }
     }
 
@@ -1038,7 +1038,7 @@ void RunRNNBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     std::vector<Tref> hx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state.at(h) = hx.at(h);
+        hx_state.at(h) = Tref(hx.at(h));
     }
 
     if(inputMode == 1)

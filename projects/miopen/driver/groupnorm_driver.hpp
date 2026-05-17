@@ -315,11 +315,13 @@ int GroupNormDriver<Tgpu, Tref>::RunForwardGPU()
         STOP_TIME
         int iter = inflags.GetValueInt("iter");
         if(WALL_CLOCK)
-            printf("Wall-clock Time Forward GroupNorm Elapsed: %f ms\n", t.gettime_ms() / iter);
+            std::cout << "Wall-clock Time Forward GroupNorm Elapsed: " << (t.gettime_ms() / iter)
+                      << " ms\n";
 
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        printf("GPU Kernel Time Forward GroupNorm Elapsed: %f ms\n", kernel_average_time);
+        std::cout << "GPU Kernel Time Forward GroupNorm Elapsed: " << kernel_average_time
+                  << " ms\n";
     }
 
     out_dev->FromGPU(GetStream(), out.data());

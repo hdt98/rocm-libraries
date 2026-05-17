@@ -41,11 +41,11 @@ T logaddexp(T x, T y)
 {
     T a = std::max(x, y);
     T b = std::min(x, y);
-    T c = b - a;
+    auto c = double(b - a);
 
-    return c <= T(NEGATIVE_CUTOFF_VAL)
+    return c <= NEGATIVE_CUTOFF_VAL
                ? std::max(a, T(NEGATIVE_CUTOFF_VAL))
-               : std::max(T(a + log(T(1) + exp(b - a))), T(NEGATIVE_CUTOFF_VAL));
+               : std::max(a + T(log(1.0 + exp(c))), T(NEGATIVE_CUTOFF_VAL));
 }
 
 template <typename T>
@@ -244,7 +244,7 @@ void ctc_gradient_log(std::vector<int>& label,
             gradients_logits[gidx] -= (2 * probs_logits[pidx]);
             gradients_logits[gidx] -= prob_lx_log;
             gradients_logits[gidx] = std::max(gradients_logits[gidx], T(NEGATIVE_CUTOFF_VAL));
-            gradients_logits[gidx] = -exp(gradients_logits[gidx]);
+            gradients_logits[gidx] = -exp(double(gradients_logits[gidx]));
         }
 
     for(int j = input_length; j < max_time_step; j++)
@@ -320,7 +320,7 @@ void ctc_softmaxlayer_gradient_log(std::vector<int>& label,
             gradients_logits[gidx] -= prob_lx_log;
             gradients_logits[gidx] = std::max(gradients_logits[gidx], T(NEGATIVE_CUTOFF_VAL));
 
-            gradients_logits[gidx] = exp(probs_logits[pidx]) - exp(gradients_logits[gidx]);
+            gradients_logits[gidx] = exp(double(probs_logits[pidx])) - exp(double(gradients_logits[gidx]));
         }
 }
 

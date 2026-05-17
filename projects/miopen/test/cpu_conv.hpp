@@ -276,8 +276,8 @@ void cpu_convolution_backward_data_impl(tensor<Tin>& in,
                         out_id[0] = in_n_id;
                         out_id[1] = out_k_id;
                         std::copy_n(out_spatial_id.begin(), ConvDim, out_id.begin() + 2);
-                        Tacc tmp1 = fo(out(out_id));
-                        Tacc tmp2 = fw(wei(out_k_id, wei_c_id, wei_spatial_id_pack...));
+                        Tacc tmp1 = Tacc(fo(out(out_id)));
+                        Tacc tmp2 = Tacc(fw(wei(out_k_id, wei_c_id, wei_spatial_id_pack...)));
                         acc += tmp1 * tmp2;
                     }
                 });
@@ -364,8 +364,8 @@ void cpu_convolution_backward_weight_impl(const tensor<Tin>& in,
                         in_id[0] = out_n_id;
                         in_id[1] = in_c_id;
                         std::copy_n(in_spatial_id.begin(), ConvDim, in_id.begin() + 2);
-                        Tacc tmp1 = fi(in(in_id));
-                        Tacc tmp2 = fo(out(out_n_id, wei_k_id, out_spatial_id_pack...));
+                        Tacc tmp1 = Tacc(fi(in(in_id)));
+                        Tacc tmp2 = Tacc(fo(out(out_n_id, wei_k_id, out_spatial_id_pack...)));
                         acc += tmp1 * tmp2;
                     }
                 });

@@ -110,6 +110,7 @@ private:
     double beta;
     double tensor_val;
 };
+
 template <typename Tgpu, typename Tref>
 int TensorOpDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
 {
@@ -118,6 +119,7 @@ int TensorOpDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
         miopenEnableProfiling(GetHandle(), true);
     return miopenStatusSuccess;
 }
+
 template <typename Tgpu, typename Tref>
 int TensorOpDriver<Tgpu, Tref>::GetandSetData()
 {
@@ -301,27 +303,25 @@ int TensorOpDriver<Tgpu, Tref>::RunForwardGPU()
     }
 
     if(WALL_CLOCK)
-        printf("Wall-clock Time Tensor Ops Elapsed: %f ms, for %d iterations.\n",
-               (iters == 1) ? t.gettime_ms() : (fulltime / float(iters - 1)),
-               (iters > 1) ? iters - 1 : 1);
+    std:;
+        cout << "Wall-clock Time Tensor Ops Elapsed: "
+             << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
+             << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     if(inflags.GetValueInt("time") == 1)
     {
-        printf("GPU Kernel Min Time Tensor Op Elapsed: %f ms\n", min_time);
+        std::cout << "GPU Kernel Min Time Tensor Op Elapsed: " << min_time << " ms\n";
         if(iters > 1)
-            printf("GPU Kernel Avg Time Tensor Op Elapsed: %f ms, for %d iterations.\n",
-                   avgtime / (iters - 1),
-                   iters - 1);
+            std::cout << "GPU Kernel Avg Time Tensor Op Elapsed: " << avgtime / (iters - 1)
+                      << " ms, "
+                      << "for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(aTensor).GetLengths());
         size_t dataSz =
             in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(aTensor).GetType());
 
-        printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
-        printf("stats: tensor op, %zu, %zu, %f, %f\n",
-               3 * dataSz,
-               dataSz,
-               4 * dataSz / min_time / 1e6,
-               avgtime / (iters - 1));
+        std::cout << "stats: name, bytesRead, bytesWritten, GB/s, timeMs\n";
+        std::cout << "stats: tensor op, " << 3 * dataSz << ", " << dataSz << ", "
+                  << 4 * dataSz / min_time / 1e6f << ", " << avgtime / (iters - 1) << '\n';
     }
     if(!is_set && !is_scale)
         c_dev->FromGPU(GetStream(), c.data());
@@ -367,11 +367,12 @@ int TensorOpDriver<Tgpu, Tref>::RunForwardCPU()
             {
                 std::vector<Tgpu> tmp(a_verif.size(), static_cast<Tgpu>(0.0));
                 std::transform(a_verif.begin(), a_verif.end(), b_verif.begin(), tmp.begin(), op_fn);
-                std::transform(tmp.begin(),
-                               tmp.end(),
-                               c_verif.begin(),
-                               c_verif.begin(),
-                               [&](auto el_tmp, auto el_c) { return el_tmp + (beta * el_c); });
+                std::transform(
+                    tmp.begin(),
+                    tmp.end(),
+                    c_verif.begin(),
+                    c_verif.begin(),
+                    [&](auto el_tmp, auto el_c) { return el_tmp + (Tgpu(beta) * el_c); });
             }
         }
     }
@@ -387,10 +388,10 @@ int TensorOpDriver<Tgpu, Tref>::CheckTensor(std::vector<Tgpu>& cpu_res,
 
     for(auto idx = 0; idx < cpu_res.size() && match; ++idx)
     {
-        Tref cpu_val   = cpu_res[idx];
-        Tref gpu_val   = static_cast<Tref>(gpu_res[idx]);
-        double err     = std::abs(cpu_val - gpu_val);
-        double err_rel = calculate_relative_error(cpu_val, gpu_val);
+        Tref cpu_val = cpu_res[idx];
+        Tref gpu_val = static_cast<Tref>(gpu_res[idx]);
+        auto err     = double(std::abs(cpu_val - gpu_val));
+        auto err_rel = double(calculate_relative_error(cpu_val, gpu_val));
 
         if((err > allowedEps && err_rel > allowedEps) || std::isnan(cpu_val) ||
            std::isnan(gpu_val) || !std::isfinite(cpu_val) || !std::isfinite(gpu_val))
@@ -403,11 +404,12 @@ int TensorOpDriver<Tgpu, Tref>::CheckTensor(std::vector<Tgpu>& cpu_res,
     }
     return match;
 }
+
 template <typename Tgpu, typename Tref>
 int TensorOpDriver<Tgpu, Tref>::VerifyForward()
 {
-    double allowedEps = std::numeric_limits<Tgpu>::epsilon() * 80;
-    int match         = 1;
+    auto allowedEps = double(std::numeric_limits<Tgpu>::epsilon() * 80);
+    int match{1};
 
     RunForwardCPU();
 
@@ -415,7 +417,8 @@ int TensorOpDriver<Tgpu, Tref>::VerifyForward()
         (!is_set && !is_scale) ? c_verif : a_verif, (!is_set && !is_scale) ? c : a, allowedEps);
 
     if(match)
-        printf("Tensor Op verifies on CPU and GPU\n");
+    std:;
+        cout << "Tensor Op verifies on CPU and GPU\n";
     return miopenStatusSuccess;
 }
 

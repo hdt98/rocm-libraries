@@ -379,11 +379,11 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardGPU()
     {
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Forward Adam Elapsed: %f ms\n", t.gettime_ms() / iter);
+            std::cout << "Wall-clock Time Forward Adam Elapsed: " << t.gettime_ms() / iter << " ms\n";
 
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        printf("GPU Kernel Time Forward Adam Elapsed: %f ms\n", kernel_average_time);
+        std::cout << "GPU Kernel Time Forward Adam Elapsed: " << kernel_average_time << " ms\n";
     }
 
     if(param_out_dev->FromGPU(GetStream(), param.data()) != 0)
@@ -412,10 +412,10 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardCPU()
     const float corrected_step_size =
         correct_bias ? (lr * sqrt(bias_correction2) / bias_correction1) : 0.0;
     const float step_size       = correct_bias ? corrected_step_size : lr;
-    const float k               = 1.0 - (lr * weight_decay);
-    const float inv_grad_scale  = 1.0 / static_cast<float>(grad_scale);
-    const float one_minus_beta1 = 1.0 - beta1;
-    const float one_minus_beta2 = 1.0 - beta2;
+    const float k               = 1.f - (lr * weight_decay);
+    const float inv_grad_scale  = 1.f / static_cast<float>(grad_scale);
+    const float one_minus_beta1 = 1.f - beta1;
+    const float one_minus_beta2 = 1.f - beta2;
     const size_t min_grain      = use_multithread ? 8 : numel;
 
     miopen::par_for(numel, min_grain, [&](int i) {
@@ -434,7 +434,7 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardCPU()
 
         param_val -= exp_avg_val / denorm * step_size;
 
-        if(weight_decay > 0.0)
+        if(weight_decay > 0.f)
         {
             param_val *= k;
         }
@@ -481,7 +481,7 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::VerifyForward()
 
     RunForwardCPU();
 
-    const auto error = miopen::rms_range(param_host, param);
+    const auto error = Tref(miopen::rms_range(param_host, param));
 
     if(!std::isfinite(error) || error > tolerance)
     {

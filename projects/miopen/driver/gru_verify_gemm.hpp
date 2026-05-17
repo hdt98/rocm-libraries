@@ -86,7 +86,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
     {
         for(int w = 0; w < in_h; w++)
         {
-            in_state[h * in_stride + w] = in[h * in_stride + w];
+            in_state[h * in_stride + w] = Tref(in[h * in_stride + w]);
         }
     }
 
@@ -96,7 +96,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
     Tref* hx_state = new Tref[hy_d * hy_n * hy_h];
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state[h] = hx[h];
+        hx_state[h] = Tref(hx[h]);
     }
 
     if(inputMode == 1)
@@ -122,7 +122,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
     Tref* wei_state = new Tref[wei_len];
     for(int h = 0; h < wei_len; h++)
     {
-        wei_state[h] = wei[h];
+        wei_state[h] = Tref(wei[h]);
     }
 
     // initial dropoput
@@ -194,7 +194,8 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                     {
                         for(int h = 0; h < wei_stride; h++)
                         {
-                            hid_state[hid_shift + bs * hy_stride + h] += wei[wei_shift_bias + h];
+                            hid_state[hid_shift + bs * hy_stride + h] +=
+                                Tref(wei[wei_shift_bias + h]);
                         }
                     }
                 }
@@ -225,7 +226,8 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                     {
                         for(int h = 0; h < wei_stride; h++)
                         {
-                            hid_state[hid_shift + bs * hy_stride + h] += wei[wei_shift_bias + h];
+                            hid_state[hid_shift + bs * hy_stride + h] +=
+                                Tref(wei[wei_shift_bias + h]);
                         }
                     }
                 }
@@ -281,7 +283,8 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                 {
                     for(int h = 0; h < wei_stride; h++)
                     {
-                        hid_state[hid_shift + bs * hy_stride + h] += wei[wei_shift_bias_temp + h];
+                        hid_state[hid_shift + bs * hy_stride + h] +=
+                            Tref(wei[wei_shift_bias_temp + h]);
                     }
                 }
             }
@@ -327,7 +330,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state[hid_shift + (bacc + bs) * hy_stride + gi * hy_h +
                                               h] +=
-                                        wei[wei_shift_bias_temp + wei_stride + gi * hy_h + h];
+                                        Tref(wei[wei_shift_bias_temp + wei_stride + gi * hy_h + h]);
                                 }
                             }
                         }
@@ -358,7 +361,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                             {
                                 hid_state[hid_shift + (bacc + bs) * hy_stride + bi * 3 * hy_h +
                                           h] +=
-                                    wei[wei_shift_bias_temp + wei_stride + 2 * hy_h + h];
+                                    Tref(wei[wei_shift_bias_temp + wei_stride + 2 * hy_h + h]);
                             }
                         }
                     }
@@ -393,8 +396,8 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                     {
                                         hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                                   (3 + gi) * hy_h + h] +=
-                                            wei[wei_shift_bias_temp + wei_stride + (3 + gi) * hy_h +
-                                                h];
+                                            Tref(wei[wei_shift_bias_temp + wei_stride +
+                                                     (3 + gi) * hy_h + h]);
                                     }
                                 }
                             }
@@ -426,7 +429,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                               bi * 3 * hy_h + hy_h + h] +=
-                                        wei[wei_shift_bias_temp + wei_stride + 5 * hy_h + h];
+                                        Tref(wei[wei_shift_bias_temp + wei_stride + 5 * hy_h + h]);
                                 }
                             }
                         }
@@ -461,7 +464,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                             for(int gi = 0; gi < 2; gi++)
                             {
                                 hid_state[hid_shift + (bacc + bs) * hy_stride + gi * hy_h + h] +=
-                                    wei[wei_shift_bias_temp + wei_stride + gi * hy_h + h];
+                                    Tref(wei[wei_shift_bias_temp + wei_stride + gi * hy_h + h]);
                             }
                         }
                     }
@@ -491,7 +494,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < hy_h; h++)
                         {
                             hid_state[hid_shift + (bacc + bs) * hy_stride + bi * 3 * hy_h + h] +=
-                                wei[wei_shift_bias_temp + wei_stride + 2 * hy_h + h];
+                                Tref(wei[wei_shift_bias_temp + wei_stride + 2 * hy_h + h]);
                         }
                     }
                 }
@@ -532,8 +535,8 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                     {
                                         hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                                   (3 + gi) * hy_h + h] +=
-                                            wei[wei_shift_bias_temp + wei_stride + (3 + gi) * hy_h +
-                                                h];
+                                            Tref(wei[wei_shift_bias_temp + wei_stride +
+                                                     (3 + gi) * hy_h + h]);
                                     }
                                 }
                             }
@@ -568,7 +571,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                               bi * 3 * hy_h + hy_h + h] +=
-                                        wei[wei_shift_bias_temp + wei_stride + 5 * hy_h + h];
+                                        Tref(wei[wei_shift_bias_temp + wei_stride + 5 * hy_h + h]);
                                 }
                             }
                         }
@@ -601,7 +604,8 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                               (3 + gi) * hy_h + h] +=
-                                        wei[wei_shift_bias_temp + wei_stride + (3 + gi) * hy_h + h];
+                                        Tref(wei[wei_shift_bias_temp + wei_stride +
+                                                 (3 + gi) * hy_h + h]);
                                 }
                             }
                         }
@@ -633,7 +637,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                             {
                                 hid_state[hid_shift + (baccbi + bs) * hy_stride + bi * 3 * hy_h +
                                           hy_h + h] +=
-                                    wei[wei_shift_bias_temp + wei_stride + 5 * hy_h + h];
+                                    Tref(wei[wei_shift_bias_temp + wei_stride + 5 * hy_h + h]);
                             }
                         }
                     }
@@ -664,7 +668,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                                          2 * hy_h + h],
                                                1) +
                                  activfunc(hid_state[hid_shift + (bacc + bs) * hy_stride + h], 2) *
-                                     hx[hx_shift + bs * uni_stride + h]);
+                                     Tref(hx[hx_shift + bs * uni_stride + h]));
                         }
                         else
                         {
@@ -747,7 +751,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                      activfunc(hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                                          3 * hy_h + h],
                                                2) *
-                                         hx[hx_shift + bs * uni_stride + hy_n * hy_h + h]);
+                                         Tref(hx[hx_shift + bs * uni_stride + hy_n * hy_h + h]));
                             }
                             else
                             {
@@ -773,7 +777,7 @@ void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,
                                         (activfunc(hid_state[hid_shift + (baccbi + bs) * hy_stride +
                                                              3 * hy_h + h],
                                                    2) *
-                                         hx[hx_shift + bs * uni_stride + hy_n * hy_h + h]);
+                                         Tref(hx[hx_shift + bs * uni_stride + hy_n * hy_h + h]));
                                 }
                             }
 
@@ -917,7 +921,7 @@ void RunGRUBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
     {
         for(int w = 0; w < out_h; w++)
         {
-            dout_state[h * out_stride + w] = dout[h * out_stride + w];
+            dout_state[h * out_stride + w] = Tref(dout[h * out_stride + w]);
         }
     }
 
@@ -929,12 +933,12 @@ void RunGRUBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
     Tref* dhy_state = new Tref[hy_d * hy_n * hy_h];
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        dhy_state[h] = dhy[h];
+        dhy_state[h] = Tref(dhy[h]);
     }
     Tref* hx_state = new Tref[hy_d * hy_n * hy_h];
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state[h] = hx[h];
+        hx_state[h] = Tref(hx[h]);
     }
 
     if(inputMode == 1)
@@ -959,7 +963,7 @@ void RunGRUBackwardDataGEMMCPUVerify(std::vector<Tref>& din_host,
     Tref* wei_state = new Tref[wei_len];
     for(int h = 0; h < wei_len; h++)
     {
-        wei_state[h] = wei[h];
+        wei_state[h] = Tref(wei[h]);
     }
 
     // initial dropoput
@@ -1589,7 +1593,7 @@ void RunGRUBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     {
         for(int w = 0; w < in_h; w++)
         {
-            in_state[h * in_h + w] = in[h * in_h + w];
+            in_state[h * in_h + w] = Tref(in[h * in_h + w]);
         }
     }
 
@@ -1599,7 +1603,7 @@ void RunGRUBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     {
         for(int w = 0; w < out_h; w++)
         {
-            dout_state[h * out_h + w] = dout[h * out_h + w];
+            dout_state[h * out_h + w] = Tref(dout[h * out_h + w]);
         }
     }
 
@@ -1620,7 +1624,7 @@ void RunGRUBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     Tref* hx_state = new Tref[hy_d * hy_n * hy_h];
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state[h] = hx[h];
+        hx_state[h] = Tref(hx[h]);
     }
 
     if(inputMode == 1)

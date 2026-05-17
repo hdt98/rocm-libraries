@@ -307,12 +307,12 @@ int SoftmaxDriver<Tgpu, Tref>::RunForwardGPU()
 
         if(WALL_CLOCK)
         {
-            printf("Wall-clock Time Forward Softmax Elapsed: %f ms", wall_time);
+            std::cout << "Wall-clock Time Forward Softmax Elapsed: " << wall_time << " ms";
             if(iter > 1)
-                printf(", First Call Overhead: %f ms", aux_wall_time);
-            printf("\n");
+                std::cout << ", First Call Overhead: " << aux_wall_time << " ms";
+            std::cout << '\n';
         }
-        printf("GPU Kernel Time Forward Softmax Elapsed: %f ms\n", gpu_time);
+        std::cout << "GPU Kernel Time Forward Softmax Elapsed: " << gpu_time << " ms\n";
     }
 
     out_dev->FromGPU(GetStream(), out.data());
@@ -378,12 +378,12 @@ int SoftmaxDriver<Tgpu, Tref>::RunBackwardGPU()
 
         if(WALL_CLOCK)
         {
-            printf("Wall-clock Time Backward Softmax Elapsed: %f ms", wall_time);
+            std::cout << "Wall-clock Time Backward Softmax Elapsed: " << wall_time << " ms";
             if(iter > 1)
-                printf(", First Call Overhead: %f ms", aux_wall_time);
-            printf("\n");
+                std::cout << ", First Call Overhead: " << aux_wall_time << " ms";
+            std::cout << '\n';
         }
-        printf("GPU Kernel Time Backward Softmax Elapsed: %f ms\n", gpu_time);
+        std::cout << "GPU Kernel Time Backward Softmax Elapsed: " << gpu_time << " ms\n";
     }
 
     din_dev->FromGPU(GetStream(), din.data());

@@ -42,11 +42,11 @@ T logaddexp_gpu(T* x, T* y)
 {
     T a = std::max(*x, *y);
     T b = std::min(*x, *y);
-    T c = b - a;
+    auto c = double(b - a);
 
-    return c <= T(NEGATIVE_CUTOFF_VAL)
+    return c <= NEGATIVE_CUTOFF_VAL
                ? std::max(a, T(NEGATIVE_CUTOFF_VAL))
-               : std::max(T(a + log(T(1) + exp(b - a))), T(NEGATIVE_CUTOFF_VAL));
+               : std::max(a + log(1.0 + exp(c))), T(NEGATIVE_CUTOFF_VAL));
 }
 
 template <typename T>
@@ -196,7 +196,7 @@ void ctc_gradient_gpu(std::vector<int>& probsDesc,
             grad_temp[i] -= prob_lx_log;
             grad_temp[i] = std::max(grad_temp[i], T(NEGATIVE_CUTOFF_VAL));
 
-            gradients_logits[gidx] = exp(probs_logits_pidx) - exp(grad_temp[i]);
+            gradients_logits[gidx] = exp(double(probs_logits_pidx)) - exp(double(grad_temp[i]));
         }
         else
         {
@@ -204,7 +204,7 @@ void ctc_gradient_gpu(std::vector<int>& probsDesc,
             grad_temp[i] -= prob_lx_log;
             grad_temp[i] = std::max(grad_temp[i], T(NEGATIVE_CUTOFF_VAL));
 
-            gradients_logits[gidx] = -exp(grad_temp[i]);
+            gradients_logits[gidx] = -exp(double(grad_temp[i]));
         }
     }
 
@@ -255,7 +255,7 @@ void ctc_gradient_gpu(std::vector<int>& probsDesc,
                 grad_temp[i] -= prob_lx_log;
                 grad_temp[i] = std::max(grad_temp[i], T(NEGATIVE_CUTOFF_VAL));
 
-                gradients_logits[gidx] = exp(probs_logits_pidx) - exp(grad_temp[i]);
+                gradients_logits[gidx] = exp(double(probs_logits_pidx)) - exp(double(grad_temp[i]));
             }
             else
             {
@@ -263,7 +263,7 @@ void ctc_gradient_gpu(std::vector<int>& probsDesc,
                 grad_temp[i] -= prob_lx_log;
                 grad_temp[i] = std::max(grad_temp[i], T(NEGATIVE_CUTOFF_VAL));
 
-                gradients_logits[gidx] = -exp(grad_temp[i]);
+                gradients_logits[gidx] = -exp(double(grad_temp[i]));
             }
         }
     }

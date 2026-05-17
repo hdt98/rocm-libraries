@@ -998,7 +998,7 @@ bool mloVerify(const miopenTensorDescriptor_t& cpu_,
                                                          k * g_depth_stride + j * g_height_stride +
                                                          i * g_width_stride]);
 
-                            const auto diff = std::abs(c_val - g_val);
+                            const auto diff = Tcheck_(std::abs(c_val - g_val));
                             const auto ulps = ApproxUlps(c_val, g_val);
                             const bool check_failed =
                                 (diff > diff_tolerance && ulps > ulps_tolerance) //
@@ -1161,7 +1161,7 @@ bool mloVerify_mt(const miopenTensorDescriptor_t& cpu_,
                             g_ptr[b * g_batch_stride + c * g_channel_stride + k * g_depth_stride +
                                   j * g_height_stride + i * g_width_stride]);
 
-                        const auto diff = std::abs(c_val - g_val);
+                        const auto diff = Tcheck_(std::abs(c_val - g_val));
                         const auto ulps = ApproxUlps(c_val, g_val);
                         const bool check_failed =
                             (diff > diff_tolerance && ulps > ulps_tolerance) //

@@ -59,8 +59,8 @@ int32_t mloSoftMarginLossForwardRunHost(miopenTensorDescriptor_t inputDesc,
     for(size_t gid = 0; gid < input_numel; gid++)
     {
         tensor_layout_t<5> idx(i_tv, gid);
-        double i    = input[i_tv.get_tensor_view_idx(idx)];
-        double t    = target[t_tv.get_tensor_view_idx(idx)];
+        double i    = double(input[i_tv.get_tensor_view_idx(idx)]);
+        double t    = double(target[t_tv.get_tensor_view_idx(idx)]);
         double loss = log1p(exp(-i * t));
         if(reduction_mode != MIOPEN_LOSS_REDUCTION_NONE)
             sum_loss += loss;
@@ -96,9 +96,9 @@ int32_t mloSoftMarginLossBackwardRunHost(miopenTensorDescriptor_t inputDesc,
 
     miopen::par_ford(input_numel)([&](size_t gid) {
         tensor_layout_t<5> idx(i_tv, gid);
-        double i   = input[i_tv.get_tensor_view_idx(idx)];
-        double t   = target[t_tv.get_tensor_view_idx(idx)];
-        double _dO = dO[dO_tv.get_tensor_view_idx(idx)];
+        double i   = double(input[i_tv.get_tensor_view_idx(idx)]);
+        double t   = double(target[t_tv.get_tensor_view_idx(idx)]);
+        double _dO = double(dO[dO_tv.get_tensor_view_idx(idx)]);
         if(reduction_mode == MIOPEN_LOSS_REDUCTION_MEAN)
             dIhost[dI_tv.get_tensor_view_idx(idx)] =
                 static_cast<Tcheck>(-t / (exp(i * t) + 1) * _dO / input_numel);
@@ -540,7 +540,7 @@ int SoftMarginLossDriver<Tgpu, Tref>::VerifyForward()
     // Example: ./MIOpenDriver softmarginlossfp16 -t 1 -R sum -F 1 -D 90000
     RunForwardCPU();
     const Tref tolerance = GetTolerance();
-    auto error           = miopen::rms_range(outhost, out);
+    auto error           = Tref(miopen::rms_range(outhost, out));
     if(!std::isfinite(error) || error > tolerance)
     {
         std::cout << "Forward SoftMarginLoss FAILED: " << error << " > " << tolerance << std::endl;
@@ -564,7 +564,7 @@ int SoftMarginLossDriver<Tgpu, Tref>::VerifyBackward()
     // SUM reduction backward still worked because this case divisor = 1, nothing special.
     RunBackwardCPU();
     const Tref tolerance = GetTolerance();
-    auto error           = miopen::rms_range(dIhost, dI);
+    auto error           = Tref(miopen::rms_range(dIhost, dI));
 
     if(!std::isfinite(error) || error > tolerance)
     {

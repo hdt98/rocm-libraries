@@ -72,14 +72,15 @@ int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,
         {
             if(y == c)
                 continue;
-            double t = margin - static_cast<double>(input[I_tv.get_tensor_view_idx({n, y})]) +
+            double t = static_cast<double>(margin) -
+                       static_cast<double>(input[I_tv.get_tensor_view_idx({n, y})]) +
                        static_cast<double>(input[I_tv.get_tensor_view_idx({n, c})]);
 
             if(t < 0)
                 continue;
             if(p == 2)
                 t = t * t;
-            t = weight[W_tv.get_tensor_view_idx({y})] * t;
+            t = static_cast<double>(weight[W_tv.get_tensor_view_idx({y})]) * t;
             loss += t / C;
         }
         if(reduction_mode != MIOPEN_LOSS_REDUCTION_NONE)
@@ -446,7 +447,7 @@ int MultiMarginLossDriver<Tgpu, Tref>::VerifyForward()
     RunForwardCPU();
 
     const Tref tolerance = GetTolerance();
-    auto error           = miopen::rms_range(Ohost, O);
+    const Tref error     = miopen::rms_range(Ohost, O);
     if(!std::isfinite(error) || error > tolerance)
     {
         std::cout << "Forward MultiMarginLoss FAILED: " << error << " > " << tolerance << std::endl;

@@ -362,8 +362,8 @@ int PReLUDriver<Tgpu, Tref>::VerifyBackward()
 {
     RunBackwardCPU();
     const Tref tolerance = GetTolerance();
-    auto error_dinput    = miopen::rms_range(dinput_host, dinput);
-    auto error_dweight   = miopen::rms_range(dweight_host, dweight);
+    auto error_dinput    = Tref(miopen::rms_range(dinput_host, dinput));
+    auto error_dweight   = Tref(miopen::rms_range(dweight_host, dweight));
 
     if(!std::isfinite(error_dinput) || error_dinput > tolerance)
     {

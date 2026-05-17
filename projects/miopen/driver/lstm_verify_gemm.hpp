@@ -87,7 +87,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
     {
         for(int w = 0; w < in_h; w++)
         {
-            in_state.at(h * in_stride + w) = in.at(h * in_stride + w);
+            in_state.at(h * in_stride + w) = Tref(in.at(h * in_stride + w));
         }
     }
 
@@ -96,13 +96,13 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
     std::vector<Tref> hx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state.at(h) = hx.at(h);
+        hx_state.at(h) = Tref(hx.at(h));
     }
     std::vector<Tref> cy_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     std::vector<Tref> cx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        cx_state.at(h) = cx.at(h);
+        cx_state.at(h) = Tref(cx.at(h));
     }
 
     if(inputMode == 1)
@@ -128,7 +128,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
     std::vector<Tref> wei_state(wei_len, static_cast<Tref>(0));
     for(int h = 0; h < wei_len; h++)
     {
-        wei_state.at(h) = wei.at(h);
+        wei_state.at(h) = Tref(wei.at(h));
     }
 
     // initial dropoput
@@ -200,7 +200,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < wei_stride; h++)
                         {
                             hid_state.at(hid_shift + bs * hy_stride + h) +=
-                                wei.at(wei_shift_bias + h);
+                                Tref(wei.at(wei_shift_bias + h));
                         }
                     }
                 }
@@ -232,7 +232,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < wei_stride; h++)
                         {
                             hid_state.at(hid_shift + bs * hy_stride + h) +=
-                                wei.at(wei_shift_bias + h);
+                                Tref(wei.at(wei_shift_bias + h));
                         }
                     }
                 }
@@ -292,7 +292,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                     for(int h = 0; h < wei_stride; h++)
                     {
                         hid_state.at(hid_shift + bs * hy_stride + h) +=
-                            wei.at(wei_shift_bias_temp + h);
+                            Tref(wei.at(wei_shift_bias_temp + h));
                     }
                 }
             }
@@ -337,7 +337,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                             for(int h = 0; h < 4 * hy_h; h++)
                             {
                                 hid_state.at(hid_shift + bacc * hy_stride + bs * hy_stride + h) +=
-                                    wei.at(wei_shift_bias_temp + h);
+                                    Tref(wei.at(wei_shift_bias_temp + h));
                             }
                         }
                     }
@@ -372,7 +372,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state.at(hid_shift + baccbi * hy_stride + 4 * hy_h +
                                                  bs * hy_stride + h) +=
-                                        wei.at(wei_shift_bias_temp + 4 * hy_h + h);
+                                        Tref(wei.at(wei_shift_bias_temp + 4 * hy_h + h));
                                 }
                             }
                         }
@@ -408,7 +408,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                         for(int h = 0; h < 4 * hy_h; h++)
                         {
                             hid_state.at(hid_shift + bacc * hy_stride + bs * hy_stride + h) +=
-                                wei.at(wei_shift_bias_temp + h);
+                                Tref(wei.at(wei_shift_bias_temp + h));
                         }
                     }
                 }
@@ -449,7 +449,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                                 {
                                     hid_state.at(hid_shift + baccbi * hy_stride + 4 * hy_h +
                                                  bs * hy_stride + h) +=
-                                        wei.at(wei_shift_bias_temp + 4 * hy_h + h);
+                                        Tref(wei.at(wei_shift_bias_temp + 4 * hy_h + h));
                                 }
                             }
                         }
@@ -483,7 +483,7 @@ void RunLSTMForwardGEMMCPUVerify(miopenHandle_t handle,
                             {
                                 hid_state.at(hid_shift + baccbi * hy_stride + 4 * hy_h +
                                              bs * hy_stride + h) +=
-                                    wei.at(wei_shift_bias_temp + 4 * hy_h + h);
+                                    Tref(wei.at(wei_shift_bias_temp + 4 * hy_h + h));
                             }
                         }
                     }
@@ -754,7 +754,7 @@ void RunLSTMBackwardDataGEMMCPUVerify(
     {
         for(int w = 0; w < out_h; w++)
         {
-            dout_state[h * out_stride + w] = dout[h * out_stride + w];
+            dout_state[h * out_stride + w] = Tref(dout[h * out_stride + w]);
         }
     }
 
@@ -763,23 +763,23 @@ void RunLSTMBackwardDataGEMMCPUVerify(
     std::vector<Tref> dhy_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        dhy_state[h] = dhy[h];
+        dhy_state[h] = Tref(dhy[h]);
     }
     std::vector<Tref> dcx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     std::vector<Tref> dcy_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        dcy_state[h] = dcy[h];
+        dcy_state[h] = Tref(dcy[h]);
     }
     std::vector<Tref> hx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state[h] = hx[h];
+        hx_state[h] = Tref(hx[h]);
     }
     std::vector<Tref> cx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        cx_state[h] = cx[h];
+        cx_state[h] = Tref(cx[h]);
     }
 
     if(inputMode == 1)
@@ -804,7 +804,7 @@ void RunLSTMBackwardDataGEMMCPUVerify(
     std::vector<Tref> wei_state(wei_len, static_cast<Tref>(0));
     for(int h = 0; h < wei_len; h++)
     {
-        wei_state[h] = wei[h];
+        wei_state[h] = Tref(wei[h]);
     }
 
     // initial dropoput
@@ -1367,7 +1367,7 @@ void RunLSTMBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     {
         for(int w = 0; w < in_h; w++)
         {
-            in_state[h * in_h + w] = in[h * in_h + w];
+            in_state[h * in_h + w] = Tref(in[h * in_h + w]);
         }
     }
 
@@ -1377,7 +1377,7 @@ void RunLSTMBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     {
         for(int w = 0; w < out_h; w++)
         {
-            dout_state[h * out_h + w] = dout[h * out_h + w];
+            dout_state[h * out_h + w] = Tref(dout[h * out_h + w]);
         }
     }
 
@@ -1398,7 +1398,7 @@ void RunLSTMBackwardWeightGEMMCPUVerify(std::vector<Tgpu>& in,
     std::vector<Tref> hx_state(hy_d * hy_n * hy_h, static_cast<Tref>(0));
     for(int h = 0; h < hy_d * hy_n * hy_h; h++)
     {
-        hx_state[h] = hx[h];
+        hx_state[h] = Tref(hx[h]);
     }
 
     if(inputMode == 1)

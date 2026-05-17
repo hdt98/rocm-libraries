@@ -344,13 +344,14 @@ int DropoutDriver<Tgpu, Tref>::RunForwardGPU()
     {
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Dropout Elapsed: %f ms\n",
-                   t.gettime_ms() / inflags.GetValueInt("iter"));
+            std::cout << "Wall-clock Time Dropout Elapsed: "
+                      << t.gettime_ms() / inflags.GetValueInt("iter") << " ms\n";
 
         int iter = inflags.GetValueInt("iter");
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        printf("GPU Kernel Time Forward Dropout. Elapsed: %f ms (average)\n", kernel_average_time);
+        std::cout << "GPU Kernel Time Forward Dropout. Elapsed: " << kernel_average_time
+                  << " ms (average)\n";
     }
 
     out_dev->FromGPU(GetStream(), out.data.data());
@@ -413,13 +414,13 @@ int DropoutDriver<Tgpu, Tref>::RunBackwardGPU()
     {
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Backward Dropout Elapsed: %f ms\n",
-                   t.gettime_ms() / inflags.GetValueInt("iter"));
+            std::cout << "Wall-clock Time Backward Dropout Elapsed: "
+                      << t.gettime_ms() / inflags.GetValueInt("iter") << " ms\n";
 
         int iter = inflags.GetValueInt("iter");
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        printf("GPU Kernel Time Backward Dropout. Elapsed: %f ms (average)\n", kernel_average_time);
+        std::cout << "GPU Kernel Time Backward Dropout. Elapsed: " << kernel_average_time << " ms (average)\n");
     }
 
     din_dev->FromGPU(GetStream(), din.data.data());
@@ -459,7 +460,7 @@ int DropoutDriver<Tgpu, Tref>::RunBackwardCPU()
         using float_ms = std::chrono::duration<float, std::milli>;
         int iter       = inflags.GetValueInt("iter");
         const auto dt  = (iter > 1) ? float_ms(t2 - t1).count() / iter : float_ms(t2 - t1).count();
-        printf("CPU Time Backward Dropout. Elapsed: %f ms (average)\n", dt);
+        std::cout << "CPU Time Backward Dropout. Elapsed: " << dt << " ms (average)\n";
     }
 
     if(inflags.GetValueInt("dump_output"))

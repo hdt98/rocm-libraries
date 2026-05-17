@@ -57,16 +57,16 @@ void cpu_layernorm_forward(tensor<T> input,
 
             mean_v        = mean_v / inner_size;
             var_v         = var_v / inner_size - mean_v * mean_v;
-            double rstd_v = 1.0 / sqrt(var_v + eps);
+            double rstd_v = 1.0 / sqrt(var_v + double(eps));
 
             ref_mean[o * stride + s] = static_cast<T>(mean_v);
             ref_rstd[o * stride + s] = static_cast<T>(rstd_v);
 
             miopen::ford(inner_size)([&](int32_t i) {
                 double weight_v =
-                    (mode == MIOPEN_ELEMENTWISE_AFFINE) ? 1.0 : static_cast<float>(weight[i]);
+                    (mode == MIOPEN_ELEMENTWISE_AFFINE) ? 1.0 : static_cast<double>(weight[i]);
                 double bias_v =
-                    (mode == MIOPEN_ELEMENTWISE_AFFINE) ? 0.0 : static_cast<float>(bias[i]);
+                    (mode == MIOPEN_ELEMENTWISE_AFFINE) ? 0.0 : static_cast<double>(bias[i]);
 
                 ref_output[o * inner_size * stride + i * stride + s] = static_cast<T>(
                     (static_cast<double>(input[o * inner_size * stride + i * stride + s]) -

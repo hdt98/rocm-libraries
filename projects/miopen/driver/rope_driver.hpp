@@ -411,7 +411,7 @@ int RoPEDriver<Tgpu, Tref>::VerifyForward()
     RunForwardCPU();
     const Tref tolerance = GetTolerance();
 
-    auto error = miopen::rms_range(y_dxhost, y_dx);
+    auto error = Tref(miopen::rms_range(y_dxhost, y_dx));
 
     if(!std::isfinite(error) || error > tolerance)
     {
@@ -433,7 +433,7 @@ int RoPEDriver<Tgpu, Tref>::VerifyBackward()
     RunBackwardCPU();
     const Tref tolerance = GetTolerance();
 
-    auto error = miopen::rms_range(y_dxhost, y_dx);
+    auto error = Tref(miopen::rms_range(y_dxhost, y_dx));
 
     if(!std::isfinite(error) || error > tolerance)
     {

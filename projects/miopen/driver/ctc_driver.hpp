@@ -379,13 +379,13 @@ int CTCDriver<Tgpu, Tref>::RunForwardGPU()
     {
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time CTC Loss Elapsed: %f ms\n",
-                   t.gettime_ms() / inflags.GetValueInt("iter"));
+            std::cout << "Wall-clock Time CTC Loss Elapsed: "
+                      << (t.gettime_ms() / inflags.GetValueInt("iter")) << " ms\n";
 
         int iter = inflags.GetValueInt("iter");
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+        std::cout << "GPU Kernel Time Forward Conv. Elapsed: " << kernel_average_time << " ms (average)\n";
     }
 
     losses_dev->FromGPU(GetStream(), losses.data());

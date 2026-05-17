@@ -69,8 +69,8 @@ int miopenBNSpatialFwdInferHost(miopenTensorDescriptor_t& inputTensor,
     double inhat    = 0.;
     for(int cidx = 0; cidx < channels; cidx++)
     { // via channel
-        mean             = estimatedMean[cidx];
-        variance         = estimatedVariance[cidx];
+        mean             = double(estimatedMean[cidx]);
+        variance         = double(estimatedVariance[cidx]);
         double invertVar = 1.0 / sqrt(variance + epsilon);
         // process the batch per channel
         for(int row = 0; row < height; row++)
@@ -85,7 +85,7 @@ int miopenBNSpatialFwdInferHost(miopenTensorDescriptor_t& inputTensor,
                     index          = in_nstride * bidx + adjIndex;
                     elemStd        = in_ptr[index] - mean;
                     inhat          = elemStd * invertVar;
-                    out_ptr[index] = scale_ptr[cidx] * inhat + bias_ptr[cidx];
+                    out_ptr[index] = double(scale_ptr[cidx]) * inhat + double(bias_ptr[cidx]);
                 } // end for (n)
             }
         }
@@ -135,8 +135,8 @@ int miopenBNPerActivFwdInferHost(miopenTensorDescriptor_t& inputTensor,
                 adjIndex          = (tensorLayout == miopenTensorNCHW)
                                         ? in_cstride * cidx + width * row + column
                                         : width * channels * row + channels * column + cidx;
-                mean              = estimatedMean[adjIndex];
-                variance          = estimatedVariance[adjIndex];
+                mean              = double(estimatedMean[adjIndex]);
+                variance          = double(estimatedVariance[adjIndex]);
                 double elemInvVar = 1.0 / double(sqrt(variance + epsilon));
                 for(int bidx = 0; bidx < n_batchs; bidx++)
                 { // via mini_batch
@@ -146,7 +146,8 @@ int miopenBNPerActivFwdInferHost(miopenTensorDescriptor_t& inputTensor,
                     double inhat = elemStd * elemInvVar;
                     // #5 Gamma and Beta adjust
                     // y_i = gamma*x_hat + beta
-                    out_ptr[index] = (scale_ptr[adjIndex] * inhat) + bias_ptr[adjIndex];
+                    out_ptr[index] =
+                        double(scale_ptr[adjIndex]) * inhat + double(bias_ptr[adjIndex]);
                 } // end for(n_batchs)
             } // for (column)
         }

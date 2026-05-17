@@ -469,7 +469,7 @@ int AddLayerNormDriver<Tgpu, Tref>::VerifyForward()
 {
     RunForwardCPU();
     const Tref tolerance    = GetTolerance();
-    auto error              = miopen::rms_range(outhost, out);
+    const Tref error        = miopen::rms_range(outhost, out);
     std::string solver_type = use_multithread ? "multi-threaded" : "single-threaded";
 
     if(!std::isfinite(error) || error > tolerance)
@@ -484,7 +484,7 @@ int AddLayerNormDriver<Tgpu, Tref>::VerifyForward()
                   << " CPU reference (" << error << " < " << tolerance << ')' << std::endl;
     }
 
-    auto meanerror = miopen::rms_range(meanhost, mean);
+    Tref meanerror = miopen::rms_range(meanhost, mean);
     if(!std::isfinite(meanerror) || meanerror > tolerance)
     {
         std::cout << "Forward AddLayerNorm mean FAILED against " << solver_type
@@ -497,7 +497,7 @@ int AddLayerNormDriver<Tgpu, Tref>::VerifyForward()
                   << " CPU reference (" << meanerror << " < " << tolerance << ')' << std::endl;
     }
 
-    auto rstderror = miopen::rms_range(rstdhost, rstd);
+    Tref rstderror = miopen::rms_range(rstdhost, rstd);
     if(!std::isfinite(rstderror) || rstderror > tolerance)
     {
         std::cout << "Forward AddLayerNorm rstd FAILED against " << solver_type

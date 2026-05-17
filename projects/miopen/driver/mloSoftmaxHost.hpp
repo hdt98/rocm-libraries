@@ -40,12 +40,13 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
     miopenGet4dTensorDescriptorStrides(inputTensor, &in_nstr, &in_cstr, &in_hstr, &in_wstr);
     miopenGet4dTensorDescriptorStrides(outputTensor, &out_nstr, &out_cstr, &out_hstr, &out_wstr);
 
-    Tcheck max_val = (sizeof(Tgpu) == 4) ? 3.402823466e+38f : 65504.;
+    Tcheck max_val = (sizeof(Tgpu) == 4) ? 3.402823466e+38 : 65504.;
     std::vector<Tcheck> channel_max((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
                                     static_cast<Tcheck>(-max_val));
     std::vector<Tcheck> results(n * c * h * w, static_cast<Tcheck>(0.0));
-
-    int ret = 0;
+    Tcheck alpha_ = Tcheck(alpha);
+    Tcheck beta_  = Tcheck(beta);
+    int ret       = 0;
 
     if(mode == MIOPEN_SOFTMAX_MODE_INSTANCE)
     {
@@ -104,10 +105,10 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                         for(int s1 = 0; s1 < w; s1++)
                         {
                             outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
-                                alpha *
+                                alpha_ *
                                     (results[(i * c + j) * h * w + s0 * w + s1] - channel_max[i]) +
-                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
-                                               s1 * out_wstr];
+                                beta_ * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                                s1 * out_wstr];
                         }
             }
             else
@@ -127,10 +128,10 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                         for(int s1 = 0; s1 < w; s1++)
                         {
                             outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
-                                alpha *
+                                alpha_ *
                                     (results[(i * c + j) * h * w + s0 * w + s1] / channel_max[i]) +
-                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
-                                               s1 * out_wstr];
+                                beta_ * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                                s1 * out_wstr];
                         }
             }
         }
@@ -186,10 +187,10 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                         for(int j = 0; j < c; j++)
                         {
                             outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
-                                alpha * (results[(i * c + j) * h * w + s0 * w + s1] -
-                                         channel_max[i * h * w + s0 * w + s1]) +
-                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
-                                               s1 * out_wstr];
+                                alpha_ * (results[(i * c + j) * h * w + s0 * w + s1] -
+                                          channel_max[i * h * w + s0 * w + s1]) +
+                                beta_ * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                                s1 * out_wstr];
                         }
                     }
                     else
@@ -206,10 +207,10 @@ int mloSoftmaxForwardRunHost(miopenTensorDescriptor_t inputTensor,
                         for(int j = 0; j < c; j++)
                         {
                             outhost[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr] =
-                                alpha * (results[(i * c + j) * h * w + s0 * w + s1] /
-                                         channel_max[i * h * w + s0 * w + s1]) +
-                                beta * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
-                                               s1 * out_wstr];
+                                alpha_ * (results[(i * c + j) * h * w + s0 * w + s1] /
+                                          channel_max[i * h * w + s0 * w + s1]) +
+                                beta_ * outhost[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                                s1 * out_wstr];
                         }
                     }
                 }
@@ -240,8 +241,9 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
     std::vector<Tcheck> channel_dot((mode == MIOPEN_SOFTMAX_MODE_INSTANCE ? n : n * h * w),
                                     static_cast<Tcheck>(0.0));
     std::vector<Tcheck> results(n * c * h * w, static_cast<Tcheck>(0.0));
-
-    int ret = 0;
+    Tcheck alpha_ = Tcheck(alpha);
+    Tcheck beta_  = Tcheck(beta);
+    int ret       = 0;
 
     for(int i = 0; i < n; i++)
     {
@@ -275,8 +277,9 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                             results[(i * c + j) * h * w + s0 * w + s1] =
                                 static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
                                                          s0 * out_hstr + s1 * out_wstr]) -
-                                channel_dot[i] * std::exp(out[i * out_nstr + j * out_cstr +
-                                                              s0 * out_hstr + s1 * out_wstr]);
+                                channel_dot[i] * static_cast<Tcheck>(
+                                                     std::exp(out[i * out_nstr + j * out_cstr +
+                                                                  s0 * out_hstr + s1 * out_wstr]));
                         }
                         else
                         {
@@ -289,8 +292,9 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                                 out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr]);
                         }
                         dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr] =
-                            alpha * results[(i * c + j) * h * w + s0 * w + s1] +
-                            beta * dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr];
+                            alpha_ * results[(i * c + j) * h * w + s0 * w + s1] +
+                            beta_ *
+                                dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr];
                     }
         }
         else
@@ -323,8 +327,9 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                                 static_cast<Tcheck>(dout[i * out_nstr + j * out_cstr +
                                                          s0 * out_hstr + s1 * out_wstr]) -
                                 channel_dot[i * h * w + s0 * w + s1] *
-                                    std::exp(out[i * out_nstr + j * out_cstr + s0 * out_hstr +
-                                                 s1 * out_wstr]);
+                                    static_cast<Tcheck>(
+                                        std::exp(out[i * out_nstr + j * out_cstr + s0 * out_hstr +
+                                                     s1 * out_wstr]));
                         }
                         else
                         {
@@ -337,8 +342,9 @@ int mloSoftmaxBackwardRunHost(miopenTensorDescriptor_t dInputTensor,
                                 out[i * out_nstr + j * out_cstr + s0 * out_hstr + s1 * out_wstr]);
                         }
                         dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr] =
-                            alpha * results[(i * c + j) * h * w + s0 * w + s1] +
-                            beta * dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr];
+                            alpha_ * results[(i * c + j) * h * w + s0 * w + s1] +
+                            beta_ *
+                                dinhost[i * in_nstr + j * in_cstr + s0 * in_hstr + s1 * in_wstr];
                     }
                 }
         }

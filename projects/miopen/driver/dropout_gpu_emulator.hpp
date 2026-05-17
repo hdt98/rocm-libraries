@@ -139,7 +139,7 @@ void RunDropoutForwardEmulator(miopenHandle_t handle,
 
     const auto use_mask     = miopen::deref(dropoutDesc).use_mask;
     const auto dropout_rate = miopen::deref(dropoutDesc).dropout;
-    if(dropout_rate < 0.0 || dropout_rate > 1.0)
+    if(dropout_rate < 0.f || dropout_rate > 1.f)
     {
         printf("CPU verification: Invalid dropout rate\n");
     }
@@ -166,7 +166,7 @@ void RunDropoutForwardEmulator(miopenHandle_t handle,
             ((in_len[4] * in_len[3] * in_len[2] * in_len[1] * in_len[0] + 255) / 256)) *
         256;
 
-    const bool bound_dropout_rate = miopen::float_equal(dropout_rate, 1.0);
+    const bool bound_dropout_rate = miopen::float_equal(dropout_rate, 1.f);
     for(int i0 = 0; i0 < in_len[0]; i0++)
         for(int i1 = 0; i1 < in_len[1]; i1++)
             for(int i2 = 0; i2 < in_len[2]; i2++)
@@ -187,7 +187,7 @@ void RunDropoutForwardEmulator(miopenHandle_t handle,
                                 prng::xorwow_uniform(&states[si % glb_sz]) > dropout_rate;
 
                         out[oi] = bool(reservespace[ri]) && !bound_dropout_rate
-                                      ? static_cast<Tref>(in[ii] / (1 - dropout_rate))
+                                      ? static_cast<Tref>(in[ii] / Tgpu(1.f - dropout_rate))
                                       : 0;
                     }
 }
@@ -279,7 +279,7 @@ void RunDropoutBackwardEmulator(const miopenDropoutDescriptor_t dropoutDesc,
     }
 
     const auto dropout_rate = miopen::deref(dropoutDesc).dropout;
-    if(dropout_rate < 0.0 || dropout_rate > 1.0)
+    if(dropout_rate < 0.f || dropout_rate > 1.f)
     {
         printf("CPU verification: Invalid dropout rate\n");
     }
@@ -315,8 +315,8 @@ void RunDropoutBackwardEmulator(const miopenDropoutDescriptor_t dropoutDesc,
                                     i2 * in_len[3] * in_len[4] + i3 * in_len[4] + i4;
 
                         din[ii] = static_cast<Tref>(bool(reservespace[ri]) &&
-                                                            !miopen::float_equal(dropout_rate, 1.0)
-                                                        ? dout[oi] / (1 - dropout_rate)
+                                                            !miopen::float_equal(dropout_rate, 1.f)
+                                                        ? dout[oi] / Tgpu(1.f - dropout_rate)
                                                         : 0);
                     }
 }
@@ -351,7 +351,7 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
     }
 
     const auto dropout_rate = miopen::deref(dropoutDesc).dropout;
-    if(dropout_rate < 0.0 || dropout_rate > 1.0)
+    if(dropout_rate < 0.f || dropout_rate > 1.f)
     {
         printf("CPU verification: Invalid dropout rate\n");
     }
@@ -371,7 +371,7 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
                     out_len,
                     out_str);
 
-    const bool bound_dropout_rate = miopen::float_equal(dropout_rate, 1.0);
+    const bool bound_dropout_rate = miopen::float_equal(dropout_rate, 1.f);
     const size_t full_size        = in_len[0] * in_len[1] * in_len[2] * in_len[3] * in_len[4];
     const Indexer ind(in_len[0], in_len[1], in_len[2], in_len[3], in_len[4]);
 
@@ -389,7 +389,7 @@ void RunDropoutBackwardEmulatorMT(const miopenDropoutDescriptor_t dropoutDesc,
                               i3 * in_len[4] + i4;
 
             din[ii] = static_cast<Tref>(
-                bool(reservespace[ri]) && !bound_dropout_rate ? dout[oi] / (1 - dropout_rate) : 0);
+                bool(reservespace[ri]) && !bound_dropout_rate ? dout[oi] / Tgpu(1.f - dropout_rate) : 0);
             ind.step(i0, i1, i2, i3, i4);
         }
     };

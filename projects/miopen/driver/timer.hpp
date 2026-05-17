@@ -60,12 +60,12 @@ public:
             return;
         capture();
     }
-    float gettime_ms()
+    auto gettime_ms()
     {
-        return std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(et - st)
+        return std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(et - st)
             .count();
     }
-    float interim_time_ms()
+    auto interim_time_ms()
     {
         capture();
         return gettime_ms();
@@ -244,10 +244,8 @@ public:
             if(clockMode == ClockMode::SeparateClocksNotSynced ||
                clockMode == ClockMode::SeparateClocksSynced)
             {
-                printf("launch#%llu, host_time= %f ms, gpu_time= %f ms\n",
-                       i,
-                       hostTimePerLaunch[i],
-                       gpu_time);
+                std::cout << "launch#" << i << ", host_time= " << hostTimePerLaunch[i]
+                          << " ms, gpu_time= " << gpu_time << " ms\n";
             }
 
             if(i > 0)
@@ -260,9 +258,10 @@ public:
         if(n_iter == 1)
             (void)hipEventElapsedTime(&gpu_time, startEvent[0].get(), endEvent[0].get());
 
-        printf("GPU Kernel Time Elapsed: %f ms\n", n_iter > 1 ? gpu_avg / (n_iter - 1) : gpu_time);
-        printf("Wall-clock Time Elapsed: %f ms\n",
-               n_iter > 1 ? host_avg / (n_iter - 1) : hostTimePerLaunch[0]);
+        std::cout << "GPU Kernel Time Elapsed: "
+                  << (n_iter > 1 ? gpu_avg / (n_iter - 1) : gpu_time) << " ms\n";
+        std::cout << "Wall-clock Time Elapsed: "
+                  << (n_iter > 1 ? host_avg / (n_iter - 1) : hostTimePerLaunch[0]) << " ms\n";
     }
 
     enum class ClockMode

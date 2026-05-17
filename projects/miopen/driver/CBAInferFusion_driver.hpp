@@ -1253,19 +1253,17 @@ int CBAInferFusionDriver<Tgpu, Tref>::RunForwardGPU()
 
     if(WALL_CLOCK)
     {
-        printf("Wall-clock Time Elapsed: %f ms, for %d iterations.\n",
-               (iters == 1) ? t.gettime_ms() : (fulltime / float(iters - 1)),
-               (iters > 1) ? iters - 1 : 1);
+        std::cout << "Wall-clock Time Elapsed: "
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
+                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueStr("time") == "1")
     {
-        printf("GPU Fused Kernel Min Time Elapsed: %f ms\n", lowtime);
+        std::cout << "GPU Fused Kernel Min Time Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
-            printf("GPU Fused Kernel Avg Time Elapsed: %f ms, for %d "
-                   "iterations.\n",
-                   avgtime / (iters - 1),
-                   iters - 1);
+            std::cout << "GPU Fused Kernel Avg Time Elapsed: " << avgtime / (iters - 1) << " ms, "
+                      << "for " << (iters - 1) << " iterations.\n";
     }
 
     out_dev->FromGPU(GetStream(), out.data());
@@ -1413,9 +1411,9 @@ int CBAInferFusionDriver<Tgpu, Tref>::VerifyForward()
 {
     RunForwardCPU();
 
-    const auto error = miopen::rms_range(out_host, out);
+    const auto error = double(miopen::rms_range(out_host, out));
 
-    const double tolerance = std::numeric_limits<Tgpu>::epsilon() * 80;
+    const auto tolerance = double(std::numeric_limits<Tgpu>::epsilon() * 80);
 
     if(!std::isfinite(error) || error > tolerance)
     {

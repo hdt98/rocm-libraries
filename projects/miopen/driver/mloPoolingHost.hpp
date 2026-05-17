@@ -317,7 +317,7 @@ void fwd_pooling_compute_verify(const TensorDimsStrides& bot_dims_strides,
 
                 gg_val = (gg_val == (-G_MAX_VAL)) ? static_cast<Tgpu_>(0) : gg_val;
 
-                Tcheck_ g_val(gg_val);
+                Tcheck_ g_val = static_cast<Tcheck_>(gg_val);
 
                 double err = std::abs(c_val - g_val);
 

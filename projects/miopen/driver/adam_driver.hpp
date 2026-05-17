@@ -501,7 +501,7 @@ int AdamDriver<Tgpu, Tref, Tgrad>::RunForwardGPU()
                                   foundInfDesc,
                                   found_inf_ptr);
 
-        float time = 0.0;
+        float time = 0.f;
         miopenGetKernelTime(GetHandle(), &time);
         kernel_total_time += time;
         if(i == 0)
@@ -512,11 +512,11 @@ int AdamDriver<Tgpu, Tref, Tgrad>::RunForwardGPU()
     {
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Forward Adam Elapsed: %f ms\n", t.gettime_ms() / iter);
+            std::cout << "Wall-clock Time Forward Adam Elapsed: " << (t.gettime_ms() / iter) << " ms\n";
 
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        printf("GPU Kernel Time Forward Adam Elapsed: %f ms\n", kernel_average_time);
+        std::cout << "GPU Kernel Time Forward Adam Elapsed: " << kernel_average_time << " ms\n";
     }
 
     if(param_out_dev->FromGPU(GetStream(), param.data()) != 0)
@@ -585,7 +585,7 @@ int AdamDriver<Tgpu, Tref, Tgrad>::VerifyForward()
 {
     RunForwardCPU();
     const Tref tolerance = GetTolerance();
-    const auto error     = miopen::rms_range(param_host, param);
+    const Tref error     = miopen::rms_range(param_host, param);
     const char* ref_type = use_multithread ? "multi-threaded" : "single-threaded";
 
     if(!std::isfinite(error) || error > tolerance)

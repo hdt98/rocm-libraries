@@ -356,7 +356,7 @@ int ReduceCalculationDriver<Tgpu, Tref>::VerifyForward()
 {
     RunForwardCPU();
     const Tref tolerance = GetTolerance();
-    auto error           = miopen::rms_range(outhost, out);
+    const Tref error     = Tref(miopen::rms_range(outhost, out));
 
     if(!std::isfinite(error) || error > tolerance)
     {

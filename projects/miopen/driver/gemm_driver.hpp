@@ -381,7 +381,7 @@ int GemmDriver<T>::RunForwardGPU()
     {
         float time = 0.0;
         miopenGetKernelTime(GetHandle(), &time);
-        printf("GPU Kernel Time Gemm Elapsed: %f ms\n", time);
+        std::cout << "GPU Kernel Time Gemm Elapsed: " << time << " ms\n";
     }
 
     c_dev->FromGPU(GetStream(), c.data());

@@ -420,7 +420,7 @@ int ReduceExtremeDriver<Tgpu, Tref>::VerifyForward()
        (reduceExtremeOp == MIOPEN_REDUCE_EXTREME_MAX))
     {
         const Tref tolerance = GetTolerance();
-        auto error           = miopen::rms_range(yhost, y);
+        const Tref error     = Tref(miopen::rms_range(yhost, y));
 
         if(!std::isfinite(error) || error > tolerance)
         {

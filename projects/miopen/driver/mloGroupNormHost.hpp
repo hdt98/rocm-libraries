@@ -56,8 +56,8 @@ int32_t mloGroupNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
     size_t min_grain = use_multithread ? 8 : outer_size;
 
     miopen::par_for(outer_size, min_grain, [&](size_t o) {
-        Tcheck pmean = 0.0f;
-        Tcheck pvar  = 0.0f;
+        Tcheck pmean{0};
+        Tcheck pvar{0};
         for(size_t i = 0; i < inner_size; i++)
         {
             Tcheck tmp = static_cast<Tcheck>(input[o * inner_size + i]);
@@ -67,7 +67,7 @@ int32_t mloGroupNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
 
         pmean        = pmean / inner_size;
         pvar         = pvar / inner_size - pmean * pmean;
-        Tcheck prstd = 1.0f / sqrt(pvar + eps);
+        Tcheck prstd = Tcheck(1.0) / sqrt(pvar + Tcheck(eps));
 
         meanhost[o] = pmean;
         rstdhost[o] = prstd;

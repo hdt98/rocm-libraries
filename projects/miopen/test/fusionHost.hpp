@@ -147,10 +147,9 @@ void batchNormSpatialHostInference(const tensor<T>& input,
     int n_batches, channels, height, width;
     std::tie(n_batches, channels, height, width) = miopen::tien<4>(input.desc.GetLengths());
     miopen::par_for(channels, 1, [&](int cidx) { // via channel
-        V mean     = estimatedMean(0, cidx, 0, 0);
-        V variance = estimatedVariance(0, cidx, 0, 0);
-        double invertVar =
-            useInverseVariance ? static_cast<double>(variance) : 1.0 / sqrt(variance + epsilon);
+        double mean      = double(estimatedMean(0, cidx, 0, 0));
+        double variance  = double(estimatedVariance(0, cidx, 0, 0));
+        double invertVar = useInverseVariance ? variance : 1.0 / sqrt(variance + epsilon);
         // process the batch per channel
         for(int row = 0; row < height; row++)
         { // via rows
@@ -160,8 +159,8 @@ void batchNormSpatialHostInference(const tensor<T>& input,
                 { // via mini_batch
                     double elemStd = static_cast<double>(input(bidx, cidx, row, column)) - mean;
                     double inhat   = elemStd * invertVar;
-                    output(bidx, cidx, row, column) =
-                        static_cast<T>(scale(0, cidx, 0, 0) * inhat + bias(0, cidx, 0, 0));
+                    output(bidx, cidx, row, column) = static_cast<Tref>(
+                        double(scale(0, cidx, 0, 0)) * inhat + double(bias(0, cidx, 0, 0)));
                     // printf("output: %f\n",scale(0, cidx, 0, 0) * inhat + bias(0, cidx, 0, 0));
                 }
             }
@@ -187,17 +186,17 @@ void batchNormPerActivHostInference(const tensor<T>& input,
             for(int column = 0; column < width; column++)
             { // via columns
                 // apply down the n_batch dimension
-                double mean       = estimatedMean(0, cidx, row, column);
-                double variance   = estimatedVariance(0, cidx, row, column);
+                double mean       = double(estimatedMean(0, cidx, row, column));
+                double variance   = double(estimatedVariance(0, cidx, row, column));
                 double elemInvVar = useInverseVariance ? variance : 1.0 / sqrt(variance + epsilon);
                 for(int bidx = 0; bidx < n_batches; bidx++)
                 { // via mini_batch
                     // per (x-dims) channel load a block of data into LDS
-                    double elemStd = input(bidx, cidx, row, column) - mean;
-                    double inhat   = elemStd * elemInvVar;
-                    output(bidx, cidx, row, column) =
-                        scale(0, cidx, row, column) * inhat + bias(0, cidx, row, column);
-                    //    printf("output: %f\n",output(bidx, cidx, row, column));
+                    double elemStd                  = input(bidx, cidx, row, column) - mean;
+                    double inhat                    = elemStd * elemInvVar;
+                    output(bidx, cidx, row, column) = double(scale(0, cidx, row, column)) * inhat +
+                                                      double(bias(0, cidx, row, column));
+                    // printf("output: %f\n", output(bidx, cidx, row, column));
                 }
             }
         }
@@ -262,8 +261,8 @@ void batchNormSpatialHostFwdTrain(const tensor<T>& input,
                     // y_i = gamma*x_hat + beta
                     elemStd = (static_cast<double>(input(bidx, cidx, row, column)) -
                                mean_accum); // (x_i - mean)
-                    out(bidx, cidx, row, column) = static_cast<T>(
-                        scale(0, cidx, 0, 0) * (invVar * elemStd) + bias(0, cidx, 0, 0));
+                    out(bidx, cidx, row, column) = static_cast<Tout>(
+                        scale(0, cidx, 0, 0) * U(invVar * elemStd) + bias(0, cidx, 0, 0));
                 } // for (column)
             } // for (row)
         } // end for(n_batchs)
@@ -354,7 +353,8 @@ void batchNormSpatialHostBwdTrain(const tensor<XDataType>& x_input,
                         elemStd = static_cast<double>(x_input(bidx, cidx, row, column)) -
                                   mean; // (x_i - mean)
                         input_norm(bidx, cidx, row, column) = static_cast<AccDataType>(
-                            bnScale(0, cidx, 0, 0) * (elemStd * invVar) + bnBias(0, cidx, 0, 0));
+                            double(bnScale(0, cidx, 0, 0)) * (elemStd * invVar) +
+                            double(bnBias(0, cidx, 0, 0)));
                     }
                 }
             }
@@ -383,8 +383,8 @@ void batchNormSpatialHostBwdTrain(const tensor<XDataType>& x_input,
         if(!savedMean.data.empty())
         {
 
-            mean   = savedMean(0, cidx, 0, 0);   // HxW elements
-            invVar = savedInvVar(0, cidx, 0, 0); // HxW elements
+            mean   = double(savedMean(0, cidx, 0, 0));   // HxW elements
+            invVar = double(savedInvVar(0, cidx, 0, 0)); // HxW elements
         }
         else
         {
@@ -442,9 +442,10 @@ void batchNormSpatialHostBwdTrain(const tensor<XDataType>& x_input,
                 { // via mini_batch
                     xhat_index = in_cstride * bidx + (width * row + column);
 
-                    double tmp1 = nhw * dy_input(bidx, cidx, row, column) - dbias(0, cidx, 0, 0);
+                    double tmp1 = nhw * double(dy_input(bidx, cidx, row, column)) -
+                                  double(dbias(0, cidx, 0, 0));
                     double tmp2 = -xhat[xhat_index] * dscale(0, cidx, 0, 0);
-                    double tmp3 = (bnScale(0, cidx, 0, 0) * invVar) / nhw;
+                    double tmp3 = (double(bnScale(0, cidx, 0, 0)) * invVar) / nhw;
                     dx_out(bidx, cidx, row, column) =
                         static_cast<RefDataType>(tmp3 * (tmp2 + tmp1));
                 } // end for(n_batchs)
@@ -599,12 +600,12 @@ void batchNormPerActHostFwdTrain(const tensor<T>& input,
                 // #4 apply the normalization :: x_hat = (x_i - mean) / sqrt(variance_accum -
                 // epsilon)
                 for(int bidx = 0; bidx < n_batch; bidx++)
-                {                                                            // via mini_batch
-                    elemStd = (input(bidx, cidx, row, column) - mean_accum); // (x_i - mean)
+                {                                                                  // via mini_batch
+                    elemStd = double(input(bidx, cidx, row, column)) - mean_accum; // (x_i - mean)
                     inhat   = elemStd * elemInvVar;
                     // #5 Gamma and Beta adjust :: y_i = gamma*x_hat + beta
                     out(bidx, cidx, row, column) = static_cast<Tref>(
-                        scale(0, cidx, row, column) * inhat + bias(0, cidx, row, column));
+                        scale(0, cidx, row, column) * U(inhat) + bias(0, cidx, row, column));
                 } // end for(n_batch)
 
                 if(!runMean.data.empty())
@@ -673,8 +674,8 @@ void batchNormPerActHostBwdTrain(const tensor<XDataType>& x_input,
 
                 if(!savedMean.data.empty())
                 {
-                    mean       = savedMean(0, cidx, row, column);   // HxW elements
-                    elemInvVar = savedInvVar(0, cidx, row, column); // HxW elements
+                    mean       = double(savedMean(0, cidx, row, column));   // HxW elements
+                    elemInvVar = double(savedInvVar(0, cidx, row, column)); // HxW elements
                 }
                 else
                 {
@@ -707,7 +708,7 @@ void batchNormPerActHostBwdTrain(const tensor<XDataType>& x_input,
                     dyelem           = static_cast<double>(dy_input(bidx, cidx, row, column));
                     dbias(0, cidx, row, column) += dyelem;
                     dscale(0, cidx, row, column) += xhat[xhat_index] * dyelem;
-                    tmp1 = scale(0, cidx, row, column) * dyelem;
+                    tmp1 = double(scale(0, cidx, row, column)) * dyelem;
                     dxhat += tmp1;
                     dxhathat += tmp1 * xhat[xhat_index];
 
@@ -715,11 +716,11 @@ void batchNormPerActHostBwdTrain(const tensor<XDataType>& x_input,
 
                 for(int bidx = 0; bidx < n_batch; bidx++)
                 { // via mini_batch
-                    xhat_index = in_cstride * bidx + (width * row + column);
-                    tmp1       = xhat[xhat_index] * dxhathat + dxhat;
-                    double tmp2 =
-                        n_batch * scale(0, cidx, row, column) * dy_input(bidx, cidx, row, column) -
-                        tmp1;
+                    xhat_index  = in_cstride * bidx + (width * row + column);
+                    tmp1        = xhat[xhat_index] * dxhathat + dxhat;
+                    double tmp2 = double(n_batch * scale(0, cidx, row, column) *
+                                         dy_input(bidx, cidx, row, column)) -
+                                  tmp1;
                     double tmp3                     = elemInvVar / (double(n));
                     dx_out(bidx, cidx, row, column) = static_cast<DxDataType>(tmp3 * tmp2);
                 } // end for(n_batchs)

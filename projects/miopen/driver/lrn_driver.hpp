@@ -316,9 +316,9 @@ int LRNDriver<Tgpu, Tref>::RunForwardGPU()
 
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Forward LRN Elapsed: %f ms\n",
-                   t.gettime_ms() / inflags.GetValueInt("iter"));
-        printf("GPU Kernel Time Forward LRN Elapsed: %f ms\n", time);
+            std::cout << "Wall-clock Time Forward LRN Elapsed: "
+                      << (t.gettime_ms() / inflags.GetValueInt("iter")) << " ms\n";
+        std::cout << "GPU Kernel Time Forward LRN Elapsed: " << time << " ms\n";
     }
 
     out_dev->FromGPU(GetStream(), out.data());
@@ -378,14 +378,14 @@ int LRNDriver<Tgpu, Tref>::RunBackwardGPU()
 
     if(inflags.GetValueInt("time") == 1)
     {
-        float time = 0.0;
+        float time = 0.f;
         miopenGetKernelTime(GetHandle(), &time);
 
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Backward LRN Elapsed: %f ms\n",
-                   t.gettime_ms() / inflags.GetValueInt("iter"));
-        printf("GPU Kernel Time Backward LRN Elapsed: %f ms\n", time);
+            std::cout << "Wall-clock Time Backward LRN Elapsed: "
+                      << (t.gettime_ms() / inflags.GetValueInt("iter")) << " ms\n";
+        std::cout << "GPU Kernel Time Backward LRN Elapsed: " << time << " ms\n";
     }
 
     din_dev->FromGPU(GetStream(), din.data());

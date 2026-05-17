@@ -1680,13 +1680,14 @@ template <typename Tgpu, typename Tref>
 void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                                               const float kernel_first_time) const
 {
-    float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
-    printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    auto kernel_average_time = double(ComputeAverageTime(kernel_total_time, kernel_first_time));
+    std::cout << "GPU Kernel Time Forward Conv. Elapsed: " << kernel_average_time
+              << " ms (average)\n";
 
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        printf("stats: <not implemented> for conv%ud\n", num_dim);
+        std::cout << "stats: <not implemented> for conv" << num_dim << '\n';
         return;
     }
 
@@ -1963,7 +1964,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGPU()
             {
                 miopenGetKernelTime(GetHandle(), &time);
             }
-            printf("GPU Kernel Time Forward Conv. Bias Elapsed: %f ms\n", time);
+            std::cout << "GPU Kernel Time Forward Conv. Bias Elapsed: " << time << " ms\n";
         }
 
         FinalizeKernel();
@@ -2575,7 +2576,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardGPU()
                 {
                     miopenGetKernelTime(GetHandle(), &time);
                 }
-                printf("GPU Kernel Time Backward Bias Conv. Elapsed: %f ms\n", time);
+                std::cout << "GPU Kernel Time Backward Bias Conv. Elapsed: " << time << " ms\n";
             }
 
             FinalizeKernel();
@@ -2711,13 +2712,14 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
 template <typename Tgpu, typename Tref>
 void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, float kernel_first_time)
 {
-    float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
-    printf("GPU Kernel Time Backward Data Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    auto kernel_average_time = double(ComputeAverageTime(kernel_total_time, kernel_first_time));
+    std::cout << "GPU Kernel Time Backward Data Conv. Elapsed: " << kernel_average_time
+              << " ms (average)\n";
 
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        printf("stats: <not implemented> for conv%ud\n", num_dim);
+        std::cout << "stats: <not implemented> for conv" << num_dim << '\n';
         return;
     }
 
@@ -2940,14 +2942,14 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
 template <typename Tgpu, typename Tref>
 void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float kernel_first_time)
 {
-    float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
-    printf("GPU Kernel Time Backward Weights Conv. Elapsed: %f ms (average)\n",
-           kernel_average_time);
+    auto kernel_average_time = double(ComputeAverageTime(kernel_total_time, kernel_first_time));
+    std::cout << "GPU Kernel Time Backward Weights Conv. Elapsed: " << kernel_average_time
+              << " ms (average)\n";
 
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
-        printf("stats: <not implemented> for conv%ud\n", num_dim);
+        std::cout << "stats: <not implemented> for conv" << num_dim << '\n';
         return;
     }
 

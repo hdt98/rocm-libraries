@@ -514,7 +514,7 @@ int GetitemDriver<Tgpu, Tref>::VerifyBackward()
     RunBackwardCPU();
     const Tref tolerance = GetTolerance();
 
-    auto error_dx = miopen::rms_range(dxhost, dx);
+    Tref error_dx = miopen::rms_range(dxhost, dx);
 
     if(!std::isfinite(error_dx) || error_dx > tolerance)
     {

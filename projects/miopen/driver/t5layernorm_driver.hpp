@@ -586,7 +586,7 @@ int T5LayerNormDriver<Tgpu, Tref>::VerifyForward()
 {
     RunForwardCPU();
     const Tref tolerance    = GetTolerance();
-    auto error              = miopen::rms_range(yhost, y);
+    auto error              = Tref(miopen::rms_range(yhost, y));
     std::string solver_type = use_multithread ? "multi-threaded" : "single-threaded";
 
     if(!std::isfinite(error) || error > tolerance)
@@ -601,7 +601,7 @@ int T5LayerNormDriver<Tgpu, Tref>::VerifyForward()
                   << error << " < " << tolerance << ')' << std::endl;
     }
 
-    auto rstderror = miopen::rms_range(rstdhost, rstd);
+    auto rstderror = Tref(miopen::rms_range(rstdhost, rstd));
     if(!std::isfinite(rstderror) || rstderror > tolerance)
     {
         std::cout << "Forward T5LayerNorm rstd FAILED against " << solver_type
@@ -622,7 +622,7 @@ int T5LayerNormDriver<Tgpu, Tref>::VerifyBackward()
 {
     RunBackwardCPU();
     const Tref tolerance    = GetTolerance();
-    auto error              = miopen::rms_range(dxhost, dx);
+    auto error              = Tref(miopen::rms_range(dxhost, dx));
     std::string solver_type = use_multithread ? "multi-threaded" : "single-threaded";
 
     if(!std::isfinite(error) || error > tolerance)
@@ -637,7 +637,7 @@ int T5LayerNormDriver<Tgpu, Tref>::VerifyBackward()
                   << " CPU reference (" << error << " < " << tolerance << ')' << std::endl;
     }
 
-    auto dwerror = miopen::rms_range(dwhost, dw);
+    auto dwerror = Tref(miopen::rms_range(dwhost, dw));
     if(!std::isfinite(dwerror) || dwerror > tolerance)
     {
         std::cout << "Backward T5LayerNorm dw FAILED against " << solver_type

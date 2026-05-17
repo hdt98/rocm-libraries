@@ -320,8 +320,8 @@ int ReduceDriver<Tgpu, Tref>::RunForwardGPU()
 
     bool output_accumulate = !(reduce::float_equal_one(alpha) && reduce::float_equal_zero(beta));
 
-    const double alpha64       = alpha;
-    const double beta64        = beta;
+    const double alpha64       = double(alpha);
+    const double beta64        = double(beta);
     const void* const alphaPtr = std::is_same<Tgpu, double>::value
                                      ? static_cast<const void*>(&alpha64)
                                      : static_cast<const void*>(&alpha);
@@ -382,9 +382,9 @@ int ReduceDriver<Tgpu, Tref>::RunForwardGPU()
 
         STOP_TIME
         if(WALL_CLOCK)
-            printf("Wall-clock Time Reduction Elapsed: %f ms\n",
-                   t.gettime_ms() / inflags.GetValueInt("iter"));
-        printf("GPU Kernel Time Reduction Elapsed: %f ms\n", time);
+            std::cout << "Wall-clock Time Reduction Elapsed: "
+                      << (t.gettime_ms() / inflags.GetValueInt("iter")) << " ms\n";
+        std::cout << "GPU Kernel Time Reduction Elapsed: " << time << " ms\n";
     }
 
     return miopenStatusSuccess;

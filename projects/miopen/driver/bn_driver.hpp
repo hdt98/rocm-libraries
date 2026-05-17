@@ -1341,7 +1341,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunForwardGPU()
     if(WALL_CLOCK)
     {
         printf("Wall-clock Time Forward GPU Batch Norm Elapsed: %f ms, for %d iterations.\n",
-               (iters == 1) ? t.gettime_ms() : (fulltime / float(iters - 1)),
+               (iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)),
                (iters > 1) ? iters - 1 : 1);
     }
 
@@ -1724,11 +1724,8 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
             float rdCnt   = 2.0;
             float wrCnt   = 1.0;
             // layer, flopCnt, reads, writes, GFLOPS, GB/s, timeMs
-            printf("stats: bnormb, 0, %zu, %zu, 0, %f, %f\n",
-                   dataSz,
-                   dataSz,
-                   (rdCnt * dataSz + wrCnt * dataSz) / lowtime / 1e6,
-                   lowtime);
+            std::cout << "stats: bnormb, 0, " << dataSz << ", " << dataSz << ", 0, "
+                      << ((rdCnt * dataSz + wrCnt * dataSz) / lowtime / 1e6f) << ", " << lowtime;
         }
     }
 
@@ -1736,15 +1733,16 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::RunBackwardGPU()
 
     if(WALL_CLOCK)
     {
-        printf("Wall-clock Time Backward GPU Batch Norm Elapsed: %f ms\n",
-               (iters == 1) ? t.gettime_ms() : (fulltime / float(iters - 1)));
+        std::cout << "Wall-clock Time Backward GPU Batch Norm Elapsed: "
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms\n";
     }
     if(inflags.GetValueStr("time") == "1")
     {
-        printf("GPU Kernel Min Time Backwards Batch Normalization Elapsed: %f ms\n", lowtime);
+        std::cout << "GPU Kernel Min Time Backwards Batch Normalization Elapsed: " << lowtime
+                  << " ms\n";
         if(iters > 1)
-            printf("GPU Kernel Avg Time Backward Batch Normalization Elapsed: %f ms\n",
-                   avgtime / (iters - 1));
+            std::cout << "GPU Kernel Avg Time Backward Batch Normalization Elapsed: "
+                      << avgtime / (iters - 1) << " ms\n";
     }
 
     return miopenStatusSuccess;
@@ -1760,7 +1758,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyForward()
 
     const Tref maxrms = static_cast<Tref>((sizeof(TInput) == 4) ? RMSTOL_FP32 : RMSTOL_FP16);
 
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
     const Tref tolerance = static_cast<Tref>((sizeof(TInput) == 4) ? ERRTOL_FP32 : ERRTOL_FP16);
     Tref diff            = static_cast<Tref>(0.);
 #endif
@@ -1784,7 +1782,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyForward()
                 std::cout << "Forward train batch norm verification FAILED on running mean: "
                           << errorRunMean << std::endl;
                 anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
                 for(int i = 0; i < runMean.GetVector().size() && i < runMean_ref.data.size() &&
                                i < MIO_BN_MAX_DEBUGLOOP;
                     i++)
@@ -1813,7 +1811,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyForward()
                 std::cout << "Forward train batch norm verification FAILED on running variance: "
                           << errorRunVar << std::endl;
                 anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
                 for(int i = 0; i < runVariance.GetVector().size() &&
                                i < runVariance_ref.data.size() && i < MIO_BN_MAX_DEBUGLOOP;
                     i++)
@@ -1850,7 +1848,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyForward()
                 std::cout << "Forward train batch norm verification FAILED on saved mean: "
                           << errorSaveMean << std::endl;
                 anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
                 for(int i = 0; i < savedMean.GetVector().size() && i < savedMean_ref.data.size() &&
                                i < MIO_BN_MAX_DEBUGLOOP;
                     i++)
@@ -1884,7 +1882,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyForward()
                     << "Forward train batch norm verification FAILED on saved inverse variance: "
                     << errorSaveVar << std::endl;
                 anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
                 for(int i = 0; i < savedVariance.GetVector().size() &&
                                i < savedVariance_ref.data.size() && i < MIO_BN_MAX_DEBUGLOOP;
                     i++)
@@ -1921,7 +1919,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyForward()
     {
         std::cout << "Forward batch norm verification FAILED on output: " << errorOut << std::endl;
         anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
         unsigned int count = 0;
         for(int i = 0; i < out.GetVector().size() && i < out_ref.data.size(); i++)
         {
@@ -2082,7 +2080,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyBackward()
     dScale.CopyFromDeviceToHost(GetStream());
     dBias.CopyFromDeviceToHost(GetStream());
 
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
     const Tref tolerance =
         static_cast<Tref>(1000 * ((sizeof(TInput) == 4) ? ERRTOL_FP32 : ERRTOL_FP16));
 #endif
@@ -2093,7 +2091,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyBackward()
         std::cout << "Backwards prop batch norm verification FAILED on dx: " << errordxout
                   << std::endl;
         anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
         for(int i = 0; i < out_ref.data.size() && i < MIO_BN_MAX_DEBUGLOOP; i++)
         {
             auto diff = fabs(TOut(fabs(out_ref.data[i]) - fabs(out_bwd.GetVector()[i])));
@@ -2126,7 +2124,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyBackward()
         std::cout << "Backwards prop batch norm verification FAILED on dscale: " << errordscale
                   << std::endl;
         anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
         for(int i = 0; i < dScale.GetVector().size() && i < MIO_BN_MAX_DEBUGLOOP; i++)
         {
             auto diff = fabs(TAcc(fabs(dScale.GetVector()[i]) - fabs(dScale_ref.data[i])));
@@ -2158,7 +2156,7 @@ int BatchNormDriver<TInput, Tref, TAcc, TScaleBias, TOut>::VerifyBackward()
         std::cout << "Backwards prop batch norm verification FAILED on dbias: " << errordbias
                   << std::endl;
         anError = true;
-#if(MIO_BN_DEBUG == 1)
+#if (MIO_BN_DEBUG == 1)
         for(int i = 0; i < dBias.GetVector().size() && i < MIO_BN_MAX_DEBUGLOOP; i++)
         {
             auto diff = fabs(TAcc(fabs(dBias.GetVector()[i]) - fabs(dBias_ref.data[i])));

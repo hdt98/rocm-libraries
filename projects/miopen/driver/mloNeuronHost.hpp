@@ -57,7 +57,7 @@
 #define MIOPEN_NEURON_TOTAL 11
 #endif
 
-const float kBNLL_THRESHOLD = 50.;
+const double kBNLL_THRESHOLD = 50.;
 
 template <typename T>
 T calculate_relative_error(T uref, T u)

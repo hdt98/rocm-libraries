@@ -360,30 +360,28 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
 
     if(WALL_CLOCK)
     {
-        printf("Wall-clock Time Forward GPU Activation Elapsed: %f ms, for %d iterations.\n",
-               (iters == 1) ? t.gettime_ms() : (fulltime / float(iters - 1)),
-               (iters > 1) ? iters - 1 : 1);
+        std::cout << "Wall-clock Time Forward GPU Activation Elapsed: "
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
+                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueInt("time") == 1)
     {
-        printf("GPU Kernel Min Time Forward Activation Elapsed: %f ms\n", lowtime);
+        std::cout << "GPU Kernel Min Time Forward Activation Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
-            printf("GPU Kernel Avg Time Forward Activation Elapsed: %f ms, for %d iterations.\n",
-                   avgtime / (iters - 1),
-                   iters - 1);
+            std::cout << "GPU Kernel Avg Time Forward Activation Elapsed: "
+                      << avgtime / (iters - 1) << " ms, "
+                      << "for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
         size_t dataSz =
             in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
 
         // layer, readbytes, writebytes, BG/s, timeMS
-        printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
-        printf("stats: fwd-activ, %zu, %zu, %f, %f\n",
-               dataSz,
-               dataSz,
-               2 * dataSz / lowtime / 1e6,
-               avgtime / (iters - 1));
+        std::cout << "stats: name, bytesRead, bytesWritten, GB/s, timeMs\n";
+        std::cout << "stats: fwd-activ, " << dataSz ", " << dataSz << ", "
+                  << (2 * dataSz / lowtime / 1e6f) << " ,"
+                  << (avgtime / (iters - 1)) << '\n';
     }
 
     out_dev->FromGPU(GetStream(), out.data());
@@ -463,30 +461,28 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
 
     if(WALL_CLOCK)
     {
-        printf("Wall-clock Time Backward GPU Activation Elapsed: %f ms, for %d iterations.\n",
-               (iters == 1) ? t.gettime_ms() : (fulltime / float(iters - 1)),
-               (iters > 1) ? iters - 1 : 1);
+        std::cout << "Wall-clock Time Backward GPU Activation Elapsed: "
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
+                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueInt("time") == 1)
     {
-        printf("GPU Kernel Min Time Backward Activation Elapsed: %f ms\n", lowtime);
+        std::cout << "GPU Kernel Min Time Backward Activation Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
-            printf("GPU Kernel Avg Time Backward Activation Elapsed: %f ms, for %d iterations.\n",
-                   avgtime / (iters - 1),
-                   iters - 1);
+            std::cout << "GPU Kernel Avg Time Backward Activation Elapsed: "
+                      << avgtime / (iters - 1) << ", ms "
+                      << "for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
         size_t dataSz =
             in_n * in_c * in_h * in_w * miopen::GetTypeSize(miopen::deref(inputTensor).GetType());
 
         // layer, readbytes, writebytes, BG/s, timeMS
-        printf("stats: name, bytesRead, bytesWritten, GB/s, timeMs\n");
-        printf("stats: bwd-activ, %zu, %zu, %f, %f\n",
-               dataSz,
-               dataSz,
-               2 * dataSz / lowtime / 1e6,
-               avgtime / (iters - 1));
+        std::cout << "stats: name, bytesRead, bytesWritten, GB/s, timeMs\n";
+        std::cout << "stats: bwd-activ, " << dataSz << ", " << dataSz << ", "
+                  << (2 * dataSz / lowtime / 1e6f) << ", "
+                  << (avgtime / (iters - 1)) << '\n';
     }
 
     din_dev->FromGPU(GetStream(), din.data());
@@ -498,7 +494,7 @@ template <typename Tgpu, typename Tref>
 int ActivationDriver<Tgpu, Tref>::VerifyForward()
 {
 
-    double allowedEps = std::numeric_limits<Tgpu>::epsilon() * 80;
+    auto allowedEps = std::numeric_limits<Tgpu>::epsilon() * 80;
     miopenActivationMode_t v_mode;
     double v_Alpha;
     double v_Beta;
@@ -532,7 +528,7 @@ template <typename Tgpu, typename Tref>
 int ActivationDriver<Tgpu, Tref>::VerifyBackward()
 {
 
-    double allowedEps = std::numeric_limits<Tgpu>::epsilon() * 80;
+    auto allowedEps = std::numeric_limits<Tgpu>::epsilon() * 80;
     miopenActivationMode_t v_mode;
     double v_Alpha;
     double v_Beta;
