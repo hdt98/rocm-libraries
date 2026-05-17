@@ -378,7 +378,7 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
 
         // layer, readbytes, writebytes, BG/s, timeMS
         std::cout << "stats: name, bytesRead, bytesWritten, GB/s, timeMs\n";
-        std::cout << "stats: fwd-activ, " << dataSz ", " << dataSz << ", "
+        std::cout << "stats: fwd-activ, " << dataSz << ", " << dataSz << ", "
                   << (2 * dataSz / lowtime / 1e6f) << " ," << (avgtime / (iters - 1)) << '\n';
     }
 
