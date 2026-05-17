@@ -44,9 +44,8 @@ T logaddexp_gpu(T* x, T* y)
     T b    = std::min(*x, *y);
     auto c = double(b - a);
 
-    return c <= NEGATIVE_CUTOFF_VAL
-               ? std::max(a, T(NEGATIVE_CUTOFF_VAL))
-               : std::max(a + log(1.0 + exp(c)), T(NEGATIVE_CUTOFF_VAL));
+    return c <= NEGATIVE_CUTOFF_VAL ? std::max(a, T(NEGATIVE_CUTOFF_VAL))
+                                    : std::max(a + T(log(1.0 + exp(c))), T(NEGATIVE_CUTOFF_VAL));
 }
 
 template <typename T>

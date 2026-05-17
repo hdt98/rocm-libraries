@@ -420,7 +420,8 @@ int DropoutDriver<Tgpu, Tref>::RunBackwardGPU()
         int iter = inflags.GetValueInt("iter");
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
-        std::cout << "GPU Kernel Time Backward Dropout. Elapsed: " << kernel_average_time << " ms (average)\n";
+        std::cout << "GPU Kernel Time Backward Dropout. Elapsed: " << kernel_average_time
+                  << " ms (average)\n";
     }
 
     din_dev->FromGPU(GetStream(), din.data.data());
