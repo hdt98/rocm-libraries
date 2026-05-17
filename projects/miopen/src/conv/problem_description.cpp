@@ -27,6 +27,7 @@
 #include <miopen/conv/problem_description.hpp>
 
 #include <miopen/conv/data_invoke_params.hpp>
+#include <miopen/conv/solvers.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/datatype.hpp>
 #include <miopen/execution_context.hpp>
@@ -249,6 +250,11 @@ void ProblemDescription::MakeNetworkConfig(std::string& conf_key) const
     ss << 'x' << GetGroupCount();
     ss << 'x' << GetDirectionStr();
     ss << 'x' << GetAlphaBetaCaseStr();
+
+    // GPU reference mode uses double accumulators in the naive conv solver.
+    // Include this flag so the invoker cache differentiates the two modes.
+    if(miopen::debug::AlwaysEnableConvDirectNaive)
+        ss << "xGPURef";
 
     conf_key = ss.str();
 }
