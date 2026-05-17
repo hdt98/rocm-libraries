@@ -725,7 +725,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::createRunningBuffers()
         // Populate
         for(int i = 0; i < sb_sz; i++)
         {
-#if (CBA_DEBUG_VALUES == 1)
+#if(CBA_DEBUG_VALUES == 1)
             runningMean[i]     = 0.;
             runningVariance[i] = 1.;
 #else
@@ -815,7 +815,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
         // Using random beta and gamma
         for(int i = 0; i < sb_sz; i++)
         {
-#if (CBA_DEBUG_VALUES == 1)
+#if(CBA_DEBUG_VALUES == 1)
             scale[i] = 1.; // prng::gen_canonical<float>(); // 1.0;
             bias[i]  = 10.;
 #else
@@ -841,7 +841,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     // Data initialization
     for(int i = 0; i < in_sz; i++)
     {
-#if (CBA_DEBUG_VALUES == 1)
+#if(CBA_DEBUG_VALUES == 1)
         auto rval  = 1.; // prng::gen_canonical<Tgpu>(); // 1.0;
         in_host[i] = static_cast<double>(rval);
         in[i]      = rval;
@@ -857,7 +857,7 @@ int CBAInferFusionDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
         wei = std::vector<Tgpu>(wei_sz, static_cast<Tgpu>(0));
         for(int i = 0; i < wei_sz; i++)
         {
-#if (CBA_DEBUG_VALUES == 1)
+#if(CBA_DEBUG_VALUES == 1)
             auto rval   = 1.; // prng::gen_canonical<Tgpu>(); // 1.;
             wei[i]      = static_cast<double>(rval);
             wei_host[i] = rval;
@@ -1254,16 +1254,16 @@ int CBAInferFusionDriver<Tgpu, Tref>::RunForwardGPU()
     if(WALL_CLOCK)
     {
         std::cout << "Wall-clock Time Elapsed: "
-                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
-                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1))
+                  << " ms, for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueStr("time") == "1")
     {
         std::cout << "GPU Fused Kernel Min Time Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
-            std::cout << "GPU Fused Kernel Avg Time Elapsed: " << avgtime / (iters - 1) << " ms, "
-                      << "for " << (iters - 1) << " iterations.\n";
+            std::cout << "GPU Fused Kernel Avg Time Elapsed: " << avgtime / (iters - 1)
+                      << " ms, for " << (iters - 1) << " iterations.\n";
     }
 
     out_dev->FromGPU(GetStream(), out.data());

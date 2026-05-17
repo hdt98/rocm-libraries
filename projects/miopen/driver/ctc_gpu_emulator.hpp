@@ -40,8 +40,8 @@
 template <typename T>
 T logaddexp_gpu(T* x, T* y)
 {
-    T a = std::max(*x, *y);
-    T b = std::min(*x, *y);
+    T a    = std::max(*x, *y);
+    T b    = std::min(*x, *y);
     auto c = double(b - a);
 
     return c <= NEGATIVE_CUTOFF_VAL

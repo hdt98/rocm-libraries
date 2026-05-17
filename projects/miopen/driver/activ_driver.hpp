@@ -361,8 +361,8 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
     if(WALL_CLOCK)
     {
         std::cout << "Wall-clock Time Forward GPU Activation Elapsed: "
-                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
-                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, for "
+                  << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueInt("time") == 1)
@@ -370,8 +370,7 @@ int ActivationDriver<Tgpu, Tref>::RunForwardGPU()
         std::cout << "GPU Kernel Min Time Forward Activation Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
             std::cout << "GPU Kernel Avg Time Forward Activation Elapsed: " << avgtime / (iters - 1)
-                      << " ms, "
-                      << "for " << (iters - 1) << " iterations.\n";
+                      << " ms, for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
         size_t dataSz =
@@ -461,8 +460,8 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
     if(WALL_CLOCK)
     {
         std::cout << "Wall-clock Time Backward GPU Activation Elapsed: "
-                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
-                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, for "
+                  << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueInt("time") == 1)
@@ -470,8 +469,7 @@ int ActivationDriver<Tgpu, Tref>::RunBackwardGPU()
         std::cout << "GPU Kernel Min Time Backward Activation Elapsed: " << lowtime << " ms\n";
         if(iters > 1)
             std::cout << "GPU Kernel Avg Time Backward Activation Elapsed: "
-                      << avgtime / (iters - 1) << ", ms "
-                      << "for " << (iters - 1) << " iterations.\n";
+                      << avgtime / (iters - 1) << ", ms for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(inputTensor).GetLengths());
         size_t dataSz =

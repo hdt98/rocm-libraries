@@ -379,7 +379,8 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardGPU()
     {
         STOP_TIME
         if(WALL_CLOCK)
-            std::cout << "Wall-clock Time Forward Adam Elapsed: " << t.gettime_ms() / iter << " ms\n";
+            std::cout << "Wall-clock Time Forward Adam Elapsed: " << t.gettime_ms() / iter
+                      << " ms\n";
 
         float kernel_average_time =
             iter > 1 ? (kernel_total_time - kernel_first_time) / (iter - 1) : kernel_first_time;
