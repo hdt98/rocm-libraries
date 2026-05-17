@@ -964,18 +964,13 @@ inline rocblas_status potrf_syrk_herk_NB(rocblas_handle handle,
             return (rocblas_status_internal_error);
         }
 
-        istat = rocblasCall_syrk_herk<BATCHED, T>(handle, uplo, transA, n, k,
+        istat = potrf_syrk_gemm<BATCHED, T>(handle, uplo, transA, n, k,
 
-                                                  alpha,
+                                            alpha, A, shiftA, lda, strideA,
 
-                                                  A, shiftA, lda, strideA,
+                                            beta, C, shiftC, ldc, strideC,
 
-                                                  beta,
-
-                                                  C, shiftC, ldc, strideC,
-
-                                                  batch_count);
-
+                                            batch_count, use_syrk);
         return istat;
     }
 
