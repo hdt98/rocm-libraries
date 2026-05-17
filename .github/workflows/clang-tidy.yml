@@ -131,6 +131,7 @@ jobs:
       - name: Run clang-tidy (stinkytofu)
         if: steps.changes.outputs.stinkytofu == 'true' || github.event_name == 'workflow_dispatch'
         run: |
+          . .venv/bin/activate
           sudo apt-get install -y libgtest-dev
           pip install invoke
           cd shared/stinkytofu
