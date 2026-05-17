@@ -1254,8 +1254,8 @@ int CBAInferFusionDriver<Tgpu, Tref>::RunForwardGPU()
     if(WALL_CLOCK)
     {
         std::cout << "Wall-clock Time Elapsed: "
-                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1))
-                  << " ms, for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, for "
+                  << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     }
 
     if(inflags.GetValueStr("time") == "1")

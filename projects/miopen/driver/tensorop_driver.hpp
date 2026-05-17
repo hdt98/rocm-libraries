@@ -304,15 +304,14 @@ int TensorOpDriver<Tgpu, Tref>::RunForwardGPU()
 
     if(WALL_CLOCK)
         std::cout << "Wall-clock Time Tensor Ops Elapsed: "
-                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, "
-                  << "for " << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
+                  << ((iters == 1) ? t.gettime_ms() : fulltime / (iters - 1)) << " ms, for "
+                  << ((iters > 1) ? iters - 1 : 1) << " iterations.\n";
     if(inflags.GetValueInt("time") == 1)
     {
         std::cout << "GPU Kernel Min Time Tensor Op Elapsed: " << min_time << " ms\n";
         if(iters > 1)
             std::cout << "GPU Kernel Avg Time Tensor Op Elapsed: " << avgtime / (iters - 1)
-                      << " ms, "
-                      << "for " << (iters - 1) << " iterations.\n";
+                      << " ms, for " << (iters - 1) << " iterations.\n";
         int in_n, in_c, in_h, in_w;
         std::tie(in_n, in_c, in_h, in_w) = miopen::tien<4>(miopen::deref(aTensor).GetLengths());
         size_t dataSz =
