@@ -39,7 +39,7 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-static bool constexpr use_syrk = true;
+static bool constexpr use_syrk = false;
 static bool constexpr use_rocblas_trsm = true;
 
 // --------------------------------
@@ -88,13 +88,14 @@ static inline bool is_power_of_2(int const n)
 };
 
 // ---------------------------------------------------------------
-// kernel to copy the strictly upper triangular part or
-// strictly lower triangular part to array of length n * (n-1) / 2
+// kernel to copy the strictly upper triangular diagonal blocks or
+// strictly lower triangular diagonal blocks to array
 // ---------------------------------------------------------------
 template <typename T, typename I, typename Istride, typename UA>
 __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
                                                 bool const is_restore,
-                                                I const n,
+                                                I const n_arg,
+                                                I const nb,
 
                                                 UA A,
                                                 Istride const shiftA,
@@ -104,6 +105,18 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
                                                 T* const save_A,
                                                 I const batch_count)
 {
+    auto ceildiv = [](I const n, I const nb) { return ((n <= 0) ? 0 : ((n - 1) / nb + 1)); };
+
+    // --------------------------------------
+    // partition the z-dimension of blocks as
+    // groups of nblocks
+    // --------------------------------------
+
+    I const nblocks = ceildiv(n_arg, nb);
+
+    I const ib_start = 0;
+    I const ib_inc = 1;
+
     I const bid_start = blockIdx.z;
     I const bid_inc = gridDim.z;
 
@@ -113,49 +126,67 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
     I const i_start = threadIdx.x + blockIdx.x * blockDim.x;
     I const i_inc = gridDim.x * blockDim.x;
 
-    auto idx_lower = [=](I const i, I const j) {
+    auto idx_lower = [](I const i, I const j, I const n) {
         auto const ipos
             = ((static_cast<int64_t>(j) * n - static_cast<int64_t>(j) * (j + 1) / 2) + (i - j - 1));
         return (ipos);
     };
 
-    auto idx_upper = [=](I const i, I const j) {
+    auto idx_upper = [](I const i, I const j, I const n) {
         auto ipos = (static_cast<int64_t>(j) * (j - 1) / 2 + i);
         return (ipos);
     };
 
-    auto idx2D = [](auto i, auto j, auto lda) { return (i + j * static_cast<int64_t>(lda)); };
+    auto idx2D
+        = [](I const i, I const j, I const lda) { return (i + j * static_cast<int64_t>(lda)); };
+
+    size_t const size_triangle = size_t(nb) * (nb - 1) / 2;
 
     for(I bid = 0 + bid_start; bid < batch_count; bid += bid_inc)
     {
         T* const A_bid = load_ptr_batch<T>(A, bid, shiftA, strideA);
+        T* const save_A_bid = save_A + (size_triangle * nblocks) * bid;
 
-        size_t const size_triangle = size_t(n) * (n - 1) / 2;
-        T* const save_A_bid = save_A + size_triangle * bid;
-
-        for(I j = 0 + j_start; j < n; j += j_inc)
+        // --------------------
+        // save diagonal blocks
+        // --------------------
+        for(I ib = ib_start; ib < nblocks; ib += ib_inc)
         {
-            I const row_start = (is_strictly_lower) ? (j + 1) : 0;
-            I const row_end = (is_strictly_lower) ? (n - 1) : (j - 1);
+            T* const A_ib = A_bid + idx2D(ib * nb, ib * nb, lda);
 
-            // ------------------------------
-            // note row_start <= i <= row_end
-            // ------------------------------
-            for(I i = row_start + i_start; i <= row_end; i += i_inc)
+            T* const save_A_ib = save_A_bid + ib * size_triangle;
+
+            // ------------------------------------------
+            // size of the ib-th diagonal block is n by n
+            // ------------------------------------------
+            bool const is_last_block = (ib == (nblocks - 1));
+            I const n = (is_last_block) ? (n - (nblocks - 1) * nb) : nb;
+
+            for(I j = 0 + j_start; j < n; j += j_inc)
             {
-                auto const ipos = (is_strictly_lower) ? idx_lower(i, j) : idx_upper(i, j);
-                auto const ij = idx2D(i, j, lda);
+                I const row_start = (is_strictly_lower) ? (j + 1) : 0;
+                I const row_end = (is_strictly_lower) ? (n - 1) : (j - 1);
 
-                if(is_restore)
+                // ------------------------------
+                // note row_start <= i <= row_end
+                // ------------------------------
+                for(I i = row_start + i_start; i <= row_end; i += i_inc)
                 {
-                    A_bid[ij] = save_A_bid[ipos];
-                }
-                else
-                {
-                    save_A_bid[ipos] = A_bid[ij];
-                }
-            } // end for i
-        } // end for j
+                    auto const ipos = (is_strictly_lower) ? idx_lower(i, j, n) : idx_upper(i, j, n);
+                    auto const ij = idx2D(i, j, lda);
+
+                    if(is_restore)
+                    {
+                        A_ib[ij] = save_A_ib[ipos];
+                    }
+                    else
+                    {
+                        save_A_ib[ipos] = A_ib[ij];
+                    }
+                } // end for i
+            } // end for j
+
+        } // end for ib
     } // end for bid
 }
 
@@ -164,6 +195,7 @@ static inline void copy_strictly_triangular(hipStream_t stream,
                                             bool const is_strictly_lower,
                                             bool const is_restore,
                                             I const n,
+                                            I const nb,
 
                                             UA A,
                                             Istride const shiftA,
@@ -180,12 +212,13 @@ static inline void copy_strictly_triangular(hipStream_t stream,
     I const nz = 1;
 
     I const max_blocks = 64 * 1024 - 3;
+
     I const nbz = std::min(max_blocks, batch_count);
     I const nbx = std::min(max_blocks, ceildiv(n, nx));
     I const nby = std::min(max_blocks, ceildiv(n, ny));
 
     copy_strictly_triangular_kernel<T, I, Istride, UA>
-        <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz), 0, stream>>>(is_strictly_lower, is_restore, n,
+        <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz), 0, stream>>>(is_strictly_lower, is_restore, n, nb,
 
                                                                A, shiftA, lda, strideA,
 
@@ -200,8 +233,8 @@ template <typename T, typename I>
 static inline bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
 {
     // simple heuristic
-    bool const is_use_recursion = (n > POTRF_RECURSION_SWITCH_SIZE(T));
-
+    // bool const is_use_recursion = (n > POTRF_RECURSION_SWITCH_SIZE(T));
+    bool const is_use_recursion = true;
     return is_use_recursion;
 };
 
@@ -551,6 +584,8 @@ void rocsolver_potrf_getMemorySize(const I n,
                                    size_t* p_size_iinfo,
                                    bool* optim_mem)
 {
+    auto ceildiv = [](I const n, I const nb) { return ((n <= 0) ? 0 : (n - 1) / nb + 1); };
+
     bool const use_recursion_potrf = use_recursion<T>(uplo, n);
     bool const use_iinfo = !use_recursion_potrf;
 
@@ -602,7 +637,10 @@ void rocsolver_potrf_getMemorySize(const I n,
             // reuse storage in work1 to
             // save the strictly lower or upper triangular part in work1
             // ----------------------------------------------------
-            size_t const size_save_A = sizeof(T) * (size_t(n) * (n - 1) / 2) * batch_count;
+            I const nb = potrf_get_NB<T>();
+            I const nblocks = ceildiv(n, nb);
+            size_t const size_triangle = sizeof(T) * ((size_t(nb) * (nb - 1)) / 2);
+            size_t const size_save_A = (nblocks * size_triangle) * batch_count;
             lsize_work1 += size_save_A;
         }
 
@@ -718,31 +756,31 @@ void rocsolver_potrf_getMemorySize(const I n,
     *p_size_iinfo = std::max(*p_size_iinfo, size_iinfo);
 }
 
-#if(0)
 template <bool BATCHED, typename T, typename I, typename UA, typename UC, typename S = decltype(std::real(T{}))>
-static inline rocblas_status potrf_syrk_org(rocblas_handle handle,
-                                            rocblas_fill const uplo,
-                                            rocblas_operation const trans,
+static inline rocblas_status potrf_syrk_gemm(rocblas_handle handle,
+                                             rocblas_fill const uplo,
+                                             rocblas_operation const trans,
 
-                                            I const n,
+                                             I const n,
 
-                                            I const k,
+                                             I const k,
 
-                                            S* alpha,
+                                             S* alpha,
 
-                                            UA A,
-                                            rocblas_stride const shiftA,
-                                            I const lda,
-                                            rocblas_stride const strideA,
+                                             UA A,
+                                             rocblas_stride const shiftA,
+                                             I const lda,
+                                             rocblas_stride const strideA,
 
-                                            S* beta,
+                                             S* beta,
 
-                                            UC C,
-                                            rocblas_stride const shiftC,
-                                            I const ldc,
-                                            rocblas_stride const strideC,
+                                             UC C,
+                                             rocblas_stride const shiftC,
+                                             I const ldc,
+                                             rocblas_stride const strideC,
 
-                                            I const batch_count)
+                                             I const batch_count,
+                                             bool const use_syrk = true)
 {
     rocblas_status istat = rocblas_status_success;
 
@@ -807,8 +845,7 @@ static inline rocblas_status potrf_syrk_org(rocblas_handle handle,
             batch_count, work);
     }
     return istat;
-}; // end potrf_syrk
-#endif
+}; // end potrf_syrk_gemm
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename UA, typename UB>
 static inline rocblas_status potrf_trsm(rocblas_handle handle,
@@ -1188,13 +1225,14 @@ static inline rocblas_status potrf_syrk(rocblas_handle handle,
             // -----------------
             // small matrix case
             // -----------------
-            istat = rocblasCall_syrk_herk<BATCHED, T>(handle, uplo, transA, n, k,
 
-                                                      alpha, A, shiftA, lda, strideA,
+            istat = potrf_syrk_gemm<BATCHED, T>(handle, uplo, transA, n, k,
 
-                                                      beta, C, shiftC, ldc, strideC,
+                                                alpha, A, shiftA, lda, strideA,
 
-                                                      batch_count);
+                                                beta, C, shiftC, ldc, strideC,
+
+                                                batch_count, use_syrk);
 
             return (istat);
         }
@@ -2025,6 +2063,8 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
         return rocblas_status_success;
     }
 
+    auto ceildiv = [](auto const n, auto const nb) { return ((n <= 0) ? 0 : (n - 1) / nb + 1); };
+
     bool const use_recursion_potrf = use_recursion<T>(uplo, n);
     void* work1 = work1_arg;
 
@@ -2034,6 +2074,8 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
 
     rocblas_status istat = rocblas_status_success;
+
+    I const nb = potrf_get_NB<T>();
     if(use_recursion_potrf)
     {
         T* save_A = nullptr;
@@ -2044,7 +2086,10 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
             // get scratch storage from work1
             // ------------------------------
             std::byte* pfree = reinterpret_cast<std::byte*>(work1_arg);
-            size_t const size_save_A = sizeof(T) * (size_t(n) * (n - 1) / 2) * batch_count;
+
+            I const nblocks = ceildiv(n, nb);
+            size_t const size_triangle = sizeof(T) * ((size_t(nb) * (nb - 1)) / 2);
+            size_t const size_save_A = (nblocks * size_triangle) * batch_count;
 
             save_A = reinterpret_cast<T*>(pfree);
             pfree += size_save_A;
@@ -2063,7 +2108,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
             // ---------------------------------------------------------------
             bool const is_copy_strictly_lower = (uplo == rocblas_fill_upper);
             bool const is_restore = false;
-            copy_strictly_triangular(stream, is_copy_strictly_lower, is_restore, n,
+            copy_strictly_triangular(stream, is_copy_strictly_lower, is_restore, n, nb,
 
                                      A, shiftA, lda, strideA,
 
@@ -2088,7 +2133,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
             bool const is_copy_strictly_lower = (uplo == rocblas_fill_upper);
             bool const is_restore = true;
 
-            copy_strictly_triangular(stream, is_copy_strictly_lower, is_restore, n,
+            copy_strictly_triangular(stream, is_copy_strictly_lower, is_restore, n, nb,
 
                                      A, shiftA, lda, strideA,
 
