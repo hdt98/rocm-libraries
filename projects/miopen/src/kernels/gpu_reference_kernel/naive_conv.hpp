@@ -26,66 +26,31 @@
 #ifndef MIOPEN_HIP_RUNTIME_COMPILE
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
-#include <hip/hip_bfloat16.h>
 #endif
+#include <hip/hip_bfloat16.h>
 
 #include "miopen_cstdint.hpp"
 #include "miopen_limits.hpp"
 
 #include "stride_array.hpp"
 
-// hcc seems need __device__ __host__ together to compile, and no extern "C"
-typedef union value_bf16_fp32_t
-{
-    uint u32;
-    ushort2 ushortx2;
-    ushort ushortvec[2];
-    float f32;
-} value_bf16_fp32_t;
-
-inline __device__ __host__ float convert_bf16_to_fp32(ushort src_val)
-{
-    value_bf16_fp32_t target_val;
-    target_val.ushortx2 = make_ushort2(0, src_val);
-    return target_val.f32;
-}
-
-inline __device__ __host__ ushort convert_fp32_to_bf16(float src_val)
-{
-    value_bf16_fp32_t target_val;
-    target_val.f32 = src_val;
-
-    if((~target_val.u32 & 0x7f800000) == 0) // Inf or NaN
-    {
-        if((target_val.u32 & 0xffff) != 0)
-        {
-            target_val.u32 |= 0x10000; // Preserve signaling NaN
-        }
-    }
-    else
-    {
-#ifdef MIOPEN_USE_RNE_BFLOAT16
-        target_val.u32 += (0x7fff + (target_val.ushortvec[1] & 1));
-#endif // MIOPEN_USE_RNE_BFLOAT16
-    }
-    return target_val.ushortvec[1];
-}
-
 template <typename src_data_t, typename dst_data_t, int use_tf32 = 0>
 inline __device__ __host__ dst_data_t cast_to(const src_data_t& val)
 {
     return static_cast<dst_data_t>(val);
 }
+// __hip_bfloat16 ↔ double
 template <>
-inline __device__ __host__ ushort cast_to(const double& val)
+inline __device__ __host__ __hip_bfloat16 cast_to(const double& val)
 {
-    return convert_fp32_to_bf16(static_cast<float>(val));
+    return __hip_bfloat16(static_cast<float>(val));
 }
 template <>
-inline __device__ __host__ double cast_to(const ushort& val)
+inline __device__ __host__ double cast_to(const __hip_bfloat16& val)
 {
-    return static_cast<double>(convert_bf16_to_fp32(val));
+    return static_cast<double>(static_cast<float>(val));
 }
+// half ↔ double
 template <>
 inline __device__ __host__ half cast_to(const double& val)
 {
@@ -96,16 +61,16 @@ inline __device__ __host__ double cast_to(const half& val)
 {
     return static_cast<double>(__half2float(val));
 }
-// bfloat16 (ushort) ↔ float
+// __hip_bfloat16 ↔ float
 template <>
-inline __device__ __host__ ushort cast_to(const float& val)
+inline __device__ __host__ __hip_bfloat16 cast_to(const float& val)
 {
-    return convert_fp32_to_bf16(val);
+    return __hip_bfloat16(val);
 }
 template <>
-inline __device__ __host__ float cast_to(const ushort& val)
+inline __device__ __host__ float cast_to(const __hip_bfloat16& val)
 {
-    return convert_bf16_to_fp32(val);
+    return static_cast<float>(val);
 }
 // half ↔ float
 template <>

@@ -186,7 +186,7 @@ std::string ConvDirectNaiveConvKernelName(const ProblemDescription& problem)
     }
     else if(IsInputBfp16(problem))
     {
-        kernel_name << "ushort_";
+        kernel_name << "__hip_bfloat16_";
     }
     else if(IsInputInt8(problem))
     {
@@ -212,7 +212,7 @@ std::string ConvDirectNaiveConvKernelName(const ProblemDescription& problem)
     else if(IsOutputFp16(problem))
         kernel_name << "half";
     else if(IsOutputBfp16(problem))
-        kernel_name << "ushort";
+        kernel_name << "__hip_bfloat16";
     else if(IsOutputInt8(problem))
         kernel_name << "int8_t";
     else if(IsOutputInt32(problem))
