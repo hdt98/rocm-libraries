@@ -135,6 +135,5 @@ jobs:
           sudo apt-get install -y libgtest-dev
           pip install invoke
           cd shared/stinkytofu
-          invoke build --no-python
-          cmake -B build -DENABLE_CLANG_TIDY=ON
-          cmake --build build --target tidy
+          invoke build
+          invoke tidy
