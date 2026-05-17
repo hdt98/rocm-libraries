@@ -132,8 +132,8 @@ jobs:
         if: steps.changes.outputs.stinkytofu == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           . .venv/bin/activate
-          sudo apt-get install -y libgtest-dev
-          pip install invoke
+          sudo apt-get install -y libgtest-dev python3-dev
           cd shared/stinkytofu
+          pip install -r requirements.txt
           invoke build
           invoke tidy
