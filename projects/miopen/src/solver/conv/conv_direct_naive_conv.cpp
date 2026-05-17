@@ -1052,18 +1052,22 @@ GetConv2DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
 
     size_t block_size = 256;
     size_t grid_size  = 1;
+    size_t thread_length = 1;
     if(problem.IsLayoutDefault())
     {
-        grid_size = static_cast<size_t>(n) * c;
+        grid_size     = static_cast<size_t>(n) * c;
+        thread_length = static_cast<size_t>(hi) * wi;
     }
     else if(problem.IsLayoutNHWC())
     {
-        grid_size = static_cast<size_t>(n) * hi;
+        grid_size     = static_cast<size_t>(n) * hi;
+        thread_length = static_cast<size_t>(wi) * c;
     }
     else
     {
         MIOPEN_THROW("Unsupported layout");
     }
+    size_t num_spatial_tiles = (thread_length + block_size - 1) / block_size;
 
     KernelInfo kernel;
 
@@ -1072,7 +1076,7 @@ GetConv2DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     kernel.g_wk.clear();
 
     kernel.g_wk.push_back(grid_size * block_size);
-    kernel.g_wk.push_back(1);
+    kernel.g_wk.push_back(num_spatial_tiles);
     kernel.g_wk.push_back(1);
     kernel.l_wk.clear();
     kernel.l_wk.push_back(block_size);
@@ -1202,18 +1206,22 @@ GetConv3DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
 
     size_t block_size = 256;
     size_t grid_size  = 1;
+    size_t thread_length = 1;
     if(problem.IsLayoutDefault())
     {
-        grid_size = static_cast<size_t>(n) * c;
+        grid_size     = static_cast<size_t>(n) * c;
+        thread_length = static_cast<size_t>(di) * hi * wi;
     }
     else if(problem.IsLayoutNHWC())
     {
-        grid_size = static_cast<size_t>(group) * n * di;
+        grid_size     = static_cast<size_t>(group) * n * di;
+        thread_length = static_cast<size_t>(hi) * wi * c_per_group;
     }
     else
     {
         MIOPEN_THROW("Unsupported layout");
     }
+    size_t num_spatial_tiles = (thread_length + block_size - 1) / block_size;
 
     KernelInfo kernel;
 
@@ -1222,7 +1230,7 @@ GetConv3DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     kernel.g_wk.clear();
 
     kernel.g_wk.push_back(grid_size * block_size);
-    kernel.g_wk.push_back(1);
+    kernel.g_wk.push_back(num_spatial_tiles);
     kernel.g_wk.push_back(1);
     kernel.l_wk.clear();
     kernel.l_wk.push_back(block_size);

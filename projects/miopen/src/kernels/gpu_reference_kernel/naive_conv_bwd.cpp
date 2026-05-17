@@ -32,8 +32,8 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
 {
     /*
      *  need to compute total input pixel: `group * n * c_per_group * hi * wi`.
-     *  to distribute this workload, let one workgroup compute `hi * wi` pixel,
-     *  hence need `group * n * c_per_group` workgroups (grid_size).
+     *  gridDim.x = group * n * c_per_group (channel slices)
+     *  gridDim.y = ceil(hi * wi / blockDim.x) (spatial tiles)
      */
     int k             = k_per_group * group;
     int c             = c_per_group * group;
@@ -66,7 +66,9 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
             static_cast<size_t>(in) * out_strides[4] + static_cast<size_t>(ig) * out_strides[3];
     }
 
-    for(int tid = threadIdx.x; tid < thread_length; tid += blockDim.x)
+    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
+              static_cast<int>(threadIdx.x);
+    if(tid < thread_length)
     {
         int ihi = tid / wi;
         int iwi = tid % wi;
@@ -167,11 +169,8 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
                                             int group)
 {
     /*
-     *  need to compute total input pixel: `group * n * c_per_group * di * hi *
-     * wi`.
-     *  to distribute this workload, let one workgroup compute `di * hi * wi`
-     * pixel,
-     *  hence need `group * n * c_per_group` workgroups (grid_size).
+     *  gridDim.x = group * n * c_per_group (channel slices)
+     *  gridDim.y = ceil(di * hi * wi / blockDim.x) (spatial tiles)
      */
     int k             = k_per_group * group;
     int c             = c_per_group * group;
@@ -205,7 +204,9 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
             static_cast<size_t>(in) * out_strides[5] + static_cast<size_t>(ig) * out_strides[4];
     }
 
-    for(int tid = threadIdx.x; tid < thread_length; tid += blockDim.x)
+    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
+              static_cast<int>(threadIdx.x);
+    if(tid < thread_length)
     {
         int iwi = tid % wi;
         int ihi = (tid / wi) % hi;
@@ -315,10 +316,8 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
                                            int group)
 {
     /*
-     *  need to compute total input pixel: `group * n * hi * wi * c_per_group`.
-     *  to distribute this workload, let one workgroup compute `wi *
-     *  group * c_per_group` pixel,
-     *  hence need `n * hi` workgroups (grid_size).
+     *  gridDim.x = n * hi (row slices)
+     *  gridDim.y = ceil(wi * c / blockDim.x) (spatial tiles within each row)
      */
     int k             = k_per_group * group;
     int c             = c_per_group * group;
@@ -340,7 +339,9 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
         p_out += static_cast<size_t>(in) * out_strides[4];
     }
 
-    for(int tid = threadIdx.x; tid < thread_length; tid += blockDim.x)
+    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
+              static_cast<int>(threadIdx.x);
+    if(tid < thread_length)
     {
         // We want to compute
         //      iwi = tid / c
@@ -459,11 +460,8 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
 {
 
     /*
-     *  need to compute total input pixel: `group * n * di * hi * wi *
-     * c_per_group`.
-     *  to distribute this workload, let one workgroup compute `hi * wi *
-     * c_per_group` pixel,
-     *  hence need `group * n * di` workgroups (grid_size).
+     *  gridDim.x = group * n * di (depth/batch/group slices)
+     *  gridDim.y = ceil(hi * wi * c_per_group / blockDim.x) (spatial tiles)
      */
     int k             = k_per_group * group;
     int c             = c_per_group * group;
@@ -494,7 +492,9 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
             static_cast<size_t>(in) * out_strides[5] + static_cast<size_t>(ig) * out_strides[1];
     }
 
-    for(int tid = threadIdx.x; tid < thread_length; tid += blockDim.x)
+    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
+              static_cast<int>(threadIdx.x);
+    if(tid < thread_length)
     {
         int ic  = tid % c_per_group;
         int iwi = (tid / c_per_group) % wi;
