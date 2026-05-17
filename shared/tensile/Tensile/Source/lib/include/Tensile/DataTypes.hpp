@@ -42,6 +42,10 @@
 #include <Tensile/DataTypes_Int8x4.hpp>
 #include <Tensile/DataTypes_XFloat32.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -227,3 +231,5 @@ namespace Tensile
  * @}
  */
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

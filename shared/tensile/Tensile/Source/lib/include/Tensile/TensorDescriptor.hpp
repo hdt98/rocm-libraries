@@ -40,6 +40,8 @@
 #include <Tensile/Macros.hpp>
 #include <Tensile/Utils.hpp>
 
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     template <typename SizeIter>
@@ -439,3 +441,5 @@ namespace Tensile
     }
 
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

@@ -31,6 +31,10 @@
 
 #include <Tensile/Singleton.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -105,3 +109,5 @@ namespace Tensile
         Debug();
     };
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

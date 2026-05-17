@@ -26,7 +26,13 @@
 
 #pragma once
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     class TensorOp;
 }
+
+TENSILE_HIDDEN_END

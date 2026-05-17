@@ -31,6 +31,10 @@
 
 #include <Tensile/MasterSolutionLibrary.hpp>
 #include <Tensile/PlaceholderLibrary.hpp>
+
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
 //Replace std::regex, as it crashes when matching long lines(GCC Bug #86164).
 #ifdef WIN32
 #include "shlwapi.h"
@@ -92,3 +96,5 @@ namespace Tensile
 
     } // namespace Serialization
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

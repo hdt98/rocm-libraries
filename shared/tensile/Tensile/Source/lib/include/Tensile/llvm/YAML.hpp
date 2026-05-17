@@ -33,6 +33,10 @@
 
 #include <cstddef>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace llvm
 {
     namespace yaml
@@ -308,3 +312,5 @@ namespace llvm
             "fdsa");
     } // namespace yaml
 } // namespace llvm
+
+TENSILE_HIDDEN_END

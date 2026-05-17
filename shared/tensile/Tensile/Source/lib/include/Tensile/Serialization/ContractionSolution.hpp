@@ -31,6 +31,10 @@
 #include <Tensile/ContractionSolution.hpp>
 #include <Tensile/Serialization/Base.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     namespace Serialization
@@ -160,3 +164,5 @@ namespace Tensile
         };
     } // namespace Serialization
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

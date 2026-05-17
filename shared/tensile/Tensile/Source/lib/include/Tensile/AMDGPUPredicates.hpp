@@ -31,6 +31,10 @@
 
 #include <vector>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     namespace Predicates
@@ -154,3 +158,5 @@ namespace Tensile
  */
     } // namespace Predicates
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

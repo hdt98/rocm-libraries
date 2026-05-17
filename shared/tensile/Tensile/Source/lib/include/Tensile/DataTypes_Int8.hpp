@@ -32,6 +32,10 @@
 
 #include <Tensile/DistinctType.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -49,3 +53,5 @@ namespace std
         return stream << static_cast<int32_t>(val);
     }
 } // namespace std
+
+TENSILE_HIDDEN_END

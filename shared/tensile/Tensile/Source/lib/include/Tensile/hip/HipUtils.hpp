@@ -34,6 +34,10 @@
 #include <Tensile/TensorDescriptor.hpp>
 #include <Tensile/Utils.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 #define HIP_CHECK_EXC(expr)                                                                       \
     do                                                                                            \
     {                                                                                             \
@@ -133,3 +137,5 @@ namespace Tensile
         }
     } // namespace hip
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

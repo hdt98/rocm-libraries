@@ -26,8 +26,14 @@
 
 #pragma once
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     class ContractionSolution;
     struct SizeMapping;
 }
+
+TENSILE_HIDDEN_END

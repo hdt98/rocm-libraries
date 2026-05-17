@@ -50,6 +50,10 @@ namespace tensile_hip_f8_impl
 
 #include "hip_f8_impl.h"
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 //  Naming convension of datatype in hip header file
 //      float8: fp8
 //      bfloat8: bf8
@@ -669,3 +673,5 @@ namespace std
     }
 
 } // namespace std
+
+TENSILE_HIDDEN_END

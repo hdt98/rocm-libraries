@@ -32,6 +32,10 @@
 
 #include <Tensile/SolutionLibrary.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     template <typename MyProblem, typename MySolution>
@@ -43,3 +47,5 @@ namespace Tensile
     std::shared_ptr<SolutionLibrary<MyProblem, MySolution>>
         MessagePackLoadLibraryData(std::vector<uint8_t> const& data);
 }
+
+TENSILE_HIDDEN_END

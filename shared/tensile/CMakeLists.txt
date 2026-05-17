@@ -130,8 +130,6 @@ if(TENSILE_ENABLE_HOST)
 
   target_compile_definitions(tensile-host PUBLIC TENSILE_USE_HIP __HIP_HCC_COMPAT_MODE__=1)
 
-  target_compile_definitions(tensile-host PRIVATE TENSILE_STATIC_ONLY)
-
   if(TENSILE_ENABLE_ASAN)
       target_compile_options(tensile-host PRIVATE -fsanitize=address -shared-libasan)
       target_link_options(tensile-host PRIVATE -fsanitize=address -shared-libasan -fuse-ld=lld)
@@ -208,13 +206,11 @@ if(TENSILE_ENABLE_CLIENT)
       BOOST_ALL_NO_LIB
       BOOST_PROGRAM_OPTIONS_DYN_LINK
       __HIP_HCC_COMPAT_MODE__=1
-      TENSILE_STATIC_ONLY
   )
 
   add_executable(tensile-client)
   target_link_libraries(tensile-client PRIVATE tensile::client-lib roc::tensile-host hip::device)
   target_include_directories(tensile-client PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/Source/client/include")
-  target_compile_definitions(tensile-client PRIVATE TENSILE_STATIC_ONLY)
 
   add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Tensile/Source/client")
 endif()

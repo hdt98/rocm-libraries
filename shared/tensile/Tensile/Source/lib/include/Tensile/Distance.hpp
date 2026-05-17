@@ -28,6 +28,10 @@
 
 #include <cmath>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     namespace Matching
@@ -399,3 +403,5 @@ namespace Tensile
 
     } // namespace Matching
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

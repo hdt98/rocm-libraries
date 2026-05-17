@@ -26,6 +26,10 @@
 
 #pragma once
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     enum class DataType : int;
@@ -33,3 +37,5 @@ namespace Tensile
     class TensorDescriptor;
 
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

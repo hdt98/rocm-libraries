@@ -40,6 +40,10 @@
 #include <Tensile/Task.hpp>
 #include <Tensile/Utils.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     struct PerfModel
@@ -364,3 +368,5 @@ namespace Tensile
                              ContractionSolution::ProjectedPerformance const& spm);
     std::ostream& operator<<(std::ostream& stream, BufferLoadCheckPacket const& st);
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

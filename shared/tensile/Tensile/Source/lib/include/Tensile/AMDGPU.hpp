@@ -29,6 +29,10 @@
 #include <Tensile/Tensile.hpp>
 #include <cstdlib>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -374,3 +378,5 @@ namespace Tensile
     TENSILE_API std::ostream& operator<<(std::ostream& stream, AMDGPU::Processor p);
     TENSILE_API std::ostream& operator<<(std::ostream& stream, AMDGPU g);
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

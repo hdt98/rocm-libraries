@@ -26,6 +26,10 @@
 
 #pragma once
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -75,3 +79,5 @@ namespace Tensile
 
     static_assert(sizeof(Int8x4) == 4, "Int8x4 must be 4 bytes.");
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

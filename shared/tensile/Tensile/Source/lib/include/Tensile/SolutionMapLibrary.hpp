@@ -28,6 +28,10 @@
 
 #include <SolutionLibrary.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     template <typename MyProblem, typename MySolution, typename>
@@ -35,3 +39,5 @@ namespace Tensile
     {
     };
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

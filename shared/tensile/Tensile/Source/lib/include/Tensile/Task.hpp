@@ -30,6 +30,10 @@
 #include <Tensile/ContractionProblem_fwd.hpp>
 #include <Tensile/ContractionSolution_fwd.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     struct Task
@@ -47,3 +51,5 @@ namespace Tensile
         ContractionSolution const& solution;
     };
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

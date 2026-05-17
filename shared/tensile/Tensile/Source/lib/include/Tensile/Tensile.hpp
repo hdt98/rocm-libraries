@@ -41,6 +41,8 @@
 #include <Tensile/KernelArguments.hpp>
 #include <Tensile/geom.hpp>
 
+TENSILE_HIDDEN_BEGIN
+
 /**
  * \mainpage
  *
@@ -200,3 +202,5 @@ namespace Tensile
 } // namespace Tensile
 
 /** @} */
+
+TENSILE_HIDDEN_END

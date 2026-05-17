@@ -26,6 +26,10 @@
 
 #pragma once
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
 
@@ -40,3 +44,5 @@ namespace Tensile
               typename Beta  = D>
     struct TypedContractionInputs;
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

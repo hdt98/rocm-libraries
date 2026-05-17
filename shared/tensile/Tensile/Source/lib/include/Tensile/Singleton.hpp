@@ -28,6 +28,10 @@
 
 #include <mutex>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     template <typename Class>
@@ -44,3 +48,5 @@ namespace Tensile
     private:
     };
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

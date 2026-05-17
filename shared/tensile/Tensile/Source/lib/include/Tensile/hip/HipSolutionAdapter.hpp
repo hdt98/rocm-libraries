@@ -33,6 +33,10 @@
 
 #include <mutex>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     namespace hip
@@ -104,3 +108,5 @@ namespace Tensile
         std::ostream& operator<<(std::ostream& stream, std::shared_ptr<SolutionAdapter> const& ptr);
     } // namespace hip
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

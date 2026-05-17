@@ -31,6 +31,10 @@
 
 #include <Tensile/Utils.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -195,3 +199,5 @@ namespace Tensile
  * @brief Individual Property classes
  */
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

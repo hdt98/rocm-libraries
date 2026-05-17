@@ -27,6 +27,10 @@
 #ifndef _HIP_FLOAT8_IMPL_H_
 #define _HIP_FLOAT8_IMPL_H_
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace tensile_hip_f8_impl
 {
     __host__ inline int clz(uint32_t x)
@@ -379,5 +383,7 @@ uint8_t cast_to_f8_no_range_reduce(T _x, bool stoch = false, uint32_t rng = 0) {
     }
 
 } // namespace tensile_hip_f8_impl
+
+TENSILE_HIDDEN_END
 
 #endif // _HIP_FLOAT8_IMPL_H_

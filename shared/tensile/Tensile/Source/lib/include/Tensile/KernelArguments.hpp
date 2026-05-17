@@ -35,6 +35,8 @@
 #include <Tensile/DataTypes.hpp>
 #include <Tensile/Macros.hpp>
 
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
 
@@ -258,3 +260,5 @@ namespace Tensile
         return *reinterpret_cast<T*>(const_cast<void*>(m_value.first));
     }
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

@@ -26,6 +26,10 @@
 
 #pragma once
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     class Problem;
@@ -36,3 +40,5 @@ namespace Tensile
     class Solution;
     class SolutionAdapter;
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

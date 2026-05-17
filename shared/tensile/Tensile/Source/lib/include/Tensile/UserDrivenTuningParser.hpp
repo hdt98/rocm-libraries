@@ -31,6 +31,10 @@
 #include <string>
 #include <vector>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     template <typename MyProblem>
@@ -227,3 +231,5 @@ namespace std
         }
     };
 } // namespace std
+
+TENSILE_HIDDEN_END

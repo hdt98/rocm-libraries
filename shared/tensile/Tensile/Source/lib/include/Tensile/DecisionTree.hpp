@@ -33,6 +33,10 @@
 #include <Tensile/MLFeatures.hpp>
 #include <Tensile/ProblemKey.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -354,3 +358,5 @@ namespace Tensile
         };
     } // namespace DecisionTree
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

@@ -40,6 +40,10 @@
 #include <Tensile/Properties.hpp>
 #include <Tensile/Utils.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -901,3 +905,5 @@ namespace Tensile
         };
     } // namespace Matching
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

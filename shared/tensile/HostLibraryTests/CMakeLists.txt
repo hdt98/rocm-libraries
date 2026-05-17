@@ -133,6 +133,4 @@ if(TENSILE_ENABLE_HIP)
   endforeach()
 endif()
 
-target_compile_definitions(tensile-tests PRIVATE TENSILE_STATIC_ONLY)
-
 gtest_discover_tests(tensile-tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 60)

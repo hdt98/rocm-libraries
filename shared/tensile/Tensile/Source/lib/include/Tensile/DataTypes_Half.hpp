@@ -32,6 +32,10 @@
 
 #include <Tensile/DistinctType.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
 #if defined(TENSILE_USE_HIP) || defined(TENSILE_USE_FLOAT16_BUILTIN)
@@ -57,3 +61,5 @@ namespace std
         return stream << static_cast<float>(val);
     }
 } // namespace std
+
+TENSILE_HIDDEN_END

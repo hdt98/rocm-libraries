@@ -31,6 +31,10 @@
 
 #include <Tensile/PropertyMatching.hpp>
 
+#include <Tensile/Macros.hpp>
+
+TENSILE_HIDDEN_BEGIN
+
 namespace Tensile
 {
     /**
@@ -134,3 +138,5 @@ namespace Tensile
         }
     };
 } // namespace Tensile
+
+TENSILE_HIDDEN_END

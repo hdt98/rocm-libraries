@@ -68,7 +68,6 @@ target_link_libraries(test_kernels_lite PRIVATE roc::tensile-host hip::device)
 target_compile_definitions(test_kernels_lite
   PRIVATE
     __HIP_HCC_COMPAT_MODE__=1
-    TENSILE_STATIC_ONLY
 )
 
 add_library(test_kernels_lite2 STATIC
@@ -77,7 +76,6 @@ target_link_libraries(test_kernels_lite2 PRIVATE roc::tensile-host hip::device)
 target_compile_definitions(test_kernels_lite2
   PRIVATE
     __HIP_HCC_COMPAT_MODE__=1
-    TENSILE_STATIC_ONLY
 )
 
 add_library(test_kernels_lite_mixed STATIC
@@ -86,7 +84,6 @@ target_link_libraries(test_kernels_lite_mixed PRIVATE roc::tensile-host hip::dev
 target_compile_definitions(test_kernels_lite_mixed
   PRIVATE
     __HIP_HCC_COMPAT_MODE__=1
-    TENSILE_STATIC_ONLY
 )
 
 add_library(test_tile_aware_selection STATIC
@@ -95,5 +92,4 @@ target_link_libraries(test_tile_aware_selection PRIVATE roc::tensile-host hip::d
 target_compile_definitions(test_tile_aware_selection
   PRIVATE
     __HIP_HCC_COMPAT_MODE__=1
-    TENSILE_STATIC_ONLY
 )
