@@ -163,7 +163,7 @@ struct BlockMXGemmASmemBRegCReg
             constexpr auto k_iter    = ikpack * KXdlPack + ikxdl;
             constexpr auto APackIter = ikxdl * MXdlPack + imxdl;
 
-            WarpGemm{}.template operator()<APackIter, ikxdl * NXdlPack + inxdl>(
+            WarpGemm{}.template operator()<OpSelA<APackIter>, OpSelB<ikxdl * NXdlPack + inxdl>>(
                 c_warp_tensors(number<m_iter>{})(number<n_iter>{}),
                 preloaded_a_warp_tensor(number<APackIter>{}),
                 bit_cast<typename WarpGemm::BWarpTensor>(

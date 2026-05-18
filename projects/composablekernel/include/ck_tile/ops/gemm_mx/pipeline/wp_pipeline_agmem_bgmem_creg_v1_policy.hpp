@@ -388,6 +388,13 @@ struct MXGemmPipelineAgBgCrPolicy
     FORWARD_METHOD_(GetSmemSize);
 
 #undef FORWARD_METHOD_
+
+    // A is always RowMajor and B is preshuffled: no transpose-load needed.
+    template <typename Problem>
+    static constexpr bool is_a_load_tr = false;
+
+    template <typename Problem>
+    static constexpr bool is_b_load_tr = false;
 };
 
 } // namespace ck_tile

@@ -56,6 +56,7 @@ float mx_gemm_calc(const MXGemmHostArgs<ScaleM, ScaleN>& args, const ck_tile::st
                                               ck_tile::element_wise::PassThrough,
                                               ck_tile::element_wise::PassThrough,
                                               ADataType,
+                                              ADataType,
                                               false,
                                               1,
                                               1>;
@@ -70,27 +71,29 @@ float mx_gemm_calc(const MXGemmHostArgs<ScaleM, ScaleN>& args, const ck_tile::st
                                                    GemmConfig::TileParitionerGroupNum,
                                                    GemmConfig::TileParitionerM01>;
 
-    using GemmEpilogueProblem =
-        ck_tile::CShuffleEpilogueProblem<ComputeDataType,
-                                         ComputeDataType,
-                                         ck_tile::tuple<>,
-                                         AccDataType,
-                                         CDataType,
-                                         ck_tile::tuple<>,
-                                         CLayout,
-                                         ck_tile::element_wise::PassThrough,
-                                         TilePartitioner::MPerBlock,
-                                         TilePartitioner::NPerBlock,
-                                         GemmConfig::M_Warp,
-                                         GemmConfig::N_Warp,
-                                         GemmConfig::M_Warp_Tile,
-                                         GemmConfig::N_Warp_Tile,
-                                         GemmConfig::K_Warp_Tile,
-                                         MXPipelineProblem::TransposeC,
-                                         GemmConfig::NumWaveGroups,
-                                         false,
-                                         1,
-                                         ck_tile::MXEpilogueTraits<GemmConfig>::BlockedXDLNPerWarp>;
+    constexpr ck_tile::index_t kBlockedXDLNPerWarp =
+        ck_tile::MXEpilogueTraits<GemmConfig>::BlockedXDLNPerWarp;
+
+    using GemmEpilogueProblem = ck_tile::CShuffleEpilogueProblem<ComputeDataType,
+                                                                 ComputeDataType,
+                                                                 ck_tile::tuple<>,
+                                                                 AccDataType,
+                                                                 CDataType,
+                                                                 ck_tile::tuple<>,
+                                                                 CLayout,
+                                                                 ck_tile::element_wise::PassThrough,
+                                                                 TilePartitioner::MPerBlock,
+                                                                 TilePartitioner::NPerBlock,
+                                                                 GemmConfig::M_Warp,
+                                                                 GemmConfig::N_Warp,
+                                                                 GemmConfig::M_Warp_Tile,
+                                                                 GemmConfig::N_Warp_Tile,
+                                                                 GemmConfig::K_Warp_Tile,
+                                                                 MXPipelineProblem::TransposeC,
+                                                                 GemmConfig::NumWaveGroups,
+                                                                 false,
+                                                                 1,
+                                                                 kBlockedXDLNPerWarp>;
 
     using GemmEpilogue = ck_tile::CShuffleEpilogue<GemmEpilogueProblem>;
 

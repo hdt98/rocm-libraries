@@ -392,11 +392,12 @@ struct BlockGemmARegBRegCRegV1
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
 
                         // warp GEMM with MX scaling using pre-packed scale and OpSel
-                        WarpGemm{}.template operator()<kOpSelA, kOpSelB>(c_warp_tensor,
-                                                                         a_warp_tensor,
-                                                                         b_warp_tensor,
-                                                                         a_scale_packed,
-                                                                         b_scale_packed);
+                        WarpGemm{}.template operator()<OpSelA<kOpSelA>, OpSelB<kOpSelB>>(
+                            c_warp_tensor,
+                            a_warp_tensor,
+                            b_warp_tensor,
+                            a_scale_packed,
+                            b_scale_packed);
 
                         // write C warp tensor into C block tensor
                         c_block_tensor.set_y_sliced_thread_data(
