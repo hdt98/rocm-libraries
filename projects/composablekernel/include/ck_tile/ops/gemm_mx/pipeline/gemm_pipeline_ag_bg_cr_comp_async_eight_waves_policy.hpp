@@ -19,15 +19,19 @@ struct MXGemmPipelineAgBgCrCompAsyncEightWavesPolicy
     // MX scaling configuration: each e8m0 scale covers 32 elements in K
     static constexpr int BlockScaleSize = 32;
 
-    using ALayout         = remove_cvref_t<typename Problem::ALayout>;
-    using BLayout         = remove_cvref_t<typename Problem::BLayout>;
-    using ADataType       = remove_cvref_t<typename Problem::ADataType>;
-    using BDataType       = remove_cvref_t<typename Problem::BDataType>;
-    using CDataType       = remove_cvref_t<typename Problem::CDataType>;
-    using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
+    using ALayout          = remove_cvref_t<typename Problem::ALayout>;
+    using BLayout          = remove_cvref_t<typename Problem::BLayout>;
+    using ADataType        = remove_cvref_t<typename Problem::ADataType>;
+    using BDataType        = remove_cvref_t<typename Problem::BDataType>;
+    using CDataType        = remove_cvref_t<typename Problem::CDataType>;
+    using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
+    using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
+    using ComputeDataType  = AComputeDataType;
     static_assert(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::RowMajor>, "Wrong!");
     static_assert(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::ColumnMajor>, "Wrong!");
-    static_assert(is_any_of<ComputeDataType, fp8_t, bf8_t, pk_fp4_t>::value);
+    static_assert(is_any_of<AComputeDataType, fp8_t, bf8_t, pk_fp4_t>::value);
+    static_assert(is_any_of<BComputeDataType, fp8_t, bf8_t, pk_fp4_t>::value);
+    static_assert(std::is_same_v<AComputeDataType, BComputeDataType>);
     static_assert(std::is_same_v<CDataType, float>);
 
     using BlockGemmShape = typename Problem::BlockGemmShape;

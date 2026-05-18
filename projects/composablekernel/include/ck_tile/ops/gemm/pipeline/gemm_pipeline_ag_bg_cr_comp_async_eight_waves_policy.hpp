@@ -28,17 +28,15 @@ struct GemmPipelineAgBgCrCompAsyncEightWavesPolicy
     using CDataType        = remove_cvref_t<typename Problem::CDataType>;
     using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
     using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
-    using ComputeDataType  = typename AComputeDataType;
+    using ComputeDataType  = AComputeDataType;
     static_assert(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::RowMajor>,
                   "ALayout must be RowMajor!");
     static_assert(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::ColumnMajor>,
                   "BLayout must be ColumnMajor!");
-    static_assert(is_any_of<AComputeDataType, fp8_t, bf8_t, pk_fp4_t>);
-    static_assert(is_any_of<BComputeDataType, fp8_t, bf8_t, pk_fp4_t>);
+    static_assert(is_any_of<AComputeDataType, fp8_t, bf8_t, pk_fp4_t>::value);
+    static_assert(is_any_of<BComputeDataType, fp8_t, bf8_t, pk_fp4_t>::value);
     static_assert(std::is_same_v<AComputeDataType, BComputeDataType>);
     static_assert(std::is_same_v<CDataType, float>);
-
-    using ComputeDataType = typename AComputeDataType;
 
     static constexpr auto WGAccess   = std::is_same_v<ComputeDataType, fp8_t>
                                            ? WGAttrNumAccessEnum::Double
