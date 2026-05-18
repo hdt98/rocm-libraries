@@ -105,6 +105,85 @@ def memCompress(obj):
 def memDecompress(byt):
     return pickle.loads(zlib.decompress(byt))
 
+def _runtime_dat_basename(libraryName, libraryFormat):
+    return os.path.basename(LibraryIO.formatFilename(libraryName, libraryFormat))
+
+def _runtime_solution_name(sol, *, datName=False):
+    if datName:
+        value = getattr(sol, "name", "")
+        if value:
+            return value
+    value = getattr(sol, "kernelName", "")
+    if value:
+        return value
+    value = getattr(sol, "name", "")
+    if value:
+        return value
+    try:
+        state = sol.originalSolution._state
+        return state.get("KernelNameMin") or state.get("SolutionNameMin") or ""
+    except Exception:
+        return ""
+
+def _asm_solution_name(sol):
+    try:
+        state = sol.originalSolution._state
+        return state.get("SolutionNameMin") or state.get("KernelNameMin") or ""
+    except Exception:
+        return ""
+
+def _write_runtime_solution_map(masterLibraries, archs, libraryFormat, splitGSU, outputPath, lazyLibraryLoading):
+    """Write authoritative runtime-index -> asm_full solution metadata.
+
+    This is intentionally generated in the same process that assigns runtime
+    ``sol.index`` and writes ``TensileLibrary_*.dat``.  Post-build consumers
+    should use this map instead of trying to reinterpret MatchTable keys.
+    """
+    entries = {}
+
+    def recordSolution(archName, libraryName, sol):
+        runtimeIndex = getattr(sol, "index", None)
+        if runtimeIndex is None:
+            return
+        srcName = getattr(sol, "srcName", "") or ""
+        libraryLogicIndex = getattr(sol, "libraryLogicIndex", None)
+        runtimeName = _runtime_solution_name(sol, datName=False)
+        runtimeDatName = _runtime_solution_name(sol, datName=True)
+        asmName = _asm_solution_name(sol)
+        entries[int(runtimeIndex)] = {
+            "runtime_index": int(runtimeIndex),
+            "runtime_dat": _runtime_dat_basename(libraryName, libraryFormat),
+            "runtime_name": runtimeName,
+            "runtime_dat_name": runtimeDatName,
+            "asm_full_path": srcName,
+            "asm_solution_index": int(libraryLogicIndex) if libraryLogicIndex is not None else None,
+            "asm_solution_name": asmName,
+            "arch": archName,
+            "match_method": "tensile_create_library_origin",
+        }
+
+    for archName, masterLibrary in masterLibraries.items():
+        if archName not in archs:
+            continue
+        if len(masterLibrary.solutions):
+            libraryName = ("TensileLibrary_lazy_" if lazyLibraryLoading else "TensileLibrary_") + archName
+            masterLibrary.applyNaming(splitGSU)
+            for _, sol in masterLibrary.solutions.items():
+                recordSolution(archName, libraryName, sol)
+        for name, lib in masterLibrary.lazyLibraries.items():
+            lib.applyNaming(splitGSU)
+            for _, sol in lib.solutions.items():
+                recordSolution(archName, name, sol)
+
+    payload = {
+        "version": 1,
+        "entries": dict(sorted(entries.items())),
+        "stats": {
+            "entries": len(entries),
+        },
+    }
+    LibraryIO.write(os.path.join(outputPath, "RuntimeSolutionMap"), payload, "yaml")
+
 def processKernelSource(kernelWriterAssembly, data, outOptions, splitGSU, kernel, compress = False) -> KernelCodeGenResult:
     """
     Generate source for a single kernel.
@@ -883,6 +962,14 @@ def run():
     LibraryIO.write(filename, libraryMapping, "msgpack")
 
     start_msl = timer()
+    _write_runtime_solution_map(
+        masterLibraries,
+        archs,
+        arguments["LibraryFormat"],
+        splitGSU,
+        outputPath,
+        arguments["LazyLibraryLoading"],
+    )
     for archName, newMasterLibrary in masterLibraries.items():
         if archName in archs:
             if arguments["LazyLibraryLoading"]:
