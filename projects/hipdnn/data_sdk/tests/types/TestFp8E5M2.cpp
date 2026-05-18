@@ -280,11 +280,15 @@ TEST(TestFp8E5M2, RoundTripAllPatterns)
             continue;
         }
 
-        // Inf patterns (exp=31, mant=0): decode-only check.
+        // Inf patterns (exp=31, mant=0): decode to Inf, re-encode saturates to MAX/LOWEST.
         if((pattern & 0x7F) == 0x7C)
         {
             EXPECT_TRUE(std::isinf(f))
                 << "Pattern 0x" << std::hex << bits << " should decode to Inf";
+            const uint8_t expectedSaturated = std::signbit(f) ? 0xFB : 0x7B;
+            EXPECT_EQ(fp8_e5m2(f).data, expectedSaturated)
+                << "Inf at 0x" << std::hex << bits << " should saturate to 0x"
+                << static_cast<int>(expectedSaturated);
             continue;
         }
 
