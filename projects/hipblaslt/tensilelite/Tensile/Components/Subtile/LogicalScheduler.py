@@ -2342,7 +2342,11 @@ class LogicalScheduler:
         module.add(endLabel)
 
         # ── TailLoop ──
-        hasTailLoop = True#not kernel["NoTailLoop"]
+        # Gate on kernel["NoTailLoop"]: existing subtile solutions set this True
+        # (since Solution.py forces K%DepthU==0 for subtile), so the template
+        # tail-loop emit is currently a no-op for in-tree tests. Phase 1+ will
+        # introduce solutions where NoTailLoop=False and exercise this path.
+        hasTailLoop = not kernel["NoTailLoop"]
         tailEndLabel = Label("TailLoopEnd", "")
         if hasTailLoop:
             module.addComment0(f"TAILLOOP")
