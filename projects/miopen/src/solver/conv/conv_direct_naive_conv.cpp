@@ -1146,6 +1146,9 @@ GetConv2DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     {
         MIOPEN_THROW("Unsupported layout");
     }
+    // BWD-d kernel uses a single if(tid < thread_length) guard with no loop,
+    // so tiling is required for correctness — unlike FWD which has a grid-stride
+    // loop and only tiles for occupancy.
     size_t num_spatial_tiles = (thread_length + block_size - 1) / block_size;
 
     KernelInfo kernel;
@@ -1300,6 +1303,9 @@ GetConv3DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     {
         MIOPEN_THROW("Unsupported layout");
     }
+    // BWD-d kernel uses a single if(tid < thread_length) guard with no loop,
+    // so tiling is required for correctness — unlike FWD which has a grid-stride
+    // loop and only tiles for occupancy.
     size_t num_spatial_tiles = (thread_length + block_size - 1) / block_size;
 
     KernelInfo kernel;
