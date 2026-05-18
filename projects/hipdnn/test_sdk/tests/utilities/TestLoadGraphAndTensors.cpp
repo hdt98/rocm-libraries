@@ -65,6 +65,19 @@ TEST(TestFillTensorFromFile, Valid)
     }
 }
 
+TEST(TestFillTensorFromFile, SizeMismatch)
+{
+    const std::filesystem::path filename = "SizeMismatchTensor.bin";
+    const ScopedExecute fileDeleter([filename]() { std::filesystem::remove(filename); });
+
+    // Write 3 ints to file but create a tensor expecting 4
+    const std::vector<int> values{0, 1, 2};
+    writeVectorToFile(filename, values);
+
+    Tensor<int> tensor({4});
+    EXPECT_THROW(fillTensorFromFile(tensor, filename), std::runtime_error);
+}
+
 #ifndef HIPDNN_FLATBUFFERS_SDK_SKIP_JSON_LIB
 
 TEST(TestLoadGraphAndTensors, Valid)
