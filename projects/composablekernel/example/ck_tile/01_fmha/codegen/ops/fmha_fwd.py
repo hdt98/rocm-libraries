@@ -1400,7 +1400,6 @@ class KernelComponentFactoryGfx125(CompatibilityRuleFactory):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
         return pipelines
 
-
 class CustomFactory(KernelComponentFactoryGfx9, CompatibilityRuleFactoryGfx9):
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
