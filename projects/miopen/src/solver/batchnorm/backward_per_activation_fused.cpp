@@ -128,7 +128,7 @@ ConvSolution BnBwdTrgActivationFused::GetSolution(const FusionContext& context,
         }
         else
         {
-            auto segment = int(std::ceil(double(in_cstride) / double(ylocalsize)));
+            auto segment = int{std::ceil(double(in_cstride) / double(ylocalsize))};
             xgridsize    = c;
             ygridsize    = segment * ylocalsize;
         }

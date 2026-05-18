@@ -329,7 +329,7 @@ static inline T
 linear_to_offset(size_t li, const std::vector<T>& lens, const std::vector<T>& strides)
 {
     T off = 0;
-    for(int d = int(lens.size()) - 1; d >= 0; --d)
+    for(int d = int{lens.size()} - 1; d >= 0; --d)
     {
         const T idx = li % lens[d];
         li /= lens[d];
@@ -492,7 +492,7 @@ std::tuple<tensor<Tref>, tensor<int>> reduce_cpu_common(const miopenReduceTensor
             partial.emplace_back(nanOpt, reduceOp, zeroV, withIdx);
 
         auto worker = [&](int p) {
-            const std::size_t begin = std::size_t(p) * chunk;
+            const std::size_t begin = std::size_t{p} * chunk;
             const std::size_t end   = std::min(begin + chunk, N);
 
             auto& r = partial[p];
@@ -551,7 +551,7 @@ std::tuple<tensor<Tref>, tensor<int>> reduce_cpu_common(const miopenReduceTensor
         const std::size_t chunk = (INV + Te - 1) / Te;
 
         auto worker = [&](int t) {
-            const std::size_t row0 = std::size_t(t) * chunk;
+            const std::size_t row0 = std::size_t{t} * chunk;
             const std::size_t row1 = std::min(row0 + chunk, INV);
 
             for(std::size_t r = row0; r < row1; ++r)

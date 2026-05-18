@@ -189,8 +189,8 @@ void PoolingDescriptor::GetForwardOutputDimNd(const TensorDescriptor& xDesc,
     assert(std::all_of(padd.begin(), padd.end(), [](int s) { return s >= 0; }));
 
     auto in_itr = input_dim.begin();
-    out_dim.push_back(int(*(in_itr++))); // n
-    out_dim.push_back(int(*(in_itr++))); // c
+    out_dim.push_back(int{*(in_itr++)}); // n
+    out_dim.push_back(int{*(in_itr++)}); // c
 
     auto str_itr = strs.begin();
     auto pad_itr = padd.begin();

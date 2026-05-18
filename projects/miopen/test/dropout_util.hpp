@@ -51,7 +51,7 @@ inline void InitKernelStateEmulator(std::vector<rocrand_state_xorwow>& states,
                                     const miopen::DropoutDescriptor& dropoutDesc)
 {
     size_t states_num = dropoutDesc.stateSizeInBytes / sizeof(rocrand_state_xorwow);
-    size_t wk_grp_num = std::min(size_t(MAX_PRNG_STATE / 256), (states_num + 255) / 256);
+    size_t wk_grp_num = std::min(size_t{MAX_PRNG_STATE / 256}, (states_num + 255) / 256);
     size_t glb_sz     = wk_grp_num * 256;
 
     for(size_t j = 0; j < (states_num + glb_sz - 1) / glb_sz; j++)
@@ -136,7 +136,7 @@ void DropoutForwardVerify(const miopen::Handle& handle,
                     out_str);
 
     size_t glb_sz =
-        std::min(size_t(std::min(size_t(MAX_PRNG_STATE), handle.GetImage3dMaxWidth()) / 256),
+        std::min((std::min(size_t{MAX_PRNG_STATE}, size_t{handle.GetImage3dMaxWidth()}) / 256),
                  ((in_len[4] * in_len[3] * in_len[2] * in_len[1] * in_len[0] + 255) / 256)) *
         256;
 

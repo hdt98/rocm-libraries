@@ -233,7 +233,7 @@ void BatchNormForwardTraining(const Handle& handle,
         epsilon,
         resultsave,
         resultrunning,
-        std::max(size_t(1), size_t(0.6f * handle.GetMaxComputeUnits())),
+        std::max(size_t{1}, size_t{0.6 * handle.GetMaxComputeUnits()}),
         activDesc};
 
     const auto algo = bn_mode == miopenBNSpatial
@@ -502,7 +502,7 @@ void BatchNormBackward(const Handle& handle,
         savedVarianceDesc,
         epsilon,
         useSaved,
-        std::max(size_t(1), size_t(0.6f * handle.GetMaxComputeUnits())),
+        std::max(size_t{1}, size_t{0.6 * handle.GetMaxComputeUnits()}),
         activDesc};
 
     const auto algo = bn_mode == miopenBNSpatial

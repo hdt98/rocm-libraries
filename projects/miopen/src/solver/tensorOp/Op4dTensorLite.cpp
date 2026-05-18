@@ -100,7 +100,7 @@ ConvSolution Op4dTensorLite::GetSolution([[maybe_unused]] const ExecutionContext
     auto&& [RD_BLCK, READ_TYPE] =
         GetRDBLCKandREADTYPEHIP(cTensorDesc.GetElementSize(), bTensorDesc.GetType());
 
-    size_t total_work = std::max(cTensorDesc.GetElementSize() / RD_BLCK, size_t(1));
+    size_t total_work = std::max(cTensorDesc.GetElementSize() / RD_BLCK, size_t{1});
 
     const std::array<size_t, 3> vld{local_threads, 1, 1};
     const std::array<size_t, 3> vgd{global_threads, 1, 1};

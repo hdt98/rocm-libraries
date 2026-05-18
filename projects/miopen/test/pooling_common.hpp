@@ -365,7 +365,7 @@ struct verify_backward_pooling
                             mx_idx_dim += (out_spatial_id[i] * strides[i] - pads[i]);
                             in_cmp_idx &= (in_dim[i + 2] > mx_idx_dim && mx_idx_dim >= 0);
 
-                            idx[i + 2] = std::size_t(mx_idx_dim);
+                            idx[i + 2] = std::size_t{mx_idx_dim};
                         }
                     }
 

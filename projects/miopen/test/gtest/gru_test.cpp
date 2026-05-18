@@ -2219,7 +2219,7 @@ struct verify_forward_train_gru
            << std::endl;
         ss << "hz: " << hiddenSize << " batch_n: " << batch_n << " seqLength: " << seqLength
            << " inputLen: " << inputVecLen << " numLayers: " << nLayers
-           << " useDropout: " << int(use_dropout) << std::endl;
+           << " useDropout: " << int{use_dropout} << std::endl;
         ss << "Forward Train GRU: " << std::endl;
         GTEST_FAIL() << ss.str();
     }
@@ -2468,7 +2468,7 @@ struct verify_backward_data_gru
            << std::endl;
         ss << "hz: " << hiddenSize << " batch_n: " << batch_n << " seqLength: " << seqLength
            << " inputLen: " << inputVecLen << " numLayers: " << nLayers
-           << " useDropout: " << int(use_dropout) << std::endl;
+           << " useDropout: " << int{use_dropout} << std::endl;
         ss << "Backward Data GRU: " << std::endl;
         GTEST_FAIL() << ss.str();
     }
@@ -2651,7 +2651,7 @@ struct verify_backward_weights_gru
            << std::endl;
         ss << "hz: " << hiddenSize << " batch_n: " << batch_n << " seqLength: " << seqLength
            << " inputLen: " << inputVecLen << " numLayers: " << nLayers
-           << " useDropout: " << int(use_dropout) << std::endl;
+           << " useDropout: " << int{use_dropout} << std::endl;
         ss << "Backward Weights GRU: " << std::endl;
         GTEST_FAIL() << ss.str();
     }

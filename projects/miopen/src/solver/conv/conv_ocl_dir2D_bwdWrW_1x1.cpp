@@ -393,7 +393,7 @@ ConvSolution ConvOclBwdWrW1x1::GetSolution(const ExecutionContext& ctx,
 
             const auto subsample_kernel_build_params = KernelBuildParameters{
                 {"LOCAL_SIZE_X", n_grp_size0},
-                {"LOCAL_SIZE_Y", int(1)},
+                {"LOCAL_SIZE_Y", int{1}},
                 {"FILTER0_STRIDE0", kernel0_stride0},
                 {"FILTER0_STRIDE1", kernel0_stride1},
                 {"WRITE_UNIT", write_unit},

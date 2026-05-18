@@ -62,7 +62,7 @@ inline void GetLocalConfigNHWC(const miopen::batchnorm::ProblemDescription& prob
     {
         // xlocalsize must be power of 2 as reductions in the kernels rely on it, here c is rounded
         // up to next power of 2.
-        xlocalsize  = std::min(size_t{1 << int(std::ceil(std::log2(c / vectorsize)))},
+        xlocalsize  = std::min(size_t{1 << int{std::ceil(std::log2(c / vectorsize))}},
                               size_t{xlocalsize_limit});
         ylocalsize  = max_localsize / xlocalsize;
         nworkgroups = ((c / vectorsize + xlocalsize - 1) / xlocalsize) *
@@ -109,7 +109,7 @@ inline void GetSpatialMultipleConfig(const miopen::batchnorm::ProblemDescription
         {
             // No need to use workgroups larger than the HW dimension
             ylocalsize = std::max(size_t{64},
-                                  size_t{1 << int(std::ceil(std::log2(in_cstride / vectorsize)))});
+                                  size_t{1 << int{std::ceil(std::log2(in_cstride / vectorsize))}});
         }
     }
 }
@@ -444,7 +444,7 @@ inline void GetHeuristicsConfigTuningNHWC(const miopen::batchnorm::ProblemDescri
 
     // if c is not a power of 2, set vectorsize and xlocalsize pair to have modulo equal
     // to zero or the highest possible in order to minimize the number of inactive threads
-    size_t c_next_pow2 = size_t{1 << int(std::ceil(std::log2(c)))};
+    size_t c_next_pow2 = size_t{1 << int{std::ceil(std::log2(c))}};
     if(c != c_next_pow2)
     {
         size_t max_modulo = 0;
@@ -452,7 +452,7 @@ inline void GetHeuristicsConfigTuningNHWC(const miopen::batchnorm::ProblemDescri
         {
             for(size_t xl = 64; xl > 8; xl >>= 1)
             {
-                size_t xl_pow2 = std::min(size_t{1 << int(std::ceil(std::log2(c / vs)))}, xl);
+                size_t xl_pow2 = std::min(size_t{1 << int{std::ceil(std::log2(c / vs))}}, xl);
                 size_t modulo  = c % (xl_pow2 * vs);
                 if(modulo == 0)
                 {
@@ -545,7 +545,7 @@ inline void GetHeuristicsConfigTuningNHWC(const miopen::batchnorm::ProblemDescri
             xlocalsize = 64;
         }
     }
-    xlocalsize = std::min(size_t{1 << int(std::ceil(std::log2(c / vectorsize)))}, xlocalsize);
+    xlocalsize = std::min(size_t{1 << int{std::ceil(std::log2(c / vectorsize))}}, xlocalsize);
 }
 
 // Add spatial multiple instances for given problem.
@@ -642,7 +642,7 @@ inline void DefaultConfigSpatialMultiple(const miopen::batchnorm::ProblemDescrip
             if(vectorsize == 1)
             {
                 xlocalsize =
-                    std::min(size_t{1 << int(std::ceil(std::log2(c / vectorsize)))}, size_t{64});
+                    std::min(size_t{1 << int{std::ceil(std::log2(c / vectorsize))}}, size_t{64});
             }
         }
 

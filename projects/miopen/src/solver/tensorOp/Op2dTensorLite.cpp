@@ -58,11 +58,11 @@ bool Op2dTensorLite::IsApplicable([[maybe_unused]] const ExecutionContext& conte
 
         // for naive tensor ops
         size_t RD_BLCK    = (clens[2] % 4 == 0) ? 4 : (clens[2] % 2 == 0) ? 2 : 1;
-        size_t total_work = std::max(clens[2] / RD_BLCK, size_t(1));
+        size_t total_work = std::max(clens[2] / RD_BLCK, size_t{1});
         size_t grp_sz     = (total_work + local_threads - 1) / local_threads;
 
         // opencl kernels are no longer supported, fallback to generic case
-        bool lite_applicable = grp_sz <= size_t(max_num_wg);
+        bool lite_applicable = grp_sz <= size_t{max_num_wg};
 
         bool is_lite = clens[0] == 1 && blens[0] == 1 && alens[0] == 1 &&
                        (blens[1] == clens[1] || blens[1] == 1) && blens[2] == clens[2];
@@ -111,16 +111,16 @@ ConvSolution Op2dTensorLite::GetSolution([[maybe_unused]] const ExecutionContext
     // for naive tensor ops
     auto&& [RD_BLCK, READ_TYPE] = GetRDBLCKandREADTYPE(clens[2], data_type);
 
-    size_t total_work = std::max(clens[2] / RD_BLCK, size_t(1));
+    size_t total_work = std::max(clens[2] / RD_BLCK, size_t{1});
     size_t grp_sz     = (total_work + local_threads - 1) / local_threads;
 
-    grp_sz        = std::min(size_t(max_num_wg), grp_sz);
+    grp_sz        = std::min(size_t{max_num_wg}, grp_sz);
     size_t glb_sz = local_threads * grp_sz;
 
     size_t local_threads2 = 64;
     size_t total_work2    = clens[1];
     size_t grp_sz2        = (total_work2 + local_threads2 - 1) / local_threads2;
-    grp_sz2               = std::min(size_t(max_num_wg / grp_sz), grp_sz2);
+    grp_sz2               = std::min(size_t{max_num_wg / grp_sz}, grp_sz2);
     size_t glb_sz2        = local_threads2 * grp_sz2;
 
     const std::array<size_t, 3> vld{local_threads, 1, 1};

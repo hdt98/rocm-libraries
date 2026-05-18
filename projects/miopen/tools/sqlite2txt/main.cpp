@@ -26,7 +26,7 @@ std::unique_ptr<sqlite3_stmt, int (*)(sqlite3_stmt*)> PrepareStatement(sqlite3* 
 {
     sqlite3_stmt* stmt;
     const char* tail;
-    if(sqlite3_prepare_v2(db, sql.c_str(), (int)sql.length(), &stmt, &tail) != SQLITE_OK ||
+    if(sqlite3_prepare_v2(db, sql.c_str(), static_cast<int>(sql.length()), &stmt, &tail) != SQLITE_OK ||
        stmt == nullptr)
     {
         std::cerr << "Error while preparing SQL statement: " << sqlite3_errmsg(db) << std::endl;
@@ -162,7 +162,7 @@ int main(int argn, char** args)
         if(step_result == SQLITE_MISUSE)
             abort();
 
-        int col             = 0;
+        int col{0};
         std::string solver  = reinterpret_cast<const char*>(sqlite3_column_text(stmt.get(), col++));
         std::string perfcgf = reinterpret_cast<const char*>(sqlite3_column_text(stmt.get(), col++));
         ProblemConfig problem;

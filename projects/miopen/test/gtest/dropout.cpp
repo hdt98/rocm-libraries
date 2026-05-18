@@ -280,7 +280,7 @@ struct DropoutCommon : public testing::TestWithParam<TestCase>
         auto in                  = tensor<T>{in_dim}.generate(tensor_elem_gen_integer{max_value});
         miopenRNGType_t rng_mode = miopenRNGType_t(rng_mode_cmd);
 
-        size_t stateSizeInBytes = std::min(size_t(MAX_PRNG_STATE), handle.GetImage3dMaxWidth()) *
+        size_t stateSizeInBytes = std::min(size_t{MAX_PRNG_STATE}, handle.GetImage3dMaxWidth()) *
                                   sizeof(rocrand_state_xorwow);
         size_t reserveSpaceSizeInBytes = in.desc.GetElementSize() * sizeof(bool);
         size_t total_mem =

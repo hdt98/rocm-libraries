@@ -101,10 +101,10 @@ Op2dTensorSquash::GetSolution([[maybe_unused]] const ExecutionContext& context,
     // for naive tensor ops
     auto&& [RD_BLCK, READ_TYPE] = GetRDBLCKandREADTYPE(clens[2], data_type);
 
-    size_t total_work = std::max(clens[2] / RD_BLCK, size_t(1));
+    size_t total_work = std::max(clens[2] / RD_BLCK, size_t{1});
     size_t grp_sz     = (total_work + local_threads - 1) / local_threads;
 
-    grp_sz        = std::min(size_t(max_num_wg), grp_sz);
+    grp_sz        = std::min(size_t{max_num_wg}, grp_sz);
     size_t glb_sz = local_threads * grp_sz;
 
     const std::array<size_t, 3> vld{local_threads, 1, 1};

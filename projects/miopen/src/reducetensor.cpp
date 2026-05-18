@@ -374,27 +374,26 @@ static std::pair<bool, bool> get_padding_need(ReductionMethod_t reduceImpl,
     switch(reduceImpl)
     {
     case Reduce_DirectThreadWise:
-        copySliceLen     = size_t(tunable->GredThreadBufferLength);
+        copySliceLen     = size_t{tunable->GredThreadBufferLength};
         src_need_padding = (invariantLen < static_cast<size_t>(GridSize * BlockSize) ||
                             toReduceLen % copySliceLen > 0);
         dst_need_padding = (invariantLen < static_cast<size_t>(GridSize * BlockSize));
         break;
     case Reduce_DirectWarpWise:
-        copySliceLen = size_t(warpSize * tunable->GredAccessesPerThreadInWarp);
+        copySliceLen = size_t{warpSize * tunable->GredAccessesPerThreadInWarp};
         src_need_padding =
             (invariantLen < GridSize * BlockSize / warpSize || toReduceLen % copySliceLen > 0);
         dst_need_padding = (invariantLen < GridSize * BlockSize / warpSize);
         break;
     case Reduce_BlockWise:
-        copySliceLen     = size_t(BlockSize * tunable->GredAccessesPerThreadInBlock);
+        copySliceLen     = size_t{BlockSize * tunable->GredAccessesPerThreadInBlock};
         src_need_padding = (toReduceLen % copySliceLen > 0);
         break;
     case Reduce_MultiBlock:
-        copySliceLen       = size_t(BlockSize * tunable->GredAccessesPerThreadInBlock);
-        reduceSizePerBlock = int(
-            (((toReduceLen + size_t(BlkGroupSize) - 1) / size_t(BlkGroupSize) + copySliceLen - 1) /
-             copySliceLen) *
-            copySliceLen);
+        copySliceLen       = size_t{BlockSize * tunable->GredAccessesPerThreadInBlock};
+        reduceSizePerBlock = int{
+            (((toReduceLen + size_t{BlkGroupSize} - 1) / size_t{BlkGroupSize} + copySliceLen - 1) /
+             copySliceLen) * copySliceLen};
         src_need_padding = (toReduceLen < static_cast<size_t>(reduceSizePerBlock * BlkGroupSize));
         break;
     default: MIOPEN_THROW("Invalid reduction method ID!"); break;
@@ -471,7 +470,7 @@ std::size_t ReduceTensorDescriptor::GetWorkspaceSize(const Handle& handle,
     const tunable_generic_reduction* tunable = &default_tunable_generic_reduction;
     int blockSize                            = tunable->BlockSize;
 
-    detail::ReductionKernelConfigurator configurator(blockSize, int(handle.GetWavefrontWidth()));
+    detail::ReductionKernelConfigurator configurator(blockSize, int{handle.GetWavefrontWidth()});
 
     auto workspace_size = configurator.getWorkspaceSize(invariantLength, toReduceLength);
 
@@ -482,7 +481,7 @@ std::size_t ReduceTensorDescriptor::GetWorkspaceSize(const Handle& handle,
         (reduceOp == MIOPEN_REDUCE_TENSOR_MIN || reduceOp == MIOPEN_REDUCE_TENSOR_MAX ||
          reduceOp == MIOPEN_REDUCE_TENSOR_AMAX);
 
-    size_t datatype_size = size_t(detail::GetDataTypeSize(inDesc.GetType()));
+    size_t datatype_size = size_t{detail::GetDataTypeSize(inDesc.GetType())};
     size_t wsSizeInBytes = !need_indices ? workspace_size * datatype_size
                                          : workspace_size * (datatype_size + sizeof(int)) + 64 +
                                                sizeof(int) + workspaceAlignRequirementBytes;
@@ -554,7 +553,7 @@ void ReduceTensorDescriptor::ReduceTensor(const Handle& handle,
     const tunable_generic_reduction* tunable = &default_tunable_generic_reduction;
 
     const int blockSize = tunable->BlockSize;
-    detail::ReductionKernelConfigurator configurator(blockSize, int(handle.GetWavefrontWidth()));
+    detail::ReductionKernelConfigurator configurator(blockSize, int{handle.GetWavefrontWidth()});
 
     const bool need_indices =
         (reduceIndicesOpt == MIOPEN_REDUCE_TENSOR_FLATTENED_INDICES) &&
@@ -596,7 +595,7 @@ void ReduceTensorDescriptor::ReduceTensor(const Handle& handle,
 
     if(need_indices && workspace != nullptr)
     {
-        size_t aTypeSize    = size_t(detail::GetDataTypeSize(aDesc.GetType()));
+        size_t aTypeSize    = size_t{detail::GetDataTypeSize(aDesc.GetType())};
         auto workspace_size = configurator.getWorkspaceSize(invariantLength, toReduceLength);
 
         ws_buf2_bytes_offset = ((workspace_size * aTypeSize + 63) / 64) * 64;
@@ -615,7 +614,7 @@ void ReduceTensorDescriptor::ReduceTensor(const Handle& handle,
 
     for(int i = 0; i < inDescLengths.size(); i++)
     {
-        if(outDescLengths[size_t(i)] == 1)
+        if(outDescLengths[size_t{i}] == 1)
             toReduceDims.push_back(i);
         else
             invariantDims.push_back(i);
@@ -722,9 +721,9 @@ void ReduceTensorDescriptor::ReduceTensor(const Handle& handle,
         auto use_padding = detailDynamic::get_padding_need(reduceImpl,
                                                            invariantLength,
                                                            toReduceLength,
-                                                           int(gridSize),
+                                                           int{gridSize},
                                                            tunable->BlockSize,
-                                                           int(handle.GetWavefrontWidth()),
+                                                           int{handle.GetWavefrontWidth()},
                                                            blkGroupSize,
                                                            tunable);
 
@@ -820,7 +819,7 @@ void ReduceTensorDescriptor::ReduceTensor(const Handle& handle,
 
         if(useTwoCalls)
         {
-            const size_t toReduceLength_2 = size_t(blkGroupSize);
+            const size_t toReduceLength_2 = size_t{blkGroupSize};
             const int gridSize_2 =
                 static_cast<int>(configurator.getGridSize_2(invariantLength, toReduceLength_2));
             const std::vector<size_t> vgd2_2 = {
@@ -832,7 +831,7 @@ void ReduceTensorDescriptor::ReduceTensor(const Handle& handle,
                                                 toReduceLength_2,
                                                 gridSize_2,
                                                 tunable->BlockSize,
-                                                int(handle.GetWavefrontWidth()),
+                                                int{handle.GetWavefrontWidth()},
                                                 1,
                                                 tunable);
 

@@ -657,7 +657,7 @@ KernelInfo GetSampleKernelInfo(const ProblemDescription& problem)
 
     auto sampling_kernel_build_params = KernelBuildParameters{
         {"LOCAL_SIZE_X", local_size_x},
-        {"LOCAL_SIZE_Y", int(1)},
+        {"LOCAL_SIZE_Y", int{1}},
         {"FILTER0_STRIDE0", problem.GetKernelStrideW()},
         {"FILTER0_STRIDE1", problem.GetKernelStrideH()},
         {"WRITE_UNIT", write_unit},

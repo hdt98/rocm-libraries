@@ -1339,7 +1339,7 @@ MakeSolutionGroupConvImplicitGemmXdlops(const miopen::conv::ProblemDescription& 
 static inline bool IsIndexRangeLargeEnough(const miopen::conv::ProblemDescription& problem)
 {
     // composable kernel use int32_t for memory offset, which covers 2GB of memory maximum
-    const std::size_t max_index_range = std::size_t(2) * 1024 * 1024 * 1024;
+    const std::size_t max_index_range = std::size_t{2} * 1024 * 1024 * 1024;
 
     return problem.GetInSize() < max_index_range && problem.GetWeightsSize() < max_index_range &&
            problem.GetOutSize() < max_index_range;

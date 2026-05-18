@@ -621,7 +621,7 @@ PredictionResult ProcessPredictions(const std::vector<float>& predictions,
     if(miopen::IsLogging(LoggingLevel::Info2) && !solver_map.empty())
     {
         MIOPEN_LOG_I2("=== " << model_type << "Top Ranked Solvers ===");
-        for(size_t i = 0; i < std::min(size_t(3), sort_res.size()); i++)
+        for(size_t i = 0; i < std::min(size_t{3}, sort_res.size()); i++)
         {
             const auto idx   = sort_res[i].first;
             const auto score = sort_res[i].second;

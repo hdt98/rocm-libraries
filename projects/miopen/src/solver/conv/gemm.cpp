@@ -189,7 +189,7 @@ size_t GemmFwd1x1_0_2::GetWorkspaceSize(const ExecutionContext& context,
     const auto x_t_size = in_n * in_c * (xDesc.GetType() == miopenInt8 ? 2 : 1) *
                           std::accumulate(out_spatial.begin(),
                                           out_spatial.end(),
-                                          std::size_t(1),
+                                          std::size_t{1},
                                           std::multiplies<std::size_t>()) *
                           GetTypeSize(xDesc.GetType());
 
@@ -316,7 +316,7 @@ ConvSolution GemmFwd1x1_0_2::GetSolution(const ExecutionContext& context,
 
     solution.invoker_factory = [=](const std::vector<Kernel>&) {
         const std::size_t out_spatial_size = std::accumulate(
-            out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         return [=](const Handle& handle, const AnyInvokeParams& primitive_params) {
             float time_gemm          = 0;
@@ -486,11 +486,11 @@ size_t GemmFwd1x1_0_1_int8::GetWorkspaceSize(const ExecutionContext& context,
     const auto ws_size = wei_c *
                          std::accumulate(wei_spatial.begin(),
                                          wei_spatial.end(),
-                                         std::size_t(1),
+                                         std::size_t{1},
                                          std::multiplies<std::size_t>()) *
                          std::accumulate(out_spatial.begin(),
                                          out_spatial.end(),
-                                         std::size_t(1),
+                                         std::size_t{1},
                                          std::multiplies<std::size_t>()) *
                          GetTypeSize(wDesc.GetType()) * conv.group_count;
 
@@ -584,10 +584,10 @@ ConvSolution GemmFwd1x1_0_1_int8::GetSolution(const ExecutionContext& context,
 
     solution.invoker_factory = [=](const std::vector<Kernel>&) {
         const std::size_t in_spatial_size = std::accumulate(
-            in_spatial.begin(), in_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            in_spatial.begin(), in_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         const std::size_t out_spatial_size = std::accumulate(
-            out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         return [=](const Handle& handle, const AnyInvokeParams& primitive_params) {
             const auto& conv_params  = primitive_params.CastTo<miopen::conv::DataInvokeParams>();
@@ -607,8 +607,8 @@ ConvSolution GemmFwd1x1_0_1_int8::GetSolution(const ExecutionContext& context,
 
             // y = w * x
             miopenStatus_t gemm_status = miopenStatusNotInitialized;
-            float time                 = 0;
-            const auto gemm_desc       = [&]() {
+            float time{0.f};
+            const auto gemm_desc = [&]() {
                 auto tmp            = tmp_gemm_desc;
                 tmp.gfx90a_alt_impl = conv_params.gfx90aFp16alt;
                 return tmp;
@@ -759,16 +759,16 @@ ConvSolution GemmFwd1x1_0_1::GetSolution(const ExecutionContext& context,
         }();
 
         const std::size_t in_spatial_size = std::accumulate(
-            in_spatial.begin(), in_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            in_spatial.begin(), in_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         const std::size_t out_spatial_size = std::accumulate(
-            out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         solution.invoker_factory = [=](const std::vector<Kernel>&) {
             MIOPEN_LOG_FUNCTION("groupconv, 1x1");
 
             return [=](const Handle& handle, const AnyInvokeParams& primitive_params) {
-                float time_gemm         = 0;
+                float time_gemm{0.f};
                 const auto& conv_params = primitive_params.CastTo<miopen::conv::DataInvokeParams>();
                 const auto x            = conv_params.tensors.in;
                 const auto w            = conv_params.tensors.w;
@@ -890,11 +890,11 @@ size_t GemmFwdRest::GetWorkspaceSize(const ExecutionContext& context,
     const auto workspace_size = wei_c *
                                 std::accumulate(wei_spatial.begin(),
                                                 wei_spatial.end(),
-                                                std::size_t(1),
+                                                std::size_t{1},
                                                 std::multiplies<std::size_t>()) *
                                 std::accumulate(out_spatial.begin(),
                                                 out_spatial.end(),
-                                                std::size_t(1),
+                                                std::size_t{1},
                                                 std::multiplies<std::size_t>()) *
                                 GetTypeSize(wDesc.GetType()) * conv.group_count;
 
@@ -1096,16 +1096,16 @@ ConvSolution GemmFwdRest::GetSolution(const ExecutionContext& context,
         const auto wei_spatial = std::vector<std::size_t>(wei_spatial_.begin(), wei_spatial_.end());
 
         const auto in_spatial_size = std::accumulate(
-            in_spatial.begin(), in_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            in_spatial.begin(), in_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         const auto out_spatial_size = std::accumulate(
-            out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         const auto wei_spatial_size = std::accumulate(
-            wei_spatial.begin(), wei_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+            wei_spatial.begin(), wei_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
         return [=](const Handle& handle, const AnyInvokeParams& primitive_params) {
-            float time_gemm          = 0;
+            float time_gemm{0.f};
             const auto& conv_params  = primitive_params.CastTo<miopen::conv::DataInvokeParams>();
             const auto& workSpace    = conv_params.workSpace;
             const auto workSpaceSize = conv_params.workSpaceSize;

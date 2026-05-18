@@ -214,7 +214,7 @@ struct verify_backward_data_lstm
                   << " dirMode: " << dirMode << std::endl;
         std::cout << "hz: " << hiddenSize << " batch_n: " << batch_n << " seqLength: " << seqLength
                   << " inputLen: " << inputVecLen << " numLayers: " << nLayers
-                  << " useDropout: " << int(use_dropout) << std::endl;
+                  << " useDropout: " << int{use_dropout} << std::endl;
         std::cout << "Backward Data LSTM: " << std::endl;
 
         switch(badtensor)
@@ -331,7 +331,7 @@ struct verify_backward_weights_lstm
                   << " dirMode: " << dirMode << std::endl;
         std::cout << "hz: " << hiddenSize << " batch_n: " << batch_n << " seqLength: " << seqLength
                   << " inputLen: " << inputVecLen << " numLayers: " << nLayers
-                  << " useDropout: " << int(use_dropout) << std::endl;
+                  << " useDropout: " << int{use_dropout} << std::endl;
         std::cout << "Backward Weights LSTM: " << std::endl;
     }
 };
@@ -998,7 +998,7 @@ struct verify_forward_train_lstm : verify_forward_lstm<T>
                   << " dirMode: " << dirMode << std::endl;
         std::cout << "hz: " << hiddenSize << " batch_n: " << batch_n << " seqLength: " << seqLength
                   << " inputLen: " << inputVecLen << " numLayers: " << nLayers
-                  << " useDropout: " << int(use_dropout) << std::endl;
+                  << " useDropout: " << int{use_dropout} << std::endl;
         std::cout << "Forward Train LSTM: " << std::endl;
 
         switch(badtensor)
@@ -1801,7 +1801,7 @@ struct LSTM_test : Verifier
         inlens.at(1)        = inVecReal;
         auto firstInputDesc = miopen::TensorDescriptor(dataType, inlens);
         miopenGetRNNParamsSize(&handle, rnnDesc, &firstInputDesc, &wei_bytes, dataType);
-        auto wei_sz = int(wei_bytes / sizeof(T));
+        auto wei_sz = int{wei_bytes / sizeof(T)};
         std::vector<T> weights(wei_sz);
         for(std::size_t i = 0; i < wei_sz; i++)
         {

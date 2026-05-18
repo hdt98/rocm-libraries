@@ -148,7 +148,7 @@ struct TransposeSolutionDefault2Nhwc : public BatchedTransposeSolution
                                   uint32_t w_)
         : BatchedTransposeSolution(ctx_, data_type_, n_, c_, h_ * w_)
     {
-        MIOPEN_THROW_IF(size_t(h_ * w_) != (size_t(h_) * size_t(w_)), "integer overflow");
+        MIOPEN_THROW_IF(size_t{h_ * w_} != (size_t{h_} * size_t{w_}), "integer overflow");
     }
 };
 
@@ -162,7 +162,7 @@ struct TransposeSolutionNhwc2Default : public BatchedTransposeSolution
                                   uint32_t w_)
         : BatchedTransposeSolution(ctx_, data_type_, n_, h_ * w_, c_)
     {
-        MIOPEN_THROW_IF(size_t(h_ * w_) != (size_t(h_) * size_t(w_)), "integer overflow");
+        MIOPEN_THROW_IF(size_t{h_ * w_} != (size_t{h_} * size_t{w_}), "integer overflow");
     }
 };
 
@@ -177,7 +177,7 @@ struct TransposeSolutionDefault2Ndhwc : public BatchedTransposeSolution
                                    uint32_t w_)
         : BatchedTransposeSolution(ctx_, data_type_, n_, c_, d_ * h_ * w_)
     {
-        MIOPEN_THROW_IF(size_t(d_ * h_ * w_) != (size_t(d_) * size_t(h_) * size_t(w_)),
+        MIOPEN_THROW_IF(size_t{d_ * h_ * w_} != (size_t{d_} * size_t{h_} * size_t{w_}),
                         "integer overflow");
     }
 };
@@ -193,7 +193,7 @@ struct TransposeSolutionNdhwc2Default : public BatchedTransposeSolution
                                    uint32_t w_)
         : BatchedTransposeSolution(ctx_, data_type_, n_, d_ * h_ * w_, c_)
     {
-        MIOPEN_THROW_IF(size_t(d_ * h_ * w_) != (size_t(d_) * size_t(h_) * size_t(w_)),
+        MIOPEN_THROW_IF(size_t{d_ * h_ * w_} != (size_t{d_} * size_t{h_} * size_t{w_}),
                         "integer overflow");
     }
 };

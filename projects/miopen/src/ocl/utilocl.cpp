@@ -1187,7 +1187,7 @@ float transpose_NCHW2Vec(const Handle& handle,
 
     // "hw" is for any-D spatial data
     const auto hw = std::accumulate(
-        lens.begin() + 2, lens.end(), std::size_t(1), std::multiplies<std::size_t>());
+        lens.begin() + 2, lens.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     // clang-format off
     std::string network_config =

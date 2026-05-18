@@ -193,12 +193,12 @@ ConvCkIgemmFwdV6r1DlopsNchw::GetSolution(const ExecutionContext& ctx,
         kernel1_info.kernel_name = "convolution_forward_implicit_gemm_v6r1_dlops_nchw_kcyx_nkhw";
 
         const auto block_size =
-            std::size_t(ck::driver::ConvIgemmFwdV6r1DlopsNchwKcyxNkhw::GetBlockSize(
-                ck_conv_problem_desc, ck_compile_param));
+            std::size_t{ck::driver::ConvIgemmFwdV6r1DlopsNchwKcyxNkhw::GetBlockSize(
+                ck_conv_problem_desc, ck_compile_param)};
 
         const auto grid_size =
-            std::size_t(ck::driver::ConvIgemmFwdV6r1DlopsNchwKcyxNkhw::GetGridSize(
-                ck_conv_problem_desc, ck_compile_param));
+            std::size_t{ck::driver::ConvIgemmFwdV6r1DlopsNchwKcyxNkhw::GetGridSize(
+                ck_conv_problem_desc, ck_compile_param)};
 
         kernel1_info.l_wk = {block_size, 1, 1};
         kernel1_info.g_wk = {block_size * grid_size, 1, 1};

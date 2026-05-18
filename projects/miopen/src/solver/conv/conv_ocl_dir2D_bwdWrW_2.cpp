@@ -417,7 +417,7 @@ bool PerformanceConfigConvOclBwdWrw2<N_BATCH_LOOPS>::IsValid(
 
 #if WORKAROUND_ISSUE_1185
         if(result.workspace_sz >
-           (std::size_t(6) * std::size_t(1024) * std::size_t(1024) * std::size_t(1024)))
+           (std::size_t{6} * std::size_t{1024} * std::size_t{1024} * std::size_t{1024}))
         {
             return false;
         }
@@ -431,8 +431,9 @@ template <int N_BATCH_LOOPS>
 void PerformanceConfigConvOclBwdWrw2<N_BATCH_LOOPS>::HeuristicInit(
     const ProblemDescription& problem)
 {
-    n_waves                                = 1;
-    read_size                              = 6;
+    n_waves   = 1;
+    read_size = 6;
+
     const auto n_output_channels_per_group = problem.GetInChannels() / problem.GetGroupCount();
     // NOLINTBEGIN(*-braces-around-statements)
     if(n_output_channels_per_group % 4 == 0)

@@ -235,10 +235,10 @@ ConvSolution GemmWrw1x1_stride1::GetSolution(const ExecutionContext&,
         dyDesc.GetLengths() | std::views::drop(2) | std::views::take(conv.GetSpatialDimension());
 
     const auto out_spatial_size = std::accumulate(
-        out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     const auto in_spatial_size = std::accumulate(
-        in_spatial.begin(), in_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        in_spatial.begin(), in_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     std::size_t in_n, in_c;
     std::tie(in_n, in_c) = tie_pick<0, 1>()(xDesc.GetLengths());
@@ -344,11 +344,11 @@ size_t GemmWrwUniversal::GetWorkspaceSize(const ExecutionContext& context,
     auto ws_size = GetTypeSize(dyDesc.GetType()) * wei_c *
                    std::accumulate(out_spatial.begin(),
                                    out_spatial.end(),
-                                   std::size_t(1),
+                                   std::size_t{1},
                                    std::multiplies<std::size_t>()) *
                    std::accumulate(wei_spatial.begin(),
                                    wei_spatial.end(),
-                                   std::size_t(1),
+                                   std::size_t{1},
                                    std::multiplies<std::size_t>()) *
                    conv.group_count;
 
@@ -482,9 +482,9 @@ ConvSolution GemmWrwUniversal::GetSolution(const ExecutionContext& context,
             dwDesc.GetLengths() | std::views::drop(2) | std::views::take(spatial_dims);
         return GetTypeSize(data_type) * wei_c *
                std::accumulate(
-                   out_sp.begin(), out_sp.end(), std::size_t(1), std::multiplies<std::size_t>()) *
+                   out_sp.begin(), out_sp.end(), std::size_t{1}, std::multiplies<std::size_t>()) *
                std::accumulate(
-                   wei_sp.begin(), wei_sp.end(), std::size_t(1), std::multiplies<std::size_t>()) *
+                   wei_sp.begin(), wei_sp.end(), std::size_t{1}, std::multiplies<std::size_t>()) *
                conv.group_count;
     }();
     // Offset to fp32 accumulation buffer within workspace (256-byte aligned)
@@ -503,10 +503,10 @@ ConvSolution GemmWrwUniversal::GetSolution(const ExecutionContext& context,
     const auto out_spatial = std::vector<std::size_t>(out_spatial_.begin(), out_spatial_.end());
 
     const auto out_spatial_size = std::accumulate(
-        out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     const auto in_spatial_size = std::accumulate(
-        in_spatial.begin(), in_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        in_spatial.begin(), in_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     auto solution         = ConvSolution{miopenStatusSuccess};
     solution.workspace_sz = workspace_req;

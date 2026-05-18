@@ -170,7 +170,7 @@ size_t GemmBwd1x1_stride2::GetWorkspaceSize(const ExecutionContext& context,
     const auto dx_t_size = in_n * in_c *
                            std::accumulate(out_spatial.begin(),
                                            out_spatial.end(),
-                                           std::size_t(1),
+                                           std::size_t{1},
                                            std::multiplies<std::size_t>()) *
                            GetTypeSize(dxDesc.GetType());
 
@@ -533,12 +533,12 @@ ConvSolution GemmBwd1x1_stride1::GetSolution(const ExecutionContext&,
 
             std::size_t out_spatial_size = std::accumulate(out_spatial.begin(),
                                                            out_spatial.end(),
-                                                           std::size_t(1),
+                                                           std::size_t{1},
                                                            std::multiplies<std::size_t>());
 
             std::size_t in_spatial_size = std::accumulate(in_spatial.begin(),
                                                           in_spatial.end(),
-                                                          std::size_t(1),
+                                                          std::size_t{1},
                                                           std::multiplies<std::size_t>());
 
             if(group_count > 1)
@@ -626,11 +626,11 @@ size_t GemmBwdRest::GetWorkspaceSize(const ExecutionContext& context,
     auto gemm_size = wei_c *
                      std::accumulate(wei_spatial.begin(),
                                      wei_spatial.end(),
-                                     std::size_t(1),
+                                     std::size_t{1},
                                      std::multiplies<std::size_t>()) *
                      std::accumulate(out_spatial.begin(),
                                      out_spatial.end(),
-                                     std::size_t(1),
+                                     std::size_t{1},
                                      std::multiplies<std::size_t>()) *
                      GetTypeSize(dyDesc.GetType()) * conv.group_count;
 
@@ -768,12 +768,12 @@ ConvSolution GemmBwdRest::GetSolution(const ExecutionContext& context,
     const auto wei_k = wDesc.GetLengths()[0];
 
     const auto out_spatial_size = std::accumulate(
-        out_spatial.begin(), out_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        out_spatial.begin(), out_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     const auto in_spatial_size = std::accumulate(
-        in_spatial.begin(), in_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        in_spatial.begin(), in_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
     const auto wei_spatial_size = std::accumulate(
-        wei_spatial.begin(), wei_spatial.end(), std::size_t(1), std::multiplies<std::size_t>());
+        wei_spatial.begin(), wei_spatial.end(), std::size_t{1}, std::multiplies<std::size_t>());
 
     const auto workspace_req = GetWorkspaceSize(context, problem);
 

@@ -66,7 +66,7 @@ GetConsistentFlattenedTensorDescriptors(const TDescriptors&... real_descriptor_p
             real_descriptors);
     };
 
-    auto indices = std::views::iota(std::size_t(0), num_dims) |
+    auto indices = std::views::iota(std::size_t{0}, num_dims) |
                    std::views::filter([&](const size_t i) { return length_[i] > 1; });
     auto non1_length_strides = indices | std::views::transform(combine_length_and_strides);
 

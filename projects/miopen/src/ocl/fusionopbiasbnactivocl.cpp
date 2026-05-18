@@ -101,7 +101,7 @@ BatchNormInferenceFusionOpDescriptor::GetGlobalWGSz(const Handle& /*handle*/,
     }
 
     size_t xgridsize = read_len / read_unit;
-    size_t ygridsize = (mode == miopenBNSpatial) ? size_t(c) : 1;
+    size_t ygridsize = (mode == miopenBNSpatial) ? size_t{c} : size_t{1};
     size_t zgridsize = 1;
 
     std::vector<size_t> vgd{};
@@ -234,7 +234,7 @@ std::vector<size_t> BatchNormBwdTrainFusionOpDescriptor::GetGlobalWGSz()
     }
     else
     {
-        auto segment = int(std::ceil(double(in_cstride) / double(ylocalsize)));
+        auto segment = int{std::ceil(double(in_cstride) / double(ylocalsize))};
         xgridsize    = c;
         ygridsize    = segment * ylocalsize;
     }
@@ -353,7 +353,7 @@ std::vector<size_t> BatchNormFwdTrainFusionOpDescriptor::GetGlobalWGSz()
 
     if(mode != miopenBNSpatial)
     {
-        auto segment = int(std::ceil(double(in_cstride) / double(ylocalsize)));
+        auto segment = int{std::ceil(double(in_cstride) / double(ylocalsize))};
         xgridsize    = c;
         ygridsize    = segment * ylocalsize;
     }

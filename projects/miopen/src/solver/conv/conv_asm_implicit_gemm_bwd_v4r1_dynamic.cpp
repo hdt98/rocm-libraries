@@ -217,7 +217,7 @@ ConvSolution ConvAsmImplicitGemmV4R1DynamicBwd::GetSolution(const ExecutionConte
     kernel.comp_options = options.str();
 
     result.invoker_factory =
-        miopen::conv::MakeImplGemmDynamicBackwardDataInvokerFactory(problem, int(0));
+        miopen::conv::MakeImplGemmDynamicBackwardDataInvokerFactory(problem, int{0});
     result.construction_params.push_back(kernel);
     return result;
 }

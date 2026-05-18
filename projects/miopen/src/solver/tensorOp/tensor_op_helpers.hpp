@@ -214,9 +214,9 @@ Get4dParams(const miopen::tensorOp::ProblemDescription& problem, bool is4dLite)
         size_t TENS_LEN = cTensorDesc.GetElementSize();
         size_t RD_BLCK  = (TENS_LEN % 4 == 0) ? 4 : (TENS_LEN % 2 == 0) ? 2 : 1;
 
-        size_t total_work = std::max(TENS_LEN / RD_BLCK, size_t(1));
+        size_t total_work = std::max(TENS_LEN / RD_BLCK, size_t{1});
         size_t grp_sz     = (total_work + local_threads - 1) / local_threads;
-        grp_sz            = std::min(size_t(max_num_wg), grp_sz);
+        grp_sz            = std::min(size_t{max_num_wg}, grp_sz);
         size_t glb_sz     = local_threads * grp_sz;
 
         global_threads = glb_sz;

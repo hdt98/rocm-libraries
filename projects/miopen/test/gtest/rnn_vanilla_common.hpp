@@ -632,7 +632,7 @@ struct verify_forward_train_rnn
         }
         ss << " -m " << ((rnnMode != 0) ? "tanh" : "relu") << " -k " << seqLength << " -H "
            << hiddenSize << " -W " << inputVecLen << " -l " << nLayers << " -F 0 -r " << dirMode
-           << " -b " << biasMode << " -p " << inputMode << " -U " << int(use_dropout) << std::endl;
+           << " -b " << biasMode << " -p " << inputMode << " -U " << int{use_dropout} << std::endl;
         ss << "Forward Train RNN vanilla: " << std::endl;
         GTEST_FAIL() << ss.str();
     }
@@ -919,7 +919,7 @@ struct verify_backward_data_rnn
         }
         ss << " -m " << ((rnnMode != 0) ? "tanh" : "relu") << " -k " << seqLength << " -H "
            << hiddenSize << " -W " << inputVecLen << " -l " << nLayers << " -F 0 -r " << dirMode
-           << " -b " << biasMode << " -p " << inputMode << " -U " << int(use_dropout) << std::endl;
+           << " -b " << biasMode << " -p " << inputMode << " -U " << int{use_dropout} << std::endl;
         ss << "Backward Data RNN vanilla: " << std::endl;
         GTEST_FAIL() << ss.str();
     }
@@ -1140,7 +1140,7 @@ struct verify_backward_weights_rnn
         }
         ss << " -m " << ((rnnMode != 0) ? "tanh" : "relu") << " -k " << seqLength << " -H "
            << hiddenSize << " -W " << inputVecLen << " -l " << nLayers << " -F 0 -r " << dirMode
-           << " -b " << biasMode << " -p " << inputMode << " -U " << int(use_dropout) << std::endl;
+           << " -b " << biasMode << " -p " << inputMode << " -U " << int{use_dropout} << std::endl;
         ss << "Backward Weights RNN vanilla: " << std::endl;
         GTEST_FAIL() << ss.str();
     }
@@ -1305,7 +1305,7 @@ protected:
         auto firstInputDesc = miopen::TensorDescriptor(miopen::deref(rnnDesc).dataType, inlens);
         miopenGetRNNParamsSize(
             &handle, rnnDesc, &firstInputDesc, &wei_bytes, miopen::deref(rnnDesc).dataType);
-        auto wei_sz = int(wei_bytes / sizeof(T));
+        auto wei_sz = int{wei_bytes / sizeof(T)};
         std::vector<T> weights(wei_sz);
         for(std::size_t i = 0; i < wei_sz; i++)
         {

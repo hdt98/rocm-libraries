@@ -710,7 +710,7 @@ bool PerformanceImplicitGemmForwardV4R5Xdlops::IsFastToBeUsedForTuning(
 
         // this is the grid size using the biggest blockwise-GEMM
         auto grid_size_max_blockwise_gemm =
-            (std::size_t(gemm_m) * gemm_n) / max_blockwise_gemm_size;
+            (std::size_t{gemm_m} * gemm_n) / max_blockwise_gemm_size;
 
         const float ratio = float(grid_size) / grid_size_max_blockwise_gemm;
 
@@ -719,27 +719,27 @@ bool PerformanceImplicitGemmForwardV4R5Xdlops::IsFastToBeUsedForTuning(
         // heuristic to exclude performance paramater that result in very large number of blocks
         if(grid_size_max_blockwise_gemm > 5 * num_cu)
         {
-            if(ratio > 2.81)
+            if(ratio > 2.81f)
                 return false;
         }
         else if(grid_size_max_blockwise_gemm > 4 * num_cu)
         {
-            if(ratio > 3.61)
+            if(ratio > 3.61f)
                 return false;
         }
         else if(grid_size_max_blockwise_gemm > 3 * num_cu)
         {
-            if(ratio > 4.41)
+            if(ratio > 4.41f)
                 return false;
         }
         else if(grid_size_max_blockwise_gemm > 2 * num_cu)
         {
-            if(ratio > 6.41)
+            if(ratio > 6.41f)
                 return false;
         }
         else if(grid_size_max_blockwise_gemm > num_cu)
         {
-            if(ratio > 12.41)
+            if(ratio > 12.41f)
                 return false;
         }
     }

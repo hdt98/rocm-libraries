@@ -72,7 +72,7 @@ extern "C" miopenStatus_t miopenDropoutGetStatesSize(miopenHandle_t handle,
     MIOPEN_LOG_FUNCTION(handle);
     return miopen::try_([&] {
         miopen::deref(stateSizeInBytes) =
-            std::min(size_t(MAX_PRNG_STATE), miopen::deref(handle).GetImage3dMaxWidth()) *
+            std::min(size_t{MAX_PRNG_STATE}, miopen::deref(handle).GetImage3dMaxWidth()) *
             sizeof(rocrand_state_xorwow);
     });
 }
