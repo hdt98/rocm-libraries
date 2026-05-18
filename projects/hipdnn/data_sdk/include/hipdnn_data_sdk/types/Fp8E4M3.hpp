@@ -92,8 +92,7 @@ constexpr uint32_t FP8_E4M3_ROUND_THRESHOLD = 0x80000;
 // Convert float to FP8 E4M3 bits (OCP format: 1 sign, 4 exponent, 3 mantissa)
 // Range: +/- 448, no infinity, NaN = 0x7F or 0xFF
 // The `saturate=false` paths return NaN on overflow per the OCP spec and are
-// reserved for future non-saturating-mode support; no public caller exercises
-// them today, so they are intentionally not covered by tests.
+// reserved for future non-saturating-mode support.
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline uint8_t float_to_fp8_e4m3_bits(float f, bool saturate = true) noexcept
 {
