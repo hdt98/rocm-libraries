@@ -288,12 +288,13 @@ std::string ConvDirectNaiveConvCompileOption(const ExecutionContext& ctx,
 
     ss << " -DNAIVE_CONV_BLOCK_SIZE=" << NAIVE_CONV_BLOCK_SIZE;
 
-    // 16-bit float atomicAdd (half, __hip_bfloat16) is available on
-    // CDNA2+ (gfx90a, gfx94x, gfx95x) and RDNA3+ (gfx110x, gfx115x, gfx120x).
+    // Native scalar 16-bit float atomicAdd (half, __hip_bfloat16) is available
+    // on CDNA2+ (gfx90a, gfx94x, gfx95x) and RDNA4 (gfx120x). RDNA3/3.5
+    // (gfx110x, gfx115x) only have packed f16 atomics in hardware, so scalar
+    // half atomicAdd compiles via CAS-loop emulation on those architectures.
     const auto device_name = ctx.GetStream().GetDeviceName();
     if(StartsWith(device_name, "gfx90a") || StartsWith(device_name, "gfx94") ||
-       StartsWith(device_name, "gfx95") || StartsWith(device_name, "gfx110") ||
-       StartsWith(device_name, "gfx115") || StartsWith(device_name, "gfx120"))
+       StartsWith(device_name, "gfx95") || StartsWith(device_name, "gfx120"))
     {
         ss << " -DNAIVE_CONV_HAS_16BIT_FLOAT_ATOMIC=1";
     }
