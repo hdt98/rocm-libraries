@@ -104,6 +104,32 @@ class GroupedConvTraitConfig(TraitConfigBase):
 TraitConfig = GroupedConvTraitConfig
 
 
+def deduce_block_per_cu(pipeline: str, double_smem_buffer: bool) -> int:
+    """Deduce the minimum blocks-per-CU hint from pipeline type and LDS buffering mode.
+
+    Rules derived from pipeline LDS allocation (see pipeline headers):
+    - compv4 / comp_async: mandatory double LDS (static_assert enforced).
+      Double LDS halves achievable occupancy by itself, so we set block_per_cu=1
+      to let the compiler use as many registers as it needs.
+    - compv1/v2, basic_v1/v2, basic_async_v1: always single LDS (hardcoded false).
+      Hence, so we set block_per_cu=2.
+      Matches the CK Tile global default (CK_TILE_MIN_BLOCK_PER_CU=2).
+    - mem, compv3, compv5, compv6: configurable via double_smem_buffer.
+      Follow the same logic: 1 when double buffering, 2 when single.
+    """
+    # Pipelines that mandate double LDS (no user choice)
+    _ALWAYS_DOUBLE = {"compv4", "comp_async"}
+    # Pipelines that mandate single LDS (no user choice)
+    _ALWAYS_SINGLE = {"compv1", "compv2", "basic_v1", "basic_v2", "basic_async_v1"}
+
+    if pipeline in _ALWAYS_DOUBLE:
+        return 1
+    if pipeline in _ALWAYS_SINGLE:
+        return 2
+    # Configurable pipelines (mem, compv3, compv5, compv6, ...)
+    return 1 if double_smem_buffer else 2
+
+
 @dataclass
 class GroupedConvKernelConfig:
     """Complete grouped convolution kernel configuration"""
@@ -125,10 +151,12 @@ class GroupedConvKernelConfig:
     vector_size_c: int = 8
     vector_sizes: Optional[Tuple[int, int, int]] = None
 
-    # Occupancy parameters
-    block_per_cu: int = 1
-    num_wave_groups: int = 1
+    # Merging multiple conv groups into a single GEMM batch.
+    # By default no merging. This helps when the number of channel per groups is small.
     num_groups_to_merge: int = 1
+
+    # Occupancy parameters
+    num_wave_groups: int = 1
 
     # Double buffering
     double_smem_buffer: bool = False
@@ -148,6 +176,11 @@ class GroupedConvKernelConfig:
             self.trait.num_groups_to_merge = self.num_groups_to_merge
         elif self.trait.num_groups_to_merge != 1:
             self.num_groups_to_merge = self.trait.num_groups_to_merge
+
+    @property
+    def block_per_cu(self) -> int:
+        """Deduce min blocks-per-CU from pipeline type and LDS buffering mode."""
+        return deduce_block_per_cu(self.trait.pipeline, self.double_smem_buffer)
 
     def _layout_str(self) -> str:
         """Get layout as lowercase string for naming."""
@@ -207,10 +240,6 @@ class GroupedConvKernelConfig:
             name += (
                 f"_vec{self.vector_size_a}_{self.vector_size_b}_{self.vector_size_c}"
             )
-
-        # Occupancy hints (only if non-default)
-        if self.block_per_cu != 1:
-            name += f"_bpc{self.block_per_cu}"
 
         if self.num_wave_groups != 1:
             name += f"_wg{self.num_wave_groups}"
@@ -1342,7 +1371,6 @@ def load_configs_from_json(
             vector_size_a=inst["vector_size_a"],
             vector_size_b=inst["vector_size_b"],
             vector_size_c=inst["vector_size_c"],
-            block_per_cu=inst.get("block_per_cu", 1),
             num_wave_groups=inst.get("num_wave_groups", 1),
         )
         configs.append(config)
@@ -1985,7 +2013,6 @@ def main():
     parser.add_argument("--vector-a", type=int, default=4, help="Vector size A")
     parser.add_argument("--vector-b", type=int, default=8, help="Vector size B")
     parser.add_argument("--vector-c", type=int, default=8, help="Vector size C")
-    parser.add_argument("--block-per-cu", type=int, default=1, help="Blocks per CU")
     parser.add_argument("--num-wave-groups", type=int, default=1, help="Wave groups")
     parser.add_argument(
         "--num-groups-to-merge", type=int, default=1, help="Groups to merge"
@@ -2064,7 +2091,6 @@ def main():
             vector_size_a=args.vector_a,
             vector_size_b=args.vector_b,
             vector_size_c=args.vector_c,
-            block_per_cu=args.block_per_cu,
             num_wave_groups=args.num_wave_groups,
         )
         filtered_configs = [config]
