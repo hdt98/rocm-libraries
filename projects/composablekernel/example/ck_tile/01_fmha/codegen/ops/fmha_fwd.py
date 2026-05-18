@@ -1336,7 +1336,6 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
         return pipelines
 
-
 class KernelComponentFactoryGfx125(CompatibilityRuleFactory):
     arch = ArchTrait("gfx125")
 
