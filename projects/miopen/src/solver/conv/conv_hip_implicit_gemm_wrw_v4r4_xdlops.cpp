@@ -1117,7 +1117,7 @@ bool ConvHipImplicitGemmWrwV4R4Xdlops::IsApplicable(const ExecutionContext& ctx,
     // GemmKBlock == 2 is deterministic (FP commutativity: a+b = b+a).
     // GemmKBlock == 1 does not use AtomicAdd (uses Set).
     // Tested with 101,000+ kernel runs on gfx908 (MI100).
-    if(problem.GetConv().attribute.deterministic.Get() && GemmKBlock > 2)
+    if(problem.GetConv().attribute.deterministic.Get() != 0 && GemmKBlock > 2)
         return false;
 
     return static_ck::IsValidGridGemmXdlops(gemm_m, gemm_n, gemm_k_total);

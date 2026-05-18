@@ -642,7 +642,7 @@ bool ConvHipImplicitGemmBwdDataV1R1::IsApplicable(const ExecutionContext& ctx,
     // ALMIOPEN-718: Reject non-deterministic configs when determinism is requested.
     // BwdV1R1 uses AtomicAdd when stride < dilation*(kernel_size-1)+1.
     // This causes non-deterministic results due to FP rounding order dependency.
-    if(problem.GetConv().attribute.deterministic.Get())
+    if(problem.GetConv().attribute.deterministic.Get() != 0)
     {
         const auto y           = ProblemInterpreter::GetFilterHeightY(problem);
         const auto x           = ProblemInterpreter::GetFilterWidthX(problem);
