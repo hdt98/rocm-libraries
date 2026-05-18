@@ -1250,7 +1250,7 @@ def getPytorchTestsCmds() {
         "mkdir pytorch",
         "cp -r /var/jenkins/workspace/pytorch/* pytorch/",
         "cd pytorch",
-        "ls -ltr"
+        "ls -ltr",
         "python3 tools/amd_build/build_amd.py",
         "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python3 setup.py develop"
     ]
