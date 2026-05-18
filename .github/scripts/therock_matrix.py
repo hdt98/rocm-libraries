@@ -167,7 +167,6 @@ def collect_projects_to_run(subtrees):
         if subtree in subtree_to_project_map:
             projects.add(subtree_to_project_map.get(subtree))
 
-    for subtree in subtrees:
         extra_matrix = SUBTREE_EXTRA_MATRIX_PROJECTS.get(subtree)
         if extra_matrix:
             projects.add(extra_matrix)
