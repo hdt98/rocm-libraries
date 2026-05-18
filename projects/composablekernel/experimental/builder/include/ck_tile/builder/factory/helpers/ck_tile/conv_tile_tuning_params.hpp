@@ -100,6 +100,27 @@ struct TilePipelineType<ck_tile::GemmPipeline::COMPUTE_V5>
 };
 
 template <>
+struct TilePipelineType<ck_tile::GemmPipeline::COMPUTE_TDM_V1>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompTDMV1<PipelineProblem>;
+};
+
+template <>
+struct TilePipelineType<ck_tile::GemmPipeline::COMPUTE_TDM_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompTDMV2<PipelineProblem>;
+};
+
+template <>
+struct TilePipelineType<ck_tile::GemmPipeline::COMPUTE_ASYNC_V2>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompAsyncV2<PipelineProblem>;
+};
+
+template <>
 struct TilePipelineType<ck_tile::GemmPipeline::COMPUTE_V6>
 {
     template <typename PipelineProblem>
@@ -132,6 +153,9 @@ consteval ck_tile::GemmPipeline SetTileBlockGemmPipelineVersion()
     case PipelineVersion::V3: return ck_tile_pipeline::COMPUTE_V3;
     case PipelineVersion::V4: return ck_tile_pipeline::COMPUTE_V4;
     case PipelineVersion::V5: return ck_tile_pipeline::COMPUTE_V5;
+    case PipelineVersion::COMPUTE_TDM_V1: return ck_tile_pipeline::COMPUTE_TDM_V1;
+    case PipelineVersion::COMPUTE_TDM_V2: return ck_tile_pipeline::COMPUTE_TDM_V2;
+    case PipelineVersion::COMPUTE_ASYNC_V2: return ck_tile_pipeline::COMPUTE_ASYNC_V2;
     case PipelineVersion::V6: return ck_tile_pipeline::COMPUTE_V6;
     case PipelineVersion::ASYNC_V1: return ck_tile_pipeline::BASIC_ASYNC_V1;
     case PipelineVersion::ASYNC_V4: return ck_tile_pipeline::COMPUTE_ASYNC;

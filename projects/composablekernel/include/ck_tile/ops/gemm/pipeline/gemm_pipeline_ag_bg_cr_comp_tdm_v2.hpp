@@ -702,13 +702,13 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             const index_t warp_id = get_warp_id();
 
             return wave_specialized_func<HasHotLoop, TailNum>(a_dram_block_window_tmp,
-                                                              a_element_func,
-                                                              b_dram_block_window_tmp,
-                                                              b_element_func,
-                                                              num_loop,
+                                                                     a_element_func,
+                                                                     b_dram_block_window_tmp,
+                                                                     b_element_func,
+                                                                     num_loop,
                                                               p_smem,
                                                               warp_id);
-        }
+            }
 
         template <
             bool HasHotLoop,
@@ -1023,7 +1023,7 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
                                         a_prefetch_window
                                             .template prefetch_for_tdm<Policy::DataCachePrefetchA>(
                                                 tdm_config_a[1]);
-                                }
+            }
                             }
                             if(is_warp3)
                             {
@@ -1364,12 +1364,12 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
             const index_t warp_id = get_warp_id();
 
             return wave_specialized_func<HasHotLoop, TailNum>(a_dram_block_window_tmp,
-                                                              a_element_func,
-                                                              b_dram_block_window_tmp,
-                                                              b_element_func,
+                                                                     a_element_func,
+                                                                     b_dram_block_window_tmp,
+                                                                     b_element_func,
                                                               scale_a_dram_block_window_tmp,
                                                               scale_b_dram_block_window_tmp,
-                                                              num_loop,
+                                                                     num_loop,
                                                               p_smem,
                                                               warp_id);
         }
@@ -1405,38 +1405,9 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
 
     template <typename ADramBlockWindowTmp,
               typename BDramBlockWindowTmp,
-              typename ScaleADramBlockWindowTmp,
-              typename ScaleBDramBlockWindowTmp,
-              typename AElementFunction,
-              typename BElementFunction>
-    CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                   const AElementFunction& a_element_func,
-                                   const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                   const BElementFunction& b_element_func,
-                                   const ScaleADramBlockWindowTmp& scale_a_window,
-                                   const ScaleBDramBlockWindowTmp& scale_b_window,
-                                   index_t num_loop,
-                                   void* p_smem) const
-    {
-        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
-        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
-
-        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
-            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
-                a_dram_block_window_tmp,
-                a_element_func,
-                b_dram_block_window_tmp,
-                b_element_func,
-                scale_a_window,
-                scale_b_window,
-                num_loop,
-                p_smem);
-        };
-
-        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
-    }
-
-    template <typename ADramBlockWindowTmp, typename BDramBlockWindowTmp>
+              typename std::enable_if_t<is_detected<is_tuple, ADramBlockWindowTmp>::value &&
+                                            is_detected<is_tuple, BDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
     CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
                                    const BDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const index_t num_loop,
@@ -1447,9 +1418,9 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
         const auto RunPipeline  = [&](auto hot_loop_, auto tail_num_) {
             return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
                 a_dram_block_window_tmp,
-                [](const typename Base::ADataType& a) { return a; },
+                element_wise::PassThrough{},
                 b_dram_block_window_tmp,
-                [](const typename Base::BDataType& b) { return b; },
+                element_wise::PassThrough{},
                 num_loop,
                 p_smem);
         };
@@ -1458,27 +1429,33 @@ struct GemmPipelineAgBgCrCompTDMV2 : public GemmPipelineAgBgCrCompTDMV1<Problem,
 
     template <typename ADramBlockWindowTmp,
               typename BDramBlockWindowTmp,
-              typename ScaleADramBlockWindowTmp,
-              typename ScaleBDramBlockWindowTmp,
-              typename std::enable_if_t<is_detected<is_tuple, ScaleADramBlockWindowTmp>::value &&
-                                            is_detected<is_tuple, ScaleBDramBlockWindowTmp>::value,
+              typename std::enable_if_t<!is_detected<is_tuple, ADramBlockWindowTmp>::value &&
+                                            !is_detected<is_tuple, BDramBlockWindowTmp>::value,
                                         bool>* = nullptr>
     CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
                                    const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                   const ScaleADramBlockWindowTmp& scale_a_window,
-                                   const ScaleBDramBlockWindowTmp& scale_b_window,
-                                   const index_t num_loop,
-                                   void* __restrict__ p_smem) const
+                                   index_t num_loop,
+                                   void* p_smem) const
     {
-        return operator()(
-            a_dram_block_window_tmp,
-            [](const typename Base::ADataType & a) { return a; },
-            b_dram_block_window_tmp,
-            [](const typename Base::BDataType & b) { return b; },
-            scale_a_window,
-            scale_b_window,
-            num_loop,
-            p_smem);
+        const bool has_hot_loop = Base::BlockHasHotloop(num_loop);
+        const auto tail_number  = Base::GetBlockLoopTailNum(num_loop);
+        const auto RunPipeline  = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                ck_tile::make_tuple(a_dram_block_window_tmp),
+                element_wise::PassThrough{},
+                ck_tile::make_tuple(b_dram_block_window_tmp),
+                element_wise::PassThrough{},
+                num_loop,
+                p_smem);
+        };
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
+    }
+
+    [[nodiscard]] CK_TILE_HOST static const std::string GetPipelineName()
+    {
+        // clang-format off
+        return "COMPUTE_TDM_V2";
+        // clang-format on
     }
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()

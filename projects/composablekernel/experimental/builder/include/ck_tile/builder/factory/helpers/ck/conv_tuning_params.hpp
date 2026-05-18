@@ -61,6 +61,12 @@ consteval BlockGemmSpec SetBlockGemm()
     case PipelineVersion::V5: version = ck::BlockGemmPipelineVersion::v5; break;
     case PipelineVersion::ASYNC_V1: throw "PipelineVersion::ASYNC can be used only for CK TILE.";
     case PipelineVersion::ASYNC_V4: throw "PipelineVersion::ASYNC can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_TDM_V1:
+        throw "PipelineVersion::COMPUTE_TDM_V1 can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_TDM_V2:
+        throw "PipelineVersion::COMPUTE_TDM_V2 can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_ASYNC_V2:
+        throw "PipelineVersion::COMPUTE_ASYNC_V2 can be used only for CK TILE.";
     case PipelineVersion::V6: throw "PipelineVersion::V6 is supported only for CK Tile.";
     case PipelineVersion::WEIGHT_ONLY:
         throw "PipelineVersion::WEIGHT_ONLY is not supported for block GEMM.";
@@ -96,6 +102,12 @@ consteval ck::PipelineVersion SetGridwiseGemmPipelineVersion()
     case PipelineVersion::V3: throw "PipelineVersion::V3 is used only for stream-K.";
     case PipelineVersion::V4: return ck_pipeline::v4;
     case PipelineVersion::V5: throw "PipelineVersion::V5 cannot be used for gridwise GEMM.";
+    case PipelineVersion::COMPUTE_TDM_V1:
+        throw "PipelineVersion::COMPUTE_TDM_V1 can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_TDM_V2:
+        throw "PipelineVersion::COMPUTE_TDM_V2 can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_ASYNC_V2:
+        throw "PipelineVersion::COMPUTE_ASYNC_V2 can be used only for CK TILE.";
     case PipelineVersion::ASYNC_V1: throw "PipelineVersion::ASYNC can be used only for CK TILE.";
     case PipelineVersion::ASYNC_V4: throw "PipelineVersion::ASYNC can be used only for CK TILE.";
     case PipelineVersion::V6: throw "PipelineVersion::V6 can be used only for CK TILE.";
@@ -144,6 +156,12 @@ consteval ck::BlockGemmPipelineVersion SetBlockGemmPipelineVersion()
     case PipelineVersion::V3: return ck_pipeline::v3;
     case PipelineVersion::V4: return ck_pipeline::v4;
     case PipelineVersion::V5: return ck_pipeline::v5;
+    case PipelineVersion::COMPUTE_TDM_V1:
+        throw "PipelineVersion::COMPUTE_TDM_V1 can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_TDM_V2:
+        throw "PipelineVersion::COMPUTE_TDM_V2 can be used only for CK TILE.";
+    case PipelineVersion::COMPUTE_ASYNC_V2:
+        throw "PipelineVersion::COMPUTE_ASYNC_V2 can be used only for CK TILE.";
     case PipelineVersion::ASYNC_V1: throw "PipelineVersion::ASYNC can be used only for CK TILE.";
     case PipelineVersion::ASYNC_V4: throw "PipelineVersion::ASYNC can be used only for CK TILE.";
     case PipelineVersion::V6: throw "PipelineVersion::V6 is supported only for CK Tile.";

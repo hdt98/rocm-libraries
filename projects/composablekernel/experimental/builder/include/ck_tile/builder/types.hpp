@@ -157,6 +157,9 @@ enum class PipelineVersion
     V3,
     V4,
     V5,
+    COMPUTE_TDM_V1,
+    COMPUTE_TDM_V2,
+    COMPUTE_ASYNC_V2,
     V6,
     ASYNC_V1,
     ASYNC_V4,
@@ -351,6 +354,9 @@ inline std::string_view to_string(PipelineVersion ver)
     case V3: return "V3";
     case V4: return "V4";
     case V5: return "V5";
+    case COMPUTE_TDM_V1: return "COMPUTE_TDM_V1";
+    case COMPUTE_TDM_V2: return "COMPUTE_TDM_V2";
+    case COMPUTE_ASYNC_V2: return "COMPUTE_ASYNC_V2";
     case V6: return "V6";
     case ASYNC_V1: return "ASYNC_V1";
     case ASYNC_V4: return "ASYNC_V4";
