@@ -15,15 +15,9 @@ on:
       # - 'dnn-providers/miopen-provider/.clang-tidy'
       - '.github/workflows/clang-tidy.yml'
   pull_request:
-    paths:
-      - 'projects/hipdnn/**/*.[ch]p?p?'
-      - 'projects/hipdnn/cmake/ClangTidy.cmake'
-      - 'projects/hipdnn/.clang-tidy'
-      # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
-      # - 'dnn-providers/miopen-provider/**/*.[ch]p?p?'
-      # - 'dnn-providers/miopen-provider/cmake/ClangTidy.cmake'
-      # - 'dnn-providers/miopen-provider/.clang-tidy'
-      - '.github/workflows/clang-tidy.yml'
+    # No paths: filter — workflow must always run so the required check is registered
+    # for every PR. The clang-tidy job itself is skipped when no opted-in component
+    # is affected (guarded by the setup job output).
   workflow_dispatch:
 
 concurrency:
@@ -35,22 +29,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  clang-tidy:
-    runs-on: azure-linux-scale-rocm
+  setup:
+    name: "Setup"
+    runs-on: ubuntu-24.04
+    outputs:
+      hipdnn: ${{ steps.changes.outputs.hipdnn }}
     steps:
       - name: Checkout rocm-libraries
         uses: actions/checkout@v6
 
-      - name: Detect changed projects
+      - name: Detect changed opted-in projects
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: changes
         with:
           filters: |
             hipdnn:
               - 'projects/hipdnn/**'
+            # To opt in a new library, add a filter here and a corresponding
+            # step in the clang-tidy job below.
             # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
             # miopen-provider:
             #   - 'dnn-providers/miopen-provider/**'
+
+  clang-tidy:
+    name: "clang-tidy"
+    needs: setup
+    if: needs.setup.outputs.hipdnn == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: azure-linux-scale-rocm
+    steps:
+      - name: Checkout rocm-libraries
+        uses: actions/checkout@v6
 
       - name: Checkout TheRock
         uses: actions/checkout@v6
@@ -88,7 +96,7 @@ jobs:
             --base-only
 
       - name: Run clang-tidy (hipDNN)
-        if: steps.changes.outputs.hipdnn == 'true' || github.event_name == 'workflow_dispatch'
+        if: needs.setup.outputs.hipdnn == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           . .venv/bin/activate
           export PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
@@ -103,7 +111,7 @@ jobs:
 
       # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
       # - name: Run clang-tidy (miopen-provider)
-      #   if: steps.changes.outputs.miopen-provider == 'true' || github.event_name == 'workflow_dispatch'
+      #   if: needs.setup.outputs.miopen-provider == 'true' || github.event_name == 'workflow_dispatch'
       #   run: |
       #     . .venv/bin/activate
       #     export PATH=/opt/rocm/bin:/opt/rocm/llvm/bin:$PATH
@@ -115,3 +123,23 @@ jobs:
       #       -DENABLE_CLANG_FORMAT=OFF \
       #       -DHIP_PLATFORM=amd
       #     ninja -C build-miopen-provider tidy
+
+  clang_tidy_summary:
+    name: "clang-tidy summary"
+    if: always()
+    needs:
+      - setup
+      - clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Output failed jobs
+        run: |
+          echo '${{ toJson(needs) }}'
+          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
+            | jq --raw-output \
+            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
+          )"
+          if [[ "${FAILED_JOBS}" != "" ]]; then
+            echo "The following jobs failed: ${FAILED_JOBS}"
+            exit 1
+          fi
