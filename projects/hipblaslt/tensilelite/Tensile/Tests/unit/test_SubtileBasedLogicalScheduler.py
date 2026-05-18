@@ -155,6 +155,16 @@ def make_example_granularities_1():
     )
 
 
+_ASMPATH = None
+
+def _get_asmpath():
+    global _ASMPATH
+    if _ASMPATH is None:
+        import shutil
+        _ASMPATH = shutil.which('amdclang++') or '/usr/bin/amdclang++'
+    return _ASMPATH
+
+
 def make_writer_and_tileinfos(kernel, fp4=False):
     """Create writer with register pools and TileInfos for integration tests."""
     from types import SimpleNamespace
@@ -163,10 +173,7 @@ def make_writer_and_tileinfos(kernel, fp4=False):
     from rocisa.enum import RegisterType
 
     ri = rocIsa.getInstance()
-    if not ri.isInit():
-        import shutil
-        asmpath = shutil.which('amdclang++') or '/usr/bin/amdclang++'
-        ri.init((9, 5, 0), asmpath)
+    ri.init((9, 5, 0), _get_asmpath())
     ri.setKernel((9, 5, 0), 64)
 
     tiA = makeTileInfo('A', kernel)
