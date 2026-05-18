@@ -103,8 +103,8 @@ constexpr uint32_t FP8_E5M2_ROUND_THRESHOLD = 0x100000;
 
 // Convert float to FP8 E5M2 bits (OCP format: 1 sign, 5 exponent, 2 mantissa)
 // Range: +/- 57344, has infinity and NaN
-// The `saturate=false` paths return Inf on overflow per the OCP spec and are
-// reserved for future non-saturating-mode support.
+// NOTE: The `saturate=false` paths return Inf on overflow per the OCP spec and
+// are reserved for future non-saturating-mode support.
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline uint8_t float_to_fp8_e5m2_bits(float f, bool saturate = true) noexcept
 {
