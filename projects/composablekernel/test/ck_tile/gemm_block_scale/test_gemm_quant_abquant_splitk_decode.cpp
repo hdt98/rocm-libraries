@@ -113,6 +113,16 @@ TYPED_TEST(TestCkTileGemmABQuant, SplitK8_LargeK_LargeMN)
 
 // Test one padded-K split shape whose earlier split-K batches and final batch would need
 // different compile-time pipeline tail handling. Fixed host-side tail selection rejects it.
+//
+// K=3328, k_batch=9, GemmConfigPadding (K_Tile=256):
+//   K_Warp_Tile is arch-dependent (gfx94/95: 32 or 64, gfx12 WMMA: 16); for all of these
+//   ceil(3328 / (9 * K_Warp_Tile)) * K_Warp_Tile = 384, so KRead is always a multiple of
+//   BQuantGroupSize::kK = AQuantGroupSize::kK = 128 (Constraints 2/3 of IsSupportedArgument).
+//   KLast = 3328 - 8*384 = 256.
+//   num_loop_first = ceil(384/256) = 2  (hot_loop=false, tail=Even)
+//   num_loop_last  = ceil(256/256) = 1  (hot_loop=false, tail=Odd)
+// Mismatched tail, so the fixed host-side dispatch rejects; the runtime-tail dispatch path
+// (RuntimeSplitKTail=true) accepts and dispatches per-batch.
 using ABQuantSplitKRejectTypes = ::testing::Types<std::tuple<RowMajor,
                                                              ColumnMajor,
                                                              RowMajor,
@@ -136,10 +146,10 @@ TYPED_TEST_SUITE(TestCkTileGemmABQuantSplitKReject, ABQuantSplitKRejectTypes);
 
 TYPED_TEST(TestCkTileGemmABQuantSplitKReject, RejectsMismatchedTailSplitK)
 {
-    EXPECT_THROW(this->run_test_with_validation(32, 128, 1792, 5), std::runtime_error);
+    EXPECT_THROW(this->run_test_with_validation(32, 128, 3328, 9), std::runtime_error);
 }
 
 TYPED_TEST(TestCkTileGemmABQuantSplitKReject, RuntimeTailAllowsMismatchedTailSplitK)
 {
-    this->run_test_with_validation(32, 128, 1792, 5, 0, true /* allow_runtime_splitk_tail */);
+    this->run_test_with_validation(32, 128, 3328, 9, 0, true /* allow_runtime_splitk_tail */);
 }

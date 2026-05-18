@@ -73,18 +73,22 @@ class TestCkTileGemmABQuantSplitKPreshuffleBReject : public TestCkTileGemmABQuan
 TYPED_TEST_SUITE(TestCkTileGemmABQuantSplitKPreshuffleBReject,
                  ABQuantSplitKPreshuffleBRuntimeTailTypes);
 
-// K=1792, k_batch=5 with K_Tile=128, K_Warp_Tile=64:
-//   KRead = ceil(1792/(5*64))*64 = 384,  KLast = 1792 - 4*384 = 256
-//   num_loop_first = ceil(384/128) = 3  (Odd)
-//   num_loop_last  = ceil(256/128) = 2  (Even)
-// Tails differ, so the fixed host-side dispatch rejects.
+// K=3328, k_batch=9 with K_Tile=128:
+//   K_Warp_Tile is arch-dependent (gfx94/95: 64 for 8-bit, gfx12 WMMA: 16); for both
+//   ceil(3328 / (9 * K_Warp_Tile)) * K_Warp_Tile = 384, so KRead is always a multiple of
+//   BQuantGroupSize::kK = AQuantGroupSize::kK = 128 (Constraints 2/3 of IsSupportedArgument).
+//   KLast = 3328 - 8*384 = 256.
+//   num_loop_first = ceil(384/128) = 3  (hot_loop=true,  tail=Odd)
+//   num_loop_last  = ceil(256/128) = 2  (hot_loop=false, tail=Even)
+// Both hot_loop and tail differ, so the fixed host-side dispatch rejects; the runtime-tail
+// dispatch path (RuntimeSplitKTail=true) accepts and dispatches per-batch.
 
 TYPED_TEST(TestCkTileGemmABQuantSplitKPreshuffleBReject, RejectsMismatchedTailSplitK)
 {
-    EXPECT_THROW(this->run_test_with_validation(128, 128, 1792, 5), std::runtime_error);
+    EXPECT_THROW(this->run_test_with_validation(128, 128, 3328, 9), std::runtime_error);
 }
 
 TYPED_TEST(TestCkTileGemmABQuantSplitKPreshuffleBReject, RuntimeTailAllowsMismatchedTailSplitK)
 {
-    this->run_test_with_validation(128, 128, 1792, 5, 0, true /* allow_runtime_splitk_tail */);
+    this->run_test_with_validation(128, 128, 3328, 9, 0, true /* allow_runtime_splitk_tail */);
 }
