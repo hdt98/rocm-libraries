@@ -829,14 +829,11 @@ class LraTileAssignmentMFMA(LraTileAssignment):
               strideK  = 8
            strideK1 = mt+LdsPad
 
-        # FIXME SPARSE
-        if kernel["ProblemType"]["Sparse"] != 0:
-            if kernel["MIInputPerThread"] * kernel["ProblemType"]["DataType"].numBytes() > 16:
-                isSparseTrack = (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) or tP["isM"]
-                strideK       = (inputPerThread if umlds else (mt + LdsPad) * inputPerThread) * (2 if isSparseTrack and kernel["MIInputPerThread%s"%tc] > inputPerThread else 1)
-            # GFX1250 Sparse
-            if writer.states.asmCaps["HasSWMMAC"] and writer.states.asmCaps["HasSWMMAC_gfx1250"] and (not isSparseTrack or tP["isM"]):
-                strideK *= 2
+        # FIXME SPARSE - double K
+        if kernel["ProblemType"]["Sparse"]:
+            if (kernel["MIInputPerThread"] * kernel["ProblemType"]["DataType"].numBytes() > 16):
+                if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) or tP["isM"]:
+                    strideK *= 2
 
         # special case for new F8 MFMA, need to exclude wmma_v3
         elif kernel["ProblemType"]["DataType"].is8bitFloat() and kernel["MatrixInstK"] > 32 and (not writer.states.asmCaps["HasWMMA_V3"]) and (not isgfx950mx):
