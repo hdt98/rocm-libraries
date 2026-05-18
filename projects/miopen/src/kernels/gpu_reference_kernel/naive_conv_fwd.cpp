@@ -96,8 +96,7 @@ inline __device__ void naive_conv_fwd_nchw(const src_data_t* __restrict__ p_in,
                     if constexpr(ASSUME_PACKED)
                     {
                         size_t i_idx = static_cast<size_t>(ic) * hi * wi +
-                                       static_cast<size_t>(cur_h) * wi +
-                                       static_cast<size_t>(cur_w);
+                                       static_cast<size_t>(cur_h) * wi + static_cast<size_t>(cur_w);
 
                         size_t f_idx = static_cast<size_t>(ic) * fy * fx +
                                        static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
@@ -249,8 +248,7 @@ inline __device__ void naive_conv_fwd_ncdhw(const src_data_t* __restrict__ p_in,
 
                             size_t f_idx = static_cast<size_t>(ic) * fz * fy * fx +
                                            static_cast<size_t>(iz) * fy * fx +
-                                           static_cast<size_t>(iy) * fx +
-                                           static_cast<size_t>(ix);
+                                           static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
                             value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
                                      cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
@@ -384,10 +382,9 @@ inline __device__ void naive_conv_fwd_nhwc(const src_data_t* __restrict__ p_in,
                 {
                     if constexpr(ASSUME_PACKED)
                     {
-                        size_t i_idx = static_cast<size_t>(cur_h) * wi * c +
-                                       static_cast<size_t>(cur_w) * c +
-                                       static_cast<size_t>(ig) * c_per_group +
-                                       static_cast<size_t>(ic);
+                        size_t i_idx =
+                            static_cast<size_t>(cur_h) * wi * c + static_cast<size_t>(cur_w) * c +
+                            static_cast<size_t>(ig) * c_per_group + static_cast<size_t>(ic);
 
                         size_t f_idx =
                             static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group +
@@ -541,14 +538,13 @@ inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
                         {
                             size_t i_idx = static_cast<size_t>(cur_d) * hi * wi * c +
                                            static_cast<size_t>(cur_h) * wi * c +
-                                           static_cast<size_t>(cur_w) * c +
-                                           static_cast<size_t>(ic);
+                                           static_cast<size_t>(cur_w) * c + static_cast<size_t>(ic);
 
-                            size_t f_idx =
-                                static_cast<size_t>(ik) * fz * fy * fx * c_per_group +
-                                static_cast<size_t>(iz) * fy * fx * c_per_group +
-                                static_cast<size_t>(iy) * fx * c_per_group +
-                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
+                            size_t f_idx = static_cast<size_t>(ik) * fz * fy * fx * c_per_group +
+                                           static_cast<size_t>(iz) * fy * fx * c_per_group +
+                                           static_cast<size_t>(iy) * fx * c_per_group +
+                                           static_cast<size_t>(ix) * c_per_group +
+                                           static_cast<size_t>(ic);
 
                             value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
                                      cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
@@ -589,7 +585,6 @@ inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
         }
     }
 }
-
 
 // double accumulator (GPU reference mode)
 DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, double, float, 0)
@@ -648,4 +643,3 @@ DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, __hip_bfloat16, float, __hip_bfloat16, 0
 // int8
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, int32_t, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, float, 0)
-

@@ -38,12 +38,6 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_NAIVE_USE_PACKED_KERNELS);
 
 namespace miopen {
 
-namespace debug {
-// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
-MIOPEN_EXPORT bool AlwaysEnableConvDirectNaive = false;
-
-} // namespace debug
-
 namespace solver {
 namespace conv {
 
@@ -52,6 +46,13 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 // Block size for naive conv kernels. Passed to kernels via -DNAIVE_CONV_BLOCK_SIZE
 // so shared memory arrays match the launch configuration.
 constexpr size_t NAIVE_CONV_BLOCK_SIZE = 256;
+
+// Minimum spatial work (n * ho * wo, or n * do * ho * wo for 3D) before WRW
+// enables cross-block tiling with atomicAdd. Below this threshold, a single
+// block per filter position is sufficient and avoids the cost of zeroing the
+// weight buffer and atomic contention. 262144 = 1024 * 256, roughly the point
+// where one block can no longer cover the spatial dimension in its thread-loop.
+constexpr size_t WRW_SPATIAL_TILING_THRESHOLD = 262144;
 
 // Native scalar 16-bit float atomicAdd (half, __hip_bfloat16) is available
 // on CDNA2+ (gfx90a, gfx94x, gfx95x) and RDNA4 (gfx120x). RDNA3/3.5
@@ -856,7 +857,8 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     size_t spatial           = static_cast<size_t>(n) * ho * wo;
     size_t num_spatial_tiles = 1;
     bool can_use_wrw_atomic  = IsInputFp32(problem) || HasNative16BitFloatAtomic(ctx);
-    if(!IsAccFp64(problem) && !IsAccInt32(problem) && can_use_wrw_atomic && spatial > 262144)
+    if(!IsAccFp64(problem) && !IsAccInt32(problem) && can_use_wrw_atomic &&
+       spatial > WRW_SPATIAL_TILING_THRESHOLD)
         num_spatial_tiles = (spatial + block_size - 1) / block_size;
 
     KernelInfo kernel;
@@ -931,8 +933,8 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
                     if(alpha_val == 1.0 && beta_val == 0.0)
                     {
                         // Zero weight buffer before atomicAdd accumulation
-                        (void)hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
-                                             handle.GetStream());
+                        (void)hipMemsetAsync(
+                            tensors.dw, 0, tensors.dwDesc.GetNumBytes(), handle.GetStream());
                     }
                     else
                     {
@@ -942,29 +944,29 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
                 }
 
                 handle.Run(kern_copy)(tensors.x,
-                                 tensors.dw,
-                                 alpha_val,
-                                 beta_val,
-                                 tensors.dy,
-                                 in_strides,
-                                 wei_strides,
-                                 out_strides,
-                                 hi,
-                                 wi,
-                                 n,
-                                 k_per_group,
-                                 c_per_group,
-                                 ho,
-                                 wo,
-                                 sy,
-                                 sx,
-                                 dy,
-                                 dx,
-                                 py,
-                                 px,
-                                 fy,
-                                 fx,
-                                 group);
+                                      tensors.dw,
+                                      alpha_val,
+                                      beta_val,
+                                      tensors.dy,
+                                      in_strides,
+                                      wei_strides,
+                                      out_strides,
+                                      hi,
+                                      wi,
+                                      n,
+                                      k_per_group,
+                                      c_per_group,
+                                      ho,
+                                      wo,
+                                      sy,
+                                      sx,
+                                      dy,
+                                      dx,
+                                      py,
+                                      px,
+                                      fy,
+                                      fx,
+                                      group);
             }
             if(handle.IsProfilingEnabled())
                 elapsed += handle.GetKernelTime();
@@ -1017,7 +1019,8 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     size_t spatial           = static_cast<size_t>(n) * do_ * ho * wo;
     size_t num_spatial_tiles = 1;
     bool can_use_wrw_atomic  = IsInputFp32(problem) || HasNative16BitFloatAtomic(ctx);
-    if(!IsAccFp64(problem) && !IsAccInt32(problem) && can_use_wrw_atomic && spatial > 262144)
+    if(!IsAccFp64(problem) && !IsAccInt32(problem) && can_use_wrw_atomic &&
+       spatial > WRW_SPATIAL_TILING_THRESHOLD)
         num_spatial_tiles = (spatial + block_size - 1) / block_size;
 
     KernelInfo kernel;
@@ -1060,8 +1063,8 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
             {
                 if(alpha_val == 1.0 && beta_val == 0.0)
                 {
-                    (void)hipMemsetAsync(tensors.dw, 0, tensors.dwDesc.GetNumBytes(),
-                                         handle.GetStream());
+                    (void)hipMemsetAsync(
+                        tensors.dw, 0, tensors.dwDesc.GetNumBytes(), handle.GetStream());
                 }
                 else
                 {
@@ -1071,35 +1074,35 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
             }
 
             handle.Run(kern_copy)(tensors.x,
-                             tensors.dw,
-                             alpha_val,
-                             beta_val,
-                             tensors.dy,
-                             in_strides,
-                             wei_strides,
-                             out_strides,
-                             di,
-                             hi,
-                             wi,
-                             n,
-                             k_per_group,
-                             c_per_group,
-                             do_,
-                             ho,
-                             wo,
-                             sz,
-                             sy,
-                             sx,
-                             dz,
-                             dy,
-                             dx,
-                             pz,
-                             py,
-                             px,
-                             fz,
-                             fy,
-                             fx,
-                             group);
+                                  tensors.dw,
+                                  alpha_val,
+                                  beta_val,
+                                  tensors.dy,
+                                  in_strides,
+                                  wei_strides,
+                                  out_strides,
+                                  di,
+                                  hi,
+                                  wi,
+                                  n,
+                                  k_per_group,
+                                  c_per_group,
+                                  do_,
+                                  ho,
+                                  wo,
+                                  sz,
+                                  sy,
+                                  sx,
+                                  dz,
+                                  dy,
+                                  dx,
+                                  pz,
+                                  py,
+                                  px,
+                                  fz,
+                                  fy,
+                                  fx,
+                                  group);
 
             if(handle.IsProfilingEnabled())
                 elapsed += handle.GetKernelTime();
@@ -1138,8 +1141,8 @@ GetConv2DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size = NAIVE_CONV_BLOCK_SIZE;
-    size_t grid_size  = 1;
+    size_t block_size    = NAIVE_CONV_BLOCK_SIZE;
+    size_t grid_size     = 1;
     size_t thread_length = 1;
     if(problem.IsLayoutDefault())
     {
@@ -1295,8 +1298,8 @@ GetConv3DBWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     int c_per_group = c / group;
     int k_per_group = k / group;
 
-    size_t block_size = NAIVE_CONV_BLOCK_SIZE;
-    size_t grid_size  = 1;
+    size_t block_size    = NAIVE_CONV_BLOCK_SIZE;
+    size_t grid_size     = 1;
     size_t thread_length = 1;
     if(problem.IsLayoutDefault())
     {

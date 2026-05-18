@@ -27,7 +27,6 @@
 #include <miopen/conv/problem_description.hpp>
 
 #include <miopen/conv/data_invoke_params.hpp>
-#include <miopen/conv/solvers.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/datatype.hpp>
 #include <miopen/execution_context.hpp>
@@ -36,6 +35,11 @@
 #include <sstream>
 
 namespace miopen {
+
+namespace debug {
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+MIOPEN_EXPORT bool AlwaysEnableConvDirectNaive = false;
+} // namespace debug
 
 std::string
 EncodeDataTypesForKey(miopenDataType_t in, miopenDataType_t weights, miopenDataType_t out)

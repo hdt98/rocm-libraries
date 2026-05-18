@@ -68,8 +68,8 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
             static_cast<size_t>(in) * out_strides[4] + static_cast<size_t>(ig) * out_strides[3];
     }
 
-    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
-              static_cast<int>(threadIdx.x);
+    int tid =
+        static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) + static_cast<int>(threadIdx.x);
     if(tid < thread_length)
     {
         int ihi = tid / wi;
@@ -206,8 +206,8 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
             static_cast<size_t>(in) * out_strides[5] + static_cast<size_t>(ig) * out_strides[4];
     }
 
-    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
-              static_cast<int>(threadIdx.x);
+    int tid =
+        static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) + static_cast<int>(threadIdx.x);
     if(tid < thread_length)
     {
         int iwi = tid % wi;
@@ -243,10 +243,9 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
                                            static_cast<size_t>(cur_ho) * wo +
                                            static_cast<size_t>(cur_wo);
 
-                            size_t f_idx =
-                                static_cast<size_t>(ik) * c_per_group * fz * fy * fx +
-                                static_cast<size_t>(iz) * fy * fx +
-                                static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
+                            size_t f_idx = static_cast<size_t>(ik) * c_per_group * fz * fy * fx +
+                                           static_cast<size_t>(iz) * fy * fx +
+                                           static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
                             value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
                                      cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
@@ -341,8 +340,8 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
         p_out += static_cast<size_t>(in) * out_strides[4];
     }
 
-    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
-              static_cast<int>(threadIdx.x);
+    int tid =
+        static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) + static_cast<int>(threadIdx.x);
     if(tid < thread_length)
     {
         // We want to compute
@@ -374,10 +373,9 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
                 {
                     if constexpr(ASSUME_PACKED)
                     {
-                        size_t o_idx = static_cast<size_t>(cur_ho) * wo * k +
-                                       static_cast<size_t>(cur_wo) * k +
-                                       static_cast<size_t>(ig) * k_per_group +
-                                       static_cast<size_t>(ik);
+                        size_t o_idx =
+                            static_cast<size_t>(cur_ho) * wo * k + static_cast<size_t>(cur_wo) * k +
+                            static_cast<size_t>(ig) * k_per_group + static_cast<size_t>(ik);
 
                         size_t f_idx =
                             static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group +
@@ -494,8 +492,8 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
             static_cast<size_t>(in) * out_strides[5] + static_cast<size_t>(ig) * out_strides[1];
     }
 
-    int tid = static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) +
-              static_cast<int>(threadIdx.x);
+    int tid =
+        static_cast<int>(blockIdx.y) * static_cast<int>(blockDim.x) + static_cast<int>(threadIdx.x);
     if(tid < thread_length)
     {
         int ic  = tid % c_per_group;
@@ -530,11 +528,11 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
                                            static_cast<size_t>(cur_wo) * k +
                                            static_cast<size_t>(ik);
 
-                            size_t f_idx =
-                                static_cast<size_t>(ik) * fz * fy * fx * c_per_group +
-                                static_cast<size_t>(iz) * fy * fx * c_per_group +
-                                static_cast<size_t>(iy) * fx * c_per_group +
-                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
+                            size_t f_idx = static_cast<size_t>(ik) * fz * fy * fx * c_per_group +
+                                           static_cast<size_t>(iz) * fy * fx * c_per_group +
+                                           static_cast<size_t>(iy) * fx * c_per_group +
+                                           static_cast<size_t>(ix) * c_per_group +
+                                           static_cast<size_t>(ic);
 
                             value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
                                      cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
@@ -575,7 +573,6 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
         }
     }
 }
-
 
 // double accumulator (GPU reference mode)
 DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, double, float, 0)
@@ -620,4 +617,3 @@ DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, float, float, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, float, float, 1)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, half, float, half, 0)
 DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, __hip_bfloat16, float, __hip_bfloat16, 0)
-

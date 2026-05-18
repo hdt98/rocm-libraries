@@ -130,9 +130,8 @@ struct has_native_atomic_add<__hip_bfloat16>
 // For FWD: cur = stride * o_pos - pad + dil * iy, need 0 <= cur < i_size.
 // Returns iy_start, iy_end (inclusive). Loop: for(iy = iy_start; iy <= iy_end; iy++)
 // If no valid positions, iy_start > iy_end.
-inline __device__ __host__ void
-fwd_filter_range(int o_pos, int pad, int dil, int stride, int f, int i_size,
-                 int& iy_start, int& iy_end)
+inline __device__ __host__ void fwd_filter_range(
+    int o_pos, int pad, int dil, int stride, int f, int i_size, int& iy_start, int& iy_end)
 {
     int tmp = stride * o_pos - pad;
     // cur = tmp + dil * iy >= 0  →  iy >= ceil(-tmp / dil) when tmp < 0
@@ -177,9 +176,8 @@ inline __device__ __host__ int device_gcd(int a, int b)
 //       cur_o = (tmp - dil * iy) / s;    // guaranteed valid, no checks needed
 //
 // If no valid positions exist, iy_start > iy_end.
-inline __device__ __host__ void
-bwd_filter_range(int i_pos, int pad, int dil, int s, int f, int o,
-                 int& iy_start, int& iy_end, int& iy_step)
+inline __device__ __host__ void bwd_filter_range(
+    int i_pos, int pad, int dil, int s, int f, int o, int& iy_start, int& iy_end, int& iy_step)
 {
     int tmp = i_pos + pad;
 
@@ -196,7 +194,7 @@ bwd_filter_range(int i_pos, int pad, int dil, int s, int f, int o,
         iy_hi = f - 1;
 
     // (2) Stride alignment: need (tmp - dil * iy) % s == 0
-    int g = device_gcd(dil, s);
+    int g   = device_gcd(dil, s);
     iy_step = s / g;
 
     // Find first iy >= iy_lo that satisfies (tmp - dil * iy) % s == 0
