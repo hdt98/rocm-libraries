@@ -76,6 +76,10 @@ constexpr uint8_t FP8_E5M2_NEG_INF = 0xFC;
 /// All NaN encodings S.11111.{01, 10, 11} are treated as (quiet) NaN.
 constexpr uint8_t FP8_E5M2_NAN = 0x7F;
 
+/// Smallest absolute bit pattern that decodes to NaN (0x7D).
+/// NaN range is [0x7D, 0x7F]; equivalently exp=31 and mant != 0.
+constexpr uint8_t FP8_E5M2_NAN_MIN = 0x7D;
+
 /// Maximum finite positive value: 0x7B = 57344.0
 constexpr uint8_t FP8_E5M2_MAX = 0x7B;
 
@@ -265,7 +269,7 @@ inline float fp8_e5m2_bits_to_float(uint8_t bits) noexcept
     // Negative values
     const float posVal = TABLE[absBits];
     // NaN requires copysign
-    if(absBits > FP8_E5M2_POS_INF) // 0x7D, 0x7E, 0x7F are NaN
+    if(absBits >= FP8_E5M2_NAN_MIN) // 0x7D, 0x7E, 0x7F are NaN
     {
         return std::copysign(posVal, -1.0f);
     }
