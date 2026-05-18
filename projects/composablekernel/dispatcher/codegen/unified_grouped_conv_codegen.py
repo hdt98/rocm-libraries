@@ -269,7 +269,7 @@ class GroupedConvKernelConfig:
         """Check if configuration is valid for target architecture.
 
         Note: irregular vector sizes and multi-warp tile dimensions are
-        validated upstream in convert_builder_configs.py before JSON configs
+        validated upstream in before the JSON configs
         are generated — they never reach this point.
         """
         target_arch = arch if arch is not None else self.arch
@@ -1292,7 +1292,7 @@ def load_configs_from_json(
     """Load kernel configurations from a JSON config file.
 
     Args:
-        config_path: Path to JSON config file (as produced by convert_builder_configs.py)
+        config_path: Path to JSON config file
         arch: Target GPU architecture
         instance_id: If specified, load only the instance with this ID
 
@@ -1962,12 +1962,12 @@ def main():
         help="List configurations without generating",
     )
 
-    # JSON config file (from convert_builder_configs.py)
+    # JSON config file
     parser.add_argument(
         "--config-file",
         type=Path,
         default=None,
-        help="Path to JSON config file (from convert_builder_configs.py). "
+        help="Path to JSON config file. "
              "Overrides --variant, --ndim, and individual tile/pipeline args.",
     )
     parser.add_argument(

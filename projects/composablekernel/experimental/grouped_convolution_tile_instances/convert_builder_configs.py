@@ -20,14 +20,14 @@
 #      (tile_m > warp_size * vec_a, or tile_n > warp_size * vec_b) — the
 #      codegen assumes single-warp coverage per tile dimension for data loading
 #
-# Usage:
-#   python3 convert_builder_configs.py \
-#     --input ../experimental/.../configs/backward_weight/profiler/nhwgc_bf16.conf \
-#     --output configs/grouped_conv/backward_weight/profiler/nhwgc_bf16.json \
+# Usage example:
+#   python3 convert_builder_configs.py convert \
+#     --input configs/backward_weight/profiler/nhwgc_bf16.conf \
+#     --output ../../dispatcher/codegen/configs/grouped_conv/backward_weight/profiler/nhwgc_bf16.json \
 #     --variant bwd_weight --layout nhwgc --datatype bf16 --ndim 2
 #
 # Or convert all configs at once:
-#   python3 convert_builder_configs.py --convert-all
+#   python3 convert_builder_configs.py convert-all
 
 import argparse
 import json
@@ -641,13 +641,12 @@ def main():
     batch = subparsers.add_parser("convert-all", help="Convert all backward_weight configs")
     batch.add_argument(
         "--builder-configs-dir",
-        default=str(Path(__file__).resolve().parent.parent.parent /
-                    "experimental/grouped_convolution_tile_instances/configs"),
+        default=str(Path(__file__).resolve().parent / "configs"),
         help="Path to CK Builder configs directory",
     )
     batch.add_argument(
         "--output-dir",
-        default=str(Path(__file__).resolve().parent / "configs/grouped_conv"),
+        default=str(Path(__file__).resolve().parent.parent.parent / "dispatcher/codegen/configs/grouped_conv"),
         help="Output directory for JSON configs",
     )
 

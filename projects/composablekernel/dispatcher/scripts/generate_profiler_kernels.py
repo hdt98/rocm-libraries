@@ -5,7 +5,7 @@
 # Generates dispatcher-based kernels for the CK Profiler (all directions).
 #
 # This script:
-# 1. Reads JSON config files (from convert_builder_configs.py)
+# 1. Reads JSON config files
 # 2. Calls unified_grouped_conv_codegen.py --config-file for each JSON
 # 3. Generates include_all_grouped_conv_<variant>_kernels.hpp
 # 4. Generates chunked register_*_chunk_N.cpp files + register_all_grouped_conv_kernels.cpp
