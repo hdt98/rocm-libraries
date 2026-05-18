@@ -19,13 +19,13 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     static constexpr auto ATileAccessPattern = tile_distribution_pattern::warp_raked;
     static constexpr auto BTileAccessPattern = tile_distribution_pattern::warp_raked;
     using Base = UniversalGemmBasePolicy<GemmPipelineAgBgCrCompAsyncDefaultPolicy<EnableSubTile>>;
+    using Base::GetSmemPackA;
+    using Base::GetSmemPackB;
     using Base::I0;
     using Base::I1;
     using Base::I2;
     using Base::is_a_load_tr;
     using Base::is_b_load_tr;
-    using Base::GetSmemPackA;
-    using Base::GetSmemPackB;
 
     // Async copy supports 32-bit, 96-bit, or 128-bit transfers (4, 12, 16 bytes)
     template <typename DataType, index_t KPack>
@@ -44,13 +44,15 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     // Check that async vector store to LDS is supported
     template <typename Problem>
     static constexpr bool IsSupportedXorSwizzleAsyncWidth =
-        IsSupportedAsyncVectorWidth<typename Problem::ADataType, GetSmemPackA<Problem>()> &&
-        IsSupportedAsyncVectorWidth<typename Problem::BDataType, GetSmemPackB<Problem>()>;
+        IsSupportedAsyncVectorWidth<typename Problem::ADataType,
+                                    Base::template GetSmemPackA<Problem>()> &&
+        IsSupportedAsyncVectorWidth<typename Problem::BDataType,
+                                    Base::template GetSmemPackB<Problem>()>;
 
     // Assume normal LDS layout, not transpose-load
     template <typename Problem>
     static constexpr bool UseXorSwizzle =
-        !is_a_load_tr<Problem> && !is_b_load_tr<Problem> &&
+        !Base::template is_a_load_tr<Problem> && !Base::template is_b_load_tr<Problem> &&
         IsSupportedXorSwizzleDataType<Problem> && IsSupportedXorSwizzleAsyncWidth<Problem>;
 
     // Compute the number of LDS read accesses for A or B
@@ -94,7 +96,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     {
         using WarpTile                    = typename Problem::BlockGemmShape::WarpTile;
         constexpr index_t thread_elements = WarpTile::at(I0) * WarpTile::at(I2) / get_warp_size();
-        return CalculateWGAttrNumAccess<is_a_load_tr<Problem>,
+        return CalculateWGAttrNumAccess<Base::template is_a_load_tr<Problem>,
                                         typename Problem::ADataType,
                                         thread_elements>();
     }
@@ -104,7 +106,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     {
         using WarpTile                    = typename Problem::BlockGemmShape::WarpTile;
         constexpr index_t thread_elements = WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
-        return CalculateWGAttrNumAccess<is_b_load_tr<Problem>,
+        return CalculateWGAttrNumAccess<Base::template is_b_load_tr<Problem>,
                                         typename Problem::BDataType,
                                         thread_elements>();
     }
@@ -237,7 +239,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
             if constexpr(UseXorSwizzle<Problem>)
             {
                 using WarpTile          = typename Problem::BlockGemmShape::WarpTile;
-                constexpr index_t KPack = GetSmemPackA<Problem>();
+                constexpr index_t KPack = Base::template GetSmemPackA<Problem>();
                 constexpr auto desc =
                     MakeXorSwizzledABLdsBlockDescriptor<Problem,
                                                         MPerBlock,
@@ -250,7 +252,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
             }
             else
             {
-                constexpr index_t KPack = GetSmemPackA<Problem>();
+                constexpr index_t KPack = Base::template GetSmemPackA<Problem>();
 
                 constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
                     make_tuple(number<KPerBlock / KPack>{}, number<MPerBlock>{}, number<KPack>{}),
@@ -295,7 +297,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
             if constexpr(UseXorSwizzle<Problem>)
             {
                 using WarpTile          = typename Problem::BlockGemmShape::WarpTile;
-                constexpr index_t KPack = GetSmemPackB<Problem>();
+                constexpr index_t KPack = Base::template GetSmemPackB<Problem>();
                 constexpr auto desc =
                     MakeXorSwizzledABLdsBlockDescriptor<Problem,
                                                         NPerBlock,
@@ -308,7 +310,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
             }
             else
             {
-                constexpr index_t KPack = GetSmemPackB<Problem>();
+                constexpr index_t KPack = Base::template GetSmemPackB<Problem>();
 
                 constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
                     make_tuple(number<KPerBlock / KPack>{}, number<NPerBlock>{}, number<KPack>{}),
@@ -396,7 +398,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     {
         if constexpr(UseXorSwizzle<Problem>)
         {
-            constexpr index_t KPack = GetSmemPackA<Problem>();
+            constexpr index_t KPack = Base::template GetSmemPackA<Problem>();
             return MakeAsyncLoadABDramWindow<Problem, KPack, GetWGAttrNumAccess<Problem>()>(window);
         }
         else
@@ -412,7 +414,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     {
         if constexpr(UseXorSwizzle<Problem>)
         {
-            constexpr index_t KPack = GetSmemPackB<Problem>();
+            constexpr index_t KPack = Base::template GetSmemPackB<Problem>();
             return MakeAsyncLoadABDramWindow<Problem, KPack, GetWGAttrNumAccess<Problem>()>(window);
         }
         else
