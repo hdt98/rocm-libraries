@@ -144,6 +144,8 @@ class GlobalWriteBatchWriter:
     3. Not a Beta path (Beta paths need separate alpha multiply + beta*C)
     4. Destination is FP8 with stochastic rounding (ToDo: add support for FP8 w/o SR)
     5. Batch has 8+ elements (for pk8 conversion)
+    6. No bias read or activation (these modify data after the alpha-skip point,
+       but the fused pk8 path reads from raw WMMA output, missing those modifications)
     """
     if not self.parentWriter.states.asmCaps.get("HasScaleSRPk8Cvt", False):
       return False
@@ -156,6 +158,10 @@ class GlobalWriteBatchWriter:
     if not self.kernel["ProblemType"]["StochasticRounding"]:
       return False
     if len(self.batchElements) < 8:
+      return False
+    if self.parentWriter.states.useBias == DataDirection.READ:
+      return False
+    if self.kernel.get("ActivationFuncCall", False):
       return False
     return True
 
