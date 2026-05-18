@@ -2342,11 +2342,13 @@ class LogicalScheduler:
         module.add(endLabel)
 
         # ── TailLoop ──
-        # Gate on kernel["NoTailLoop"]: existing subtile solutions set this True
-        # (since Solution.py forces K%DepthU==0 for subtile), so the template
-        # tail-loop emit is currently a no-op for in-tree tests. Phase 1+ will
-        # introduce solutions where NoTailLoop=False and exercise this path.
-        hasTailLoop = not kernel["NoTailLoop"]
+        # Gate on kernel["NoTailLoop"]: real subtile kernels always have this
+        # key (set in Solution.py — True when ASEM%DepthU==0, which the current
+        # subtile path forces), so the template tail-loop emit is a no-op for
+        # in-tree tests. Phase 1+ lifts the K%DepthU constraint and adds tests
+        # that exercise this path. Default True so unit-test mock dicts (which
+        # don't set NoTailLoop) also skip the emit cleanly.
+        hasTailLoop = not kernel.get("NoTailLoop", True)
         tailEndLabel = Label("TailLoopEnd", "")
         if hasTailLoop:
             module.addComment0(f"TAILLOOP")
