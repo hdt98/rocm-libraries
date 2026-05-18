@@ -2204,3 +2204,228 @@ class TestBuildTailloopPGR0:
 
         finally:
             sched.deallocVgprTiles(writer)
+
+
+# ── Tail-loop emission assertions (Phase 1.5 red baseline) ─────
+#
+# These tests pin the *future* behaviour of the subtile tail-loop emit
+# (Phase 3.4 wires it into emitAllLoops; Phase 4 wires preloop K==0
+# routing). They are expected to fail on the current branch — the
+# imported template_tailloop scaffold uses the wrong label name and
+# places the tail block after SkipToEnd (where it is unreachable).
+# The Phase 3-4 implementation will:
+#   - Emit a `SkipTailLoopL` label at the end of the tail block, used as
+#     the early-exit destination when K%DepthU==0.
+#   - Place the tail block before `SkipToEnd` so fall-through reaches it.
+#   - Emit the LoopCounterL = K%DU + early-exit branch (calculateLoopNumIter
+#     -1 sequence).
+#   - For PGR=2, route the preloop K==0 path past the tail (skip to
+#     SkipTailLoopL or equivalent).
+
+
+def _tail_kernel_bf16(MT0=256, MT1=256, depthU=64, no_tail_loop=False):
+    """BF16 mock kernel with NoTailLoop set (real solutions populate this)."""
+    kernel = create_kernel(MT0, MT1, fp4=False, depthU=depthU)
+    kernel["NoTailLoop"] = no_tail_loop
+    return kernel
+
+
+def _tail_kernel_fp4(MT0=256, MT1=256, depthU=256, no_tail_loop=False):
+    """FP4 mock kernel with NoTailLoop set."""
+    kernel = create_kernel(MT0, MT1, fp4=True, depthU=depthU)
+    kernel["NoTailLoop"] = no_tail_loop
+    return kernel
+
+
+class TestEmitAllLoopsTail_PGR0:
+    """Tail-loop assertions on emitAllLoops output for PGR=0 kernels."""
+
+    def test_omits_tail_when_NoTailLoop_true(self):
+        """Control: aligned-K kernels (NoTailLoop=True) emit no tail block.
+
+        This passes today (current template gates on NoTailLoop) and acts
+        as a regression guard against accidentally enabling the emit
+        unconditionally.
+        """
+        kernel = _tail_kernel_fp4(no_tail_loop=True)
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = \
+            make_writer_and_tileinfos(kernel, fp4=True)
+
+        cfg = make_cfg_256x256_fp4()
+        sched = LogicalScheduler(cfg)
+        sched.build()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                             scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+            module = sched.emitAllLoops(writer, kernel)
+            asm = str(module)
+            assert "TAILLOOP" not in asm, \
+                "Tail block must not be emitted when NoTailLoop=True"
+            assert "SkipTailLoopL" not in asm
+            assert "TailLoopEnd" not in asm
+        finally:
+            sched.deallocVgprTiles(writer)
+
+    def test_emits_SkipTailLoopL_label(self):
+        """Tail block uses the standard SkipTailLoopL label.
+
+        The legacy non-subtile tail-loop emitter (KernelWriterAssembly.py)
+        uses `SkipTailLoopL` as both the early-exit destination and the
+        post-tail join point. The subtile path should match for symmetry
+        with the rest of Tensile's loop labelling.
+
+        Red today: imported template uses `TailLoopEnd` instead.
+        """
+        kernel = _tail_kernel_fp4(no_tail_loop=False)
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = \
+            make_writer_and_tileinfos(kernel, fp4=True)
+
+        cfg = make_cfg_256x256_fp4()
+        sched = LogicalScheduler(cfg)
+        sched.build()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                             scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+            module = sched.emitAllLoops(writer, kernel)
+            asm = str(module)
+            assert "SkipTailLoopL:" in asm, \
+                "Tail block must declare a SkipTailLoopL label " \
+                "(early-exit destination + post-tail join). Got:\n" + asm[-2000:]
+        finally:
+            sched.deallocVgprTiles(writer)
+
+    def test_tail_appears_before_SkipToEnd(self):
+        """Tail block must be placed before SkipToEnd in code order.
+
+        SkipToEnd is the join point that exit branches from the mainloop /
+        NLL paths target. If the tail block lives *after* SkipToEnd it is
+        unreachable from any exit path. The Phase 3.4 wiring places the
+        tail between the last NLL block and SkipToEnd.
+
+        Red today: imported template emits `module.add(endLabel)` first,
+        then the tail body, so SkipToEnd appears before TAILLOOP.
+        """
+        kernel = _tail_kernel_fp4(no_tail_loop=False)
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = \
+            make_writer_and_tileinfos(kernel, fp4=True)
+
+        cfg = make_cfg_256x256_fp4()
+        sched = LogicalScheduler(cfg)
+        sched.build()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                             scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+            module = sched.emitAllLoops(writer, kernel)
+            asm = str(module)
+
+            assert "TAILLOOP" in asm, "Tail block must be emitted"
+            tail_pos = asm.find("TAILLOOP")
+            skip_to_end_pos = asm.find("SkipToEnd:")
+            assert skip_to_end_pos > 0, \
+                "SkipToEnd label missing from emitAllLoops output"
+            assert tail_pos < skip_to_end_pos, (
+                f"Tail block must appear before SkipToEnd. "
+                f"TAILLOOP at offset {tail_pos}, SkipToEnd at offset "
+                f"{skip_to_end_pos}: tail is currently unreachable."
+            )
+        finally:
+            sched.deallocVgprTiles(writer)
+
+    def test_emits_LoopCounterL_early_exit_branch(self):
+        """Tail emit must compute LoopCounterL = K%DU and skip on zero.
+
+        Step 2-1-1 of the tail-loop init: derive the per-tail iteration
+        count from SizesSum and branch over the body when the remainder
+        is zero. The asm should contain references to LoopCounterL and a
+        comparison-against-zero / SCBranchSCC* sequence within the tail
+        section.
+
+        Red today: imported template emits the tail body unconditionally
+        without computing LoopCounterL or any early-exit branch.
+        """
+        kernel = _tail_kernel_fp4(no_tail_loop=False)
+        writer, tiA, tiB, scaleTiA, scaleTiB, dTileInfo = \
+            make_writer_and_tileinfos(kernel, fp4=True)
+
+        cfg = make_cfg_256x256_fp4()
+        sched = LogicalScheduler(cfg)
+        sched.build()
+        sched.allocVgprTiles(writer, tiA, tiB,
+                             scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB)
+        try:
+            sched.populate_instructions(
+                writer, kernel,
+                tileInfoA=tiA, tileInfoB=tiB,
+                dtileInfo=dTileInfo,
+                scaleTileInfoA=scaleTiA, scaleTileInfoB=scaleTiB,
+            )
+            module = sched.emitAllLoops(writer, kernel)
+            asm = str(module)
+
+            assert "LoopCounterL" in asm, \
+                "Tail emit must reference LoopCounterL " \
+                "(set to SizesSum % DepthU)"
+            assert ("s_cmp_eq" in asm.lower() or "scmpequ" in asm.lower()), \
+                "Tail emit must compare LoopCounterL against zero"
+            assert "SkipTailLoopL" in asm, \
+                "Early-exit branch needs a SkipTailLoopL target"
+        finally:
+            sched.deallocVgprTiles(writer)
+
+
+class TestPreloopSkipsTail_PGR2:
+    """Preloop must route K==0 / single-iter cases past the tail block."""
+
+    def test_preloop_emits_skip_past_tail_when_K_zero(self):
+        """For PGR=2 with NoTailLoop=False, the preloop's compare-and-skip
+        chain must include a target that jumps over the tail block when
+        the unrolled K count is zero (i.e., K < 2*DU).
+
+        Today the preloop only emits skips to NGLL / NLL — there is no
+        SkipOp whose target reaches past the tail. Phase 4 adds either a
+        new TailEnd-style target, or extends one of the existing skip
+        targets so that K==0 paths bypass the tail block too.
+        """
+        cfg = make_cfg_bf16(MT0=256, MT1=256, depthU=64)
+        assert cfg.pgr == 2, "make_cfg_bf16 should default to PGR=2"
+        sched = LogicalScheduler(cfg)
+        sched.emit()
+        preloop = sched.build_preloop()
+
+        from Tensile.Components.Subtile.LogicalScheduler import SkipOp
+        skip_targets = []
+        for partition in preloop:
+            for em_or_list in partition:
+                ems = em_or_list if isinstance(em_or_list, list) else [em_or_list]
+                for em in ems:
+                    for op in getattr(em, 'ops', []):
+                        if isinstance(op, SkipOp):
+                            skip_targets.append(op.target)
+
+        # Acceptable Phase-4 targets: the tail-end label or a dedicated
+        # all-tail-only path. Today only NGLL/NLL appear here.
+        tail_safe = [t for t in skip_targets
+                     if 'Tail' in t or t in ('SkipTailLoopL', 'TailLoopEnd')]
+        assert tail_safe, (
+            f"Preloop emitted SkipOp targets {skip_targets!r} but none route "
+            f"past the tail block. Expected at least one target referring to "
+            f"the tail-end label so K==0 paths bypass the tail."
+        )
