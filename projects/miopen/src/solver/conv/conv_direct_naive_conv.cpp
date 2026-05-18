@@ -689,7 +689,7 @@ GetConv3DFWDSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     else if(problem.IsLayoutNHWC())
     {
         grid_size_per_batch = static_cast<size_t>(group) * do_;
-        thread_length       = static_cast<size_t>(ho) * wo * k;
+        thread_length       = static_cast<size_t>(ho) * wo * k_per_group;
         CalculateBatchChunkSize(grid_size_per_batch, n, batch_chunk_size, grid_size);
     }
     else

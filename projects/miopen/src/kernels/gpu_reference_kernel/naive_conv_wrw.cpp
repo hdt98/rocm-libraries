@@ -72,6 +72,10 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
     int spatial_length = n * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    // Invariant: the solver must only set gridDim.y > 1 when dst_data_t has
+    // native atomicAdd (has_native_atomic_add<dst_data_t>::value). The if
+    // constexpr guard prevents compilation of atomicAdd for unsupported types,
+    // but racing non-atomic writes would produce wrong results at runtime.
     bool use_atomic    = (gridDim.y > 1);
 
     // Spatial tile range for cross-block tiling (gridDim.y > 1)
@@ -468,6 +472,10 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
     int spatial_length = n * do_ * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    // Invariant: the solver must only set gridDim.y > 1 when dst_data_t has
+    // native atomicAdd (has_native_atomic_add<dst_data_t>::value). The if
+    // constexpr guard prevents compilation of atomicAdd for unsupported types,
+    // but racing non-atomic writes would produce wrong results at runtime.
     bool use_atomic    = (gridDim.y > 1);
 
     // Spatial tile range for cross-block tiling (gridDim.y > 1)
@@ -902,6 +910,10 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
     int spatial_length = n * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    // Invariant: the solver must only set gridDim.y > 1 when dst_data_t has
+    // native atomicAdd (has_native_atomic_add<dst_data_t>::value). The if
+    // constexpr guard prevents compilation of atomicAdd for unsupported types,
+    // but racing non-atomic writes would produce wrong results at runtime.
     bool use_atomic    = (gridDim.y > 1);
 
     // Spatial tile range for cross-block tiling (gridDim.y > 1)
@@ -1296,6 +1308,10 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
     int spatial_length = n * do_ * ho * wo;
     int bdx            = static_cast<int>(blockDim.x);
     int tx             = static_cast<int>(threadIdx.x);
+    // Invariant: the solver must only set gridDim.y > 1 when dst_data_t has
+    // native atomicAdd (has_native_atomic_add<dst_data_t>::value). The if
+    // constexpr guard prevents compilation of atomicAdd for unsupported types,
+    // but racing non-atomic writes would produce wrong results at runtime.
     bool use_atomic    = (gridDim.y > 1);
 
     // Spatial tile range for cross-block tiling (gridDim.y > 1)
