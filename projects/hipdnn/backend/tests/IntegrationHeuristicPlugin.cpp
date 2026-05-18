@@ -207,10 +207,14 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
     const auto policyInfos = rm->getHeuristicPolicyInfos();
     ASSERT_FALSE(policyInfos.empty());
 
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
+    // Target the test plugin by known policy ID. policyInfos[0] is derived
+    // from an unordered_map iteration and lands on different plugins across
+    // platforms; built-ins reject the synthetic graph payload below.
+    const auto goodPolicyId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
+    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(goodPolicyId);
     ASSERT_NE(plugin, nullptr);
 
-    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
+    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(goodPolicyId);
     ASSERT_NE(handle, nullptr);
 
     // Set device properties on handle
@@ -227,8 +231,8 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
     plugin->setDeviceProperties(handle, &devicePropsData);
 
     // Create policy descriptor (RAII so destroy runs even on ASSERT_* abort)
-    const auto descGuard = makeScopedPolicyDescriptor(
-        *plugin, plugin->createPolicyDescriptor(handle, policyInfos[0].policyId));
+    const auto descGuard
+        = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle, goodPolicyId));
     ASSERT_NE(descGuard.get(), nullptr);
 
     // Set engine IDs
@@ -373,14 +377,18 @@ TEST_F(IntegrationHeuristicPlugin, FinalizeWithEmptyEngineIdsSucceeds)
     const auto policyInfos = rm->getHeuristicPolicyInfos();
     ASSERT_FALSE(policyInfos.empty());
 
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
+    // Target the test plugin by known policy ID. policyInfos[0] is derived
+    // from an unordered_map iteration and lands on different plugins across
+    // platforms; built-ins reject finalize() without a real graph payload.
+    const auto goodPolicyId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
+    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(goodPolicyId);
     ASSERT_NE(plugin, nullptr);
 
-    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
+    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(goodPolicyId);
     ASSERT_NE(handle, nullptr);
 
-    const auto descGuard = makeScopedPolicyDescriptor(
-        *plugin, plugin->createPolicyDescriptor(handle, policyInfos[0].policyId));
+    const auto descGuard
+        = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle, goodPolicyId));
     ASSERT_NE(descGuard.get(), nullptr);
 
     // Don't set any engine IDs - just finalize
