@@ -242,8 +242,11 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PolicyDescriptorCreationSucceeds)
     auto policyInfos = heurRm->getHeuristicPolicyInfos();
     ASSERT_GT(policyInfos.size(), 0u);
 
-    // Try to create a policy descriptor for the first loaded policy
-    auto policyId = policyInfos[0].policyId;
+    // Pin to the StaticOrdering built-in: it is always registered, so the
+    // test is deterministic regardless of which vendor plugins are present
+    // (policyInfos ordering is derived from an unordered_map iteration).
+    const auto policyId
+        = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
     auto pluginHandle = heurRm->getHeuristicHandleForPolicyId(policyId);
     auto plugin = heurRm->getPluginForPolicyId(policyId);
 
