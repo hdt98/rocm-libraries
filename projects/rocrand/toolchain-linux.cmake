@@ -14,7 +14,7 @@ endif()
 
 if (NOT DEFINED ENV{CXX})
   set(CMAKE_CXX_COMPILER "${rocm_bin}/amdclang++" CACHE PATH "Path to the C++ compiler")
-  set(CMAKE_CXX_FLAGS "-mllvm -amdgpu-early-inline-all=true -mllvm -amdgpu-function-calls=false")
+  set(CMAKE_CXX_FLAGS_INIT "-mllvm -amdgpu-early-inline-all=true -mllvm -amdgpu-function-calls=false")
 else()
   set(CMAKE_CXX_COMPILER "$ENV{CXX}" CACHE PATH "Path to the C++ compiler")
 endif()

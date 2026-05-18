@@ -20,9 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set(CMAKE_CXX_STANDARD 17)
-
 include(CheckCXXSourceCompiles)
+include(CMakePushCheckState)
 
 set(HAVE_STD_FILESYSTEM_TEST [[
   #include <filesystem>
@@ -33,12 +32,19 @@ set(HAVE_STD_FILESYSTEM_TEST [[
   return 0;
   }
   ]])
+cmake_push_check_state(RESET)
+set(CMAKE_REQUIRED_FLAGS "-std=c++17")
 check_cxx_source_compiles("${HAVE_STD_FILESYSTEM_TEST}" HAVE_STD_FILESYSTEM)
+cmake_pop_check_state()
 
 add_custom_target(tools)
 
 function(rocrand_add_tool TARGET_NAME)
     add_executable(${TARGET_NAME} ${ARGN})
+    target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
+    target_compile_options(${TARGET_NAME} PRIVATE ${ROCRAND_WARNING_FLAGS} ${ROCRAND_SANITIZER_COMPILE_OPTIONS} ${ROCRAND_COVERAGE_COMPILE_OPTIONS})
+    target_link_options(${TARGET_NAME} PRIVATE ${ROCRAND_SANITIZER_LINK_OPTIONS} ${ROCRAND_COVERAGE_LINK_OPTIONS})
+    target_compile_definitions(${TARGET_NAME} PRIVATE ${ROCRAND_COVERAGE_DEFINITIONS})
     add_dependencies(tools ${TARGET_NAME})
     if(NOT HAVE_STD_FILESYSTEM)
       # if filesystem library is not available in the standard library,

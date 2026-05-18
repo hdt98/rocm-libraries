@@ -16,14 +16,10 @@ endif()
 
 set(CMAKE_CXX_COMPILER "${rocm_bin}/clang++.exe")
 
-# our usage flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32 -D_CRT_SECURE_NO_WARNINGS")
-
-# flags for clang direct use
-# -Wno-ignored-attributes to avoid warning: __declspec attribute 'dllexport' is not supported [-Wignored-attributes] which is used by msvc compiler
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -fms-extensions -fms-compatibility -Wno-ignored-attributes")
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__HIP_PLATFORM_AMD__ -D__HIP_ROCclr__ ")
+# Combined toolchain flags (usage flags, clang direct-use flags, platform defines).
+# Using _INIT so projects can still append without losing toolchain defaults.
+# -Wno-ignored-attributes: suppress __declspec 'dllexport' warning from msvc-compat mode
+set(CMAKE_CXX_FLAGS_INIT "-DWIN32 -D_CRT_SECURE_NO_WARNINGS -std=c++17 -fms-extensions -fms-compatibility -Wno-ignored-attributes -D__HIP_PLATFORM_AMD__ -D__HIP_ROCclr__")
 
 if (DEFINED ENV{VCPKG_PATH})
   file(TO_CMAKE_PATH "$ENV{VCPKG_PATH}" VCPKG_PATH)

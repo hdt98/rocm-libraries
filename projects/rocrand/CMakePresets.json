@@ -1,0 +1,78 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 16,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default (Linux)",
+      "description": "Default configure preset for Linux using amdclang++",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/toolchain-linux.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install",
+        "GPU_TARGETS": "gfx906;gfx908;gfx90a;gfx942;gfx1030;gfx1100"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (Linux)",
+      "description": "Debug build for Linux",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows",
+      "displayName": "Default (Windows)",
+      "description": "Default configure preset for Windows using HIP clang",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/toolchain-windows.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install",
+        "GPU_TARGETS": "gfx906;gfx908;gfx90a;gfx942;gfx1030;gfx1100"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "default"
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release-windows",
+      "displayName": "Release (Windows)",
+      "configurePreset": "windows"
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release: Configure + Build",
+      "steps": [
+        { "type": "configure", "name": "default" },
+        { "type": "build", "name": "release" }
+      ]
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug: Configure + Build",
+      "steps": [
+        { "type": "configure", "name": "debug" },
+        { "type": "build", "name": "debug" }
+      ]
+    }
+  ]
+}

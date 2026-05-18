@@ -52,12 +52,39 @@ function(add_relative_test test_name test_target)
 endfunction()
 
 # Get rocRAND tests source files
-file(GLOB rocRAND_TEST_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+set(rocRAND_TEST_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_basic.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_cpp_basic.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_cpp_wrapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_generate.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_generate_log_normal.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_generate_normal.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_generate_poisson.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_generate_uniform.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_hipgraphs.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_host.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_lfsr113.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_mrg.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_mtgp32.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_philox4x32_10.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_scrambled_sobol32.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_scrambled_sobol64.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_sobol32.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_sobol64.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_threefry2x32_20.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_threefry2x64_20.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_threefry4x32_20.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_threefry4x64_20.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand_kernel_xorwow.cpp
+)
 
 # Build rocRAND tests
 function(add_test_target test_src is_internal)
   get_filename_component(test_name ${test_src} NAME_WE)
   add_executable(${test_name} ${test_src})
+  target_compile_options(${test_name} PRIVATE ${ROCRAND_WARNING_FLAGS} ${ROCRAND_SANITIZER_COMPILE_OPTIONS} ${ROCRAND_COVERAGE_COMPILE_OPTIONS})
+  target_link_options(${test_name} PRIVATE ${ROCRAND_SANITIZER_LINK_OPTIONS} ${ROCRAND_COVERAGE_LINK_OPTIONS})
+  target_compile_definitions(${test_name} PRIVATE ${ROCRAND_COVERAGE_DEFINITIONS})
   # nvcc/CUDA
   if(HIP_COMPILER STREQUAL "nvcc")
     set_source_files_properties(${test_name} PROPERTIES LANGUAGE CUDA)

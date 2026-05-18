@@ -116,15 +116,20 @@ if (NOT _ROCRAND_HIP_NVCC_FLAGS_SET)
         list(APPEND HIP_NVCC_FLAGS "--generate-code" "arch=compute_${CUDA_ARCH},code=compute_${CUDA_ARCH}")
     endforeach()
 
-    # Update list parameter
+    # Build flag lists for target-scoped application (no global CMAKE_*_FLAGS mutation).
+    # Callers should apply these to targets via target_compile_options().
+
+    # CUDA compile options: HIP cpp config flags + NVCC flags
+    separate_arguments(_hip_cpp_config_list NATIVE_COMMAND "${HIP_CPP_CONFIG_FLAGS}")
+    set(ROCRAND_CUDA_COMPILE_OPTIONS ${_hip_cpp_config_list} ${HIP_NVCC_FLAGS}
+        CACHE INTERNAL "CUDA compile options for rocrand NVCC targets")
+
+    # CXX compile options: HIP cpp config flags + warning suppression for NVCC host code
+    set(ROCRAND_CXX_COMPILE_OPTIONS ${_hip_cpp_config_list} -Wno-unknown-pragmas -Wno-deprecated-declarations
+        CACHE INTERNAL "CXX compile options for rocrand NVCC host code")
+
+    # Keep HIP_NVCC_FLAGS as a joined string for Summary.cmake display
     list(JOIN HIP_NVCC_FLAGS " " HIP_NVCC_FLAGS)
 
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${HIP_CPP_CONFIG_FLAGS} ${HIP_NVCC_FLAGS}"
-        CACHE STRING "Cuda compile flags" FORCE)
-
-    # Ignore warnings about #pragma unroll
-    # and about deprecated CUDA function(s) used in hip/nvcc_detail/hip_runtime_api.h
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${HIP_CPP_CONFIG_FLAGS_STRIP} -Wno-unknown-pragmas -Wno-deprecated-declarations"
-        CACHE STRING "compile flags" FORCE)
     set(_ROCRAND_HIP_NVCC_FLAGS_SET ON CACHE INTERNAL "")
 endif()

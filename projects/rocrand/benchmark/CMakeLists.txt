@@ -25,6 +25,9 @@
 function(add_rocrand_benchmark benchmark_src legacy)
   get_filename_component(BENCHMARK_TARGET ${benchmark_src} NAME_WE)
   add_executable(${BENCHMARK_TARGET} ${benchmark_src})
+  target_compile_options(${BENCHMARK_TARGET} PRIVATE ${ROCRAND_WARNING_FLAGS} ${ROCRAND_SANITIZER_COMPILE_OPTIONS} ${ROCRAND_COVERAGE_COMPILE_OPTIONS})
+  target_link_options(${BENCHMARK_TARGET} PRIVATE ${ROCRAND_SANITIZER_LINK_OPTIONS} ${ROCRAND_COVERAGE_LINK_OPTIONS})
+  target_compile_definitions(${BENCHMARK_TARGET} PRIVATE ${ROCRAND_COVERAGE_DEFINITIONS})
 
   if(HIP_COMPILER STREQUAL "nvcc")
     set_property(TARGET ${BENCHMARK_TARGET} PROPERTY CUDA_STANDARD 14)
@@ -33,13 +36,13 @@ function(add_rocrand_benchmark benchmark_src legacy)
       PRIVATE
         $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>
     )
-    target_link_libraries(${BENCHMARK_TARGET} ${CUDA_curand_LIBRARY})
+    target_link_libraries(${BENCHMARK_TARGET} PRIVATE ${CUDA_curand_LIBRARY})
   else()
-    target_link_libraries(${BENCHMARK_TARGET} hip::device)
+    target_link_libraries(${BENCHMARK_TARGET} PRIVATE hip::device)
   endif()
-  target_link_libraries(${BENCHMARK_TARGET} rocrand)
+  target_link_libraries(${BENCHMARK_TARGET} PRIVATE rocrand)
   if(NOT legacy)
-    target_link_libraries(${BENCHMARK_TARGET} benchmark::benchmark)
+    target_link_libraries(${BENCHMARK_TARGET} PRIVATE benchmark::benchmark)
   endif()
 
   set_target_properties(${BENCHMARK_TARGET}

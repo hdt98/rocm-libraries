@@ -48,10 +48,20 @@ include(cmake/Dependencies.cmake)
 # Find rocRAND
 find_package(rocrand REQUIRED CONFIG HINTS ${rocrand_DIR} PATHS "$ENV{ROCM_PATH}/rocrand")
 
-# Get sources
-file(GLOB rocrand_pkg_TEST_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand*.cpp)
-# Exclude kernel tests
-list(FILTER rocrand_pkg_TEST_SRCS EXCLUDE REGEX ".*test_rocrand_kernel.*\\.cpp$")
+# Get sources — explicit list of test files from parent directory.
+# These are the non-kernel test_rocrand*.cpp files in test/.
+set(rocrand_pkg_TEST_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_basic.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_cpp_basic.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_cpp_wrapper.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_generate.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_generate_log_normal.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_generate_normal.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_generate_poisson.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_generate_uniform.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_hipgraphs.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../test_rocrand_host.cpp"
+)
 
 # Enable testing (ctest)
 enable_testing()

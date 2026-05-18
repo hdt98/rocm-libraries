@@ -28,6 +28,9 @@ function(add_rocrand_link_test TEST_SOURCES)
     list(GET TEST_SOURCES 0 TEST_MAIN_SOURCE)
     get_filename_component(TEST_TARGET ${TEST_MAIN_SOURCE} NAME_WE)
     add_executable(${TEST_TARGET} ${TEST_SOURCES})
+    target_compile_options(${TEST_TARGET} PRIVATE ${ROCRAND_WARNING_FLAGS} ${ROCRAND_SANITIZER_COMPILE_OPTIONS} ${ROCRAND_COVERAGE_COMPILE_OPTIONS})
+    target_link_options(${TEST_TARGET} PRIVATE ${ROCRAND_SANITIZER_LINK_OPTIONS} ${ROCRAND_COVERAGE_LINK_OPTIONS})
+    target_compile_definitions(${TEST_TARGET} PRIVATE ${ROCRAND_COVERAGE_DEFINITIONS})
     # nvcc/CUDA
     if(HIP_COMPILER STREQUAL "nvcc")
         set_source_files_properties(${TEST_SOURCES}
@@ -39,24 +42,26 @@ function(add_rocrand_link_test TEST_SOURCES)
 
     if(TARGET GTest::GTest)
         target_link_libraries(${TEST_TARGET}
-            GTest::GTest
-            GTest::Main
+            PRIVATE
+                GTest::GTest
+                GTest::Main
         )
     else()
         target_link_libraries(${TEST_TARGET}
-            GTest::gtest
-            GTest::gtest_main
+            PRIVATE
+                GTest::gtest
+                GTest::gtest_main
         )
     endif()
 
     if(USE_SYSTEM_LIB)
-        target_link_libraries(${TEST_TARGET} roc::rocrand)
+        target_link_libraries(${TEST_TARGET} PRIVATE roc::rocrand)
     else()
-        target_link_libraries(${TEST_TARGET} rocrand)
+        target_link_libraries(${TEST_TARGET} PRIVATE rocrand)
     endif()
 
     if(HIP_COMPILER STREQUAL "clang")
-        target_link_libraries(${TEST_TARGET} hip::device)
+        target_link_libraries(${TEST_TARGET} PRIVATE hip::device)
     endif()
     set_target_properties(
         ${TEST_TARGET}

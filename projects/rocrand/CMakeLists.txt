@@ -37,13 +37,15 @@ option(DEPENDENCIES_FORCE_DOWNLOAD "Don't search the system for dependencies, al
 cmake_dependent_option(RUN_SLOW_TESTS "Run extra tests with CTest. These cover niche functionality and take long time" OFF "BUILD_TEST" OFF)
 cmake_dependent_option(USE_SYSTEM_LIB "Use existing system ROCm library installation when building tests" OFF BUILD_TEST OFF)
 
-if (NOT DEFINED ENV{ROCM_PATH})
-#Path to ROCm installation
-  set(ENV{ROCM_PATH} "/opt/rocm")
+# ROCm installation path: use environment if set, otherwise default to /opt/rocm
+if(DEFINED ENV{ROCM_PATH})
+  set(ROCM_PATH "$ENV{ROCM_PATH}" CACHE PATH "ROCm installation path")
+else()
+  set(ROCM_PATH "/opt/rocm" CACHE PATH "ROCm installation path")
 endif()
 
 # Install prefix
-set(CMAKE_INSTALL_PREFIX "$ENV{ROCM_PATH}" CACHE PATH "Install path prefix, prepended onto install directories")
+set(CMAKE_INSTALL_PREFIX "${ROCM_PATH}" CACHE PATH "Install path prefix, prepended onto install directories")
 
 if(WIN32)
     set(CPACK_SOURCE_GENERATOR "ZIP")
@@ -55,10 +57,10 @@ if(WIN32)
     set(CPACK_PACKAGING_INSTALL_PREFIX "")
     set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 else()
-    set(CMAKE_INSTALL_PREFIX "$ENV{ROCM_PATH}" CACHE PATH "Install path prefix, prepended onto install directories")
+    set(CMAKE_INSTALL_PREFIX "${ROCM_PATH}" CACHE PATH "Install path prefix, prepended onto install directories")
     #Adding CMAKE_PREFIX_PATH
     if(NOT DEFINED CMAKE_PREFIX_PATH)
-      list( APPEND CMAKE_PREFIX_PATH $ENV{ROCM_PATH}/llvm $ENV{ROCM_PATH})
+      list( APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/llvm ${ROCM_PATH})
     endif()
     if(NOT CPACK_PACKAGING_INSTALL_PREFIX)
         set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
@@ -69,9 +71,9 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
 ${CMAKE_CURRENT_SOURCE_DIR}/cmake
 ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules
-$ENV{ROCM_PATH}/lib/cmake/hip
-${HIP_PATH}/cmake $ENV{ROCM_PATH}/hip/cmake # FindHIP.cmake
-$ENV{ROCM_PATH}/llvm
+${ROCM_PATH}/lib/cmake/hip
+${HIP_PATH}/cmake ${ROCM_PATH}/hip/cmake # FindHIP.cmake
+${ROCM_PATH}/llvm
 )
 
 #
@@ -141,26 +143,18 @@ include(cmake/VerifyCompiler.cmake)
 # Build option to disable -Werror
 option(DISABLE_WERROR "Disable building with Werror" ON)
 
-# Build CXX flags
-if (NOT DEFINED CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
-endif()
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Warning flags — child targets apply these via target_compile_options()
 if(DISABLE_WERROR)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+    set(ROCRAND_WARNING_FLAGS -Wall -Wextra)
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
-endif()
-if(CODE_COVERAGE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
-    add_definitions(-DCODE_COVERAGE_ENABLED)
+    set(ROCRAND_WARNING_FLAGS -Wall -Wextra -Werror)
 endif()
 
-if (CMAKE_CXX_STANDARD EQUAL 14)
-  message(WARNING "C++14 will be deprecated in the next major release")
-elseif(NOT CMAKE_CXX_STANDARD EQUAL 17)
-  message(FATAL_ERROR "Only C++14 and C++17 are supported")
+# Coverage flags — child targets apply these via target_compile_options() / target_compile_definitions()
+if(CODE_COVERAGE)
+    set(ROCRAND_COVERAGE_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+    set(ROCRAND_COVERAGE_LINK_OPTIONS -fprofile-instr-generate)
+    set(ROCRAND_COVERAGE_DEFINITIONS CODE_COVERAGE_ENABLED)
 endif()
 
 # HIP on Windows: xhip is required with clang++ to get __half defined
@@ -172,10 +166,10 @@ cmake_dependent_option(BUILD_LEGACY_BENCHMARK "Build the legacy benchmarks" ON "
 if(BUILD_LEGACY_BENCHMARK)
   message(DEPRECATION "Building the legacy benchmarks will be removed in a future release. Consider using the new benchmark suite.")
 endif()
+# ASAN flags — child targets apply these via target_compile_options() / target_link_options()
 if(BUILD_ADDRESS_SANITIZER AND BUILD_SHARED_LIBS)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -shared-libasan")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -shared-libasan")
-  add_link_options(-fuse-ld=lld)
+  set(ROCRAND_SANITIZER_COMPILE_OPTIONS -fsanitize=address -shared-libasan)
+  set(ROCRAND_SANITIZER_LINK_OPTIONS -fsanitize=address -shared-libasan -fuse-ld=lld)
 endif()
 
 # Set version variables
@@ -207,7 +201,7 @@ endif()
 # Tests
 if (BUILD_TEST)
     if(USE_SYSTEM_LIB)
-        find_package(rocrand REQUIRED CONFIG PATHS "$ENV{ROCM_PATH}/rocrand")
+        find_package(rocrand REQUIRED CONFIG PATHS "${ROCM_PATH}/rocrand")
         if (NOT ${rocrand_VERSION} VERSION_EQUAL ${rocRAND_VERSION})
             message(WARNING "The installed rocrand version, ${rocrand_VERSION}, does not match project version ${rocRAND_VERSION}. Building tests with USE_SYSTEM_LIB=ON may not work properly.")
         endif()

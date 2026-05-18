@@ -41,8 +41,13 @@ endif()
 set(USER_ROCM_WARN_TOOLCHAIN_VAR ${ROCM_WARN_TOOLCHAIN_VAR})
 
 # Change variables before configuring dependencies
+# Suppress ROCm CMake warning about global CMAKE_CXX_FLAGS mutation.
+# This is a known consequence of HIP piggybacking on the CXX language;
+# the device compiler only observes these flags at find_package(HIP) time.
 set(ROCM_WARN_TOOLCHAIN_VAR OFF CACHE BOOL "")
-# Turn off warnings and errors for all warnings in dependencies
+# Strip warning/error flags from CMAKE_CXX_FLAGS for dependency compilation.
+# Dependencies (googletest, googlebenchmark) should not inherit project warning
+# settings. The original flags are restored at the end of this file.
 separate_arguments(CXX_FLAGS_LIST NATIVE_COMMAND ${CMAKE_CXX_FLAGS})
 list(REMOVE_ITEM CXX_FLAGS_LIST /WX -Werror -Werror=pendantic -pedantic-errors)
 if(MSVC)
@@ -53,7 +58,9 @@ else()
   list(APPEND CXX_FLAGS_LIST -w)
 endif()
 list(JOIN CXX_FLAGS_LIST " " CMAKE_CXX_FLAGS)
-# Don't build client dependencies as shared
+# Force dependencies (googletest, googlebenchmark) to build as static libraries
+# regardless of the project's BUILD_SHARED_LIBS setting. This isolates FetchContent
+# dependencies from the project build type. The original value is restored below.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Global flag to cause add_library() to create shared libraries if on." FORCE)
 
 # HIP dependency is handled earlier in the project cmake file
@@ -121,7 +128,7 @@ if(BUILD_TEST)
     message(STATUS "Google Test not found or force download on. Fetching...")
     option(BUILD_GTEST "Builds the googletest subproject" ON)
     option(BUILD_GMOCK "Builds the googlemock subproject" OFF)
-    option(INSTALL_GTEST "Enable installation of googletest" ON)
+    option(INSTALL_GTEST "Enable installation of googletest" OFF)
     FetchContent_Declare(
       googletest
       GIT_REPOSITORY https://github.com/google/googletest.git

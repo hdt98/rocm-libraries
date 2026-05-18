@@ -34,7 +34,6 @@ set(BENCHMARK_TUNING_BLOCK_OPTIONS "64, 128, 256, 512, 1024, 2048" CACHE STRING
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/benchmark_tuning_setup.hpp.in"
   "${CMAKE_BINARY_DIR}/benchmark/benchmark_tuning_setup.hpp")
 
-set(CMAKE_CXX_STANDARD 17)
 add_executable(benchmark_rocrand_tuning
   benchmark_tuning.cpp
   benchmark_tuning_lfsr113.cpp
@@ -49,14 +48,12 @@ add_executable(benchmark_rocrand_tuning
   benchmark_tuning_threefry4x64_20.cpp
   benchmark_tuning_xorwow.cpp
 )
+target_compile_features(benchmark_rocrand_tuning PRIVATE cxx_std_17)
+target_compile_options(benchmark_rocrand_tuning PRIVATE ${ROCRAND_WARNING_FLAGS} ${ROCRAND_SANITIZER_COMPILE_OPTIONS} ${ROCRAND_COVERAGE_COMPILE_OPTIONS})
+target_link_options(benchmark_rocrand_tuning PRIVATE ${ROCRAND_SANITIZER_LINK_OPTIONS} ${ROCRAND_COVERAGE_LINK_OPTIONS})
+target_compile_definitions(benchmark_rocrand_tuning PRIVATE ${ROCRAND_COVERAGE_DEFINITIONS})
 target_link_libraries(benchmark_rocrand_tuning PRIVATE rocrand benchmark::benchmark hip::device)
 target_include_directories(benchmark_rocrand_tuning PRIVATE
   "${CMAKE_BINARY_DIR}/benchmark"
   "${PROJECT_SOURCE_DIR}/benchmark"
   "${PROJECT_SOURCE_DIR}/library/src")
-
-if(NOT WIN32)
-  foreach(amdgpu_target ${AMDGPU_TARGETS})
-      target_compile_options(rocrand PRIVATE --offload-arch=${amdgpu_target})
-  endforeach()
-endif()

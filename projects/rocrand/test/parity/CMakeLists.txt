@@ -73,7 +73,7 @@ find_package(rocrand REQUIRED CONFIG HINTS ${rocrand_DIR} PATHS "$ENV{ROCM_PATH}
 # avoid symbol errors between curand/cuda and rocrand/hip.
 add_library(test_rocrand_parity_curand OBJECT parity_curand.cpp)
 target_include_directories(test_rocrand_parity_curand PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(test_rocrand_parity_curand ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
+target_link_libraries(test_rocrand_parity_curand PRIVATE ${CUDA_LIBRARIES} ${CUDA_curand_LIBRARY})
 
 # Create an object library for the rocrand part of the test.
 add_library(test_rocrand_parity_rocrand OBJECT parity_rocrand.cpp)
@@ -102,7 +102,7 @@ endif()
 
 # Compile the files that invoke each API separately, to avoid symbol namespacing errors.
 add_executable(test_rocrand_parity parity.cpp)
-target_link_libraries(test_rocrand_parity
+target_link_libraries(test_rocrand_parity PRIVATE
     test_rocrand_parity_curand
     test_rocrand_parity_rocrand
 )

@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+include(GNUInstallDirs)
+
 # rocRAND library
-# C++17 is used internally
-set(CMAKE_CXX_STANDARD 17)
 # Get sources
 set(rocRAND_HIP_SRCS
     "src/rng/generator_type_lfsr113.cpp"
@@ -51,6 +51,15 @@ configure_file(
 )
 
 add_library(rocrand ${rocRAND_HIP_SRCS})
+
+# C++17 is used internally
+target_compile_features(rocrand PRIVATE cxx_std_17)
+
+target_compile_options(rocrand PRIVATE
+  $<$<COMPILE_LANGUAGE:CXX,HIP>:${ROCRAND_WARNING_FLAGS}>
+  ${ROCRAND_SANITIZER_COMPILE_OPTIONS} ${ROCRAND_COVERAGE_COMPILE_OPTIONS})
+target_link_options(rocrand PRIVATE ${ROCRAND_SANITIZER_LINK_OPTIONS} ${ROCRAND_COVERAGE_LINK_OPTIONS})
+target_compile_definitions(rocrand PRIVATE ${ROCRAND_COVERAGE_DEFINITIONS})
 
 if(WIN32)
     configure_file("${PROJECT_SOURCE_DIR}/library/include/rocrand/rocrand_in.rc.in"
@@ -126,9 +135,9 @@ rocm_install(
         "${PROJECT_BINARY_DIR}/library/include"
 )
 
-set(FORTRAN_SRCS_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/rocrand/src/fortran")
-set(LIB_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
-set(CONFIG_PACKAGE_INSTALL_DIR ${LIB_INSTALL_DIR}/cmake/rocrand)
+set(FORTRAN_SRCS_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/rocrand/src/fortran")
+set(LIB_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
+set(CONFIG_PACKAGE_INSTALL_DIR "${LIB_INSTALL_DIR}/cmake/rocrand")
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
@@ -152,9 +161,13 @@ else()
     )
 endif()
 
-# install library to C:\hipSDK\bin
+# Windows-specific install and post-build copy
 if (WIN32)
-    install (TARGETS rocrand DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
+    install(TARGETS rocrand
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    )
     if (BUILD_TEST)
 	    add_custom_command(
 		    TARGET rocrand

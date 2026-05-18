@@ -79,7 +79,9 @@ endif()
 #endif()
 
 # Get sources
-file(GLOB rocrand_pkg_TEST_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand*.cpp)
+set(rocrand_pkg_TEST_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand.cpp"
+)
 
 # Enable testing (ctest)
 enable_testing()

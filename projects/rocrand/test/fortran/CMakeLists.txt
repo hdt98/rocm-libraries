@@ -1,16 +1,16 @@
 # Fortran Wrapper Tests
 
-file(GLOB tmp ${CMAKE_CURRENT_SOURCE_DIR}/fruit/*.f90)
-set(FRUIT_SRCS ${tmp})
-file(GLOB tmp ${CMAKE_CURRENT_SOURCE_DIR}/fruit_helpers.f90)
-set(FRUIT_HELPER_SRCS ${tmp})
-file(GLOB tmp ${CMAKE_CURRENT_SOURCE_DIR}/*_rocrand.f90)
-set(FORTRAN_ROCRAND_TEST ${tmp})
-
 set(test_rocrand "test_rocrand_fortran_wrapper")
 
 # Build unit test (rocrand)
-add_executable(${test_rocrand} "${FRUIT_SRCS}" "${FRUIT_HELPER_SRCS}" "${FORTRAN_ROCRAND_TEST}")
+add_executable(${test_rocrand})
+target_sources(${test_rocrand} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/fruit/fruit.f90"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fruit/fruit_util.f90"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fruit_helpers.f90"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fruit_test_driver_rocrand.f90"
+    "${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand.f90"
+)
 target_include_directories(${test_rocrand}
     PRIVATE
         "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/library/fortran>"

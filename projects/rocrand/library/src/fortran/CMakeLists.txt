@@ -14,15 +14,16 @@ else()
     )
 endif()
 
-set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/library/fortran)
-
 # rocRAND Fortran wrapper
 set(FORTRAN_ROCRAND_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/rocrand_m.f90
     ${PROJECT_BINARY_DIR}/src/fortran/hip_m.f90
 )
 add_library(rocrand_fortran STATIC "${FORTRAN_ROCRAND_SRCS}")
-set_target_properties(rocrand_fortran PROPERTIES LINKER_LANGUAGE Fortran)
+set_target_properties(rocrand_fortran PROPERTIES
+    LINKER_LANGUAGE Fortran
+    Fortran_MODULE_DIRECTORY "${PROJECT_BINARY_DIR}/library/fortran"
+)
 if(HIP_COMPILER STREQUAL "nvcc")
     target_link_libraries(rocrand_fortran
         PRIVATE
@@ -33,7 +34,11 @@ else()
     target_link_libraries(rocrand_fortran
         PRIVATE
             rocrand
-            "-L${HIP_ROOT_DIR}/lib -Wl,-rpath,${HIP_ROOT_DIR}/lib"
+    )
+    target_link_directories(rocrand_fortran PRIVATE "${HIP_ROOT_DIR}/lib")
+    set_target_properties(rocrand_fortran PROPERTIES
+        BUILD_RPATH "${HIP_ROOT_DIR}/lib"
+        INSTALL_RPATH "${HIP_ROOT_DIR}/lib"
     )
 endif()
 
