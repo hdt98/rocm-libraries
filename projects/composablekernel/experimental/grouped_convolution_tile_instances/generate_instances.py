@@ -427,15 +427,17 @@ def parse_fwd_instances(instances, problem_name, arch):
         double_smem_buffer = pipeline_version == "v4"
         num_wave_groups = 1
         # Replace pipeline if Direct Load
-        if instance.find("DirectLoad") != -1:
-            if instance.find("BlkGemmPipelineVersion: v1") != -1:
+        if direct_load:
+            if pipeline_version == "v1":
                 pipeline_version = "ASYNC_V1"
-            elif instance.find("BlkGemmPipelineVersion: v2") != -1:
+            if pipeline_version == "v2":
                 pipeline_version = "COMPUTE_ASYNC_V2"
-            elif instance.find("BlkGemmPipelineVersion: v4") != -1:
+            elif pipeline_version == "v4":
                 pipeline_version = "ASYNC_V4"
             else:
-                raise RuntimeError("not supported pipeline for direct load")
+                raise RuntimeError(
+                    f"{pipeline_version} not supported pipeline for direct load"
+                )
         elif instance.find("TDM") != -1:
             if instance.find("BlkGemmPipelineVersion: v1") != -1:
                 pipeline_version = "COMPUTE_TDM_V1"
@@ -444,7 +446,7 @@ def parse_fwd_instances(instances, problem_name, arch):
             else:
                 raise RuntimeError("not supported pipeline for TDM")
         else:
-            pipeline_version = f"""V{pipeline_version[-1:]}"""
+            pipeline_version = pipeline_version.upper()
 
         double_smem_buffer = (
             pipeline_version == "V4"
