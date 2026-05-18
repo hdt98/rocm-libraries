@@ -26931,19 +26931,22 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrf_strided_batched(rocblas_handle 
 
     \f[
         M = \left[\begin{array}{cccc}
-        L_1 \\
-        A_1 & L_2\\
+        E_1 \\
+        A_1 & E_2\\
          & \ddots & \ddots \\
-         &  & A_{n-1} & L_n
+         &  & A_{n-1} & E_n
         \end{array}\right] \left[\begin{array}{cccc}
-        I & U_1 \\
+        I & F_1 \\
          & \ddots & \ddots \\
-         &  & I & U_{n-1}\\
+         &  & I & F_{n-1}\\
          &  &  & I
         \end{array}\right] = LU
     \f]
 
-    where the blocks \f$L_i\f$ and \f$U_i\f$ are also general blocks of size ``nb``.
+    where the blocks \f$E_i\f$ and \f$F_i\f$ are general blocks of size ``nb``. The \f$k\f$-th
+    diagonal block \f$E_k\f$ stores the LU factorization without pivoting of the corresponding
+    diagonal block and is encoded as \f$E_k=L_k+U_k\f$, where \f$L_k\f$ is strictly lower triangular
+    and \f$U_k\f$ is upper triangular, so that \f$E_k=(L_k+I)U_k\f$.
 
     @param[in]
     handle      rocblas_handle.
@@ -26962,7 +26965,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrf_strided_batched(rocblas_handle 
     @param[inout]
     B           pointer to type. Array on the GPU of dimension ldb*nb*nblocks.
                 On entry, contains the blocks B_i, arranged one after the other.
-                On exit, it is overwritten by blocks L_i in factorized form as returned by
+                On exit, it is overwritten by blocks E_i in factorized form as returned by
                 \ref rocsolver_sgetrf_npvt "GETRF_NPVT".
     @param[in]
     ldb         rocblas_int. ldb >= nb.
@@ -26970,7 +26973,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrf_strided_batched(rocblas_handle 
     @param[inout]
     C           pointer to type. Array on the GPU of dimension ldc*nb*(nblocks-1).
                 On entry, contains the blocks C_i, arranged one after the other.
-                On exit, it is overwritten by blocks U_i.
+                On exit, it is overwritten by blocks F_i.
     @param[in]
     ldc         rocblas_int. ldc >= nb.
                 Specifies the leading dimension of blocks C_i.
@@ -27045,19 +27048,23 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeblttrf_npvt(rocblas_handle handle,
 
     \f[
         M_l = \left[\begin{array}{cccc}
-        L_{l1} \\
-        A_{l1} & L_{l2}\\
+        E_{l1} \\
+        A_{l1} & E_{l2}\\
          & \ddots & \ddots \\
-         &  & A_{l(n-1)} & L_{ln}
+         &  & A_{l(n-1)} & E_{ln}
         \end{array}\right] \left[\begin{array}{cccc}
-        I & U_{l1} \\
+        I & F_{l1} \\
          & \ddots & \ddots \\
-         &  & I & U_{l(n-1)}\\
+         &  & I & F_{l(n-1)}\\
          &  &  & I
         \end{array}\right] = L_lU_l
     \f]
 
-    where the blocks \f$L_{li}\f$ and \f$U_{li}\f$ are also general blocks of size ``nb``.
+    where the blocks \f$E_{li}\f$ and \f$F_{li}\f$ are general blocks of size ``nb``. The
+    \f$k\f$-th diagonal block \f$E_{lk}\f$ stores the LU factorization without pivoting of the
+    corresponding diagonal block and is encoded as \f$E_{lk}=L_{lk}+U_{lk}\f$, where \f$L_{lk}\f$
+    is strictly lower triangular and \f$U_{lk}\f$ is upper triangular, so that
+    \f$E_{lk}=(L_{lk}+I)U_{lk}\f$.
 
 
     @param[in]
@@ -27079,7 +27086,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeblttrf_npvt(rocblas_handle handle,
     B           array of pointers to type. Each pointer points to an array on the GPU of dimension
                 ldb*nb*nblocks.
                 On entry, contains the blocks B_{li}, arranged one after the other.
-                On exit, it is overwritten by blocks L_{li} in factorized form as returned by
+                On exit, it is overwritten by blocks E_{li} in factorized form as returned by
                 \ref rocsolver_sgetrf_npvt "GETRF_NPVT".
     @param[in]
     ldb         rocblas_int. ldb >= nb.
@@ -27088,7 +27095,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeblttrf_npvt(rocblas_handle handle,
     C           array of pointers to type. Each pointer points to an array on the GPU of dimension
                 ldc*nb*(nblocks-1).
                 On entry, contains the blocks C_{li}, arranged one after the other.
-                On exit, it is overwritten by blocks U_{li}.
+                On exit, it is overwritten by blocks F_{li}.
     @param[in]
     ldc         rocblas_int. ldc >= nb.
                 Specifies the leading dimension of blocks C_{li}.
@@ -27170,19 +27177,23 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeblttrf_npvt_batched(rocblas_handle 
 
     \f[
         M_l = \left[\begin{array}{cccc}
-        L_{l1} \\
-        A_{l1} & L_{l2}\\
+        E_{l1} \\
+        A_{l1} & E_{l2}\\
          & \ddots & \ddots \\
-         &  & A_{l(n-1)} & L_{ln}
+         &  & A_{l(n-1)} & E_{ln}
         \end{array}\right] \left[\begin{array}{cccc}
-        I & U_{l1} \\
+        I & F_{l1} \\
          & \ddots & \ddots \\
-         &  & I & U_{l(n-1)}\\
+         &  & I & F_{l(n-1)}\\
          &  &  & I
         \end{array}\right] = L_lU_l
     \f]
 
-    where the blocks \f$L_{li}\f$ and \f$U_{li}\f$ are also general blocks of size ``nb``.
+    where the blocks \f$E_{li}\f$ and \f$F_{li}\f$ are general blocks of size ``nb``. The
+    \f$k\f$-th diagonal block \f$E_{lk}\f$ stores the LU factorization without pivoting of the
+    corresponding diagonal block and is encoded as \f$E_{lk}=L_{lk}+U_{lk}\f$, where \f$L_{lk}\f$
+    is strictly lower triangular and \f$U_{lk}\f$ is upper triangular, so that
+    \f$E_{lk}=(L_{lk}+I)U_{lk}\f$.
 
     @param[in]
     handle      rocblas_handle.
@@ -27207,7 +27218,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeblttrf_npvt_batched(rocblas_handle 
     @param[inout]
     B           pointer to type. Array on the GPU (the size depends on the value of strideB).
                 On entry, contains the blocks B_{li}, arranged one after the other.
-                On exit, it is overwritten by blocks L_{li} in factorized form as returned by
+                On exit, it is overwritten by blocks E_{li} in factorized form as returned by
                 \ref rocsolver_sgetrf_npvt "GETRF_NPVT".
     @param[in]
     ldb         rocblas_int. ldb >= nb.
@@ -27221,7 +27232,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgeblttrf_npvt_batched(rocblas_handle 
     @param[inout]
     C           pointer to type. Array on the GPU (the size depends on the value of strideC).
                 On entry, contains the blocks C_{li}, arranged one after the other.
-                On exit, it is overwritten by blocks U_{li}.
+                On exit, it is overwritten by blocks F_{li}.
     @param[in]
     ldc         rocblas_int. ldc >= nb.
                 Specifies the leading dimension of matrix blocks C_{li}.
@@ -27325,19 +27336,23 @@ ROCSOLVER_EXPORT rocblas_status
 
     \f[
         M_l = \left[\begin{array}{cccc}
-        L_{l1} \\
-        A_{l1} & L_{l2}\\
+        E_{l1} \\
+        A_{l1} & E_{l2}\\
          & \ddots & \ddots \\
-         &  & A_{l(n-1)} & L_{ln}
+         &  & A_{l(n-1)} & E_{ln}
         \end{array}\right] \left[\begin{array}{cccc}
-        I & U_{l1} \\
+        I & F_{l1} \\
          & \ddots & \ddots \\
-         &  & I & U_{l(n-1)}\\
+         &  & I & F_{l(n-1)}\\
          &  &  & I
         \end{array}\right] = L_lU_l
     \f]
 
-    where the blocks \f$L_{li}\f$ and \f$U_{li}\f$ are also general blocks of size ``nb``.
+    where the blocks \f$E_{li}\f$ and \f$F_{li}\f$ are general blocks of size ``nb``. The
+    \f$k\f$-th diagonal block \f$E_{lk}\f$ stores the LU factorization without pivoting of the
+    corresponding diagonal block and is encoded as \f$E_{lk}=L_{lk}+U_{lk}\f$, where \f$L_{lk}\f$
+    is strictly lower triangular and \f$U_{lk}\f$ is upper triangular, so that
+    \f$E_{lk}=(L_{lk}+I)U_{lk}\f$.
 
     @param[in]
     handle      rocblas_handle.
@@ -27367,7 +27382,7 @@ ROCSOLVER_EXPORT rocblas_status
     @param[inout]
     B           pointer to type. Array on the GPU (the size depends on the value of strideB).
                 On entry, contains the blocks B_{li}, arranged one after the other.
-                On exit, it is overwritten by blocks L_{li} in factorized form as returned by
+                On exit, it is overwritten by blocks E_{li} in factorized form as returned by
                 \ref rocsolver_sgetrf_npvt "GETRF_NPVT".
     @param[in]
     incb        rocblas_int. incb > 0.
@@ -27386,7 +27401,7 @@ ROCSOLVER_EXPORT rocblas_status
     @param[inout]
     C           pointer to type. Array on the GPU (the size depends on the value of strideC).
                 On entry, contains the blocks C_{li}, arranged one after the other.
-                On exit, it is overwritten by blocks U_{li}.
+                On exit, it is overwritten by blocks F_{li}.
     @param[in]
     incc        rocblas_int. incc > 0.
                 Stride from the start of one row of C_{li} to the next. The normal use cases are
