@@ -97,6 +97,17 @@ size_t Metadata::EncodeLayout(const std::string& layout) const
     return layout_encodings.at(layout);
 }
 
+const std::vector<int> one_hot(const size_t label, const size_t num_classes)
+{
+    std::vector<int> out = std::vector<int>(num_classes, 0);
+    if(label < num_classes)
+        out[label] = 1;
+    else
+        MIOPEN_LOG_W("one_hot: label " << label << " out of range for " << num_classes
+                                       << " classes, returning all-zero vector");
+    return out;
+}
+
 /** `Model` encapuslates the machinery required to run inference on a TunaNet model
  *
  * The `Model` class encapuslates all the machinery needed to run inference on a
@@ -788,6 +799,167 @@ std::vector<uint64_t> PredictSolver(const conv::ProblemDescription& problem,
 
 // MetadataND implementation moved to metadata_nd.cpp
 
+static std::vector<float> ExtractTunaNetND2dFeatures(const conv::ProblemDescription& problem,
+                                                     bool isFwd,
+                                                     const MetadataND& metadata)
+{
+    MIOPEN_LOG_I2("Using engineered 2d features for Tunanet");
+    // Extract convolution parameters
+    const std::size_t N       = problem.GetOutBatchSize();
+    const std::size_t C_in  = isFwd ? problem.GetInChannels() : problem.GetOutChannels();
+    const std::size_t C_out = isFwd ? problem.GetOutChannels() : problem.GetInChannels();
+    const std::size_t H_in  = isFwd ? problem.GetInHeight() : problem.GetOutHeight();
+    const std::size_t W_in  = isFwd ? problem.GetInWidth() : problem.GetOutWidth();
+    const std::size_t H_out = isFwd ? problem.GetOutHeight() : problem.GetInHeight();
+    const std::size_t W_out = isFwd ? problem.GetOutWidth() : problem.GetInWidth();
+    const std::size_t K_h   = problem.GetWeightsHeight();
+    const std::size_t K_w   = problem.GetWeightsWidth();
+    std::size_t groups      = problem.GetGroupCount();
+    const std::size_t num_cu = 254; // ctx.GetStream().GetMaxComputeUnits(); // should this be fixed?
+
+    const std::vector<int> in_layout =
+        one_hot(metadata.EncodeInLayout(problem.GetInLayout()), 2);
+    const std::vector<int> fil_layout =
+        one_hot(metadata.EncodeFilLayout(problem.GetWeightsLayout()), 2);
+    const std::vector<int> out_layout =
+        one_hot(metadata.EncodeOutLayout(problem.GetOutLayout()), 2);
+    const std::vector<int> precision =
+        one_hot(metadata.EncodePrecision(problem.GetInDataType()), 3);
+    const std::vector<int> direction =
+        one_hot(metadata.EncodeDirection(problem.GetDirection()), 3);
+
+    // Avoid division by zero
+    if(groups < 1)
+        groups = 1;
+
+    // 1. COMPUTATIONAL COMPLEXITY FEATURES
+    // FLOPs for convolution (multiply-accumulate = 2 ops)
+    const auto safe_ratio = [](double numerator, double denominator) -> double {
+        if(denominator == 0.0)
+            return 0.0;
+        const double value = numerator / denominator;
+        return std::isfinite(value) ? value : 0.0;
+    };
+
+    const auto safe_log1p = [](double value) -> double {
+        if(value <= -1.0 || !std::isfinite(value))
+            return 0.0;
+        const double logged = std::log1p(value);
+        return std::isfinite(logged) ? logged : 0.0;
+    };
+
+    const double flops =
+        safe_ratio(2.0 * static_cast<double>(N) * static_cast<double>(C_out) *
+                       static_cast<double>(C_in) * static_cast<double>(K_h) *
+                       static_cast<double>(K_w) * static_cast<double>(H_out) *
+                       static_cast<double>(W_out),
+                   static_cast<double>(groups));
+
+    // 2. GEMM DIMENSION FEATURES
+    // Implicit GEMM dimensions: Conv -> GEMM(M, N, K)
+    const double M = safe_ratio(static_cast<double>(N) * static_cast<double>(H_out) *
+                                    static_cast<double>(W_out),
+                                static_cast<double>(groups));
+    const double N_gemm = safe_ratio(static_cast<double>(C_out), static_cast<double>(groups));
+    const double K_gemm = static_cast<double>(C_in) * static_cast<double>(K_h) * static_cast<double>(K_w);
+
+    // Total GEMM size
+    const double gemm_size = M * N_gemm * K_gemm;
+
+    // 3. HARDWARE UTILIZATION FEATURES
+    // Work per compute unit
+    const double work_per_cu =
+        safe_ratio(static_cast<double>(N) * static_cast<double>(H_out) *
+                       static_cast<double>(W_out) * static_cast<double>(C_out),
+                   static_cast<double>(groups) * static_cast<double>(num_cu));
+
+    // 4. SPATIAL FEATURES
+    // Input/output spatial ratios
+    const double spatial_reduction =
+        safe_ratio(static_cast<double>(H_in) * static_cast<double>(W_in),
+                   static_cast<double>(H_out) * static_cast<double>(W_out));
+
+    // Filter size relative to input
+    const double filter_coverage =
+        safe_ratio(static_cast<double>(K_h) * static_cast<double>(K_w),
+                   static_cast<double>(H_in) * static_cast<double>(W_in));
+
+    // 5. CHANNEL RATIOS
+    const double channel_ratio = safe_ratio(static_cast<double>(C_in), static_cast<double>(C_out));
+
+    // Group density
+    const double group_density = safe_ratio(static_cast<double>(groups), static_cast<double>(C_in));
+
+    // 6. LOG-TRANSFORMED RAW FEATURES
+
+    return {
+        // One hots
+        static_cast<float>(in_layout[0]),
+        static_cast<float>(in_layout[1]),
+        static_cast<float>(fil_layout[0]),
+        static_cast<float>(fil_layout[1]),
+        static_cast<float>(out_layout[0]),
+        static_cast<float>(out_layout[1]),
+        static_cast<float>(precision[0]),
+        static_cast<float>(precision[1]),
+        static_cast<float>(precision[2]),
+        static_cast<float>(direction[0]),
+        static_cast<float>(direction[1]),
+        static_cast<float>(direction[2]),
+
+        // Input dimensions
+        static_cast<float>(C_in), // in_channels
+        static_cast<float>(H_in), // in_h
+        static_cast<float>(W_in), // in_w
+
+        // Output dimensions
+        static_cast<float>(C_out), // out_channels
+        static_cast<float>(H_out), // out_h
+        static_cast<float>(W_out), // out_w
+
+        // Filter dimensions
+        static_cast<float>(K_h), // fil_h
+        static_cast<float>(K_w), // fil_w
+
+        // Padding
+        static_cast<float>(problem.GetPadH()), // pad_h
+        static_cast<float>(problem.GetPadW()), // pad_w
+
+        // Stride
+        static_cast<float>(problem.GetKernelStrideH()), // stride_h
+        static_cast<float>(problem.GetKernelStrideW()), // stride_w
+
+        // Dilation
+        static_cast<float>(problem.GetDilationH()), // dilation_h
+        static_cast<float>(problem.GetDilationW()), // dilation_w
+
+        // Batch size
+        static_cast<float>(problem.GetOutBatchSize()), // batchsize
+
+        // Group count
+        static_cast<float>(problem.GetGroupCount()), // group_count
+
+        // Feature engineered features
+        static_cast<float>(safe_log1p(flops)),
+        static_cast<float>(safe_log1p(M)),
+        static_cast<float>(safe_log1p(N_gemm)),
+        static_cast<float>(safe_log1p(K_gemm)),
+        static_cast<float>(safe_ratio(M, N_gemm)),
+        static_cast<float>(safe_ratio(M, K_gemm)),
+        static_cast<float>(safe_ratio(N_gemm, K_gemm)),
+        static_cast<float>(safe_log1p(gemm_size)),
+        static_cast<float>(safe_log1p(work_per_cu)),
+        static_cast<float>(spatial_reduction),
+        static_cast<float>(filter_coverage),
+        static_cast<float>(channel_ratio),
+        static_cast<float>(group_density),
+        static_cast<float>(safe_log1p(static_cast<double>(H_in))),
+        static_cast<float>(safe_log1p(static_cast<double>(W_in))),
+        static_cast<float>(safe_log1p(static_cast<double>(C_in))),
+        static_cast<float>(safe_log1p(static_cast<double>(C_out))),
+        static_cast<float>(safe_log1p(static_cast<double>(N)))};
+}
+
 class TunaNetNDModel : public ModelND
 {
 private:
@@ -806,6 +978,19 @@ public:
     {
         std::vector<float> features = ToFeatures(problem);
         MIOPEN_LOG_I2("TunaNetNDModel: Extracted " << features.size() << " features");
+        if(miopen::IsLogging(LoggingLevel::Info2))
+        {
+            std::ostringstream features_ss;
+            features_ss << "TunaNetNDModel features: [";
+            for(size_t i = 0; i < features.size(); ++i)
+            {
+                if(i > 0)
+                    features_ss << ", ";
+                features_ss << features[i];
+            }
+            features_ss << "]";
+            MIOPEN_LOG_I2(features_ss.str());
+        }
 
         // Use fdeep to run TunaNetND inference
         const int dim                = problem.Is3d() ? 3 : 2;
@@ -859,13 +1044,16 @@ public:
     }
 
 protected:
+
     std::vector<float> ToFeatures(const conv::ProblemDescription& problem) const override
     {
         const bool isFwd = problem.GetDirection() == conv::Direction::Forward;
 
         std::vector<float> features = {};
-        if(problem.Is2d()) // 2d version as in the
+        if(problem.Is2d() && ( device_name== "gfx950") )
         {
+            features = ExtractTunaNetND2dFeatures(problem, isFwd, metadata);
+        } else if (problem.Is2d()) {
             features = {
                 // Input dimensions
                 static_cast<float>(isFwd ? problem.GetInChannels()
@@ -913,8 +1101,7 @@ protected:
                 // Group count
                 static_cast<float>(problem.GetGroupCount()), // group_count
             };
-        }
-        else if(problem.Is3d())
+        } else if(problem.Is3d())
         {
             features = {
                 // Input dimensions
