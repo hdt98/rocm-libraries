@@ -28,6 +28,7 @@
 
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
 #include <mxDataGen.hpp>
+#include "DataInitializationHelpers.hpp"
 #endif
 #include "TensorDataManipulation.hpp"
 #include "Utility.hpp"
@@ -205,6 +206,8 @@ namespace TensileLite
                 return "TrigIndAbsSin";
             case InitMode::TrigIndAbsCos:
                 return "TrigIndAbsCos";
+            case InitMode::UniformLowPrecision:
+                return "UniformLowPrecision";
 
             case InitMode::Count:
                 break;
@@ -276,6 +279,8 @@ namespace TensileLite
                 mode = InitMode::TrigIndAbsSin;
             else if(strValue == ToString(InitMode::TrigIndAbsCos))
                 mode = InitMode::TrigIndAbsCos;
+            else if(strValue == ToString(InitMode::UniformLowPrecision))
+                mode = InitMode::UniformLowPrecision;
             else if(std::all_of(strValue.begin(), strValue.end(), isdigit))
             {
                 int value = atoi(strValue.c_str());
@@ -1799,9 +1804,9 @@ namespace TensileLite
             // bytes the kernel sees are identical to the bytes the reference reads. We
             // gate on m_mxScaleFormat > 0 because that is the user-visible signal that
             // they opted into the subtile / pre-swizzle layout.
-            bool useMXGenerator = isMXFP4Problem(problem) && m_mxScaleFormat > 0;
+            bool useMXGenerator = isMXProblem(problem) && m_mxScaleFormat > 0;
             if(useMXGenerator)
-                initializeMXDataForFP4(problem);
+                initializeMXData(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
@@ -1875,26 +1880,8 @@ namespace TensileLite
         }
 
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
-        namespace
-        {
-            /** Maps Tensile MX scale element type to hipDataType for generateMXInput (mxDataGen). */
-            hipDataType hipMxScaleTypeForDataGenerator(rocisa::DataType mxType)
-            {
-                switch(mxType)
-                {
-                case rocisa::DataType::Float8:
-                    return HIP_R_8F_E4M3;
-                case rocisa::DataType::E5M3:
-                    return static_cast<hipDataType>(HIP_R_8F_E5M3_EXT);
-                case rocisa::DataType::E8:
-                case rocisa::DataType::None:
-                    return HIP_R_8F_UE8M0;
-                default:
-                    throw std::runtime_error(
-                        "initializeMXData: unsupported MX scale element type for generateMXInput");
-                }
-            }
-        } // namespace
+
+        using namespace detail;
 
         static std::string_view initModeToMXMethod(InitMode mode)
         {
@@ -1915,13 +1902,14 @@ namespace TensileLite
             }
         }
 
-        void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
-            // can safely skip them. For MX-FP4 sides we drive mxDataGenerator (so the values
-            // are coordinated with their E8 scales); for any non-FP4 side (e.g. MX-B6 or non-MX
-            // mixed-mode) we fall back to the same initArray path the default loop would have
-            // taken, to avoid leaving the malloc'd buffers uninitialized.
+            // can safely skip them. For MX-FP4 / MX-FP8 / MX-BFloat8 sides we drive
+            // mxDataGenerator (so the values are coordinated with their E8 scales); for any
+            // non-FP4/FP8 side (e.g. MX-B6 or non-MX mixed-mode) we fall back to the same
+            // initArray path the default loop would have taken, to avoid leaving the
+            // malloc'd buffers uninitialized
             auto const& tensors = problem.tensors();
 
             auto initTensorFromDefault = [&](int i) {
@@ -1987,7 +1975,7 @@ namespace TensileLite
                 }
             }
 
-            if(isMXFP4Tensor(problem.a(), problem.mxBlockA()))
+            if(isMXTensor(problem.a(), problem.mxBlockA()))
             {
                 auto const& tensorA = problem.a();
                 auto        rows    = tensorA.sizes()[0];
@@ -1996,16 +1984,20 @@ namespace TensileLite
                 size_t      batchCount = tensorA.sizes().size() > 2 ? tensorA.sizes()[2] : 1;
 
                 auto& pristineA
-                    = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[rocisa::DataType::Float4];
+                    = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[tensorA.dataType()];
                 auto& pristineE8A
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
 
-                // FP4: 2 elements packed per byte, batch stride in bytes = strides[2] / 2
+                // FP4: 2 elements packed per byte (packing=2); FP8: 1 element per byte
+                // (packing=1). Compute byte stride generically via DataTypeInfo so we
+                // never hard-code /2 again the next time a new dtype shows up
                 size_t dataBatchStrideBytes = 0;
                 size_t scaleBatchStrideBytes = 0;
                 if(batchCount > 1)
                 {
-                    dataBatchStrideBytes  = tensorA.strides()[2] / 2;
+                    auto const  dataInfo         = DataTypeInfo::Get(tensorA.dataType());
+                    dataBatchStrideBytes
+                        = multiplyElementSize(tensorA.strides()[2], static_cast<float>(dataInfo.elementSize));
                     auto const& mxsaTensor = problem.mxsa();
                     scaleBatchStrideBytes = mxsaTensor.strides()[mxsaTensor.sizes().size() - 1];
                 }
@@ -2025,7 +2017,7 @@ namespace TensileLite
                                      + b * dataBatchStrideBytes;
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8A.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                    generateMXInput(hipMxDataTypeForDataGenerator(tensorA.dataType()),
                                     hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                     dataPtr,
                                     scalePtr,
@@ -2057,7 +2049,7 @@ namespace TensileLite
                         auto* dataPtr  = static_cast<uint8_t*>(pristineA.cpuInput.valid.get())
                                          + b * dataBatchStrideBytes;
                         auto* scalePtr = gpuScaleBuf.data() + b * scaleBatchStrideBytes;
-                        generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                        generateMXInput(hipMxDataTypeForDataGenerator(tensorA.dataType()),
                                         hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                         dataPtr,
                                         scalePtr,
@@ -2083,7 +2075,7 @@ namespace TensileLite
             }
             else
             {
-                // A is not FP4 (or mxBlockA == 0). The default-init loop will skip A and
+                // A is not FP4/FP8 (or mxBlockA == 0). The default-init loop will skip A and
                 // MXSA because useMXGenerator is true, so seed them here with the same
                 // initArray path the default loop would have used.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::A);
@@ -2091,7 +2083,7 @@ namespace TensileLite
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
             }
 
-            if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
+            if(isMXTensor(problem.b(), problem.mxBlockB()))
             {
                 auto const& tensorB = problem.b();
                 auto        rows    = tensorB.sizes()[0];
@@ -2100,16 +2092,19 @@ namespace TensileLite
                 size_t      batchCount = tensorB.sizes().size() > 2 ? tensorB.sizes()[2] : 1;
 
                 auto& pristineB
-                    = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[rocisa::DataType::Float4];
+                    = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[tensorB.dataType()];
                 auto& pristineE8B
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
 
-                // FP4: 2 elements packed per byte, batch stride in bytes = strides[2] / 2
+                // FP4: 2 elements packed per byte (packing=2); FP8: 1 element per byte
+                // (packing=1). Generic byte-stride via DataTypeInfo (see A side above).
                 size_t dataBatchStrideBytes = 0;
                 size_t scaleBatchStrideBytes = 0;
                 if(batchCount > 1)
                 {
-                    dataBatchStrideBytes  = tensorB.strides()[2] / 2;
+                    auto const  dataInfo         = DataTypeInfo::Get(tensorB.dataType());
+                    dataBatchStrideBytes
+                        = multiplyElementSize(tensorB.strides()[2], static_cast<float>(dataInfo.elementSize));
                     auto const& mxsbTensor = problem.mxsb();
                     scaleBatchStrideBytes = mxsbTensor.strides()[mxsbTensor.sizes().size() - 1];
                 }
@@ -2128,7 +2123,7 @@ namespace TensileLite
                                      + b * dataBatchStrideBytes;
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8B.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                    generateMXInput(hipMxDataTypeForDataGenerator(tensorB.dataType()),
                                     hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                     dataPtr,
                                     scalePtr,
@@ -2157,7 +2152,7 @@ namespace TensileLite
                         auto* dataPtr  = static_cast<uint8_t*>(pristineB.cpuInput.valid.get())
                                          + b * dataBatchStrideBytes;
                         auto* scalePtr = gpuScaleBuf.data() + b * scaleBatchStrideBytes;
-                        generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                        generateMXInput(hipMxDataTypeForDataGenerator(tensorB.dataType()),
                                         hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                         dataPtr,
                                         scalePtr,
@@ -2183,7 +2178,7 @@ namespace TensileLite
             }
             else
             {
-                // B is not FP4 (or mxBlockB == 0). Same fallback rationale as the A side.
+                // B is not FP4/FP8 (or mxBlockB == 0). Same fallback rationale as the A side.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::B);
                 if(problem.mxBlockB() > 0)
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);
@@ -2193,7 +2188,7 @@ namespace TensileLite
         void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& /*problem*/)
         {
             // The MX data generator is disabled at build time. Reaching this
-            // path means a problem requiring MX FP4 initialization was issued
+            // path means a problem requiring MX FP4 or MX FP8 initialization was issued
             // against a build that doesn't include mxDataGenerator support.
             throw std::runtime_error(
                 "MX data initialization requires HIPBLASLT_ENABLE_MXDATAGENERATOR=ON at build time");
@@ -2659,7 +2654,29 @@ namespace TensileLite
                     bool preswizzledAlready = (isMXSA && m_mxPreswizzledA)
                                              || (isMXSB && m_mxPreswizzledB);
 
-                    if (m_isMXPreswizzleArch && preswizzledAlready)
+                    // The picked solution dictates the in-device MX scale layout via
+                    // problemType.mxScaleFormat (mirrors the MXScaleFormat solution
+                    // parameter): 0=NoSwizzle, 1=HostPreSwizzle, 2=InMemorySwizzle.
+                    // Sentinel -1 means "no solution selected yet" (e.g. the first
+                    // prepareGPUInputs call per problem, before solution iteration);
+                    // in that case the path below uses the arch-driven default
+                    // (gfx950 host preswizzle, otherwise K-swizzle).
+                    int kernelMxScaleFormat = -1;
+                    if (m_currentSolution != nullptr)
+                        kernelMxScaleFormat = m_currentSolution->problemType.mxScaleFormat;
+
+                    if (kernelMxScaleFormat == 0)
+                    {
+                        // NoSwizzle: kernel reads scales in canonical row/column
+                        // layout (buffer_load_* path). Upload cpuInput.valid as-is,
+                        // no K-swizzle, no padding permute.
+                        ptr = copyInputBuffers(desc,
+                                               p.gpuInput.valid.get(),
+                                               p.cpuInput.valid.get(),
+                                               p.maxElements,
+                                               hipMemcpyHostToDevice);
+                    }
+                    else if (m_isMXPreswizzleArch && preswizzledAlready)
                     {
                         // gfx950 subtile: preswizzle was applied by initializeMXDataForFP4 and
                         // gpuInput.valid was already populated — use it as-is.
