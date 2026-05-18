@@ -114,11 +114,11 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
 
     I const nblocks = ceildiv(n_arg, nb);
 
-    I const ib_start = 0;
-    I const ib_inc = 1;
+    I const ib_start = (batch_count == 1) ? blockIdx.z : 0;
+    I const ib_inc = (batch_count == 1) ? gridDim.z : 1;
 
-    I const bid_start = blockIdx.z;
-    I const bid_inc = gridDim.z;
+    I const bid_start = (batch_count == 1) ? 0 : blockIdx.z;
+    I const bid_inc = (batch_count == 1) ? 1 : gridDim.z;
 
     I const j_start = threadIdx.y + blockIdx.y * blockDim.y;
     I const j_inc = gridDim.y * blockDim.y;
@@ -207,15 +207,17 @@ static inline void copy_strictly_triangular(hipStream_t stream,
 {
     auto ceildiv = [](auto n, auto nx) { return ((n <= 0) ? 0 : (n + nx - 1) / nx); };
 
+    I const n_diagonal_submatrices = ceildiv(n, nb);
+
     I const nx = 64;
     I const ny = 4;
     I const nz = 1;
 
     I const max_blocks = 64 * 1024 - 3;
 
-    I const nbz = std::min(max_blocks, batch_count);
-    I const nbx = std::min(max_blocks, ceildiv(n, nx));
-    I const nby = std::min(max_blocks, ceildiv(n, ny));
+    I const nbz = std::min(max_blocks, (batch_count == 1) ? n_diagonal_submatrices : batch_count);
+    I const nbx = std::min(max_blocks, ceildiv(nb, nx));
+    I const nby = std::min(max_blocks, ceildiv(nb, ny));
 
     copy_strictly_triangular_kernel<T, I, Istride, UA>
         <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz), 0, stream>>>(is_strictly_lower, is_restore, n, nb,
