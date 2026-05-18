@@ -340,8 +340,10 @@ struct TileCopy
         const auto x_lds_desc = transform_tensor_descriptor(
             x_lds_desc_,
             make_tuple(make_pass_through_transform(number<S::Block_M>{}),
-                       make_merge_transform_v3_division_mod(make_tuple(
-                           number<2>{}, number<X0>{}, number<S::Block_N / repeat_num / X0>{}))),
+                       make_merge_transform_v3_division_mod(
+                           make_tuple(number<repeat_num>{},
+                                      number<X0>{},
+                                      number<S::Block_N / repeat_num / X0>{}))),
             make_tuple(sequence<1>{}, sequence<0, 2, 3>{}),
             make_tuple(sequence<0>{}, sequence<1>{}));
 

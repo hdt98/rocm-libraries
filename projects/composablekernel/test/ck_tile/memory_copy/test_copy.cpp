@@ -84,9 +84,12 @@ class TestCkTileMemoryCopy : public ::testing::TestWithParam<std::tuple<int, int
         using BlockTileList  = type_list<ck_tile::sequence<64, 8>,
                                         ck_tile::sequence<16, 96>,
                                         ck_tile::sequence<16, 384>>;
+        // Vector_N = repeat_num * X2, mirroring the CpyCfg=1 design:
+        //   CpyCfg=1: 2 * 12 = 24   (X0 = Warp_N / Vector_N = 96 / 24 = 4)
+        //   CpyCfg=2: 2 * 48 = 96   (X0 =                   384 / 96 = 4)
         using VectorList     = type_list<ck_tile::sequence<1, dword_bytes / sizeof(DataType)>,
                                      ck_tile::sequence<1, 24>,
-                                     ck_tile::sequence<1, 24>>;
+                                     ck_tile::sequence<1, 96>>;
         using BlockWaves     = ck_tile::sequence<2, 1>;
         using BlockTile      = type_at<CfgIdx, BlockTileList>::type;
         using WaveTile       = type_at<CfgIdx, BlockTileList>::type;

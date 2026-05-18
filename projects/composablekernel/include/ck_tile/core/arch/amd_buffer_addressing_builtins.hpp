@@ -1913,7 +1913,8 @@ CK_TILE_DEVICE void amd_buffer_store_impl_with_bytes(const thread_buffer<int8_t,
                                                      index_t dst_thread_addr_offset,
                                                      index_t dst_wave_addr_offset)
 {
-    static_assert(N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16 || N == 32 || N == 64,
+    static_assert(N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16 || N == 32 ||
+                      N == 48 || N == 64,
                   "wrong! not implemented");
 
     if constexpr(N == 1)
@@ -1980,6 +1981,30 @@ CK_TILE_DEVICE void amd_buffer_store_impl_with_bytes(const thread_buffer<int8_t,
             dst_wave_addr_offset + sizeof(int32_t) * 4,
             static_cast<index_t>(coherence));
     }
+    else if constexpr(N == 48)
+    {
+        // 48-byte sync store = 3 x buffer_store_dwordx4. Source is the int32x12_tt
+        // plain struct returned by the matching N==48 load branch.
+        int32x12_tt src = bit_cast<int32x12_tt>(src_thread_data);
+        int32x4_t   tmp0{src.data[0], src.data[1], src.data[2], src.data[3]};
+        int32x4_t   tmp1{src.data[4], src.data[5], src.data[6], src.data[7]};
+        int32x4_t   tmp2{src.data[8], src.data[9], src.data[10], src.data[11]};
+        llvm_amdgcn_raw_buffer_store_i32x4(tmp0,
+                                           dst_wave_buffer_resource,
+                                           dst_thread_addr_offset,
+                                           dst_wave_addr_offset,
+                                           static_cast<index_t>(coherence));
+        llvm_amdgcn_raw_buffer_store_i32x4(tmp1,
+                                           dst_wave_buffer_resource,
+                                           dst_thread_addr_offset,
+                                           dst_wave_addr_offset + sizeof(int32_t) * 4,
+                                           static_cast<index_t>(coherence));
+        llvm_amdgcn_raw_buffer_store_i32x4(tmp2,
+                                           dst_wave_buffer_resource,
+                                           dst_thread_addr_offset,
+                                           dst_wave_addr_offset + sizeof(int32_t) * 8,
+                                           static_cast<index_t>(coherence));
+    }
     else if constexpr(N == 64)
     {
         llvm_amdgcn_raw_buffer_store_i32x4(
@@ -2030,7 +2055,7 @@ CK_TILE_DEVICE void amd_buffer_store_impl(const thread_buffer<T, N> src_thread_d
             (std::is_same<T, fp8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, bf8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, int8_t>::value &&
-             (N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16)) ||
+             (N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16 || N == 48)) ||
             (std::is_same<T, uint16_t>::value &&
              (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, uint8_t>::value &&

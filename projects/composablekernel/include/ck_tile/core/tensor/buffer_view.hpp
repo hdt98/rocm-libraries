@@ -985,6 +985,7 @@ struct buffer_view<address_space_enum::lds,
                         (std::is_same_v<remove_cvref_t<T>, int8x8_t> && std::is_same_v<remove_cvref_t<X>, int8x8_t>) ||
                         (std::is_same_v<remove_cvref_t<T>, int8x16_t> && std::is_same_v<remove_cvref_t<X>, int8x16_t>) ||
                         // int8 on thread buffer
+                        (std::is_same_v<remove_cvref_t<T>, int8_t> && std::is_same_v<remove_cvref_t<X>, thread_buffer<int8_t, 48>>) ||
                         (std::is_same_v<remove_cvref_t<T>, int8_t> && std::is_same_v<remove_cvref_t<X>, thread_buffer<int8_t, 16>>) ||
                         (std::is_same_v<remove_cvref_t<T>, int8_t> && std::is_same_v<remove_cvref_t<X>, thread_buffer<int8_t, 12>>) ||
                         (std::is_same_v<remove_cvref_t<T>, int8_t> && std::is_same_v<remove_cvref_t<X>, thread_buffer<int8_t, 8>>) ||
@@ -1056,6 +1057,15 @@ struct buffer_view<address_space_enum::lds,
                 {
                     *c_style_pointer_cast<dwordx3_union*>(&p_data_[i]) =
                         *c_style_pointer_cast<const dwordx3_union*>(&x);
+                }
+                else if constexpr(std::is_same_v<remove_cvref_t<X>, thread_buffer<int8_t, 48>>)
+                {
+                    // 48-byte LDS store via int32x12_tt plain struct (mirrors the
+                    // dwordx3_union pattern used for thread_buffer<int8,12>).
+                    // Compiler lowers to 3 x ds_write_b128 (or 4 x ds_write_b96 on the
+                    // packed LDS layout).
+                    *c_style_pointer_cast<int32x12_tt*>(&p_data_[i]) =
+                        *c_style_pointer_cast<const int32x12_tt*>(&x);
                 }
                 else if constexpr((std::is_same_v<remove_cvref_t<T>, int8_t> &&
                                    std::is_same_v<remove_cvref_t<X>, int8x16_t>) ||
