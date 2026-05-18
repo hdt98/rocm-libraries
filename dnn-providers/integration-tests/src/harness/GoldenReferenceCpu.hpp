@@ -58,11 +58,27 @@ protected:
 
 inline auto getGoldenReferenceParams(const std::filesystem::path& subDirectory)
 {
-    return testing::ValuesIn(
-        hipdnn_test_sdk::utilities::filesInDirectoryWithExtReturnEmptyPathOnThrow(
-            hipdnn_data_sdk::utilities::getCurrentExecutableDirectory()
-                / "../lib/hipdnn_reference_data" / subDirectory,
-            ".json"));
+    auto dir = hipdnn_data_sdk::utilities::getCurrentExecutableDirectory()
+        / "../lib/golden_reference_data" / subDirectory;
+
+    std::vector<std::filesystem::path> paths;
+    try
+    {
+        for(const auto& entry : std::filesystem::recursive_directory_iterator(dir))
+        {
+            if(entry.path().extension() == ".json")
+                paths.push_back(entry.path());
+        }
+    }
+    catch(...)
+    {
+        return testing::ValuesIn(std::vector<std::filesystem::path>{""});
+    }
+
+    if(paths.empty())
+        return testing::ValuesIn(std::vector<std::filesystem::path>{""});
+
+    return testing::ValuesIn(paths);
 }
 }
 
