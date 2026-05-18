@@ -912,7 +912,8 @@ class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
                     and kernel_ctx.tile.F_bn0 == 128
                 )
                 or (
-                    (problem_ctx.hdim, problem_ctx.hdim_v) not in [(64, 64), (128, 128), (256, 256)]
+                    (problem_ctx.hdim, problem_ctx.hdim_v)
+                    not in [(64, 64), (128, 128), (256, 256)]
                 )
             ):
                 return False
@@ -926,23 +927,7 @@ class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
             is_v3_pipeline = kernel_ctx.pipeline.tag == "qr_async_trload_v3"
             return is_v3_dedicated_tile == is_v3_pipeline
 
-        def check_qr_ks_vs_mfma_alignment(
-            problem_ctx: ProblemContext, kernel_ctx: KernelContext
-        ) -> bool:
-            # BlockFmhaPipelineQRKSVS::schedule_gemm_0 requires
-            # NumMfmaInsts % 8 == 0 (block_fmha_pipeline_qr_ks_vs.hpp:494).
-            # NumMfmaInsts per warp = (bm0/rm0/wm0) * (bn0/rn0/wn0) * (bk0/wk0)
-            if kernel_ctx.pipeline.tag != "qr":
-                return True
-            t = kernel_ctx.tile
-            n_mfma = (
-                (t.F_bm0 // t.F_rm0 // t.F_wm0)
-                * (t.F_bn0 // t.F_rn0 // t.F_wn0)
-                * (t.F_bk0 // t.F_wk0)
-            )
-            return n_mfma % 8 == 0
-
-        rules.extend([check_tile_pipeline, check_qr_ks_vs_mfma_alignment])
+        rules.extend([check_tile_pipeline])
         return rules
 
 
@@ -1351,6 +1336,7 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
         return pipelines
 
+
 class KernelComponentFactoryGfx125(CompatibilityRuleFactory):
     arch = ArchTrait("gfx125")
 
@@ -1414,6 +1400,7 @@ class KernelComponentFactoryGfx125(CompatibilityRuleFactory):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
         return pipelines
+
 
 class CustomFactory(KernelComponentFactoryGfx9, CompatibilityRuleFactoryGfx9):
     @classmethod
