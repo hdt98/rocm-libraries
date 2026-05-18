@@ -125,7 +125,8 @@ INSTANTIATE_TEST_SUITE_P(
         // carry into smallest normal 0x04 = 6.103515625e-5.
         RoundingTestCase{5.340576171875e-5f, 6.103515625e-5f},
         // Above carry midpoint: definitively rounds up to smallest normal.
-        RoundingTestCase{5.7220458984375e-5f, 6.103515625e-5f}));
+        RoundingTestCase{5.7220458984375e-5f, 6.103515625e-5f},
+        RoundingTestCase{-5.7220458984375e-5f, -6.103515625e-5f}));
 
 // Values at the boundary between two adjacent encodings (not at exact midpoints).
 // Verifies correct rounding direction in the non-tie case.
