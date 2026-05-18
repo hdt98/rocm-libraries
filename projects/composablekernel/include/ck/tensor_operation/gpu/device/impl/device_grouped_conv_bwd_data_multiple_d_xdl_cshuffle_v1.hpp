@@ -996,11 +996,12 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                             split_valid_ = false;
                         }
 
-                        for(const auto& [conv_to_gemm_transform_split,
-                                         p_a_grid_split,
-                                         p_e_grid_split] : transform_vec)
+                        for(const auto& entry : transform_vec)
                         {
-                            const auto a_grid_desc_ak0_m_ak1 = [&]() {
+                            const auto& conv_to_gemm_transform_split = std::get<0>(entry);
+                            const auto& p_a_grid_split               = std::get<1>(entry);
+                            const auto& p_e_grid_split               = std::get<2>(entry);
+                            const auto a_grid_desc_ak0_m_ak1         = [&]() {
                                 if constexpr(CTranspose)
                                     return conv_to_gemm_transform_split.MakeBDescriptor_BK0_N_BK1();
                                 else
