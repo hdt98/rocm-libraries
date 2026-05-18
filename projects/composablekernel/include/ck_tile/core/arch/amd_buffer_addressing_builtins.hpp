@@ -19,6 +19,8 @@
 #include "ck_tile/core/utility/functional.hpp"
 #include "ck_tile/core/utility/ignore.hpp"
 #include "ck_tile/core/arch/amd_buffer_coherence.hpp"
+#include "ck_tile/core/numeric/pk_fp4.hpp"
+#include "ck_tile/core/numeric/pk_fp6.hpp"
 
 #define HAS_GLOBAL_ATOMIC_PK_ADD_BUILTIN                        \
     __has_builtin(__builtin_amdgcn_global_atomic_fadd_v2f16) && \
