@@ -466,30 +466,38 @@ TEST(DataGeneratorConstantFills, DenormMinsF32)
     expectAllValuesUnscaled<f32>(DenormMins{}, std::ldexp(1.0f, -149));
 }
 
+// Pass the per-type smallest-normal-float threshold in by value rather than
+// computing it from `DTYPE::dataMinSubNormalNumber * (1ull << 24)`. The
+// previous formula relied on a denormal float surviving a runtime
+// multiplication, which is wrong under flush-to-zero (bf16's 2^-133 and f32's
+// 2^-149 dataMinSubNormalNumber both flush to 0 before the multiply, giving
+// a useless `< 0` bound). `std::ldexp(1.0f, ...)` produces the threshold via
+// bit-pattern construction so it's FTZ-safe, and the smallest-normal itself
+// is a normal float for every type we test here.
 template <typename DTYPE>
-void expectDenormMaxAllPositiveAtBoundary()
+void expectDenormMaxAllPositiveBelow(float smallestNormal)
 {
     auto dgen = generateConstant<DTYPE>(DenormMaxs{});
     auto ref  = dgen.getReferenceFloat();
     ASSERT_EQ(ref.size(), static_cast<size_t>(kRows * kCols));
     ASSERT_GT(ref[0], 0.0f);
     // largest-denorm < smallest-normal is the type-agnostic ordering invariant.
-    EXPECT_LT(ref[0], DTYPE::dataMinSubNormalNumber * (1ull << 24));
+    EXPECT_LT(ref[0], smallestNormal);
     for(size_t i = 1; i < ref.size(); ++i)
         EXPECT_EQ(ref[i], ref[0]) << "element " << i;
 }
 
 TEST(DataGeneratorConstantFills, DenormMaxsBf16)
 {
-    expectDenormMaxAllPositiveAtBoundary<bf16>();
+    expectDenormMaxAllPositiveBelow<bf16>(std::ldexp(1.0f, -126));
 }
 TEST(DataGeneratorConstantFills, DenormMaxsFp16)
 {
-    expectDenormMaxAllPositiveAtBoundary<fp16>();
+    expectDenormMaxAllPositiveBelow<fp16>(std::ldexp(1.0f, -14));
 }
 TEST(DataGeneratorConstantFills, DenormMaxsF32)
 {
-    expectDenormMaxAllPositiveAtBoundary<f32>();
+    expectDenormMaxAllPositiveBelow<f32>(std::ldexp(1.0f, -126));
 }
 
 // Cross-check: DenormMaxs > DenormMins for every multi-byte type.

@@ -64,6 +64,13 @@ namespace DGen
                       "split the launch or use a 2D grid");
         }
 
+        // Common threads-per-block for every kernel launch in this backend.
+        // 256 is a good fit for the work pattern (one thread per MX scale
+        // block / one thread per output byte), gives full 4-wave occupancy
+        // on every supported arch, and keeps launch arithmetic uniform
+        // across the generation + pre-swizzle kernels.
+        constexpr int kThreadsPerBlock = 256;
+
 // Macros aren't namespaced even when defined inside a namespace block. This
 // detail name is `#undef`-ed at the bottom of this file so it doesn't leak
 // to includers; trailing underscore signals "private to this TU".
@@ -1180,10 +1187,10 @@ namespace DGen
         // Configuration for the kernel.
         gpu_detail::DeviceInitConfig cfg = gpu_detail::makeConfig<DTYPE>(options, sizes);
 
-        // Launch: 256 threads per block; one thread = one MX block.
-        constexpr int kThreadsPerBlock = 256;
-        size_t        gridDimX
-            = (numBlocks + kThreadsPerBlock - 1) / kThreadsPerBlock;
+        // One thread per MX scale block. See gpu_detail::kThreadsPerBlock
+        // for the rationale on 256.
+        size_t gridDimX = (numBlocks + gpu_detail::kThreadsPerBlock - 1)
+                          / gpu_detail::kThreadsPerBlock;
         gpu_detail::checkGridDimX(gridDimX, "generateInto");
 
         if(devScale == nullptr && m_scaleBufferBytes == 0)
@@ -1192,7 +1199,7 @@ namespace DGen
 
         hipLaunchKernelGGL(gpu_detail::generateMXBlocksKernel<DTYPE>,
                            dim3(static_cast<unsigned>(gridDimX)),
-                           dim3(kThreadsPerBlock),
+                           dim3(gpu_detail::kThreadsPerBlock),
                            0,
                            stream,
                            static_cast<uint8_t*>(devData),
@@ -1304,13 +1311,13 @@ namespace DGen
 
         gpu_detail::DeviceBuffer dstBuf(paddedSize);
 
-        constexpr int kThreadsPerBlock = 256;
-        size_t        gridDimX = (paddedSize + kThreadsPerBlock - 1) / kThreadsPerBlock;
+        size_t gridDimX = (paddedSize + gpu_detail::kThreadsPerBlock - 1)
+                          / gpu_detail::kThreadsPerBlock;
         gpu_detail::checkGridDimX(gridDimX, "preSwizzleScalesGFX950Device");
 
         hipLaunchKernelGGL(gpu_detail::preSwizzleScalesKernel,
                            dim3(static_cast<unsigned>(gridDimX)),
-                           dim3(kThreadsPerBlock),
+                           dim3(gpu_detail::kThreadsPerBlock),
                            0,
                            stream,
                            dstBuf.get(),
@@ -1356,14 +1363,13 @@ namespace DGen
 
         gpu_detail::DeviceBuffer dstBuf(paddedSize);
 
-        constexpr int kThreadsPerBlock = 256;
-        size_t        gridDimX
-            = (paddedSize + kThreadsPerBlock - 1) / kThreadsPerBlock;
+        size_t gridDimX = (paddedSize + gpu_detail::kThreadsPerBlock - 1)
+                          / gpu_detail::kThreadsPerBlock;
         gpu_detail::checkGridDimX(gridDimX, "preSwizzleScalesGFX1250Device");
 
         hipLaunchKernelGGL(gpu_detail::preSwizzleScalesGFX1250Kernel,
                            dim3(static_cast<unsigned>(gridDimX)),
-                           dim3(kThreadsPerBlock),
+                           dim3(gpu_detail::kThreadsPerBlock),
                            0,
                            stream,
                            dstBuf.get(),
