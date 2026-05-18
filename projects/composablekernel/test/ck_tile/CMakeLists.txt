@@ -78,9 +78,5 @@ if(BUILD_CK_TILE_ENGINE_TESTS)
 endif()
 add_subdirectory(pooling)
 add_subdirectory(grouped_conv)
-<<<<<<< HEAD
-add_subdirectory(pooling_tile_engine)
-add_subdirectory(direct_conv)
-=======
 add_subdirectory(multicast_load)
->>>>>>> origin/develop
+add_subdirectory(direct_conv)
