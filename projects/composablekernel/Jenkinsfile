@@ -1248,8 +1248,9 @@ def run_downstream_tests(Map conf=[:]){
 def getPytorchTestsCmds() {
     return [
         "mkdir pytorch",
-        "cp -r /var/jenkins/workspace/pytorch pytorch/",
+        "cp -r /var/jenkins/workspace/pytorch/* pytorch/",
         "cd pytorch",
+        "ls -ltr"
         "python3 tools/amd_build/build_amd.py",
         "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python3 setup.py develop"
     ]
