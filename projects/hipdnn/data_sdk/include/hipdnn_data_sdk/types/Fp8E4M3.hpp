@@ -245,7 +245,6 @@ inline float fp8_e4m3_bits_to_float(uint8_t bits) noexcept
     // clang-format on
     const uint8_t absBits = bits & FP8_E4M3_ABS_MASK;
     // Handle both NaN patterns: 0x7F (positive) and 0xFF (negative)
-    // Uses std::copysign to preserve sign for round-trip via float_to_fp8_e4m3_bits
     if(absBits == FP8_E4M3_NAN)
     {
         constexpr float QUIET_NAN = std::numeric_limits<float>::quiet_NaN();
