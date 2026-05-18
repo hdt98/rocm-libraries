@@ -36,17 +36,21 @@ jobs:
       hipdnn: ${{ steps.changes.outputs.hipdnn }}
     steps:
       - name: Checkout rocm-libraries
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github
+          sparse-checkout-cone-mode: true
+          fetch-depth: 2
 
       - name: Detect changed opted-in projects
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: changes
         with:
           filters: |
-            hipdnn:
-              - 'projects/hipdnn/**'
             # To opt in a new library, add a filter here and a corresponding
             # step in the clang-tidy job below.
+            hipdnn:
+              - 'projects/hipdnn/**'
             # Disabled: see https://github.com/ROCm/rocm-libraries/issues/5067
             # miopen-provider:
             #   - 'dnn-providers/miopen-provider/**'
