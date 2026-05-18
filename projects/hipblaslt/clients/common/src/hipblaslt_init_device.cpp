@@ -894,7 +894,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
                                                           : std::numeric_limits<float>::quiet_NaN();
                 T special_T = T(special_val);
                 fill_batch(A, M, N, lda, effective_stride, batch_count,
-                           [base_seed = kNormDistOneSpecialSeed, special_idx, special_T] __device__(
+                           [base_seed = kNormDistOneSpecialSeed, special_idx, special_T] __host__ __device__(
                                size_t idx) -> T {
                                if(idx == special_idx)
                                    return special_T;
