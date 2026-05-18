@@ -196,6 +196,45 @@ TEST(FmhaBwdCompat, DqDkDv_FP16_D128_Group)
     EXPECT_EQ(k.block_per_cu, 1);
 }
 
+TEST(FmhaBwdCompat, DqDkDv_FP16_D128_Group_CMask)
+{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.has_mask = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+
+    EXPECT_EQ(k.mode, FmhaMode::GROUP);
+    EXPECT_TRUE(k.has_mask);
+    EXPECT_FALSE(k.has_dropout);
+    EXPECT_FALSE(k.is_deterministic);
+}
+
+TEST(FmhaBwdCompat, DqDkDv_FP16_D128_Group_Det)
+{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.is_deterministic = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+
+    EXPECT_EQ(k.mode, FmhaMode::GROUP);
+    EXPECT_FALSE(k.has_mask);
+    EXPECT_FALSE(k.has_dropout);
+    EXPECT_TRUE(k.is_deterministic);
+}
+
+TEST(FmhaBwdCompat, DqDkDv_FP16_D128_Group_Dropout)
+{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+
+    EXPECT_EQ(k.mode, FmhaMode::GROUP);
+    EXPECT_FALSE(k.has_mask);
+    EXPECT_TRUE(k.has_dropout);
+    EXPECT_FALSE(k.is_deterministic);
+}
+
 TEST(FmhaBwdCompat, DqDkDv_FP16_D128_Batch_EBias)
 {
     constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
@@ -520,6 +559,48 @@ TEST(FmhaBwdCompat, Registry_DqDkDv_FindsDeterministic)
     EXPECT_STREQ(v->name, "fmha_bwd_dqdkdv_fp16_d128_batch_det");
 }
 
+TEST(FmhaBwdCompat, Registry_DqDkDv_FindsGroup)
+{
+    const auto* v =
+        findVariant(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                      .hdim_q = 128,
+                                                      .hdim_v = 128,
+                                                      .mode   = FmhaMode::GROUP},
+                                        .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+    ASSERT_NE(v, nullptr);
+    EXPECT_STREQ(v->name, "fmha_bwd_dqdkdv_fp16_d128_group");
+}
+
+TEST(FmhaBwdCompat, Registry_DqDkDv_FindsGroupMask)
+{
+    const auto* v = findVariant(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.has_mask = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+    ASSERT_NE(v, nullptr);
+    EXPECT_STREQ(v->name, "fmha_bwd_dqdkdv_fp16_d128_group_cmask");
+}
+
+TEST(FmhaBwdCompat, Registry_DqDkDv_FindsGroupDeterministic)
+{
+    const auto* v = findVariant(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.is_deterministic = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+    ASSERT_NE(v, nullptr);
+    EXPECT_STREQ(v->name, "fmha_bwd_dqdkdv_fp16_d128_group_det");
+}
+
+TEST(FmhaBwdCompat, Registry_DqDkDv_FindsGroupDropout)
+{
+    const auto* v = findVariant(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+    ASSERT_NE(v, nullptr);
+    EXPECT_STREQ(v->name, "fmha_bwd_dqdkdv_fp16_d128_group_dropout");
+}
+
 TEST(FmhaBwdCompat, Registry_DqDkDv_FindsCMaskDet)
 {
     const auto* v = findVariant(FmhaBwdDQDKDVConfig{
@@ -620,7 +701,7 @@ TEST(FmhaBwdCompat, Registry_DqDkDv_ReturnsNullForUnregistered)
     EXPECT_EQ(v, nullptr);
 }
 
-TEST(FmhaBwdCompat, Registry_DqDkDv_VariantCount) { EXPECT_EQ(ALL_DQDKDV_VARIANTS_COUNT, 15); }
+TEST(FmhaBwdCompat, Registry_DqDkDv_VariantCount) { EXPECT_EQ(ALL_DQDKDV_VARIANTS_COUNT, 18); }
 
 // _cmask_br and _swa share the compiled spec with _cmask. findVariant() matches
 // by spec features alone, so it returns _cmask first for any has_mask=true
