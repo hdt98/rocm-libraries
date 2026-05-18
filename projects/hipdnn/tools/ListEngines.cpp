@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    hipdnnHandle_t handle = NULL; // intentional tidy violation for CI test — revert this commit
+    hipdnnHandle_t handle = nullptr;
     if(hipdnnCreate(&handle) != HIPDNN_STATUS_SUCCESS)
     {
         std::cerr << "Error: failed to create handle\n";
