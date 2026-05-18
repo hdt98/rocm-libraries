@@ -39,7 +39,7 @@ struct type_at<0, type_list<Head, Tail...>>
     using type = Head;
 };
 
-template <typename DataType, bool AsyncCopy = true>
+template <typename DataType, bool AsyncCopy = true, int CpyCfgOverride = -1>
 class TestCkTileMemoryCopy : public ::testing::TestWithParam<std::tuple<int, int, int>>
 {
     protected:
@@ -52,8 +52,13 @@ class TestCkTileMemoryCopy : public ::testing::TestWithParam<std::tuple<int, int
         ck_tile::index_t n       = memcpy_params.n;
         ck_tile::index_t warp_id = memcpy_params.warp_id;
 
-        constexpr auto dword_bytes    = 4;
-        const ck_tile::index_t CpyCfg = std::is_same_v<DataType, ck_tile::pk_fp6x16_t> ? 1 : 0;
+        constexpr auto dword_bytes = 4;
+        // CpyCfg: 0 = normal, 1 = dwordx3 (existing fp6 path), 2 = 3xdwordx4 sync (new).
+        // Default for pk_fp6x16_t is the legacy dwordx3 path; override per test class.
+        constexpr int CpyCfg =
+            CpyCfgOverride >= 0
+                ? CpyCfgOverride
+                : (std::is_same_v<DataType, ck_tile::pk_fp6x16_t> ? 1 : 0);
 
         ck_tile::HostTensor<XDataType> x_host({m, n});
         ck_tile::HostTensor<YDataType> y_host_dev({m, n});
@@ -71,13 +76,21 @@ class TestCkTileMemoryCopy : public ::testing::TestWithParam<std::tuple<int, int
 
         x_buf.ToDevice(x_host.data());
 
-        using BlockTileList = type_list<ck_tile::sequence<64, 8>, ck_tile::sequence<16, 96>>;
-        using VectorList    = type_list<ck_tile::sequence<1, dword_bytes / sizeof(DataType)>,
-                                        ck_tile::sequence<1, 24>>;
-        using BlockWaves    = ck_tile::sequence<2, 1>;
-        using BlockTile     = type_at<CpyCfg, BlockTileList>::type;
-        using WaveTile      = type_at<CpyCfg, BlockTileList>::type;
-        using Vector        = type_at<CpyCfg, VectorList>::type;
+        // Per-CpyCfg shape selection:
+        //   idx 0 = normal copy
+        //   idx 1 = dwordx3 (12 bytes/thread per N step; Block_N=96 bytes ⇒ 2 repeats)
+        //   idx 2 = 3xdwordx4 sync (48 bytes/thread; Block_N must be a multiple of 4*48=192 bytes)
+        constexpr int CfgIdx = CpyCfg;
+        using BlockTileList  = type_list<ck_tile::sequence<64, 8>,
+                                        ck_tile::sequence<16, 96>,
+                                        ck_tile::sequence<16, 384>>;
+        using VectorList     = type_list<ck_tile::sequence<1, dword_bytes / sizeof(DataType)>,
+                                     ck_tile::sequence<1, 24>,
+                                     ck_tile::sequence<1, 24>>;
+        using BlockWaves     = ck_tile::sequence<2, 1>;
+        using BlockTile      = type_at<CfgIdx, BlockTileList>::type;
+        using WaveTile       = type_at<CfgIdx, BlockTileList>::type;
+        using Vector         = type_at<CfgIdx, VectorList>::type;
 
         ck_tile::index_t kGridSize =
             ck_tile::integer_divide_ceil(m, BlockTile::at(ck_tile::number<0>{}));
@@ -90,9 +103,10 @@ class TestCkTileMemoryCopy : public ::testing::TestWithParam<std::tuple<int, int
         constexpr ck_tile::index_t kBlockPerCu = 1;
         // when copy fp6x16 buffer, tread it as int8 buffer and recompute n-dim size.
         ck_tile::index_t cpy_n =
-            CpyCfg == 1 ? n * sizeof(DataType) /
-                              (sizeof(int8_t) * ck_tile::numeric_traits<DataType>::PackedSize)
-                        : n;
+            (CpyCfg == 1 || CpyCfg == 2)
+                ? n * sizeof(DataType) /
+                      (sizeof(int8_t) * ck_tile::numeric_traits<DataType>::PackedSize)
+                : n;
 
         auto ms = launch_kernel(
             ck_tile::stream_config{nullptr, true},
@@ -125,6 +139,13 @@ class TestCkTileMemoryCopyF6x16 : public TestCkTileMemoryCopy<ck_tile::pk_fp6x16
 {
 };
 
+// 3 x dwordx4 sync path (CpyCfg=2). AsyncCopy=false (the new sync path).
+// Block_N must be a multiple of X0*X2 = 4*48 = 192 for the dwordx3-shape distribution.
+class TestCkTileMemoryCopyF6x48
+    : public TestCkTileMemoryCopy<ck_tile::pk_fp6x16_t, false, /*CpyCfgOverride=*/2>
+{
+};
+
 class TestCkTileMemoryCopyHalfAsync : public TestCkTileMemoryCopy<ck_tile::half_t>
 {
 };
@@ -142,6 +163,12 @@ class TestCkTileMemoryCopyFP8Async : public TestCkTileMemoryCopy<ck_tile::fp8_t>
 };
 
 TEST_P(TestCkTileMemoryCopyF6x16, TestCorrectness)
+{
+    auto [M, N, warp_id] = GetParam();
+    this->Run({M, N, warp_id});
+}
+
+TEST_P(TestCkTileMemoryCopyF6x48, TestCorrectness)
 {
     auto [M, N, warp_id] = GetParam();
     this->Run({M, N, warp_id});
@@ -179,6 +206,15 @@ TEST_P(TestCkTileMemoryCopyFP8Async, TestCorrectness)
 
 INSTANTIATE_TEST_SUITE_P(TestCkTileMemCopySuite,
                          TestCkTileMemoryCopyF6x16,
+                         ::testing::Values(std::tuple{32, 128, 0},
+                                           std::tuple{64, 256, 0},
+                                           std::tuple{32, 128, 1},
+                                           std::tuple{64, 256, 1}));
+
+// F6x48 shape list mirrors F6x16 verbatim. N ∈ {128, 256} are both multiples of
+// 32 pk_fp6x16_t elements (= Block_N=384 bytes ⇒ X1/(X0*X2) integer).
+INSTANTIATE_TEST_SUITE_P(TestCkTileMemCopySuite,
+                         TestCkTileMemoryCopyF6x48,
                          ::testing::Values(std::tuple{32, 128, 0},
                                            std::tuple{64, 256, 0},
                                            std::tuple{32, 128, 1},

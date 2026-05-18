@@ -1407,7 +1407,8 @@ amd_buffer_load_impl_with_bytes(int32x4_t src_wave_buffer_resource,
                                 index_t src_thread_addr_offset,
                                 index_t src_wave_addr_offset)
 {
-    static_assert(N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16 || N == 32 || N == 64,
+    static_assert(N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16 || N == 32 ||
+                      N == 48 || N == 64,
                   "wrong! not implemented");
 
     using rtn_type = thread_buffer<int8_t, N>;
@@ -1485,6 +1486,40 @@ amd_buffer_load_impl_with_bytes(int32x4_t src_wave_buffer_resource,
 
         return bit_cast<rtn_type>(tmp);
     }
+    else if constexpr(N == 48)
+    {
+        // 48-byte sync load = 3 x buffer_load_dwordx4 (12 dwords).
+        // Used by the mxfp6 3xdwordx4 path that replaces the dwordx3 async-LDS-direct path.
+        // Result is stitched into int32x12_tt (plain struct; clang has no ext_vector<int8,48>).
+        int32x4_t tmp0 = llvm_amdgcn_raw_buffer_load_i32x4(src_wave_buffer_resource,
+                                                           src_thread_addr_offset,
+                                                           src_wave_addr_offset,
+                                                           static_cast<index_t>(coherence));
+        int32x4_t tmp1 =
+            llvm_amdgcn_raw_buffer_load_i32x4(src_wave_buffer_resource,
+                                              src_thread_addr_offset,
+                                              src_wave_addr_offset + 4 * sizeof(int32_t),
+                                              static_cast<index_t>(coherence));
+        int32x4_t tmp2 =
+            llvm_amdgcn_raw_buffer_load_i32x4(src_wave_buffer_resource,
+                                              src_thread_addr_offset,
+                                              src_wave_addr_offset + 8 * sizeof(int32_t),
+                                              static_cast<index_t>(coherence));
+        int32x12_tt ret;
+        ret.data[0]  = tmp0[0];
+        ret.data[1]  = tmp0[1];
+        ret.data[2]  = tmp0[2];
+        ret.data[3]  = tmp0[3];
+        ret.data[4]  = tmp1[0];
+        ret.data[5]  = tmp1[1];
+        ret.data[6]  = tmp1[2];
+        ret.data[7]  = tmp1[3];
+        ret.data[8]  = tmp2[0];
+        ret.data[9]  = tmp2[1];
+        ret.data[10] = tmp2[2];
+        ret.data[11] = tmp2[3];
+        return bit_cast<rtn_type>(ret);
+    }
     else if constexpr(N == 64)
     {
         int32x4_t tmp0 = llvm_amdgcn_raw_buffer_load_i32x4(src_wave_buffer_resource,
@@ -1541,7 +1576,7 @@ CK_TILE_DEVICE thread_buffer<T, N> amd_buffer_load_impl(int32x4_t src_wave_buffe
             (std::is_same<T, fp8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, bf8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, int8_t>::value &&
-             (N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16)) ||
+             (N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16 || N == 48)) ||
             (std::is_same<T, uint8_t>::value &&
              (N == 1 || N == 2 || N == 4 || N == 8 || N == 12 || N == 16)) ||
             (std::is_same<T, e8m0_bexp_t>::value &&
@@ -1552,7 +1587,7 @@ CK_TILE_DEVICE thread_buffer<T, N> amd_buffer_load_impl(int32x4_t src_wave_buffe
              (N == 1 || N == 2 || N == 4 || N == 8 || N == 16 || N == 32)) ||
             (std::is_same<T, pk_fp4_t>::value &&
              (N == 1 || N == 2 || N == 4 || N == 8 || N == 16 || N == 32)) ||
-            (std::is_same<T, pk_fp6x16_t>::value && (N == 1)),
+            (std::is_same<T, pk_fp6x16_t>::value && (N == 1 || N == 4)),
         "wrong! not implemented");
 
     using rtn_type = thread_buffer<T, N>;

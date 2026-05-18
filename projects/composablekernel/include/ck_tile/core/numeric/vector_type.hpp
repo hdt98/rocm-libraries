@@ -102,12 +102,28 @@ struct int32x6_tt
     int32_t data[6];
 };
 
+// 48-byte plain struct: clang has no ext_vector for int8 x 48 or pk_fp6x16_t x 4.
+// Mirrors the int32x3_tt / int32x6_tt pattern; used by the N==48 sync buffer-load
+// path (3 x buffer_load_dwordx4).
+struct int32x12_tt
+{
+    int32_t data[12];
+};
+
 template <>
 struct impl::ext_vector<int8_t, 12>
 {
     static constexpr index_t N = 12;
     using value_type           = int32x3_tt;
     using type                 = int32x3_tt;
+};
+
+template <>
+struct impl::ext_vector<int8_t, 48>
+{
+    static constexpr index_t N = 48;
+    using value_type           = int32x12_tt;
+    using type                 = int32x12_tt;
 };
 
 template <>
@@ -124,6 +140,14 @@ struct impl::ext_vector<pk_fp6x16_t, 2>
     static constexpr index_t N = 2;
     using value_type           = int32x6_tt;
     using type                 = int32x6_tt;
+};
+
+template <>
+struct impl::ext_vector<pk_fp6x16_t, 4>
+{
+    static constexpr index_t N = 4;
+    using value_type           = int32x12_tt;
+    using type                 = int32x12_tt;
 };
 
 // u32
