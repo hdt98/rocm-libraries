@@ -147,6 +147,10 @@ const auto& GetTestParams()
     static const auto params = [] {
         auto p = miopen::unit_tests::UnitTestConvSolverParams(Gpu::All);
         p.UseCpuRef(); // CPU verification
+        // Float accumulators (solver mode) introduce slightly more rounding
+        // error than the previous double accumulators. Relax fp32 tolerance
+        // from 1x to 2x epsilon.
+        p.SetTolerance(Gpu::All, miopenFloat, 2.0f);
         return p;
     }();
     return params;
