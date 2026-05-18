@@ -37,8 +37,9 @@ set(CMAKE_REQUIRED_FLAGS "-std=c++17")
 check_cxx_source_compiles("${HAVE_STD_FILESYSTEM_TEST}" HAVE_STD_FILESYSTEM)
 cmake_pop_check_state()
 
-add_custom_target(tools)
+add_custom_target(tools COMMENT "Build all rocRAND code-generation tools")
 
+# Adds a code-generation tool executable and attaches it to the `tools` target.
 function(rocrand_add_tool TARGET_NAME)
     add_executable(${TARGET_NAME} ${ARGN})
     target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
@@ -77,7 +78,7 @@ rocrand_add_tool(xorwow_precomputed_generator xorwow_precomputed_generator.cpp)
 # (binary files, cpp files, assembly files)
 # reads the input direction numbers from a file named direction_numbers.txt in the current
 # working directory
-add_custom_target(precompute_sobol_directions)
+add_custom_target(precompute_sobol_directions COMMENT "Regenerate all (scrambled_)sobol(32,64) precomputed direction tables")
 
 foreach(NAME IN ITEMS "sobol32" "sobol64")
     foreach(PREFIX IN ITEMS "" "scrambled_")
@@ -99,14 +100,16 @@ foreach(NAME IN ITEMS "sobol32" "sobol64")
         ${CMAKE_CURRENT_SOURCE_DIR}/direction_numbers.txt
         ${SYMBOL}
         ${OUT_H}
-        ${OUT_BIN})
+        ${OUT_BIN}
+        COMMENT "Generate ${INNER_NAME} direction vectors")
     add_dependencies(${DIRECTIONS_TARGET} ${DIRECTIONS_EXE})
 
     add_custom_target(${SCRAMBLED_DIRECTIONS_TARGET} ${SCRAMBLED_DIRECTIONS_EXE}
         ${OUT_BIN}
         ${SCRAMBLED_SYMBOL}
         ${SCRAMBLED_OUT_H}
-        ${SCRAMBLED_OUT_BIN})
+        ${SCRAMBLED_OUT_BIN}
+        COMMENT "Generate scrambled ${INNER_NAME} direction vectors")
     add_dependencies(${SCRAMBLED_DIRECTIONS_TARGET}
         ${SCRAMBLED_DIRECTIONS_EXE} ${DIRECTIONS_TARGET})
 
@@ -124,13 +127,15 @@ foreach(NAME IN ITEMS "sobol32" "sobol64")
             -DSYMBOL=${${PREFIX_UPPER}SYMBOL}
             -DINPUT_BIN=${${PREFIX_UPPER}OUT_BIN_NAME}
             -DOUTPUT=${PROJECT_SOURCE_DIR}/library/src/rocrand_${INNER_NAME}_precomputed.S
-            -P ${CMAKE_CURRENT_LIST_DIR}/AsmEmbedSymbol.cmake)
+            -P ${CMAKE_CURRENT_LIST_DIR}/AsmEmbedSymbol.cmake
+            COMMENT "Emit assembly embedding for ${INNER_NAME} precomputed table")
 
         add_custom_target(precompute_${INNER_NAME}_directions_cpp bin2typed
             ${${PREFIX_UPPER}OUT_BIN}
             ${${PREFIX_UPPER}SYMBOL}
             ${SYMBOL_TYPE}
-            ${PROJECT_SOURCE_DIR}/library/src/rocrand_${INNER_NAME}_precomputed.cpp)
+            ${PROJECT_SOURCE_DIR}/library/src/rocrand_${INNER_NAME}_precomputed.cpp
+            COMMENT "Emit typed C++ source for ${INNER_NAME} precomputed table")
         add_dependencies(precompute_${INNER_NAME}_directions_cpp
                          bin2typed ${${PREFIX_UPPER}DIRECTIONS_TARGET})
     endforeach()

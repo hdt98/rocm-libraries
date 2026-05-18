@@ -51,7 +51,6 @@ endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-
 if(NOT CMAKE_CXX_STANDARD EQUAL 17)
   message(FATAL_ERROR "Only C++17 is supported")
 endif()
@@ -86,6 +85,7 @@ set(rocrand_pkg_TEST_SRCS
 # Enable testing (ctest)
 enable_testing()
 
+# Registers a CTest entry that invokes the test binary by its relative path.
 function(add_relative_test test_name test_target)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")
@@ -144,7 +144,7 @@ foreach(test_src ${rocrand_pkg_TEST_SRCS})
       ${CMAKE_SOURCE_DIR}/rtest.*
       )
       foreach( file_i ${third_party_dlls})
-        add_custom_command( TARGET ${test_name} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test/package )
+        add_custom_command( TARGET ${test_name} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test/package COMMENT "Copy ${file_i} next to package-test binaries" )
       endforeach( file_i )
-    endif() 
+    endif()
 endforeach()

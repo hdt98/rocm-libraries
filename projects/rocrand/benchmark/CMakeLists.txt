@@ -22,6 +22,7 @@
 
 # Benchmarks
 
+# Adds a benchmark executable that links against rocrand.
 function(add_rocrand_benchmark benchmark_src legacy)
   get_filename_component(BENCHMARK_TARGET ${benchmark_src} NAME_WE)
   add_executable(${BENCHMARK_TARGET} ${benchmark_src})
@@ -56,12 +57,12 @@ function(add_rocrand_benchmark benchmark_src legacy)
     # for now adding in all .dll as dependency chain is not cmake based on win32
     file( GLOB third_party_dlls
     LIST_DIRECTORIES ON
-    CONFIGURE_DEPENDS 
+    CONFIGURE_DEPENDS
     ${HIP_DIR}/bin/*.dll
     ${CMAKE_SOURCE_DIR}/rtest.*
     )
     foreach( file_i ${third_party_dlls})
-      add_custom_command( TARGET ${BENCHMARK_TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/benchmark )
+      add_custom_command( TARGET ${BENCHMARK_TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/benchmark COMMENT "Copy ${file_i} next to benchmark binaries" )
     endforeach( file_i )
   endif()
 endfunction()
