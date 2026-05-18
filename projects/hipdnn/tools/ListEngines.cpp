@@ -1,6 +1,5 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
-// clang-tidy CI trigger test — revert this commit
 
 #include "hipdnn_backend.h"
 
