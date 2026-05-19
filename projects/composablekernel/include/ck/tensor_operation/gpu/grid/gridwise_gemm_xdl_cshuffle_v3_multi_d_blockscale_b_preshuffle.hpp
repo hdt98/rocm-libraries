@@ -643,7 +643,13 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
               AK0{CalculateAK0Padded(K_, KBatch_)},
               BK0{CalculateBK0Padded(K_, KBatch_)},
               MBlock{CalculateMBlock(M_)},
-              NBlock{CalculateNBlock(N_)}
+              NBlock{CalculateNBlock(N_)},
+              p_accum_observer{nullptr},
+              AccumObserverTileM{0},
+              AccumObserverTileN{0},
+              AccumObserverKBlock{0},
+              AccumObserverMRepeat{0},
+              AccumObserverThread{0}
         {
         }
 
@@ -673,6 +679,12 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
         index_t BK0;
         index_t MBlock;
         index_t NBlock;
+        float* p_accum_observer;
+        index_t AccumObserverTileM;
+        index_t AccumObserverTileN;
+        index_t AccumObserverKBlock;
+        index_t AccumObserverMRepeat;
+        index_t AccumObserverThread;
     };
 
     // Argument
@@ -1233,36 +1245,55 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
 
         constexpr auto NumKBlockPerScale = math::integer_divide_ceil(ScaleBlockK, KPerBlock);
 
-        blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, NumKBlockPerScale, TailNum>(
-            a_grid_desc_ak0_m_ak1,
-            a_block_desc_ak0_m_ak1,
-            a_blockwise_copy,
-            a_grid_buf,
-            a_block_buf,
-            a_block_slice_copy_step,
-            b_grid_desc_bpreshuffled,
-            b_block_desc_bk0_n_bk1,
-            b_blockwise_copy,
-            b_grid_buf,
-            b_block_buf,
-            b_block_slice_copy_step,
+        auto run_blockwise_gemm_pipeline = [&](auto... accum_observer_args) {
+            blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, NumKBlockPerScale, TailNum>(
+                a_grid_desc_ak0_m_ak1,
+                a_block_desc_ak0_m_ak1,
+                a_blockwise_copy,
+                a_grid_buf,
+                a_block_buf,
+                a_block_slice_copy_step,
+                b_grid_desc_bpreshuffled,
+                b_block_desc_bk0_n_bk1,
+                b_blockwise_copy,
+                b_grid_buf,
+                b_block_buf,
+                b_block_slice_copy_step,
 
-            c_scale_thread_desc,
-            c_thread_buf,
+                c_scale_thread_desc,
+                c_thread_buf,
 
-            a_scale_grid_desc_am_ak,
-            a_scale_thread_desc,
-            a_scale_thread_copy,
-            a_scale_grid_buf,
-            a_scale_thread_slice_copy_step,
+                a_scale_grid_desc_am_ak,
+                a_scale_thread_desc,
+                a_scale_thread_copy,
+                a_scale_grid_buf,
+                a_scale_thread_slice_copy_step,
 
-            b_scale_grid_desc_bn_ak,
-            b_scale_thread_desc,
-            b_scale_thread_copy,
-            b_scale_grid_buf,
-            b_scale_thread_slice_copy_step,
+                b_scale_grid_desc_bn_ak,
+                b_scale_thread_desc,
+                b_scale_thread_copy,
+                b_scale_grid_buf,
+                b_scale_thread_slice_copy_step,
 
-            num_k_block_main_loop);
+                num_k_block_main_loop,
+                accum_observer_args...);
+        };
+
+        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
+        {
+            run_blockwise_gemm_pipeline(problem.p_accum_observer,
+                                        problem.AccumObserverTileM,
+                                        problem.AccumObserverTileN,
+                                        problem.AccumObserverKBlock,
+                                        problem.AccumObserverMRepeat,
+                                        problem.AccumObserverThread,
+                                        block_m_id,
+                                        block_n_id);
+        }
+        else
+        {
+            run_blockwise_gemm_pipeline();
+        }
 
         // shuffle C and write out
 
@@ -1499,36 +1530,55 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
 
         constexpr auto NumKBlockPerScale = math::integer_divide_ceil(ScaleBlockK, KPerBlock);
 
-        blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, NumKBlockPerScale, TailNum>(
-            a_grid_desc_ak0_m_ak1,
-            a_block_desc_ak0_m_ak1,
-            a_blockwise_copy,
-            a_grid_buf,
-            a_block_bufs,
-            a_block_slice_copy_step,
-            b_grid_desc_bpreshuffled,
-            b_block_desc_bk0_n_bk1,
-            b_blockwise_copy,
-            b_grid_buf,
-            b_block_bufs,
-            b_block_slice_copy_step,
+        auto run_blockwise_gemm_pipeline = [&](auto... accum_observer_args) {
+            blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, NumKBlockPerScale, TailNum>(
+                a_grid_desc_ak0_m_ak1,
+                a_block_desc_ak0_m_ak1,
+                a_blockwise_copy,
+                a_grid_buf,
+                a_block_bufs,
+                a_block_slice_copy_step,
+                b_grid_desc_bpreshuffled,
+                b_block_desc_bk0_n_bk1,
+                b_blockwise_copy,
+                b_grid_buf,
+                b_block_bufs,
+                b_block_slice_copy_step,
 
-            c_scale_thread_desc,
-            c_thread_buf,
+                c_scale_thread_desc,
+                c_thread_buf,
 
-            a_scale_grid_desc_am_ak,
-            a_scale_thread_desc,
-            a_scale_thread_copy,
-            a_scale_grid_buf,
-            a_scale_thread_slice_copy_step,
+                a_scale_grid_desc_am_ak,
+                a_scale_thread_desc,
+                a_scale_thread_copy,
+                a_scale_grid_buf,
+                a_scale_thread_slice_copy_step,
 
-            b_scale_grid_desc_bn_ak,
-            b_scale_thread_desc,
-            b_scale_thread_copy,
-            b_scale_grid_buf,
-            b_scale_thread_slice_copy_step,
+                b_scale_grid_desc_bn_ak,
+                b_scale_thread_desc,
+                b_scale_thread_copy,
+                b_scale_grid_buf,
+                b_scale_thread_slice_copy_step,
 
-            num_k_block_main_loop);
+                num_k_block_main_loop,
+                accum_observer_args...);
+        };
+
+        if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
+        {
+            run_blockwise_gemm_pipeline(problem.p_accum_observer,
+                                        problem.AccumObserverTileM,
+                                        problem.AccumObserverTileN,
+                                        problem.AccumObserverKBlock,
+                                        problem.AccumObserverMRepeat,
+                                        problem.AccumObserverThread,
+                                        block_m_id,
+                                        block_n_id);
+        }
+        else
+        {
+            run_blockwise_gemm_pipeline();
+        }
 
         // shuffle C and write out
         const auto ds_grid_desc_m_n = MakeDsGridDescriptor_M_N(

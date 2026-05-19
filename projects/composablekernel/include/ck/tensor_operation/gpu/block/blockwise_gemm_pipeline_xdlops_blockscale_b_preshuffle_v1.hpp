@@ -281,10 +281,35 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
         const BScaleGridBuffer& b_scale_grid_buf,
         const BScaleThreadTransferStep& b_scale_thread_copy_step,
         // num_loop
-        index_t num_loop) const
+        index_t num_loop,
+        float* p_accum_observer        = nullptr,
+        index_t accum_observer_tile_m  = 0,
+        index_t accum_observer_tile_n  = 0,
+        index_t accum_observer_kblock  = 0,
+        index_t accum_observer_mrepeat = 0,
+        index_t accum_observer_thread  = 0,
+        index_t block_m_id             = 0,
+        index_t block_n_id             = 0) const
     {
         ignore = b_block_desc;
         ignore = b_block_buf;
+
+        const bool accum_observer_tile =
+            p_accum_observer != nullptr && block_m_id == accum_observer_tile_m &&
+            block_n_id == accum_observer_tile_n;
+        auto anchor_accumulator_value = [&](float value) {
+            if(p_accum_observer != nullptr)
+            {
+                asm volatile("" : : "v"(value));
+            }
+        };
+        auto anchor_accumulator_target_thread = [&]() {
+            if(accum_observer_tile && get_thread_local_1d_id() == accum_observer_thread)
+            {
+                asm volatile("" : : "s"(accum_observer_thread));
+            }
+        };
+
         // __builtin_amdgcn_sched_barrier(0);
         auto a_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, ComputeDataType>(
             a_thread_desc_.GetElementSpaceSize());
@@ -494,6 +519,10 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
                         constexpr index_t c_offset =
                             c_thread_desc_.CalculateOffset(make_tuple(m0, n0, 0));
 
+                        const bool observe_target_outer =
+                            accum_observer_tile && (i + mfma_reg_buf.value == accum_observer_kblock) &&
+                            (m0.value == accum_observer_mrepeat);
+
                         static_for<0, xdlops_gemm.GetRegSizePerXdlops() / 2, 1>{}([&](auto t) {
                             using pk_fma_type = typename vector_type<AccDataType, 2>::type;
 
@@ -505,6 +534,16 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
                                 c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
                                     .template AsType<pk_fma_type>()[t]);
                         });
+
+                        if(observe_target_outer)
+                        {
+                            anchor_accumulator_target_thread();
+                        }
+
+                        anchor_accumulator_value(
+                            type_convert<float>(
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
+                                    .template AsType<AccDataType>()[Number<0>{}]));
                     });
 
                     block_sync_lds();
@@ -647,6 +686,11 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
                         c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
                             .template AsType<pk_fma_type>()[t]);
                 });
+
+                anchor_accumulator_value(
+                    type_convert<float>(
+                        c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
+                            .template AsType<AccDataType>()[Number<0>{}]));
             });
 
             static_ford<Sequence<MRepeat, num_scale_n_block, num_scale_k_block>>{}([&](auto mnk) {
@@ -793,6 +837,11 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v1<BlockGemmPipelineS
                         c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
                             .template AsType<pk_fma_type>()[t]);
                 });
+
+                anchor_accumulator_value(
+                    type_convert<float>(
+                        c_thread_buf.GetVectorTypeReference(Number<c_offset>{})
+                            .template AsType<AccDataType>()[Number<0>{}]));
             });
         }
     }
