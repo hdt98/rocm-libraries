@@ -498,8 +498,11 @@ def _lraTileAssignment_legacy(writer, kernel):
 
 
 def localReadResetOffsetsSubtile(writer, kernel):
-  module = Module("Subtile LR offset reset")
-  module.addComment0("Subtile LR offsets are reset by lraTileAssignment after setupNewTile")
+  module = Module()
+  module.addComment0("REMOVE WHEN IMPLEMNTED: Placeholder for subtile based LR offset reset code")
+  for i in range(8):
+    module.addComment("")
+
   return module
 
 
