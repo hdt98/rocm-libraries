@@ -98,7 +98,6 @@ StrictTypeLoader.yaml_implicit_resolvers = {
 
 # Add back a custom bool resolver that matches true/false/True/False but NOT 0/1
 # This regex matches: true, false, True, False (but not yes, no, on, off, 0, 1)
-import re
 StrictTypeLoader.add_implicit_resolver(
     'tag:yaml.org,2002:bool',
     re.compile(r'^(?:true|false|True|False)$', re.X),
@@ -346,7 +345,7 @@ def writeSolutions(filename: str, problemSizes: Optional[ProblemSizes], biasType
 def read(filename, customizedLoader=False):
     name, extension = os.path.splitext(filename)
     if extension == ".yaml":
-        return load_yaml_stream(filename, yamlLoader) if customizedLoader else readYAML(filename)
+        return load_yaml_stream(filename, StrictTypeLoader) if customizedLoader else readYAML(filename)
     if extension == ".json":
         return readJson(filename)
     else:

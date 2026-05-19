@@ -338,6 +338,35 @@ class TestPrintTypeMismatchSummary:
         captured = capsys.readouterr()
         assert "2 files" in captured.out
 
+    def test_output_contains_fix_message(self, capsys):
+        validateParameterTypes({"UseCustomMainLoopSchedule": False})
+        printTypeMismatchSummary()
+        captured = capsys.readouterr()
+        assert "Fix these to prevent future build failures" in captured.out
+
+    def test_no_output_when_clean_no_files(self, capsys):
+        """When there are no mismatches and no files, nothing should be printed."""
+        printTypeMismatchSummary()
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == ""
+
+    def test_clean_message_when_no_mismatches(self, capsys):
+        """When files were checked but no mismatches found, print confirmation."""
+        printTypeMismatchSummary(numFiles=42)
+        captured = capsys.readouterr()
+        assert "42" in captured.out
+        assert "no type mismatches found" in captured.out
+
+    def test_multiple_param_types_in_output(self, capsys):
+        """Multiple different mismatched params should all appear in output."""
+        validateParameterTypes({"UseCustomMainLoopSchedule": False})
+        validateParameterTypes({"BufferLoad": 0})
+        printTypeMismatchSummary()
+        captured = capsys.readouterr()
+        assert "UseCustomMainLoopSchedule" in captured.out
+        assert "BufferLoad" in captured.out
+
 
 class TestValidateProblemTypeParameterTypes:
     """Tests for the validateProblemTypeParameterTypes function."""
@@ -460,32 +489,3 @@ class TestValidateProblemTypeParameterTypes:
         assert _expectedProblemTypeParamTypes["UseBias"] == {int}
         assert "MXBlockA" in _expectedProblemTypeParamTypes
         assert _expectedProblemTypeParamTypes["MXBlockA"] == {int}
-
-    def test_output_contains_fix_message(self, capsys):
-        validateParameterTypes({"UseCustomMainLoopSchedule": False})
-        printTypeMismatchSummary()
-        captured = capsys.readouterr()
-        assert "Fix these to prevent future build failures" in captured.out
-
-    def test_no_output_when_clean_no_files(self, capsys):
-        """When there are no mismatches and no files, nothing should be printed."""
-        printTypeMismatchSummary()
-        captured = capsys.readouterr()
-        assert captured.out == ""
-        assert captured.err == ""
-
-    def test_clean_message_when_no_mismatches(self, capsys):
-        """When files were checked but no mismatches found, print confirmation."""
-        printTypeMismatchSummary(numFiles=42)
-        captured = capsys.readouterr()
-        assert "42" in captured.out
-        assert "no type mismatches found" in captured.out
-
-    def test_multiple_param_types_in_output(self, capsys):
-        """Multiple different mismatched params should all appear in output."""
-        validateParameterTypes({"UseCustomMainLoopSchedule": False})
-        validateParameterTypes({"BufferLoad": 0})
-        printTypeMismatchSummary()
-        captured = capsys.readouterr()
-        assert "UseCustomMainLoopSchedule" in captured.out
-        assert "BufferLoad" in captured.out

@@ -100,8 +100,6 @@ _skipTypeCheck = {
 # instances during a build.  Key is (param_name, actual_type_name,
 # expected_type_str); value is a dict with 'count', 'values' (set of unique
 # repr(value)), and 'files' (set of source file paths).
-# NOTE: Due to multiprocessing in TensileCreateLibrary, this collector won't
-# aggregate across worker processes. Warnings are printed immediately instead.
 _typeMismatchCollector = {}
 
 
@@ -189,15 +187,14 @@ def validateProblemTypeParameterTypes(state, srcFile=""):
   against the types implied by ``_defaultProblemType``.  A ``bool`` where
   ``int`` is expected (or vice versa) is the most common error.
 
-  Due to multiprocessing, warnings are printed immediately rather than
-  collected for a summary at the end.
+  Mismatches are collected into the module-level ``_typeMismatchCollector``
+  dict. Call ``printTypeMismatchSummary()`` at the end of the build to emit a
+  consolidated warning.
 
   Args:
       state: The ProblemType state dict (parameter name -> value).
       srcFile: The YAML source file path, included in warning messages.
   """
-  import sys
-
   for key, value in state.items():
     if key not in _expectedProblemTypeParamTypes or key in _skipTypeCheck:
       continue
@@ -213,12 +210,6 @@ def validateProblemTypeParameterTypes(state, srcFile=""):
           "values": set(),
           "files": set(),
         }
-        # Print warning immediately on first occurrence
-        file_info = f" in {srcFile}" if srcFile else ""
-        print(f"\nTensile::WARNING: ProblemType parameter '{key}' has type {actualType.__name__} but expected {expectedStr}{file_info}.", file=sys.stderr)
-        print(f"                  Example value: {repr(value)}", file=sys.stderr)
-        print(f"                  This may indicate incorrect YAML formatting.", file=sys.stderr)
-        print(f"                  To fix: Use 'true'/'false' for booleans, not 0/1.\n", file=sys.stderr)
       entry = _typeMismatchCollector[collectorKey]
       entry["count"] += 1
       entry["values"].add(repr(value))
@@ -226,8 +217,8 @@ def validateProblemTypeParameterTypes(state, srcFile=""):
         entry["files"].add(srcFile)
 
 
-def printTypeMismatchSummary():
-  """Print a summary of all collected type mismatches to stderr.
+def printTypeMismatchSummary(numFiles=0):
+  """Print a summary of all collected type mismatches to stdout.
 
   If no mismatches have been collected, prints a confirmation message
   showing how many files were checked cleanly, and returns 0.  Otherwise
@@ -237,10 +228,6 @@ def printTypeMismatchSummary():
 
   Args:
       numFiles: Total number of YAML logic files that were checked.
-
-  NOTE: Due to multiprocessing in TensileCreateLibrary, the collector in the
-  main process may not see all mismatches from worker processes. Warnings are
-  also printed immediately during validation for this reason.
 
   Returns:
       int: The total number of individual mismatches (0 if clean).
