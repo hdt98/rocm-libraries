@@ -1396,6 +1396,13 @@ class Solution(collections.abc.Mapping):
         # audited below.
         if state["StreamK"] != 3:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent is currently supported only with StreamK=3")
+        isAuditedSubtilePap = state["UseSubtileImpl"] and state["ISA"] == (9, 5, 0)
+        if state["ScheduleIterAlg"] == 0:
+          if not (isGfx1250Sia0TdmPgr2 or isAuditedSubtilePap):
+            reject(state, printRejectionReason,
+                   "PrefetchAcrossPersistent with ScheduleIterAlg=0 is audited only for gfx1250 + TDMInst=3 + PGR=2")
+        elif state["ScheduleIterAlg"] != 3:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent is currently supported only with ScheduleIterAlg=3")
         if not state["BufferLoad"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent requires BufferLoad")
         if state["PrefetchGlobalRead"] < 1:
