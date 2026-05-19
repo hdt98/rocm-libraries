@@ -547,10 +547,12 @@ def noSchedGlobalRead(writer, kernel, globalReadIncACode, globalReadIncBCode):
             imod.add(nonTdmMod)
             imod.addComment1("Global Read MXSA")
             imod.add(writer.codes.dtlsM0UpdateMXSA)
-            imod.add(writer.codes.globalReadMXSA)
+            nonTdmModMXSA, tdmLoadModMXSA = _splitTdmLoad(writer.codes.globalReadMXSA)
+            imod.add(nonTdmModMXSA)
             imod.addComment1("Global Read MXSB")
             imod.add(writer.codes.dtlsM0UpdateMXSB)
-            imod.add(writer.codes.globalReadMXSB)
+            nonTdmModMXSB, tdmLoadModMXSB = _splitTdmLoad(writer.codes.globalReadMXSB)
+            imod.add(nonTdmModMXSB)
             imod.addComment1("Global Read B")
             imod.add(writer.codes.dtlsM0UpdateB)
             nonTdmModB, tdmLoadModB = _splitTdmLoad(writer.codes.globalReadB)
@@ -561,6 +563,12 @@ def noSchedGlobalRead(writer, kernel, globalReadIncACode, globalReadIncBCode):
             if tdmLoadModA.itemsSize() > 0:
                 deferMod.addComment1("Global Read A (TDM deferred after LDS swap)")
                 deferMod.add(tdmLoadModA)
+            if tdmLoadModMXSA.itemsSize() > 0:
+                deferMod.addComment1("Global Read MXSA (TDM deferred after LDS swap)")
+                deferMod.add(tdmLoadModMXSA)
+            if tdmLoadModMXSB.itemsSize() > 0:
+                deferMod.addComment1("Global Read MXSB (TDM deferred after LDS swap)")
+                deferMod.add(tdmLoadModMXSB)
             if tdmLoadModB.itemsSize() > 0:
                 # TODO: For the 1-wave case, schedule B's TDM load independently for better tensor load balance.
                 deferMod.addComment1("Global Read B (TDM deferred after LDS swap)")
