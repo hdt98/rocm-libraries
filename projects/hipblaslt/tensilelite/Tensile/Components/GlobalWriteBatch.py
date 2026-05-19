@@ -423,10 +423,6 @@ class GlobalWriteBatchWriter:
       bufferOOB = None
     #when factorDim = 1 the bias's gwvw is alwasy be 1.
     factor_gwvw = 1 if self.factorDim else self.ss.cfg.gwvw
-    # Initialize variables before loop to handle case where batchElements is empty
-    sumIdxGSUSYNC = None
-    addrCalc = None
-    self.loadE = False
     for elementIdx, element in enumerate(self.batchElements):
       addrCalc: AddrCalculation = self.ss.elementAddr[elementIdx]
       addrCVgpr    = addrCalc.addrCVgpr
