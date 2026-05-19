@@ -18,11 +18,28 @@ def _reset():
     reset_warn_once()
 
 
+@pytest.fixture
+def _force_rocprofv3_present(monkeypatch):
+    """Pretend `/opt/rocm/bin/rocprofv3` exists for tests that don't care
+    about binary resolution. Stops tests from coupling to the host's ROCm
+    install layout."""
+    monkeypatch.setattr(
+        rocprof_trace, "resolve_rocm_tool", lambda name: "/opt/rocm/bin/rocprofv3"
+    )
+
+
 class TestArgvBuild:
     def test_includes_kernel_and_memcpy_traces(self, tmp_path):
         argv = rocprof_trace._build_argv(
-            "pftrace", tmp_path, ["python", "-m", "dnn_benchmarking"]
+            "pftrace",
+            tmp_path,
+            ["python", "-m", "dnn_benchmarking"],
+            "/opt/rocm/bin/rocprofv3",
         )
+        # Absolute binary path is preserved — the orchestrator must not
+        # silently rewrite to a bare command name (PATH resolution in the
+        # spawned process would otherwise pick up the venv shim).
+        assert argv[0] == "/opt/rocm/bin/rocprofv3"
         assert "--kernel-trace" in argv
         assert "--memory-copy-trace" in argv
         assert "--output-format" in argv
@@ -31,7 +48,7 @@ class TestArgvBuild:
 
 
 class TestPftracePath:
-    def test_happy_path_records_path(self, tmp_path):
+    def test_happy_path_records_path(self, tmp_path, _force_rocprofv3_present):
         out_dir = tmp_path / "trace_out"
 
         def fake_run(argv, **kwargs):
@@ -47,7 +64,9 @@ class TestPftracePath:
         assert extra["trace"]["format"] == "pftrace"
         assert extra["trace"]["path"].endswith(".pftrace")
 
-    def test_nonzero_returncode_records_error_tail(self, tmp_path):
+    def test_nonzero_returncode_records_error_tail(
+        self, tmp_path, _force_rocprofv3_present
+    ):
         out_dir = tmp_path / "trace_out"
         proc = MagicMock(
             returncode=2, stdout="", stderr="rocprofv3: failed for reasons\n"
@@ -59,10 +78,17 @@ class TestPftracePath:
         assert extra["trace"]["returncode"] == 2
         assert "failed" in extra["trace"]["error_tail"]
 
+    def test_rocprofv3_binary_missing_returns_skipped(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(rocprof_trace, "resolve_rocm_tool", lambda name: None)
+        extra = rocprof_trace.run(
+            inner_argv=["python"], out_dir=tmp_path, fmt="pftrace"
+        )
+        assert extra["trace"]["skipped"] == "rocprofv3 binary not found"
+
 
 class TestKineto:
     def test_kineto_falls_back_to_pftrace_when_rocpd_missing(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, _force_rocprofv3_present
     ):
         out_dir = tmp_path / "trace_out"
 

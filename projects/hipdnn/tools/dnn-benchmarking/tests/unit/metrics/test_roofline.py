@@ -23,8 +23,12 @@ class TestArgvBuild:
             data_type="FP32",
             workload_dir=tmp_path / "workload",
             inner_argv=["python", "-m", "dnn_benchmarking"],
+            rocprof_compute_binary="/opt/rocm/bin/rocprof-compute",
         )
-        assert argv[0] == "rocprof-compute"
+        # Absolute binary path preserved verbatim (see rocprof_pmc tests
+        # for the rationale: PATH-based resolution from the activated
+        # venv picks up a broken shim).
+        assert argv[0] == "/opt/rocm/bin/rocprof-compute"
         assert "profile" in argv
         assert "--roof-only" in argv
         # Data type follows --roofline-data-type
@@ -37,7 +41,9 @@ class TestArgvBuild:
 class TestRunHappyPath:
     def test_records_pdf_and_db_paths(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            roofline_mod.shutil, "which", lambda _: "/opt/rocm/bin/rocprof-compute"
+            roofline_mod,
+            "resolve_rocm_tool",
+            lambda name: "/opt/rocm/bin/rocprof-compute",
         )
 
         def fake_run(argv, **kwargs):
@@ -59,15 +65,17 @@ class TestRunHappyPath:
 
 class TestFailureModes:
     def test_missing_binary_returns_skipped(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(roofline_mod.shutil, "which", lambda _: None)
+        monkeypatch.setattr(roofline_mod, "resolve_rocm_tool", lambda name: None)
         extra = roofline_mod.run(
             inner_argv=["python"], out_dir=tmp_path, data_type="FP32"
         )
-        assert "skipped" in extra["roofline"]
+        assert extra["roofline"]["skipped"] == "rocprof-compute binary not found"
 
     def test_nonzero_exit_records_error_tail(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            roofline_mod.shutil, "which", lambda _: "/opt/rocm/bin/rocprof-compute"
+            roofline_mod,
+            "resolve_rocm_tool",
+            lambda name: "/opt/rocm/bin/rocprof-compute",
         )
         proc = MagicMock(
             returncode=1, stdout="", stderr="rocprof-compute: workload failed\n"

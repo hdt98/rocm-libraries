@@ -22,15 +22,17 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ._diagnostic import warn_once
+from ._tool_resolver import resolve_rocm_tool
 
 
 def _build_argv(
     fmt: str,
     out_dir: Path,
     inner_argv: List[str],
+    rocprofv3_binary: str,
 ) -> List[str]:
     return [
-        "rocprofv3",
+        rocprofv3_binary,
         "--kernel-trace",
         "--memory-copy-trace",
         "--output-format",
@@ -107,6 +109,16 @@ def run(
 
     Never raises.
     """
+    rocprofv3_binary = resolve_rocm_tool("rocprofv3")
+    if rocprofv3_binary is None:
+        warn_once("rocprof_trace", "rocprofv3 binary not found; skipping trace pass")
+        return {
+            "trace": {
+                "format": fmt,
+                "skipped": "rocprofv3 binary not found",
+            }
+        }
+
     # rocprofv3 nests its own <hostname>/<pid>_results.* under -d. Pass
     # out_dir directly so the path doesn't double the hostname segment.
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -116,7 +128,7 @@ def run(
     # cross-version invocation is to ask for pftrace directly when the
     # user wants pftrace, and ask for the db form when they want kineto.
     rocprof_fmt = "pftrace" if fmt == "pftrace" else "rocpd"
-    argv = _build_argv(rocprof_fmt, out_dir, inner_argv)
+    argv = _build_argv(rocprof_fmt, out_dir, inner_argv, rocprofv3_binary)
 
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, check=False)
@@ -168,7 +180,7 @@ def run(
             "rocprof_trace",
             "kineto conversion unavailable; falling back to pftrace",
         )
-        fallback_argv = _build_argv("pftrace", out_dir, inner_argv)
+        fallback_argv = _build_argv("pftrace", out_dir, inner_argv, rocprofv3_binary)
         try:
             fb_proc = subprocess.run(
                 fallback_argv, capture_output=True, text=True, check=False

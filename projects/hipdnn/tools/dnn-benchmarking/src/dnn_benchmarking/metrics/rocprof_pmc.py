@@ -33,6 +33,7 @@ from typing import Any, Dict, List, Optional
 
 from ._diagnostic import warn_once
 from ._arch import detect_arch
+from ._tool_resolver import resolve_rocm_tool
 
 PMC_SETS: Dict[str, Dict[str, List[str]]] = {
     "gfx942": {
@@ -100,9 +101,10 @@ def _build_argv(
     counters: List[str],
     out_dir: Path,
     inner_argv: List[str],
+    rocprofv3_binary: str,
 ) -> List[str]:
     return [
-        "rocprofv3",
+        rocprofv3_binary,
         "--pmc",
         *counters,
         "-d",
@@ -123,6 +125,15 @@ def _parse_rocpd_db(db_path: Path) -> Dict[str, Any]:
     The rocpd schema names tables with a uuid suffix that varies per
     run (e.g. ``rocpd_pmc_event_<uuid>``). We discover them via
     ``sqlite_master`` rather than hardcoding the suffix.
+
+    Join keys (rocprofv3 1.2.2 schema):
+      * ``pmc_event.event_id`` references ``kernel_dispatch.dispatch_id``
+        (not ``kernel_dispatch.id`` — those happen to coincide for
+        single-stream single-process runs but diverge in general).
+      * ``kernel_dispatch.kernel_id`` references
+        ``info_kernel_symbol.id``, which carries the demangled
+        ``kernel_name`` column. ``kernel_dispatch`` itself has no
+        ``kernel_name``.
     """
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
@@ -136,6 +147,9 @@ def _parse_rocpd_db(db_path: Path) -> Dict[str, Any]:
         kernel_table = next(
             (t for t in tables if t.startswith("rocpd_kernel_dispatch")), None
         )
+        symbol_table = next(
+            (t for t in tables if t.startswith("rocpd_info_kernel_symbol")), None
+        )
         info_pmc_table = next(
             (t for t in tables if t.startswith("rocpd_info_pmc")), None
         )
@@ -143,6 +157,13 @@ def _parse_rocpd_db(db_path: Path) -> Dict[str, Any]:
             return {
                 "warnings": [
                     "rocpd db missing pmc_event or kernel_dispatch table; "
+                    f"present tables: {sorted(tables)}"
+                ]
+            }
+        if symbol_table is None:
+            return {
+                "warnings": [
+                    "rocpd db missing info_kernel_symbol table; "
                     f"present tables: {sorted(tables)}"
                 ]
             }
@@ -160,10 +181,12 @@ def _parse_rocpd_db(db_path: Path) -> Dict[str, Any]:
         )
         rows = conn.execute(
             f"""
-            SELECT k.kernel_name, p.pmc_id, AVG(p.value), SUM(p.value), COUNT(p.value)
+            SELECT sym.kernel_name, p.pmc_id,
+                   AVG(p.value), SUM(p.value), COUNT(p.value)
             FROM {pmc_event_table} p
-            JOIN {kernel_table} k ON p.event_id = k.id
-            GROUP BY k.kernel_name, p.pmc_id
+            JOIN {kernel_table} k  ON p.event_id  = k.dispatch_id
+            JOIN {symbol_table}  sym ON k.kernel_id = sym.id
+            GROUP BY sym.kernel_name, p.pmc_id
             """
         )
         for kname, pmc_id, mean_v, sum_v, count_v in rows:
@@ -213,10 +236,21 @@ def run(
             }
         }
 
+    rocprofv3_binary = resolve_rocm_tool("rocprofv3")
+    if rocprofv3_binary is None:
+        warn_once("rocprof_pmc", "rocprofv3 binary not found; skipping PMC pass")
+        return {
+            "pmc": {
+                "set": pmc_set,
+                "arch": arch,
+                "skipped": "rocprofv3 binary not found",
+            }
+        }
+
     # rocprofv3 nests its own <hostname>/<pid>_results.db under -d. Pass
     # out_dir directly so we don't double the hostname segment.
     out_dir.mkdir(parents=True, exist_ok=True)
-    argv = _build_argv(counters, out_dir, inner_argv)
+    argv = _build_argv(counters, out_dir, inner_argv, rocprofv3_binary)
 
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, check=False)

@@ -11,21 +11,22 @@ multi-type plots are deferred — users can re-run rocprof-compute
 against the recorded ``db_path`` if they want one.
 """
 
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ._diagnostic import warn_once
+from ._tool_resolver import resolve_rocm_tool
 
 
 def _build_argv(
     data_type: str,
     workload_dir: Path,
     inner_argv: List[str],
+    rocprof_compute_binary: str,
 ) -> List[str]:
     return [
-        "rocprof-compute",
+        rocprof_compute_binary,
         "profile",
         "--roof-only",
         "--roofline-data-type",
@@ -50,22 +51,22 @@ def run(
     data_type: str,
 ) -> Dict[str, Any]:
     """Run rocprof-compute --roof-only and record the artefact paths."""
-    binary = shutil.which("rocprof-compute")
+    binary = resolve_rocm_tool("rocprof-compute")
     if binary is None:
         warn_once(
             "roofline",
-            "rocprof-compute binary not found on PATH; skipping roofline",
+            "rocprof-compute binary not found; skipping roofline",
         )
         return {
             "roofline": {
                 "data_type": data_type,
-                "skipped": "rocprof-compute binary not found on PATH",
+                "skipped": "rocprof-compute binary not found",
             }
         }
 
     out_dir.mkdir(parents=True, exist_ok=True)
     workload_dir = out_dir / "workload"
-    argv = _build_argv(data_type, workload_dir, inner_argv)
+    argv = _build_argv(data_type, workload_dir, inner_argv, binary)
 
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, check=False)
