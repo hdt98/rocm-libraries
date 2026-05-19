@@ -36,11 +36,6 @@
 
 namespace miopen {
 
-namespace debug {
-// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
-MIOPEN_EXPORT bool AlwaysEnableConvDirectNaive = false;
-} // namespace debug
-
 std::string
 EncodeDataTypesForKey(miopenDataType_t in, miopenDataType_t weights, miopenDataType_t out)
 {
@@ -254,11 +249,6 @@ void ProblemDescription::MakeNetworkConfig(std::string& conf_key) const
     ss << 'x' << GetGroupCount();
     ss << 'x' << GetDirectionStr();
     ss << 'x' << GetAlphaBetaCaseStr();
-
-    // GPU reference mode uses double accumulators in the naive conv solver.
-    // Include this flag so the invoker cache differentiates the two modes.
-    if(miopen::debug::AlwaysEnableConvDirectNaive)
-        ss << "xGPURef";
 
     conf_key = ss.str();
 }

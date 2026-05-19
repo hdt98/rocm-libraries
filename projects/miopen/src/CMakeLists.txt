@@ -103,6 +103,7 @@ set( MIOpen_Source
     fusion/problem_description.cpp
     generic_search.cpp
     getitem_api.cpp
+    gpu_conv_reference.cpp
     glu/problem_description.cpp
     glu_api.cpp
     groupnorm_api.cpp

@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <miopen/convolution.hpp>
+#include <miopen/gpu_conv_reference.hpp>
 #include <miopen/tensor_layout.hpp>
 
 #include "../cpu_conv.hpp"
@@ -442,19 +443,14 @@ struct gpu_reference_conv_2d : public ::testing::TestWithParam<TestCase2D>
                                     miopen::deref(convDesc).GetConvDilations(),
                                     miopen::deref(convDesc).GetGroupCount());
 
-            ASSERT_EQ(miopenConvolutionForwardImmediate(
-                          handle,
-                          weiDesc,
-                          wei_dev,
-                          inDesc,
-                          in_dev,
-                          convDesc,
-                          outDesc,
-                          out_dev,
-                          nullptr,
-                          0,
-                          miopen::solver::Id("ConvDirectNaiveConvFwd").Value()),
-                      miopenStatusSuccess);
+            miopen::GpuConvReference::RunFwd(miopen::deref(handle),
+                                             miopen::deref(inDesc),
+                                             in_dev,
+                                             miopen::deref(weiDesc),
+                                             wei_dev,
+                                             miopen::deref(outDesc),
+                                             out_dev,
+                                             miopen::deref(convDesc));
 
             tensor<Tout> out_host(out_len, out_strides);
             ASSERT_EQ(
@@ -462,7 +458,7 @@ struct gpu_reference_conv_2d : public ::testing::TestWithParam<TestCase2D>
                     out_host.data.data(), out_dev, sizeof(Tout) * out_sz, hipMemcpyDeviceToHost),
                 hipSuccess);
 
-            // we expect excact match, since use integer
+            // we expect exact match, since use integer
             valid_result = verify_tensor(out_host, out);
         }
         else if(direction == miopen::conv::Direction::BackwardData)
@@ -491,19 +487,14 @@ struct gpu_reference_conv_2d : public ::testing::TestWithParam<TestCase2D>
                                           miopen::deref(convDesc).GetConvDilations(),
                                           miopen::deref(convDesc).GetGroupCount());
 
-            EXPECT_EQ(miopenConvolutionBackwardDataImmediate(
-                          handle,
-                          outDesc,
-                          out_dev,
-                          weiDesc,
-                          wei_dev,
-                          convDesc,
-                          inDesc,
-                          in_dev,
-                          nullptr,
-                          0,
-                          miopen::solver::Id("ConvDirectNaiveConvBwd").Value()),
-                      miopenStatusSuccess);
+            miopen::GpuConvReference::RunBwd(miopen::deref(handle),
+                                             miopen::deref(outDesc),
+                                             out_dev,
+                                             miopen::deref(weiDesc),
+                                             wei_dev,
+                                             miopen::deref(inDesc),
+                                             in_dev,
+                                             miopen::deref(convDesc));
 
             tensor<TRef> in_host(in_len, in_strides);
 
@@ -511,7 +502,7 @@ struct gpu_reference_conv_2d : public ::testing::TestWithParam<TestCase2D>
                 hipMemcpy(in_host.data.data(), in_dev, sizeof(TRef) * in_sz, hipMemcpyDeviceToHost),
                 hipSuccess);
 
-            // we expect excact match, since use integer
+            // we expect exact match, since use integer
             valid_result = verify_tensor(in_host, in);
         }
         else if(direction == miopen::conv::Direction::BackwardWeights)
@@ -539,19 +530,14 @@ struct gpu_reference_conv_2d : public ::testing::TestWithParam<TestCase2D>
                                             miopen::deref(convDesc).GetConvDilations(),
                                             miopen::deref(convDesc).GetGroupCount());
 
-            EXPECT_EQ(miopenConvolutionBackwardWeightsImmediate(
-                          handle,
-                          outDesc,
-                          out_dev,
-                          inDesc,
-                          in_dev,
-                          convDesc,
-                          weiDesc,
-                          wei_dev,
-                          nullptr,
-                          0,
-                          miopen::solver::Id("ConvDirectNaiveConvWrw").Value()),
-                      miopenStatusSuccess);
+            miopen::GpuConvReference::RunWrw(miopen::deref(handle),
+                                             miopen::deref(outDesc),
+                                             out_dev,
+                                             miopen::deref(inDesc),
+                                             in_dev,
+                                             miopen::deref(weiDesc),
+                                             wei_dev,
+                                             miopen::deref(convDesc));
 
             tensor<TRef> wei_host(wei_len, wei_strides);
 
@@ -560,7 +546,7 @@ struct gpu_reference_conv_2d : public ::testing::TestWithParam<TestCase2D>
                     wei_host.data.data(), wei_dev, sizeof(TRef) * wei_sz, hipMemcpyDeviceToHost),
                 hipSuccess);
 
-            // we expect excact match, since use integer
+            // we expect exact match, since use integer
             valid_result = verify_tensor(wei_host, wei);
         }
 
@@ -703,19 +689,14 @@ struct gpu_reference_conv_3d : public ::testing::TestWithParam<TestCase3D>
                                     miopen::deref(convDesc).GetConvDilations(),
                                     miopen::deref(convDesc).GetGroupCount());
 
-            ASSERT_EQ(miopenConvolutionForwardImmediate(
-                          handle,
-                          weiDesc,
-                          wei_dev,
-                          inDesc,
-                          in_dev,
-                          convDesc,
-                          outDesc,
-                          out_dev,
-                          nullptr,
-                          0,
-                          miopen::solver::Id("ConvDirectNaiveConvFwd").Value()),
-                      miopenStatusSuccess);
+            miopen::GpuConvReference::RunFwd(miopen::deref(handle),
+                                             miopen::deref(inDesc),
+                                             in_dev,
+                                             miopen::deref(weiDesc),
+                                             wei_dev,
+                                             miopen::deref(outDesc),
+                                             out_dev,
+                                             miopen::deref(convDesc));
 
             tensor<Tout> out_host(out_len, out_strides);
 
@@ -724,7 +705,7 @@ struct gpu_reference_conv_3d : public ::testing::TestWithParam<TestCase3D>
                     out_host.data.data(), out_dev, sizeof(Tout) * out_sz, hipMemcpyDeviceToHost),
                 hipSuccess);
 
-            // we expect excact match, since use integer
+            // we expect exact match, since use integer
             valid_result = verify_tensor(out_host, out);
         }
         else if(direction == miopen::conv::Direction::BackwardData)
@@ -753,19 +734,14 @@ struct gpu_reference_conv_3d : public ::testing::TestWithParam<TestCase3D>
                                           miopen::deref(convDesc).GetConvDilations(),
                                           miopen::deref(convDesc).GetGroupCount());
 
-            ASSERT_EQ(miopenConvolutionBackwardDataImmediate(
-                          handle,
-                          outDesc,
-                          out_dev,
-                          weiDesc,
-                          wei_dev,
-                          convDesc,
-                          inDesc,
-                          in_dev,
-                          nullptr,
-                          0,
-                          miopen::solver::Id("ConvDirectNaiveConvBwd").Value()),
-                      miopenStatusSuccess);
+            miopen::GpuConvReference::RunBwd(miopen::deref(handle),
+                                             miopen::deref(outDesc),
+                                             out_dev,
+                                             miopen::deref(weiDesc),
+                                             wei_dev,
+                                             miopen::deref(inDesc),
+                                             in_dev,
+                                             miopen::deref(convDesc));
 
             tensor<TRef> in_host(in_len, in_strides);
 
@@ -773,7 +749,7 @@ struct gpu_reference_conv_3d : public ::testing::TestWithParam<TestCase3D>
                 hipMemcpy(in_host.data.data(), in_dev, sizeof(TRef) * in_sz, hipMemcpyDeviceToHost),
                 hipSuccess);
 
-            // we expect excact match, since use integer
+            // we expect exact match, since use integer
             valid_result = verify_tensor(in_host, in);
         }
         else if(direction == miopen::conv::Direction::BackwardWeights)
@@ -801,19 +777,14 @@ struct gpu_reference_conv_3d : public ::testing::TestWithParam<TestCase3D>
                                             miopen::deref(convDesc).GetConvDilations(),
                                             miopen::deref(convDesc).GetGroupCount());
 
-            ASSERT_EQ(miopenConvolutionBackwardWeightsImmediate(
-                          handle,
-                          outDesc,
-                          out_dev,
-                          inDesc,
-                          in_dev,
-                          convDesc,
-                          weiDesc,
-                          wei_dev,
-                          nullptr,
-                          0,
-                          miopen::solver::Id("ConvDirectNaiveConvWrw").Value()),
-                      miopenStatusSuccess);
+            miopen::GpuConvReference::RunWrw(miopen::deref(handle),
+                                             miopen::deref(outDesc),
+                                             out_dev,
+                                             miopen::deref(inDesc),
+                                             in_dev,
+                                             miopen::deref(weiDesc),
+                                             wei_dev,
+                                             miopen::deref(convDesc));
 
             tensor<TRef> wei_host(wei_len, wei_strides);
 
@@ -822,7 +793,7 @@ struct gpu_reference_conv_3d : public ::testing::TestWithParam<TestCase3D>
                     wei_host.data.data(), wei_dev, sizeof(TRef) * wei_sz, hipMemcpyDeviceToHost),
                 hipSuccess);
 
-            // we expect excact match, since use integer
+            // we expect exact match, since use integer
             valid_result = verify_tensor(wei_host, wei, 8.0); // max possible int
                                                               // 2*14*14*10*(2*2) = 15680, hence
                                                               // int interval might be 8

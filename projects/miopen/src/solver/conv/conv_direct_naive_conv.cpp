@@ -106,13 +106,6 @@ bool IsInputInt8(const ProblemDescription& problem)
            (problem.GetInDataType() == miopenInt8 && problem.GetOutDataType() == miopenInt8);
 }
 
-bool IsAccFp64(const ProblemDescription& problem)
-{
-    if(!miopen::debug::AlwaysEnableConvDirectNaive)
-        return false;
-    return IsInputFp32(problem) || IsInputFp16(problem) || IsInputBfp16(problem);
-}
-
 bool IsAccInt32(const ProblemDescription& problem) { return IsInputInt8(problem); }
 
 bool IsOutputFp32(const ProblemDescription& problem)
@@ -214,8 +207,6 @@ std::string ConvDirectNaiveConvKernelName(const ProblemDescription& problem)
 
     if(IsAccInt32(problem))
         kernel_name << "int32_t_";
-    else if(IsAccFp64(problem))
-        kernel_name << "double_";
     else if(IsInputFp32(problem) || IsInputFp16(problem) || IsInputBfp16(problem))
         kernel_name << "float_";
     else
@@ -857,7 +848,7 @@ GetConv2DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     size_t spatial           = static_cast<size_t>(n) * ho * wo;
     size_t num_spatial_tiles = 1;
     bool can_use_wrw_atomic  = IsInputFp32(problem) || HasNative16BitFloatAtomic(ctx);
-    if(!IsAccFp64(problem) && !IsAccInt32(problem) && can_use_wrw_atomic &&
+    if(!IsAccInt32(problem) && can_use_wrw_atomic &&
        spatial > WRW_SPATIAL_TILING_THRESHOLD)
         num_spatial_tiles = (spatial + block_size - 1) / block_size;
 
@@ -1019,7 +1010,7 @@ GetConv3DWRWSolution(const ExecutionContext& ctx, const ::miopen::conv::ProblemD
     size_t spatial           = static_cast<size_t>(n) * do_ * ho * wo;
     size_t num_spatial_tiles = 1;
     bool can_use_wrw_atomic  = IsInputFp32(problem) || HasNative16BitFloatAtomic(ctx);
-    if(!IsAccFp64(problem) && !IsAccInt32(problem) && can_use_wrw_atomic &&
+    if(!IsAccInt32(problem) && can_use_wrw_atomic &&
        spatial > WRW_SPATIAL_TILING_THRESHOLD)
         num_spatial_tiles = (spatial + block_size - 1) / block_size;
 

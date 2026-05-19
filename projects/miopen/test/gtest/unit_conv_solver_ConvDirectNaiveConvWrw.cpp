@@ -145,8 +145,10 @@ const auto& GetTestParams()
         p.UseCpuRef(); // CPU verification
         // Float accumulators (solver mode) introduce more rounding error than the
         // previous double accumulators, especially for WRW which reduces over
-        // n * ho * wo spatial positions. Relax fp32 tolerance from 1x to 20x epsilon.
+        // n * ho * wo spatial positions. Relax tolerance from 1x to 20x epsilon.
         p.SetTolerance(Gpu::All, miopenFloat, 20.0f);
+        p.SetTolerance(Gpu::All, miopenHalf, 20.0f);
+        p.SetTolerance(Gpu::All, miopenBFloat16, 20.0f);
         return p;
     }();
     return params;
