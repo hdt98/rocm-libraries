@@ -5258,6 +5258,8 @@ class KernelWriterAssembly(KernelWriter):
         numLw = self.states.mxsa.numVgprLocalWriteAddrTailLoop
       elif tc == "MXSB":
         numLw = self.states.mxsb.numVgprLocalWriteAddrTailLoop
+      elif tP["isM"]:
+        numLw = self.states.m.numVgprLocalWriteAddrTailLoop
       for i in range(1,numLw):
         module.add(VAddU32(dst=vgpr("LocalWriteAddr%s + %s"%(tc, i)), src0=(i * 0x10000), \
                            src1=vgpr("LocalWriteAddr%s"%tc), comment="" ))
@@ -5855,10 +5857,11 @@ class KernelWriterAssembly(KernelWriter):
     numLWB   = self.states.b.numVgprLocalWriteAddrTailLoop
     numLWMXSA = self.states.mxsa.numVgprLocalWriteAddrTailLoop if kernel["ProblemType"]["MXBlockA"] else 0
     numLWMXSB = self.states.mxsb.numVgprLocalWriteAddrTailLoop if kernel["ProblemType"]["MXBlockB"] else 0
+    numLWM   = self.states.m.numVgprLocalWriteAddrTailLoop
 
-    if numLWA + numLWB + numLWMXSA + numLWMXSB > 0:
-      vgprBase = self.vgprPool.checkOutAligned(numLWA + numLWB + numLWMXSA + numLWMXSB, 2)
-      imod.addComment0("Check out VGPR (numLWA,numLWB,numLWMXSA,numLWMXSB) = (%d,%d,%d,%d)"%(numLWA,numLWB,numLWMXSA,numLWMXSB))
+    if numLWA + numLWB + numLWMXSA + numLWMXSB + numLWM > 0:
+      vgprBase = self.vgprPool.checkOutAligned(numLWA + numLWB + numLWMXSA + numLWMXSB + numLWM, 2)
+      imod.addComment0("Check out VGPR (numLWA,numLWB,numLWMXSA,numLWMXSB,numLWM) = (%d,%d,%d,%d,%d)"%(numLWA,numLWB,numLWMXSA,numLWMXSB,numLWM))
     if numLWA > 0 and (kernel["DirectToLdsA"] and kernel["NonDTLTailLoopA"]):
       imod.add(RegSet("v", "vgprLocalWriteAddrA", vgprBase))
     if numLWMXSA > 0 and (kernel["DirectToLdsMXSA"] and kernel["NonDTLTailLoopMXSA"]):
@@ -5867,6 +5870,8 @@ class KernelWriterAssembly(KernelWriter):
       imod.add(RegSet("v", "vgprLocalWriteAddrB", vgprBase + numLWA + numLWMXSA))
     if numLWMXSB > 0 and (kernel["DirectToLdsMXSB"] and kernel["NonDTLTailLoopMXSB"]):
       imod.add(RegSet("v", "vgprLocalWriteAddrMXSB", vgprBase + numLWA + numLWMXSA + numLWB))
+    if numLWM > 0 and (kernel["DirectToLdsMetadata"] and kernel["NonDTLTailLoopMetadata"]):
+      imod.add(RegSet("v", "vgprLocalWriteAddrMetadata", vgprBase + numLWA + numLWMXSA + numLWB + numLWMXSB))
 
     return imod, vgprBase
 
@@ -10175,7 +10180,7 @@ class KernelWriterAssembly(KernelWriter):
   # Global Read: Do It A/B
   ##############################################################################
   def globalReadDo(self, kernel, mode, tP, unrollLoopIdx=-1, g2lBufIdx=0, \
-                   doTailOpt = 0, optParams = None):
+                   doTailOpt = 0, optParams = None, tPM = None):
     tc = tP["tensorChar"]
     problemType = self.states.kernel["ProblemType"]
     numWaves: int = prod(kernel["MIWaveGroup"])
@@ -10507,8 +10512,21 @@ class KernelWriterAssembly(KernelWriter):
 
     globalReadBody(tP)
 
-    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"] and tP["is_sparse"]:
-        globalReadBody(tP["tpsMetadata"])
+    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+      # Workaround, two cases to put metadata GR to non-sparse side
+      # 1. Sparse B + DTLA0_DTLB1_DTLM0
+      # 2. Sparse A + DTLA1_DTLB1_DTLM0
+      swapMetadataGlobalReadTc = False
+      if kernel["ProblemType"]["Sparse"] == 2 and kernel["DirectToLdsB"] and not kernel["DirectToLdsA"] and not kernel["DirectToLdsMetadata"]:
+        swapMetadataGlobalReadTc = True
+      if kernel["ProblemType"]["Sparse"] == 1 and kernel["DirectToLdsB"] and kernel["DirectToLdsA"] and not kernel["DirectToLdsMetadata"]:
+        swapMetadataGlobalReadTc = True
+
+      if tP["is_sparse"] ^ swapMetadataGlobalReadTc:
+        if kernel["DirectToLdsMetadata"]:
+          imod.middle.add(SMovB32(dst=mgpr(0), src=sgpr("LocalWriteAddrMetadata"),\
+                                  comment="DTLM: m0 <- metadata LDS write base"))
+        globalReadBody(tPM if tPM else tP["tpsMetadata"])
 
     if self.db["ConservativeWaitCnt"] & 0x1:
         imod.footer.add(SBarrier(comment="debug"))
@@ -10549,7 +10567,7 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   # Local Write: Swap Offsets A/B
   ##############################################################################
-  def localWriteSwapOffsets(self, kernel, internalPointerSwap, tP, prefetch=False):
+  def localWriteSwapOffsets(self, kernel, internalPointerSwap, tP, prefetch=False, skipMetaSwap=False):
     tc = tP["tensorChar"]
     # TDM has its own swap path (tdmSwapLdsOffset); skip here for that case.
     if not self.do["LocalWrite%s"%tc] or (kernel["enableTDMA"] and kernel["enableTDMB"]):
@@ -10640,7 +10658,7 @@ class KernelWriterAssembly(KernelWriter):
         localWriteSwapXOR(tc, src0Val, numLwa)
 
     # This used to control where to store the metadata
-    if needMetaSwap:
+    if needMetaSwap and not skipMetaSwap:
       if kernel["DirectToVgprSparseMetadata"]:
         tP["metadataWriteSwapByteOffset"] = 0 if tP["metadataWriteSwapByteOffset"] else self.states.m.numVgprValuPerBlock
         module.addComment1("metadata write swap offset -> %u" % tP["metadataWriteSwapByteOffset"])
@@ -10769,11 +10787,18 @@ class KernelWriterAssembly(KernelWriter):
                                comment="Set LWA to first buffer offset"))
             self.vgprPool.checkIn(tmpvgpr)
         else:
-          module.add(VAndB32(
-            dst=vgpr("LocalWriteAddr%s+%u"%(tPM["tensorChar"], 0)), \
-            src0=resetMask, \
-            src1=vgpr("LocalWriteAddr%s+%u"%(tPM["tensorChar"], 0)), \
-            comment="reset to Red"))
+          if kernel["LocalWriteUseSgpr%s"%tPM["tensorChar"]]:
+            module.add(SAndB32(
+              dst=sgpr("LocalWriteAddr%s"%tPM["tensorChar"]), \
+              src0=resetMask, \
+              src1=sgpr("LocalWriteAddr%s"%tPM["tensorChar"]), \
+              comment="reset to Red"))
+          else:
+            module.add(VAndB32(
+              dst=vgpr("LocalWriteAddr%s+%u"%(tPM["tensorChar"], 0)), \
+              src0=resetMask, \
+              src1=vgpr("LocalWriteAddr%s+%u"%(tPM["tensorChar"], 0)), \
+              comment="reset to Red"))
 
     numLwa = 0
     if tP["isA"]:
@@ -11638,9 +11663,10 @@ class KernelWriterAssembly(KernelWriter):
       # Skip local write if DTVA or DTVB
       if not ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]):
         localWriteBody(tP)
-      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-        if tP["is_sparse"]:
-          localWriteBody(tP["tpsMetadata"])
+    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"] and \
+      (not kernel["DirectToLdsMetadata"] or (kernel["NonDTLTailLoopMetadata"] and self.states.inTailLoop)):
+      if tP["is_sparse"]:
+        localWriteBody(tP["tpsMetadata"])
 
     return imod
 
@@ -16684,7 +16710,7 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("PGR wait")
     # generate wait
     if (kernel["DirectToVgprA"] and kernel["DirectToVgprB"]) or \
-       (kernel["DirectToLdsA"] and kernel["DirectToLdsB"] and kernel["PrefetchGlobalRead"] >= 2):
+       (kernel["DirectToLdsA"] and kernel["DirectToLdsB"] and (not kernel["ProblemType"]["Sparse"] or kernel["DirectToLdsMetadata"]) and kernel["PrefetchGlobalRead"] >= 2):
       # DTVA and DTVB, or ((DTLA + DTLB) + PGR>=2) case, wait code for prefetch is unnecessary
       # (because wait is for local write code in PGR>=2 case)
       return module
