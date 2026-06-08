@@ -1,0 +1,12 @@
+packaging
+pyyaml
+msgpack
+joblib>=1.4.0
+simplejson
+ujson
+orjson
+yappi
+tox
+invoke
+numpy
+hip-python
