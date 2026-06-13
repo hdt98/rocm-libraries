@@ -55,6 +55,14 @@ def get_cxx_compiler():
 
 
 def _get_compiler_launcher():
+    if os.environ.get("PRIMUS_TURBO_DISABLE_COMPILER_LAUNCHER", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        print("[Primus-Turbo] Compiler launcher disabled by PRIMUS_TURBO_DISABLE_COMPILER_LAUNCHER")
+        return None
     for tool in ("sccache", "ccache"):
         if shutil.which(tool):
             print(f"[Primus-Turbo] Found {tool}, enabling as compiler launcher")

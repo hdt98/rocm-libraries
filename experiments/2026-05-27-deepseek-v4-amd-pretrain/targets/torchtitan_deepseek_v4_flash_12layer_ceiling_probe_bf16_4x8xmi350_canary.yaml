@@ -1,0 +1,154 @@
+target:
+  name: torchtitan_deepseek_v4_flash_12layer_ceiling_probe_bf16_4x8xmi350_canary
+  status: active_probe_pending_materialized_4x_or_8x_mi350_run
+  execution_path: direct_torchtitan_torchrun
+  model_family: deepseek-v4
+  model_name: DeepSeek-V4-Flash-FP8-12layer-ceiling-probe
+  training_precision: bf16
+  purpose: >-
+    Full-dimension first-12-layer DeepSeek-V4-Flash probe for the current
+    performance gate. This supersedes the 4-layer canary as the active
+    promotion target while keeping the 4-layer run as retained MORI/MoE
+    systems baseline evidence.
+  explicitly_not:
+    - primus_wrapped_execution
+    - deepseek_v3_16b_proxy
+    - renamed_deepseek_v3_config
+
+source_references:
+  ascend_torchtitan_npu:
+    recipe: sources/references/ascend-cann-recipes-train/llm_pretrain/deepseekv4
+    report: sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md
+    full_flash_shape: TP1_PP1_VPP1_EP128_FSDP128_MBS1_GBS1024_S4096_layers43
+  retained_4layer_anchor:
+    target: sources/targets/torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml
+    artifact: run_artifacts/torchtitan_mori_saved_dispatch_reuse_ab_20260605.json
+    read: >-
+      Retained 4-layer MORI+AITER systems baseline. It clears the thread's
+      current token-throughput gate under 4-layer accounting, but promotion
+      now requires this 12-layer probe.
+
+model_contract:
+  flavor: flash_12layer_ceiling_probe
+  full_model_layers: 43
+  canary_layers: 12
+  all_layers_are_moe: true
+  hidden_size: 4096
+  ffn_hidden_size: 2048
+  vocab_size: 129280
+  num_attention_heads: 64
+  normalization: RMSNorm
+  norm_epsilon: 1.0e-6
+  dropout: 0.0
+  attention:
+    type: dsv4_sparse_mla
+    q_lora_rank: 1024
+    kv_lora_rank: 512
+    qk_head_dim: 512
+    qk_pos_emb_head_dim: 64
+    v_head_dim: 512
+    qk_layernorm: true
+    rotary_scaling_factor: 16
+    rotary_base: 10000
+    original_max_position_embeddings: 65536
+    beta_fast: 32
+    beta_slow: 1
+    attention_softmax_in_fp32: true
+    recipe_first12_compress_ratios: [1, 1, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+    torchtitan_code_compress_ratios: [0, 0, 4, 128, 4, 128, 4, 128, 4, 128, 4, 128]
+    dense_ratio_mapping_note: >-
+      The Ascend/recipe shorthand lists dense uncompressed layers as ratio 1.
+      The current TorchTitan DeepSeek-V4 implementation uses compress_ratio=0
+      to instantiate dense MLA and compress_ratio>0 to instantiate
+      LightningIndexer sparse MLA, so the first two recipe entries are encoded
+      as 0 in code.
+    expected_read: 2 dense layers, 5 C4A layers, and 5 C128A layers
+  dsa_indexer:
+    n_heads: 64
+    head_dim: 128
+    topk: 512
+  moe:
+    num_experts: 256
+    moe_ffn_hidden_size: 2048
+    router_topk: 6
+    shared_expert_intermediate_size: 2048
+    router_pre_softmax: true
+    router_score_function: sqrtsoftplus
+    router_enable_expert_bias: true
+    router_load_balancing_type: seq_aux_loss
+    router_aux_loss_coeff: 0
+    router_topk_scaling_factor: 1.5
+    token_dispatcher_type: mori_or_alltoall
+    grouped_gemm: true
+
+parallel_targets:
+  four_gpu:
+    hardware: 4xMI350
+    tp: 1
+    pp: 1
+    cp: 1
+    fsdp: 4
+    ep: 4
+    expert_tensor_parallel: 1
+    mbs: tunable
+    gbs: 128
+    seq_len: 4096
+    tokens_per_step: 524288
+    target_tokens_per_gpu_s: 12200
+    target_node_tokens_per_s: 48800
+    derived_target_step_time_s: 10.74
+    tflops_per_gpu: report_only_for_this_probe
+  eight_gpu:
+    hardware: 8xMI350
+    tp: 1
+    pp: 1
+    cp: 1
+    fsdp: 8
+    ep: 8
+    expert_tensor_parallel: 1
+    mbs: tunable
+    gbs: 128
+    seq_len: 4096
+    tokens_per_step: 524288
+    target_tokens_per_gpu_s: 12200
+    target_node_tokens_per_s: 97600
+    derived_target_step_time_s: 5.37
+    tflops_per_gpu: report_only_for_this_probe
+
+training_contract:
+  data: mock_or_small_token_data_for_first_probe
+  optimizer: AdamW
+  activation_checkpoint: tunable
+  compile: disabled_until_correctness_and_pg_trace_are_stable
+  required_behaviors:
+    - direct_torchrun_command_does_not_invoke_primus_cli
+    - canary_config_model_family_is_deepseek_v4
+    - config_or_registry_does_not_reference_deepseek_v3_16b
+    - learned_routing
+    - ep_token_dispatch_return
+    - fsdp_sharded_non_expert_parameters
+    - gradient_accumulation_to_gbs128
+    - optimizer_step
+    - loss_or_health_metric_movement
+    - late_step_or_multistep_average_tokens_tflops_and_memory_reported
+
+torchtitan_materialization_required:
+  module: torchtitan.models.deepseek_v4
+  config_registry_flavor: deepseek_v4_flash_12layer_ceiling_probe
+  model_spec_name: deepseek_v4
+  train_config_name: deepseek_v4_flash_12layer_ceiling_probe_bf16_canary
+  direct_entrypoint: torchtitan/train.py
+  launch_rule: >-
+    Use python3 -m torch.distributed.run/torchrun directly with PYTHONPATH
+    pointing at the selected TorchTitan checkout. Do not go through primus-cli.
+
+current_first_run_plan:
+  storage_root: /scratch/sonle5/dsv4_pretrain_canary_20260527
+  preferred_host_order:
+    - do-vunguyen-mi350-gpu
+    - do-sonle5-mi350-gpu
+  first_gate: check-config must report 12 layers and torchtitan code ratios [0,0,4,128,4,128,4,128,4,128,4,128]
+  smoke_gate: 4xMI350 short run at S4096 GBS128 with MBS tuned for memory
+  promotion_gate: >-
+    Multi-step late average with tok/GPU/s, node tok/s, TFLOPs/GPU, peak memory,
+    command shape, environment knobs, and raw log path persisted.

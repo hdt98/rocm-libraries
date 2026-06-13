@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+import os
 from typing import TYPE_CHECKING
 
 from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
@@ -143,19 +144,40 @@ class ParallelDims:
         ):
             """Unflatten the world mesh to create the required mesh dimensions.
 
-            Uses fake backend for dimensions with degree 1 or for 'batch' dimension
-            to avoid unnecessary process group creation.
+            Optionally uses fake backend for dimensions with degree 1 or for
+            the 'batch' dimension to avoid unnecessary process group creation.
+            Some ROCm PyTorch nightly images expose DeviceMesh backend_override
+            but do not register the c10d 'fake' backend, so keep it opt-in.
             """
             backend_override = {}
+            use_fake_backend = (
+                os.environ.get("TORCHTITAN_DEVICE_MESH_FAKE_BACKEND", "0") == "1"
+            )
+            ep_backend_override = os.environ.get(
+                "TORCHTITAN_DEVICE_MESH_EP_BACKEND_OVERRIDE", ""
+            )
             for name, degree in zip(dim_names, dim_degrees, strict=True):
-                if not self._mesh_exist(name, degree):
+                if name == "ep" and degree > 1 and ep_backend_override:
+                    backend_override[name] = ep_backend_override
+                elif use_fake_backend and not self._mesh_exist(name, degree):
                     backend_override[name] = "fake"
 
-            return world_mesh._unflatten(
-                0,
-                dim_degrees,
-                dim_names,
-                backend_override=backend_override,
+            if hasattr(world_mesh, "_unflatten"):
+                return world_mesh._unflatten(
+                    0,
+                    dim_degrees,
+                    dim_names,
+                    backend_override=backend_override,
+                )
+            if backend_override:
+                logger.warning(
+                    "DeviceMesh._unflatten is unavailable; ignoring backend_override=%s",
+                    backend_override,
+                )
+            return DeviceMesh(
+                device_type,
+                world_mesh.mesh.reshape(dim_degrees),
+                mesh_dim_names=dim_names,
             )
 
         logger.info(

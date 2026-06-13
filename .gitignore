@@ -1,0 +1,24 @@
+.DS_Store
+*.pyc
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Vendored snapshots are tracked as plain files. Do not retain nested Git state.
+projects/**/.git/
+references/**/.git/
+
+# Raw training outputs stay outside Git. Keep compact JSON summaries only.
+experiments/*/run_artifacts/**
+!experiments/*/run_artifacts/
+!experiments/*/run_artifacts/*.json
+experiments/*/run_artifacts/*.jsonl
+experiments/*/run_artifacts/*.log
+experiments/*/run_artifacts/*.txt
+experiments/*/run_artifacts/*.pt
+experiments/*/run_artifacts/*.pth
+experiments/*/run_artifacts/*.ckpt
+experiments/*/run_artifacts/*.safetensors
+experiments/*/run_artifacts/profile_*
+experiments/*/run_artifacts/structured_logs*
+experiments/*/run_artifacts/remote_logs*

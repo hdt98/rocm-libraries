@@ -314,6 +314,41 @@ def qwen3_moe_debug_ep() -> Trainer.Config:
     return config
 
 
+def qwen3_5_397b_a17b_reduced_8layer_hothelper_gate() -> Trainer.Config:
+    return Trainer.Config(
+        loss=ChunkedCELoss.Config(num_chunks=8),
+        hf_assets_path="./tests/assets/tokenizer",
+        metrics=MetricsProcessor.Config(log_freq=1),
+        model_spec=model_registry("397B-A17B-reduced-8layer"),
+        dataloader=HuggingFaceTextDataLoader.Config(
+            dataset="c4_test",
+        ),
+        optimizer=OptimizersContainer.Config(lr=3e-4),
+        lr_scheduler=LRSchedulersContainer.Config(warmup_steps=2),
+        training=TrainingConfig(
+            local_batch_size=1,
+            seq_len=4096,
+            steps=20,
+        ),
+        parallelism=ParallelismConfig(
+            data_parallel_shard_degree=-1,
+            tensor_parallel_degree=1,
+            context_parallel_degree=1,
+            pipeline_parallel_degree=1,
+            expert_parallel_degree=8,
+        ),
+        checkpoint=CheckpointManager.Config(
+            enable=False,
+            interval=20,
+            last_save_model_only=False,
+            export_dtype="float16",
+        ),
+        activation_checkpoint=ActivationCheckpointConfig(
+            mode="selective",
+        ),
+    )
+
+
 def sft_qwen3_8b_math() -> Trainer.Config:
     """Qwen3-8B SFT on GSM8K math dataset."""
 

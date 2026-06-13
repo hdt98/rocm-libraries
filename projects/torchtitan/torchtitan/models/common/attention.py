@@ -10,12 +10,22 @@ from typing import ClassVar, NamedTuple
 
 import torch
 import torch.nn.functional as F
-from torch.nn.attention import (
-    activate_flash_attention_impl,
-    current_flash_attention_impl,
-    sdpa_kernel,
-    SDPBackend,
-)
+try:
+    from torch.nn.attention import (
+        activate_flash_attention_impl,
+        current_flash_attention_impl,
+        sdpa_kernel,
+        SDPBackend,
+    )
+except ImportError:
+    from torch.nn.attention import sdpa_kernel, SDPBackend
+
+    def activate_flash_attention_impl(_impl: str) -> None:
+        return None
+
+    def current_flash_attention_impl() -> str | None:
+        return None
+
 from torch.nn.attention.flex_attention import (
     _DEFAULT_SPARSE_BLOCK_SIZE,
     _mask_mod_signature,
@@ -25,7 +35,14 @@ from torch.nn.attention.flex_attention import (
     create_block_mask,
     flex_attention,
 )
-from torch.nn.attention.varlen import varlen_attn
+try:
+    from torch.nn.attention.varlen import varlen_attn
+except ImportError:
+
+    def varlen_attn(*args, **kwargs):
+        raise RuntimeError(
+            "torch.nn.attention.varlen is unavailable in this PyTorch build"
+        )
 
 from torchtitan.distributed.utils import is_in_batch_invariant_mode
 
@@ -182,7 +199,6 @@ class FlexAttention(Module):
         kernel_options: dict = field(default_factory=dict)
 
     inductor_configs: ClassVar[dict[str, bool]] = {
-        "wrap_inductor_compiled_regions": True,
         # Recommended workflow: run once with max_autotune=True to discover
         # good kernel_options, then set kernel_options explicitly in the config
         # and keep max_autotune disabled for faster compilation.

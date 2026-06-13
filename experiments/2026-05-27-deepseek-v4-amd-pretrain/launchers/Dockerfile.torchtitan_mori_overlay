@@ -1,0 +1,30 @@
+ARG BASE_IMAGE=onenexus/nexus-titan:rocm722-pytorch-nightly
+FROM ${BASE_IMAGE}
+
+ARG MORI_GPU_ARCHS=gfx950
+ARG MORI_ENABLE_PROFILER=OFF
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libibverbs-dev \
+        libpci-dev \
+        pciutils \
+        rdma-core && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir "setuptools-scm>=8"
+
+COPY mori /opt/mori
+
+RUN python3 -c "from pathlib import Path; p = Path('/opt/mori/pyproject.toml'); t = p.read_text(); p.write_text(t.replace('license = \"MIT\"', 'license = { text = \"MIT\" }'))"
+
+RUN cd /opt/mori && \
+    MORI_GPU_ARCHS="${MORI_GPU_ARCHS}" \
+    BUILD_EXAMPLES=OFF \
+    BUILD_TESTS=OFF \
+    BUILD_BENCHMARK=OFF \
+    MORI_WITH_MPI=OFF \
+    ENABLE_PROFILER="${MORI_ENABLE_PROFILER}" \
+    ENABLE_STANDARD_MOE_ADAPT=ON \
+    python3 -m pip install --no-build-isolation .

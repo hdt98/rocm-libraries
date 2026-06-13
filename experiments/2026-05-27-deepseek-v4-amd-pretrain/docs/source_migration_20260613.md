@@ -15,6 +15,20 @@ snapshot baseline belongs on `origin/main`; active balanced-MoE work belongs on
 - Source platform repo snapshot: local `main` at `c3df890a7657`
 - Vendor format: plain tracked snapshots, with nested `.git` and transient
   caches stripped.
+- Baseline migration commits:
+  - `ad4237094b`: vendor/source baseline layout.
+  - `6b1d5b2fb3`: compact top-level run-artifact JSON baseline.
+  - `fbe8ed7b31`: forward correction that removes active Primus-Turbo
+    hot-helper work from the baseline snapshot.
+- Updated `origin/main`: fast-forwarded to `fbe8ed7b31` without force-push.
+
+## Active Work Branch
+
+- Branch: `users/sonle5/balanced_moe`
+- Base: corrected `origin/main` at `fbe8ed7b31`
+- Purpose: carry only active TorchTitan policy/layer/autograd integration,
+  Primus-Turbo native hot-helper ABI work, MORI SDMA transport integration when
+  present, and concise experiment docs/harness changes.
 
 ## Layout
 

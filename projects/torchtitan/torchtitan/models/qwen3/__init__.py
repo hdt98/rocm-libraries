@@ -131,6 +131,7 @@ def _build_qwen3_moe_layers(
     top_k: int,
     attn_backend: str,
     moe_comm_backend: str,
+    shared_moe_hidden_dim: int | None = None,
     non_blocking_capacity_factor: float | None = None,
 ) -> list[TransformerBlock.Config]:
     """Build per-layer configs for MoE Qwen3 models with depth-scaled inits."""
@@ -172,6 +173,16 @@ def _build_qwen3_moe_layers(
                         score_before_experts=False,
                         comm_backend=moe_comm_backend,
                         non_blocking_capacity_factor=non_blocking_capacity_factor,
+                    ),
+                    shared_experts=(
+                        make_ffn_config(
+                            dim=dim,
+                            hidden_dim=shared_moe_hidden_dim,
+                            w1_param_init=_LINEAR_INIT,
+                            w2w3_param_init=_depth_init(layer_id),
+                        )
+                        if shared_moe_hidden_dim is not None
+                        else None
                     ),
                 ),
             )
@@ -601,6 +612,48 @@ def _235b_a22b(
     )
 
 
+def _397b_a17b_reduced_8layer(
+    attn_backend: str,
+    moe_comm_backend: str = "standard",
+) -> Qwen3Model.Config:
+    dim = 4096
+    head_dim = 256
+    n_layers = 8
+    vocab_size = 151936
+    return Qwen3Model.Config(
+        vocab_size=vocab_size,
+        dim=dim,
+        norm=_qwen3_norm(dim),
+        tok_embeddings=Embedding.Config(
+            num_embeddings=vocab_size, embedding_dim=dim, param_init=_EMBEDDING_INIT
+        ),
+        lm_head=Linear.Config(
+            in_features=dim,
+            out_features=vocab_size,
+            param_init=_output_linear_init(dim),
+        ),
+        rope=RoPE.Config(
+            dim=head_dim,
+            max_seq_len=4096,
+            theta=5000000.0,
+            backend="cos_sin",
+        ),
+        layers=_build_qwen3_moe_layers(
+            n_layers=n_layers,
+            dim=dim,
+            n_heads=32,
+            n_kv_heads=2,
+            head_dim=head_dim,
+            moe_hidden_dim=1024,
+            shared_moe_hidden_dim=1024,
+            num_experts=512,
+            top_k=10,
+            attn_backend=attn_backend,
+            moe_comm_backend=moe_comm_backend,
+        ),
+    )
+
+
 qwen3_configs = {
     "debugmodel": _debugmodel,
     "debugmodel_fused_qkv": _debugmodel_fused_qkv,
@@ -613,6 +666,7 @@ qwen3_configs = {
     "debugmodel_moe": _debugmodel_moe,
     "30B-A3B": _30b_a3b,
     "235B-A22B": _235b_a22b,
+    "397B-A17B-reduced-8layer": _397b_a17b_reduced_8layer,
 }
 
 

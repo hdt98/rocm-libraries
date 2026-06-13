@@ -143,7 +143,8 @@ class Decoder(BaseModel):
         # TODO: fix PP backward upstream to skip non-tensor inputs
         if self._skip_lm_head:
             return h
-        output = self.lm_head(h) if self.lm_head is not None else h
+        with torch.profiler.record_function("dsv4.model.lm_head"):
+            output = self.lm_head(h) if self.lm_head is not None else h
         return output
 
     def _get_flex_attention_masks(

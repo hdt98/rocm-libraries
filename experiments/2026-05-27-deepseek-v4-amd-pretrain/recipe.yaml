@@ -1,102 +1,150 @@
 name: 2026-05-27-deepseek-v4-amd-pretrain
 kind: experiment
 type: pretraining
-status: scaffolded_source_review
+status: native_primus_turbo_hot_helper_baseline_cleanup
+
 frameworks:
-  primary: primus
+  primary: torchtitan
   backend_candidates:
+    - primus-turbo
+    - mori
+    - primus
     - megatron-LM
-    - torchtitan
+
 model_family: deepseek-v4
-hardware_target: mi355x
+hardware_target: mi350x
 
 objective: >-
-  Create an AMD MI355X DeepSeek V4 pretraining experiment workspace with editable
-  Primus, TorchTitan, and Megatron-LM WIP snapshots, plus NVIDIA Day-0
-  Miles/Megatron-LM references for source comparison.
+  Build a reproducible AMD MI350 DeepSeek-V4-style pretraining canary and
+  promote native Primus-Turbo/MORI balanced-MoE hot-helper only when it beats
+  the strongest retained baselines without hidden adapter overhead.
 
 branch_sync:
   branch: sonle5_dsv4_amd_pretrain
   baseline_before_experiment: d4468c5b3dd072c9034fd02b268e011067850550
   relation_to_local_main_before_commit: identical
   synced_at: 2026-05-27
+  current_diff_policy: >-
+    Keep experiment docs concise, keep raw logs/traces outside the repo, and
+    avoid broad git scans over dirty WIP/vendor trees.
 
-sources:
+execution_policy:
+  selected_path: direct_torchtitan_torchrun
+  primus_role: reference_or_legacy_proxy_only
+  raw_outputs_policy: /scratch/sonle5/dsv4_pretrain_canary_20260527
+  canonical_launcher: launchers/torchtitan_direct_deepseek_v4_4x8xmi350_canary.sh
+  target_contract: targets/torchtitan_deepseek_v4_flash_12layer_ceiling_probe_bf16_4x8xmi350_canary.yaml
+
+source_layout:
   wip:
     primus:
-      remote: https://github.com/AMD-AGI/Primus.git
-      branch: main
-      commit: 05ec3231288f3932cdef789a06149d26825736ff
-      path: sources/wip/primus
-      local_state: clean_shallow_clone_snapshot_from_remote_branch_head
-      role: amd_training_framework_and_orchestration_surface
+      path: ../../projects/primus
+      role: amd_training_framework_reference
+    primus_turbo:
+      path: ../../projects/primus-turbo
+      role: active_native_hot_helper_and_turboep_backend
     torchtitan:
-      remote: https://github.com/pytorch/torchtitan.git
-      branch: main
-      commit: 7fcd9beacde733f3ceca4a4da7e2f0518d64f68e
-      path: sources/wip/torchtitan
-      local_state: clean_shallow_clone_snapshot_from_remote_branch_head
-      role: pretraining_backend_candidate_and_reference
+      path: ../../projects/torchtitan
+      role: active_policy_layer_and_training_integration
     megatron_lm:
-      remote: https://github.com/NVIDIA/Megatron-LM.git
-      branch: main
-      commit: 873678adafa71702ef7e7a405a7f4a3377dd2727
-      path: sources/wip/megatron-LM
-      local_state: clean_shallow_clone_snapshot_from_remote_branch_head
-      role: megatron_backend_surface_for_dsv4_model_port
+      path: ../../projects/megatron-LM
+      role: modeling_reference
   references:
-    lmsys_day0_rl:
-      url: https://www.lmsys.org/blog/2026-04-25-deepseek-v4/#reinforcement-learning-miles-support
-      role: public_day0_training_feature_and_result_summary
-    miles_roadmap:
-      url: https://github.com/radixark/miles/issues/1046
-      opened: 2026-04-24
-      role: public_deepseek_v4_rl_roadmap_and_launch_shape
-    miles_pr1045:
-      pr: https://github.com/radixark/miles/pull/1045
-      base:
-        remote: https://github.com/radixark/miles.git
-        branch: main
-        commit: c8e85df24a0a7dd96e6b13b7724251c034cd4968
-      head:
-        remote: https://github.com/yueming-yuan/miles.git
-        branch: deepseek-v4
-        commit: 032721cd61bf7164955f084425eb9f315352fd26
-      path: sources/references/miles-deepseek-v4-pr1045
-      role: nvidia_side_miles_dsv4_rl_reference
+    ascend_cann_recipes_train:
+      path: ../../references/ascend/ascend-cann-recipes-train
+      role: ascend_torchtitan_npu_recipe_and_sasg_moe_reference
+    ascend_torchtitan_npu:
+      path: ../../references/ascend/torchtitan-npu-v0.2.2-dev
+      role: ascend_torchtitan_npu_operator_wrapper_reference
+    mori:
+      path: ../../references/amd/mori
+      role: amd_sdma_and_ep_transport_reference
+    hipkittens:
+      path: ../../references/amd/hipkittens
+      role: amd_attention_kernel_reference
     megatron_lm_pr28:
-      pr: https://github.com/radixark/Megatron-LM/pull/28
-      base:
-        remote: https://github.com/radixark/Megatron-LM.git
-        branch: miles-main
-        commit: 23924a0b66f35b31050ce9636477d2ee32148767
-      head:
-        remote: https://github.com/yueming-yuan/Megatron-LM.git
-        branch: deepseek-v4
-        commit: 1c6e5b7bcde0097ebe193b6258115ff3558f69d6
-      merge_ref_commit: d88459d7f80a62f4d4c2ff8ca3f93723d9794695
-      path: sources/references/megatron-lm-deepseek-v4-pr28
-      role: nvidia_side_megatron_dsv4_modeling_reference
+      path: ../../references/nvidia/megatron-lm-deepseek-v4-pr28
+      role: nvidia_deepseek_v4_training_reference
+    miles_pr1045:
+      path: ../../references/nvidia/miles-deepseek-v4-pr1045
+      role: nvidia_day0_rl_reference
+    nvidia_day0:
+      urls:
+        - https://www.lmsys.org/blog/2026-04-25-deepseek-v4/#reinforcement-learning-miles-support
+        - https://github.com/radixark/miles/issues/1046
+        - https://github.com/radixark/miles/pull/1045
+        - https://github.com/radixark/Megatron-LM/pull/28
 
-runtime:
-  status: not_launched
-  raw_outputs_policy: keep_logs_checkpoints_traces_outside_repo
+active_surfaces:
+  deepseek_mtp1:
+    model: DeepSeek-V4 Flash 12-layer
+    notes: current corrected default; MTP1 enabled explicitly in the table harness
+  deepseek_nomtp:
+    model: DeepSeek-V4 Flash 12-layer
+    notes: historical control needed to reproduce the older roughly 8.5k tok/GPU/s MBS8 row
+  qwen:
+    model: Qwen3.5-397B-A17B 8-layer
+  kimi:
+    model: Kimi-K2.6 6-layer
 
-initial_source_review_focus:
-  - dsv4_model_definition_and_mhc_state_shape
-  - compressed_attention_parallelism_dp_tp_sp_ep_pp_cp
-  - fp8_rollout_bf16_or_fp8_training_precision_boundaries
-  - checkpoint_conversion_and_distributed_optimizer_precision
-  - amd_kernel_replacements_for_tilelang_or_cuda_specific_paths
+balanced_moe_goal:
+  baseline_matrix:
+    models:
+      - deepseek_mtp1
+      - deepseek_nomtp
+      - qwen
+      - kimi
+    micro_batch_sizes: [1, 2, 4, 8]
+    variants:
+      - standard_ep_no_helper
+      - primus_turbo_turboep_no_helper
+      - standard_ep_top8_helper_mori_sdma
+  candidate:
+    name: native_primus_turbo_hot_helper_mori_sdma
+    ownership:
+      torchtitan: policy_layer_autograd_and_saved_forward_partition_plan
+      primus_turbo: hot_helper_abi_and_normal_topk_turboep_dispatch_combine
+      mori: sdma_owner_compact_hot_weight_and_hot_dweight_transport
+    acceptance:
+      deepseek_mbs4_mbs8_min_uplift_pct: 3.0
+      qwen_kimi_max_regression_pct_without_fit_boundary_change: 2.0
+      correctness:
+        - finite_forward_backward
+        - loss_moves_on_20_step_runs
+        - no_missing_token_gradient_path_through_native_collectives
+
+current_evidence:
+  status_doc: docs/status.md
+  changesets_index: changesets/README.md
+  tools_index: tools/README.md
+  raw_run_root: /scratch/sonle5/dsv4_pretrain_canary_20260527
+  compact_artifact_dir: run_artifacts
+  important_read: >-
+    The historical DeepSeek helper MBS8 roughly 8.5k tok/GPU/s row was no-MTP
+    or pre-MTP-default. Current-source MTP1 rows build about 5.84B more
+    parameters and need a separate deepseek_nomtp control before comparing.
+
+tools:
+  retained:
+    - tools/run_balanced_moe_table_sweep.py
+    - tools/check_balanced_moe_backend_parity.py
+    - tools/check_balanced_moe_model_shapes.py
+    - tools/check_balanced_moe_model_surfaces.py
+    - tools/check_balanced_moe_goal_scope.py
+    - tools/mori_hot_helper_pack_smoke.py
+    - tools/smoke_mori_owner_compact_exchange_gloo.py
+  policy: >-
+    Keep this directory minimal. Old sparse-MLA/kernel/optimizer probes belong
+    outside the repo or in compact changeset notes, not in the table harness.
 
 validation:
-  status: not_run
-  required_before_promotion:
-    - command_shape
-    - node_layout
-    - dependency_shas
-    - completed_iterations
-    - skipped_and_nan_counts
-    - loss_or_health_metric_movement
-    - throughput
-    - checkpoint_or_result_markers
+  local_static:
+    - py_compile_tools
+    - backend_capability_import_checks
+    - owner_compact_metadata_shape_checks
+  remote_training:
+    - 20_step_baseline_table
+    - 20_step_native_candidate_table
+  pending: >-
+    Wait for a clean 8xMI350 node before relaunching the corrected baseline
+    table from remote tmux.

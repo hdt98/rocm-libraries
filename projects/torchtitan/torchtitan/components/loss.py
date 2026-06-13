@@ -7,6 +7,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+import os
 from typing import TypeAlias
 
 import torch
@@ -15,6 +16,11 @@ from torch.distributed.tensor import DTensor, Partial, Replicate, Shard
 from torch.distributed.tensor.experimental import local_map
 
 from torchtitan.config import CompileConfig, Configurable
+from torchtitan.models.common.dsv4_profile_timing import (
+    dsv4_profile_timing_enabled,
+    dsv4_timed_stage,
+    flush_dsv4_profile_timing,
+)
 from torchtitan.tools.logging import logger
 
 # PyTorch's default ignore index for cross-entropy loss
@@ -125,6 +131,7 @@ class BaseLoss(ABC, Configurable):
     """
 
     fn: LossFunction
+    mtp_loss_weight: float = 0.3
 
     @dataclass(kw_only=True, slots=True)
     class Config(Configurable.Config):
@@ -143,13 +150,42 @@ class BaseLoss(ABC, Configurable):
             logger.info("Compiling the loss function with torch.compile")
             self.fn = torch.compile(self.fn, backend=compile_config.backend)
 
+    def set_mtp_loss_weight(self, weight: float) -> None:
+        self.mtp_loss_weight = float(weight)
+
+    def _multi_token_loss(
+        self,
+        preds: list[torch.Tensor] | tuple[torch.Tensor, ...],
+        labels: torch.Tensor,
+    ) -> torch.Tensor:
+        if len(preds) == 0:
+            raise ValueError("MTP loss requires at least one prediction tensor.")
+        seq_len = preds[0].shape[1]
+        main_loss = self.fn(preds[0], labels[:, :seq_len])
+        if len(preds) == 1:
+            return main_loss
+        mtp_loss = preds[0].new_zeros((), dtype=torch.float32)
+        for label_offset, pred in enumerate(preds[1:], 1):
+            end_idx = label_offset + seq_len
+            if labels.shape[1] < end_idx:
+                raise ValueError(
+                    "MTP labels are too short for shifted prediction: "
+                    f"labels seq={labels.shape[1]}, need {end_idx}."
+                )
+            mtp_loss = mtp_loss + self.fn(pred, labels[:, label_offset:end_idx])
+        mtp_loss = mtp_loss / float(len(preds) - 1)
+        return main_loss + float(self.mtp_loss_weight) * mtp_loss
+
     def __call__(
         self,
-        pred: torch.Tensor,
+        pred: torch.Tensor | list[torch.Tensor] | tuple[torch.Tensor, ...],
         labels: torch.Tensor,
         global_valid_tokens: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        loss = self.fn(pred, labels)
+        if isinstance(pred, (list, tuple)):
+            loss = self._multi_token_loss(pred, labels)
+        else:
+            loss = self.fn(pred, labels)
         if global_valid_tokens is not None:
             loss = loss / global_valid_tokens
         return loss
@@ -349,13 +385,59 @@ class ChunkedCELoss(BaseLoss):
         self.fn: LossFunction = cross_entropy_loss
         self._maybe_compile(compile_config)
         self.num_chunks = config.num_chunks
+        num_chunks_override = os.environ.get("TORCHTITAN_DSV4_CHUNKED_CE_NUM_CHUNKS")
+        if num_chunks_override is not None and num_chunks_override.strip() != "":
+            self.num_chunks = int(num_chunks_override)
+        if self.num_chunks <= 0:
+            raise ValueError(
+                "ChunkedCELoss num_chunks must be positive, got "
+                f"{self.num_chunks}."
+            )
         self.lm_head: nn.Module | None = None
+        self.mtp_loss_weight = float(
+            os.environ.get("TORCHTITAN_MTP_LOSS_WEIGHT", "0.3")
+        )
 
     def set_lm_head(self, lm_head: nn.Module) -> None:
         """Set the lm_head module. Must be called before the first __call__."""
         self.lm_head = lm_head
 
+    def set_mtp_loss_weight(self, weight: float) -> None:
+        self.mtp_loss_weight = float(weight)
+
     def __call__(
+        self,
+        pred: torch.Tensor | list[torch.Tensor] | tuple[torch.Tensor, ...],
+        labels: torch.Tensor,
+        global_valid_tokens: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if isinstance(pred, (list, tuple)):
+            if len(pred) == 0:
+                raise ValueError("ChunkedCELoss MTP path got no prediction tensors.")
+            seq_len = pred[0].shape[1]
+            main_loss = self._single_call(
+                pred[0], labels[:, :seq_len], global_valid_tokens
+            )
+            if len(pred) == 1:
+                return main_loss
+            mtp_loss = pred[0].new_zeros((), dtype=torch.float32)
+            for label_offset, hidden_states in enumerate(pred[1:], 1):
+                end_idx = label_offset + seq_len
+                if labels.shape[1] < end_idx:
+                    raise ValueError(
+                        "ChunkedCELoss MTP labels are too short: "
+                        f"labels seq={labels.shape[1]}, need {end_idx}."
+                    )
+                mtp_loss = mtp_loss + self._single_call(
+                    hidden_states,
+                    labels[:, label_offset:end_idx],
+                    global_valid_tokens,
+                )
+            mtp_loss = mtp_loss / float(len(pred) - 1)
+            return main_loss + float(self.mtp_loss_weight) * mtp_loss
+        return self._single_call(pred, labels, global_valid_tokens)
+
+    def _single_call(
         self,
         pred: torch.Tensor,
         labels: torch.Tensor,
@@ -433,6 +515,7 @@ class ChunkedCELoss(BaseLoss):
         )
 
         total_loss = hidden_states.new_zeros((), dtype=torch.float32)
+        timing_records = [] if dsv4_profile_timing_enabled() else None
 
         # Disable FSDP reshard on lm_head to keep weight unsharded across
         # all chunks, avoiding repeated all-gathers. Coalesce per-chunk
@@ -450,15 +533,30 @@ class ChunkedCELoss(BaseLoss):
                     True, recurse=False
                 )
 
-            logits = lm_head(h_chunk)
+            with torch.profiler.record_function("dsv4.loss.lm_head_chunk.forward"):
+                with dsv4_timed_stage(
+                    timing_records,
+                    f"dsv4.loss.chunk_{i}.lm_head_forward",
+                ):
+                    logits = lm_head(h_chunk)
 
-            chunk_loss = self.fn(logits, label_chunk)
+            with torch.profiler.record_function("dsv4.loss.cross_entropy_chunk.forward"):
+                with dsv4_timed_stage(
+                    timing_records,
+                    f"dsv4.loss.chunk_{i}.cross_entropy_forward",
+                ):
+                    chunk_loss = self.fn(logits, label_chunk)
             if global_valid_tokens is not None:
                 chunk_loss = chunk_loss / global_valid_tokens
             total_loss = total_loss + chunk_loss.detach()
 
             if requires_grad:
-                chunk_loss.backward()
+                with torch.profiler.record_function("dsv4.loss.chunk_backward"):
+                    with dsv4_timed_stage(
+                        timing_records,
+                        f"dsv4.loss.chunk_{i}.backward",
+                    ):
+                        chunk_loss.backward()
                 assert h_chunk.grad is not None
                 grad_accumulator.add(h_chunk.grad)
                 h_chunk.grad = None
@@ -468,6 +566,17 @@ class ChunkedCELoss(BaseLoss):
             lm_head.set_reshard_after_backward(True)
             lm_head.set_requires_gradient_sync(True, recurse=False)
             lm_head.reshard()
+        flush_dsv4_profile_timing(
+            timing_records,
+            {
+                "kind": "chunked_ce_loss",
+                "num_chunks": int(num_chunks),
+                "hidden_shape": list(hidden_states.shape),
+                "labels_shape": list(labels.shape),
+                "requires_grad": bool(requires_grad),
+                "fsdp_enabled": bool(fsdp_enabled),
+            },
+        )
         if not requires_grad:
             return total_loss
 

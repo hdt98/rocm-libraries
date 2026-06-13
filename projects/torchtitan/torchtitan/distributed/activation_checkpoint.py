@@ -22,7 +22,54 @@ from torch.utils.checkpoint import (
 )
 
 from torchtitan.config import ActivationCheckpointConfig as ACConfig
+from torchtitan.models.common.dsv4_profile_timing import (
+    dsv4_current_execution_region,
+    dsv4_current_microbatch,
+    dsv4_profile_ac_blocks_enabled,
+    dsv4_timed_stage,
+    flush_dsv4_profile_timing,
+)
 from torchtitan.tools.logging import logger
+
+
+class _Dsv4TimedACModule(nn.Module):
+    """Opt-in timing wrapper for activation-checkpointed block forwards."""
+
+    def __init__(self, module: nn.Module, *, fqn: str):
+        super().__init__()
+        self.module = module
+        self.fqn = fqn
+
+    def __getattr__(self, name: str):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            module = self._modules.get("module")
+            if module is not None:
+                return getattr(module, name)
+            raise
+
+    def forward(self, *args, **kwargs):
+        if not dsv4_profile_ac_blocks_enabled():
+            return self.module(*args, **kwargs)
+
+        region = dsv4_current_execution_region() or "unknown"
+        stage = f"dsv4.ac_block.{self.fqn}.{region}"
+        timing_records = []
+        with torch.profiler.record_function(stage):
+            with dsv4_timed_stage(timing_records, stage):
+                output = self.module(*args, **kwargs)
+        flush_dsv4_profile_timing(
+            timing_records,
+            {
+                "kind": "activation_checkpoint_block_forward",
+                "layer": self.fqn,
+                "region": region,
+                "microbatch": dsv4_current_microbatch(),
+                "module_type": type(self.module).__name__,
+            },
+        )
+        return output
 
 
 def _get_save_ops() -> set:
@@ -198,10 +245,107 @@ def _apply_ac_to_transformer_block(
             f"Invalid AC mode: {ac_config.mode}. Valid modes: {valid_ac_modes}"
         )
 
+    if dsv4_profile_ac_blocks_enabled():
+        module = _Dsv4TimedACModule(module, fqn=base_fqn or "transformer_block")
+
     if ac_config.mode == "full":
         return _apply_full_ac(module, ac_config)
 
     return _apply_op_sac(module, ac_config, base_fqn=base_fqn)
+
+
+_VALID_SELECTIVE_AC_SCOPES = {
+    "transformer_block",
+    "attention_only",
+    "hyper_connections_only",
+    "attention_and_hyper_connections",
+    "dense_attention_only",
+    "sparse_attention_only",
+    "c4_attention_only",
+    "c128_attention_only",
+    "compress_ratio_attention_only",
+}
+
+
+def _selective_ac_scope() -> str:
+    scope = (
+        os.environ.get("TORCHTITAN_ACTIVATION_CHECKPOINT_SCOPE")
+        or os.environ.get("CANARY_ACTIVATION_CHECKPOINT_SCOPE")
+        or "transformer_block"
+    )
+    scope = scope.strip().lower()
+    if scope == "":
+        scope = "transformer_block"
+    if scope not in _VALID_SELECTIVE_AC_SCOPES:
+        raise ValueError(
+            "TORCHTITAN_ACTIVATION_CHECKPOINT_SCOPE must be "
+            f"one of {sorted(_VALID_SELECTIVE_AC_SCOPES)}, got {scope!r}."
+        )
+    return scope
+
+
+def _selective_ac_compress_ratios() -> set[int]:
+    raw = (
+        os.environ.get("TORCHTITAN_ACTIVATION_CHECKPOINT_COMPRESS_RATIOS")
+        or os.environ.get("CANARY_ACTIVATION_CHECKPOINT_COMPRESS_RATIOS")
+        or ""
+    )
+    ratios = {
+        int(value.strip())
+        for value in raw.split(",")
+        if value.strip()
+    }
+    if not ratios:
+        raise ValueError(
+            "compress_ratio_attention_only requires "
+            "TORCHTITAN_ACTIVATION_CHECKPOINT_COMPRESS_RATIOS or "
+            "CANARY_ACTIVATION_CHECKPOINT_COMPRESS_RATIOS, for example '4,128'."
+        )
+    return ratios
+
+
+def _attention_matches_selective_scope(
+    attention: nn.Module | None,
+    scope: str,
+    *,
+    compress_ratios: set[int] | None = None,
+) -> bool:
+    if attention is None:
+        return False
+    if scope == "attention_only":
+        return True
+
+    compress_ratio = int(getattr(attention, "compress_ratio", 0) or 0)
+    if scope == "dense_attention_only":
+        return compress_ratio == 0
+    if scope == "sparse_attention_only":
+        return compress_ratio > 0
+    if scope == "c4_attention_only":
+        return compress_ratio == 4
+    if scope == "c128_attention_only":
+        return compress_ratio == 128
+    if scope == "compress_ratio_attention_only":
+        assert compress_ratios is not None
+        return compress_ratio in compress_ratios
+    return False
+
+
+def _apply_selective_ac_to_attention_only(
+    module: nn.Module,
+    ac_config: ACConfig,
+    *,
+    base_fqn: str | None = None,
+) -> nn.Module:
+    attention = getattr(module, "attention", None)
+    if attention is None:
+        return module
+    wrapped_attention = _apply_op_sac(
+        attention,
+        ac_config,
+        base_fqn=f"{base_fqn}.attention" if base_fqn else "attention",
+    )
+    setattr(module, "attention", wrapped_attention)
+    return module
 
 
 def apply_ac(
@@ -232,7 +376,9 @@ def apply_ac(
     #
     # Also see: https://github.com/pytorch/pytorch/issues/166926
     # pyrefly: ignore [missing-attribute]
-    torch._C._dynamo.eval_frame._set_lru_cache(False)
+    set_lru_cache = getattr(torch._C._dynamo.eval_frame, "_set_lru_cache", None)
+    if set_lru_cache is not None:
+        set_lru_cache(False)
 
     if ac_config.mode == "memory_budget":
         assert model_compile_enabled, "Memory budget mode requires model to be compiled"
@@ -246,13 +392,45 @@ def apply_ac(
         torch._functorch.config.activation_memory_budget = ac_config.memory_budget
         logger.info(f"Selected {ac_config.memory_budget} budget option")
     else:
+        selective_scope = (
+            _selective_ac_scope() if ac_config.mode == "selective" else "transformer_block"
+        )
+        compress_ratios = (
+            _selective_ac_compress_ratios()
+            if selective_scope == "compress_ratio_attention_only"
+            else None
+        )
         layers = model.get_submodule("layers")
         for layer_id, transformer_block in layers.named_children():
-            transformer_block = _apply_ac_to_transformer_block(
-                transformer_block,
-                ac_config,
-                base_fqn=f"layers.{layer_id}",
-            )
+            layer_fqn = f"layers.{layer_id}"
+            attention = getattr(transformer_block, "attention", None)
+            if selective_scope == "transformer_block":
+                transformer_block = _apply_ac_to_transformer_block(
+                    transformer_block,
+                    ac_config,
+                    base_fqn=layer_fqn,
+                )
+            elif selective_scope == "hyper_connections_only":
+                pass
+            elif (
+                selective_scope == "attention_and_hyper_connections"
+                or _attention_matches_selective_scope(
+                    attention,
+                    selective_scope,
+                    compress_ratios=compress_ratios,
+                )
+            ):
+                transformer_block = _apply_selective_ac_to_attention_only(
+                    transformer_block,
+                    ac_config,
+                    base_fqn=layer_fqn,
+                )
             layers.register_module(layer_id, transformer_block)
 
-    logger.info(f"Applied {ac_config.mode} activation checkpointing to the model")
+    if ac_config.mode == "selective":
+        logger.info(
+            "Applied selective activation checkpointing to the model "
+            f"(scope={_selective_ac_scope()})"
+        )
+    else:
+        logger.info(f"Applied {ac_config.mode} activation checkpointing to the model")

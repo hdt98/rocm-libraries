@@ -297,6 +297,109 @@ def apply_fsdp(
                 reshard_after_forward=reshard_after_forward,
             )
 
+    # DeepSeek-V4 MTP modules live outside ``model.layers`` but can contain a
+    # copied MoE block. Apply the same expert-aware FSDP rule before the root
+    # wrap; otherwise those expert params fall through to the overlapping
+    # FSDP/EP root mesh and fail at DTensor/FSDP concatenation time.
+    for mtp_layer in getattr(model, "mtp_layers", {}).values():
+        transformer_block = getattr(mtp_layer, "block", None)
+        if transformer_block is None:
+            continue
+
+        if getattr(transformer_block, "moe_enabled", False):
+            assert hasattr(transformer_block, "moe")
+            expert_params = set(transformer_block.moe.experts.parameters())
+            num_experts = transformer_block.moe.experts.num_experts
+
+            if ep_degree > 1:
+                assert edp_mesh is not None
+                efsdp_ep_size = edp_mesh["efsdp"].size() * ep_degree
+            else:
+                efsdp_ep_size = fsdp_config["mesh"].size()
+
+            if efsdp_ep_size > num_experts:
+                expert_shard_placement = Shard(1)
+            else:
+                expert_shard_placement = Shard(0)
+
+            if ep_degree == 1 and expert_shard_placement == Shard(0):
+                fully_shard(
+                    transformer_block,
+                    **fsdp_config,
+                    reshard_after_forward=reshard_after_forward,
+                )
+            elif ep_degree == 1:
+                def _experts_shard_placement_fn(
+                    param: nn.Parameter,
+                    _expert_params: set = expert_params,
+                ) -> Shard | None:
+                    if param in _expert_params:
+                        return Shard(1)
+                    return None
+
+                fully_shard(
+                    transformer_block,
+                    **fsdp_config,
+                    reshard_after_forward=reshard_after_forward,
+                    shard_placement_fn=_experts_shard_placement_fn,
+                )
+            else:
+                from torch.distributed.fsdp._fully_shard._fsdp_common import (
+                    FSDPMeshInfo,
+                    HSDPMeshInfo,
+                    ShardPlacementResult,
+                )
+
+                assert edp_mesh is not None
+
+                def _get_fsdp_mesh_info(mesh: DeviceMesh) -> FSDPMeshInfo:
+                    if mesh.ndim == 1:
+                        return FSDPMeshInfo(mesh=mesh, shard_mesh_dim=0)
+                    if mesh.ndim == 2:
+                        return HSDPMeshInfo(
+                            mesh=mesh, replicate_mesh_dim=0, shard_mesh_dim=1
+                        )
+                    raise ValueError(
+                        f"Expected 1D or 2D FSDP mesh, got {mesh.ndim}D mesh."
+                    )
+
+                edp_mesh_info = _get_fsdp_mesh_info(edp_mesh)
+                dp_mesh_info = _get_fsdp_mesh_info(dp_mesh)
+
+                def _shard_placement_fn(
+                    param: nn.Parameter,
+                    _expert_params: set = expert_params,
+                    _expert_placement: Shard = expert_shard_placement,
+                    _edp_mesh_info: FSDPMeshInfo = edp_mesh_info,
+                    _dp_mesh_info: FSDPMeshInfo = dp_mesh_info,
+                ) -> ShardPlacementResult:
+                    if param in _expert_params:
+                        return ShardPlacementResult(
+                            placement=_expert_placement, mesh_info=_edp_mesh_info
+                        )
+                    return ShardPlacementResult(
+                        placement=Shard(0), mesh_info=_dp_mesh_info
+                    )
+
+                fully_shard(
+                    transformer_block,
+                    **fsdp_config,
+                    reshard_after_forward=reshard_after_forward,
+                    shard_placement_fn=_shard_placement_fn,
+                )
+        else:
+            fully_shard(
+                transformer_block,
+                **fsdp_config,
+                reshard_after_forward=reshard_after_forward,
+            )
+
+        fully_shard(
+            mtp_layer,
+            **fsdp_config,
+            reshard_after_forward=reshard_after_forward,
+        )
+
     fully_shard(model, **fsdp_config)
 
     if enable_symm_mem:

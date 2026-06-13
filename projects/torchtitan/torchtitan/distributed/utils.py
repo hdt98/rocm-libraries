@@ -432,12 +432,14 @@ def init_distributed(
         dist_config.use_torchcomms = True
         device_id = torch.device(device_type, int(os.environ["LOCAL_RANK"]))
 
-    torch.distributed.init_process_group(
-        backend=_get_distributed_backend(enable_cpu_backend),
-        timeout=timedelta(seconds=comm_config.init_timeout_seconds),
-        _ranks=ranks if ranks is not None else [],
-        device_id=device_id,
-    )
+    init_kwargs = {
+        "backend": _get_distributed_backend(enable_cpu_backend),
+        "timeout": timedelta(seconds=comm_config.init_timeout_seconds),
+        "device_id": device_id,
+    }
+    if ranks is not None:
+        init_kwargs["_ranks"] = ranks
+    torch.distributed.init_process_group(**init_kwargs)
 
     return torch.distributed.get_world_size()
 

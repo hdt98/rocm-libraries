@@ -1,0 +1,100 @@
+target_classification:
+  model_identity: DeepSeek-V3_16B
+  allowed_use: systems_proxy_only
+  forbidden_use: final_deepseek_v4_flash_canary
+  replacement_target: torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary.yaml
+
+work_group: ${PRIMUS_TEAM:sonle5}
+user_name: ${PRIMUS_USER:sonle5}
+exp_name: ${PRIMUS_EXP_NAME:torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_canary}
+workspace: ${PRIMUS_WORKSPACE:/local/data/sonle5/dsv4_pretrain_canary_20260527/output}
+
+modules:
+  pre_trainer:
+    framework: torchtitan
+    config: pre_trainer.yaml
+    model: deepseek_v3_16b.yaml
+    overrides:
+      job:
+        dump_folder: ${PRIMUS_DUMP_FOLDER:/local/data/sonle5/dsv4_pretrain_canary_20260527/output/torchtitan_dsv4style_dsv3_16b_bf16_8xmi350_canary}
+        description: "Proxy-only TorchTitan systems smoke using DeepSeek-V3 16B BF16; not the DeepSeek-V4 canary"
+        print_config: true
+
+      model:
+        hf_assets_path: "/workspace/Primus/third_party/torchtitan/tests/assets/tokenizer"
+
+      profiling:
+        enable_profiling: false
+        profile_freq: 1
+        enable_memory_snapshot: false
+
+      metrics:
+        log_freq: 1
+        disable_color_printing: true
+        enable_tensorboard: false
+        enable_wandb: false
+
+      optimizer:
+        name: "AdamW"
+        implementation: "fused"
+        lr: 2.2e-4
+        eps: 1.0e-8
+
+      lr_scheduler:
+        warmup_steps: 1
+        decay_ratio: 0.8
+        decay_type: "cosine"
+        min_lr_factor: 0.1
+
+      training:
+        mock_data: true
+        debug_moe_force_load_balance: false
+        local_batch_size: 1
+        global_batch_size: 16
+        seq_len: 4096
+        max_norm: 1.0
+        steps: 2
+        dataset: "c4_test"
+        mixed_precision_param: "bfloat16"
+        mixed_precision_reduce: "float32"
+
+      parallelism:
+        data_parallel_replicate_degree: 1
+        data_parallel_shard_degree: -1
+        fsdp_reshard_after_forward: "default"
+        tensor_parallel_degree: 1
+        context_parallel_degree: 1
+        enable_async_tensor_parallel: false
+        pipeline_parallel_degree: 1
+        pipeline_parallel_schedule: "1F1B"
+        expert_parallel_degree: 8
+        expert_tensor_parallel_degree: 1
+
+      checkpoint:
+        enable: true
+        folder: "checkpoint"
+        interval: 1
+        last_save_model_only: false
+        export_dtype: "float32"
+        async_mode: "disabled"
+        keep_latest_k: 2
+        load_step: -1
+        enable_first_step_checkpoint: true
+
+      activation_checkpoint:
+        mode: "full"
+        selective_ac_option: "op"
+        early_stop: false
+
+      compile:
+        enable: false
+        components: ["loss"]
+
+      primus_turbo:
+        enable_primus_turbo: true
+        use_turbo_mx_linear: false
+        use_turbo_float8_linear: false
+        enable_attention_float8: false
+        use_turbo_grouped_mm: true
+        use_moe_fp8: false
+        use_classic_attention: true

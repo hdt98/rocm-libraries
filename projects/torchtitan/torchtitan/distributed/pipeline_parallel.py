@@ -10,7 +10,10 @@ from collections.abc import Callable
 
 import torch
 import torch.nn as nn
-from torch.distributed._mesh_layout import _MeshLayout
+try:
+    from torch.distributed._mesh_layout import _MeshLayout
+except ModuleNotFoundError:
+    _MeshLayout = object
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.pipelining import PipelineStage
 from torch.distributed.pipelining.schedules import (

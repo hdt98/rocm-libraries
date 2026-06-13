@@ -1,0 +1,213 @@
+target:
+  name: torchtitan_deepseek_v4_flash_4layer_bf16_4x8xmi350_canary
+  status: direct_4x8x_training_passed_bounded_sparse_mla_li_smoke_passed_fused_sparse_kernel_pending
+  execution_path: direct_torchtitan_torchrun
+  model_family: deepseek-v4
+  model_name: DeepSeek-V4-Flash-FP8-4layer
+  training_precision: bf16
+  purpose: >-
+    Small real-identity DeepSeek-V4-Flash canary for 4xMI350 first, then
+    8xMI350. This is the canary target. It must not be substituted with
+    deepseek_v3/train_configs/deepseek_v3_16b.toml or any DeepSeek-V3 16B
+    proxy config.
+  explicitly_not:
+    - primus_wrapped_execution
+    - deepseek_v3_16b_proxy
+    - renamed_deepseek_v3_config
+
+source_references:
+  miles_deepseek_v4_pr1045:
+    runner: sources/references/miles-deepseek-v4-pr1045/scripts/run_deepseek_v4.py
+    model_args: sources/references/miles-deepseek-v4-pr1045/scripts/models/deepseek-v4-flash.sh
+    four_layer_override: sources/references/miles-deepseek-v4-pr1045/scripts/models/deepseek-v4-flash-4layer.sh
+    reference_model_name: DeepSeek-V4-Flash-FP8-4layer
+    reference_org: Pinaster
+    note: >-
+      The reference labels the 4-layer prune as pipeline-only sanity/smoke
+      coverage. For AMD it is still useful because it preserves DeepSeek-V4
+      attention, routing, and MoE model identity while fitting a single node.
+  ascend_torchtitan_npu:
+    recipe: sources/references/ascend-cann-recipes-train/llm_pretrain/deepseekv4
+    report: sources/references/ascend-cann-recipes-train/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md
+    full_flash_shape: TP1_PP1_VPP1_EP128_FSDP128_MBS1_GBS1024_S4096_layers43
+
+model_contract:
+  flavor: flash_4layer
+  full_model_layers: 43
+  canary_layers: 4
+  all_layers_are_moe: true
+  hidden_size: 4096
+  ffn_hidden_size: 2048
+  vocab_size: 129280
+  num_attention_heads: 64
+  normalization: RMSNorm
+  norm_epsilon: 1.0e-6
+  dropout: 0.0
+  attention:
+    type: dsv4_sparse_mla
+    q_lora_rank: 1024
+    kv_lora_rank: 512
+    qk_head_dim: 512
+    qk_pos_emb_head_dim: 64
+    v_head_dim: 512
+    qk_layernorm: true
+    rotary_scaling_factor: 16
+    rotary_base: 10000
+    original_max_position_embeddings: 65536
+    beta_fast: 32
+    beta_slow: 1
+    attention_softmax_in_fp32: true
+    compress_ratios_4layer: [0, 0, 4, 128]
+    compress_rope_theta: 160000
+    hc_mult: 4
+    hc_sinkhorn_iters: 20
+    o_groups: 8
+    o_lora_rank: 1024
+    n_hash_layers: 3
+    window_size: 128
+  dsa_indexer:
+    n_heads: 64
+    head_dim: 128
+    topk: 512
+  moe:
+    num_experts: 256
+    moe_ffn_hidden_size: 2048
+    router_topk: 6
+    shared_expert_intermediate_size: 2048
+    router_pre_softmax: true
+    router_score_function: sqrtsoftplus
+    router_enable_expert_bias: true
+    router_load_balancing_type: seq_aux_loss
+    router_aux_loss_coeff: 0
+    router_topk_scaling_factor: 1.5
+    token_dispatcher_type: alltoall
+    grouped_gemm: true
+  activation:
+    swiglu: true
+    activation_func_clamp_value: 10
+    bias_swiglu_fusion: false
+    activation_func_clamp_shared_expert: false
+
+parallel_targets:
+  four_gpu:
+    hardware: 4xMI350
+    tp: 1
+    pp: 1
+    cp: 1
+    fsdp: 4
+    ep: 4
+    expert_tensor_parallel: 1
+    mbs: 1
+    gbs: 64
+    seq_len: 4096
+    tokens_per_step: 262144
+    target_tflops_per_gpu: 277.0
+    derived_target_tokens_per_gpu_s_using_retained_flop_accounting: 14640.28
+    derived_target_node_tokens_per_s: 58561.13
+    derived_target_step_time_s: 4.48
+  eight_gpu:
+    hardware: 8xMI350
+    tp: 1
+    pp: 1
+    cp: 1
+    fsdp: 8
+    ep: 8
+    expert_tensor_parallel: 1
+    mbs: 1
+    gbs: 128
+    seq_len: 4096
+    tokens_per_step: 524288
+    target_tflops_per_gpu: 277.0
+    derived_target_tokens_per_gpu_s_using_retained_flop_accounting: 14640.28
+    derived_target_node_tokens_per_s: 117122.26
+    derived_target_step_time_s: 4.48
+
+training_contract:
+  data: mock_or_small_token_data_for_first_canary
+  optimizer: AdamW
+  activation_checkpoint: full
+  compile: disabled_until_correctness_and_pg_trace_are_stable
+  required_behaviors:
+    - learned_routing
+    - ep_token_dispatch_return
+    - ep_comm_compute_overlap
+    - fsdp_sharded_non_expert_parameters
+    - gradient_accumulation
+    - optimizer_step
+    - full_state_checkpoint_save_resume
+    - loss_or_health_metric_movement
+
+torchtitan_materialization_required:
+  module: torchtitan.models.deepseek_v4
+  config_registry_flavor: deepseek_v4_flash_4layer
+  model_spec_name: deepseek_v4
+  train_config_name: deepseek_v4_flash_4layer_bf16_canary
+  direct_entrypoint: torchtitan/train.py
+  launch_rule: >-
+    Use python3 -m torch.distributed.run/torchrun directly with PYTHONPATH
+    pointing at the selected TorchTitan checkout. Do not go through primus-cli.
+  minimum_port_items:
+    - DeepSeek-V4 Flash model config and layer builder
+    - DSV4 sparse MLA/indexer modules or a correctness-preserving PyTorch fallback
+    - sqrtsoftplus router with expert bias and top-k 6
+    - all-to-all EP token dispatcher wired to the EP DeviceMesh
+    - MORI EP dispatch/combine overlap path or a measured PyTorch all-to-all baseline exception
+    - FSDP/EP ProcessGroup separation verified by pg-probe
+    - HF/config adapter for model_type deepseek_v4 or deepseek_ref compatibility
+
+ep_overlap_contract:
+  preferred_backend: mori
+  reference: sources/references/mori
+  reference_commit: 5dd02d6815e9113381a72f6de6b22034fc09b5a3
+  first_target: single_node_ep8_intranode
+  desired_overlap_shape:
+    - dispatch_send_recv_overlap
+    - grouped_expert_gemm_produces_tile_ready_output
+    - combine_consumes_registered_buffer_before_whole_output_completion
+    - comet_style_tbo_overlap_where_practical
+  current_status: reference_imported_standalone_tile_ready_probe_passed_torchtitan_training_integration_pending
+  current_artifact: run_artifacts/mori_ep_overlap_reference_20260601.json
+  current_training_gap: >-
+    TorchTitan currently uses PyTorch all_to_all_single_autograd in
+    AllToAllTokenDispatcher. MORI's public Python dispatch/combine API is not a
+    drop-in autograd replacement for training yet, so the next implementation
+    step is an autograd-safe Mori dispatcher plus a grouped-GEMM output path
+    that writes MORI's registered combine buffer.
+
+current_blockers:
+  - >-
+    The local TorchTitan WIP now has a structural torchtitan.models.deepseek_v4
+    module, config registry, and bounded PyTorch sparse MLA/LightningIndexer
+    path for compressed layers at short sequence. The remaining attention
+    blocker is replacing that materializing correctness fallback with a fused
+    sparse MLA/indexer kernel that can run the target S=4096 canary.
+  - >-
+    The pure ROCm/PyTorch 2.9.1 image is too bare for TorchTitan deps, and the
+    non-Primus PyTorch 2.9.1 TorchTitan image lacks the WIP source's newer
+    torch.distributed._mesh_layout API. The working source/config check uses
+    onenexus/nexus-titan:rocm722-pytorch-nightly.
+  - >-
+    The direct 4xMI350 canary completed two steps. After deleting generated
+    step-1 and partial step-3 checkpoint payloads while preserving step-2, the
+    resume run loaded step-2, advanced to step 3, saved a final step-3
+    checkpoint in a run-scoped dump folder, and completed training. Checkpoint
+    footprint management is still required before more remote runs because the
+    filesystem remained about 95% full after the verified resume-save.
+  - >-
+    The selected non-Primus runtime now has direct 4xMI350 FSDP/EP process-group
+    and 8xMI350 evidence with distinct FSDP and EP ProcessGroup objects. The
+    remaining distributed gates are the final sparse-MLA path and MORI
+    comm/compute overlap in the training path.
+
+acceptance_gates:
+  - direct_torchrun_command_does_not_invoke_primus_cli
+  - canary_config_model_family_is_deepseek_v4
+  - config_or_registry_does_not_reference_deepseek_v3_16b
+  - fsdp_ep_pg_probe_reports_fsdp_group_is_ep_group_false_on_all_ranks
+  - two_or_more_training_steps_complete_on_4xmi350
+  - full_state_checkpoint_resume_advances_one_step
+  - resumed_final_checkpoint_save_completes_after_disk_cleanup
+  - metrics_record_loss_or_health_movement_and_throughput
+  - mori_ep_overlap_path_or_measured_non_overlap_exception
+
+dependency_pin_changes: []

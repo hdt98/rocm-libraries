@@ -12,15 +12,28 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.distributed.device_mesh import DeviceMesh
 from torch.distributed.tensor import DTensor, Shard
-from torch.distributed.tensor.experimental._attention import (
-    _context_parallel_shard,
-    _enable_context_parallel_dispatcher,
-    _HeadTailLoadBalancer,
-    _PTRRLoadBalancer,
-)
-from torch.distributed.tensor.experimental._context_parallel._attention import (
-    flex_cp_allgather,
-)
+try:
+    from torch.distributed.tensor.experimental._attention import (
+        _context_parallel_shard,
+        _enable_context_parallel_dispatcher,
+        _HeadTailLoadBalancer,
+        _PTRRLoadBalancer,
+    )
+    from torch.distributed.tensor.experimental._context_parallel._attention import (
+        flex_cp_allgather,
+    )
+except ImportError:
+
+    def _context_parallel_unavailable(*args, **kwargs):
+        raise RuntimeError(
+            "context parallel attention helpers are unavailable in this PyTorch build"
+        )
+
+    _context_parallel_shard = _context_parallel_unavailable
+    _enable_context_parallel_dispatcher = _context_parallel_unavailable
+    _HeadTailLoadBalancer = _context_parallel_unavailable
+    _PTRRLoadBalancer = _context_parallel_unavailable
+    flex_cp_allgather = _context_parallel_unavailable
 from torch.nn.attention.flex_attention import BlockMask
 
 from torchtitan.models.common.attention import (

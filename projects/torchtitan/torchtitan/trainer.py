@@ -7,8 +7,10 @@
 import dataclasses
 import json
 import os
+import sys
 import time
 from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import timedelta
 from typing import Annotated, Any, cast
@@ -45,6 +47,13 @@ from torchtitan.distributed.context_parallel import prepare_context_parallel_inp
 
 from torchtitan.models.common.attention import FlexAttention, VarlenAttention
 from torchtitan.models.common.decoder import Decoder
+from torchtitan.models.common.dsv4_profile_timing import (
+    Dsv4AdditiveStepTimer,
+    clear_dsv4_module_backward_timing,
+    dsv4_execution_region,
+    dsv4_nvtx_range,
+    flush_dsv4_module_backward_timing,
+)
 from torchtitan.observability import structured_logger as sl
 from torchtitan.protocols import BaseModel
 from torchtitan.protocols.model_spec import ModelSpec
@@ -188,6 +197,79 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
     step: int
     ntokens_seen: int
 
+    @contextmanager
+    def _dsv4_additive_phase(self, name: str, **meta: Any):
+        timer = getattr(self, "_dsv4_additive_timer", None)
+        with dsv4_nvtx_range(f"dsv4.phase.{name}"):
+            if timer is None:
+                yield
+                return
+            with timer.phase(name, **meta):
+                yield
+
+    @staticmethod
+    def _dsv4_env_flag(name: str, default: bool = False) -> bool:
+        value = os.environ.get(name)
+        if value is None or value == "":
+            return default
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+
+    def _dsv4_maybe_scan_nonfinite_grads(self) -> None:
+        path = os.environ.get("TORCHTITAN_DSV4_GRAD_NONFINITE_SCAN_PATH", "").strip()
+        if not path:
+            return
+        max_steps = int(
+            os.environ.get("TORCHTITAN_DSV4_GRAD_NONFINITE_SCAN_MAX_STEPS", "1")
+        )
+        if max_steps >= 0 and self.step > max_steps:
+            return
+
+        rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
+        record: dict[str, Any] = {
+            "rank": rank,
+            "step": self.step,
+            "event": "pre_clip_grad_nonfinite_scan",
+            "checked_grads": 0,
+            "none_grads": 0,
+            "first_nonfinite": None,
+        }
+        for module_idx, module in enumerate(self.model_parts):
+            for name, param in module.named_parameters():
+                grad = param.grad
+                if grad is None:
+                    record["none_grads"] += 1
+                    continue
+                record["checked_grads"] += 1
+                local_grad = grad.to_local() if isinstance(grad, DTensor) else grad
+                if bool(torch.isfinite(local_grad).all().item()):
+                    continue
+
+                nan_count = int(torch.isnan(local_grad).sum().item())
+                posinf_count = int(torch.isposinf(local_grad).sum().item())
+                neginf_count = int(torch.isneginf(local_grad).sum().item())
+                finite = local_grad[torch.isfinite(local_grad)]
+                finite_abs_max = (
+                    float(finite.abs().max().item()) if finite.numel() > 0 else None
+                )
+                record["first_nonfinite"] = {
+                    "module_idx": module_idx,
+                    "parameter": name,
+                    "grad_type": type(grad).__name__,
+                    "local_shape": list(local_grad.shape),
+                    "dtype": str(local_grad.dtype),
+                    "nan_count": nan_count,
+                    "posinf_count": posinf_count,
+                    "neginf_count": neginf_count,
+                    "finite_abs_max": finite_abs_max,
+                }
+                break
+            if record["first_nonfinite"] is not None:
+                break
+
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+
     # Enable debug tracing on failure: https://pytorch.org/docs/stable/elastic/errors.html
     @record
     def __init__(self, config: Config):
@@ -234,11 +316,14 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
         self.tokenizer = config.tokenizer.build(tokenizer_path=config.hf_assets_path)
 
         # build dataloader
+        dataloader_seq_len = config.training.seq_len + max(
+            0, int(getattr(config.training, "num_mtp_modules", 0))
+        )
         self.dataloader = config.dataloader.build(
             dp_world_size=batch_degree,
             dp_rank=batch_rank,
             tokenizer=self.tokenizer,
-            seq_len=config.training.seq_len,
+            seq_len=dataloader_seq_len,
             local_batch_size=config.training.local_batch_size,
         )
 
@@ -302,6 +387,9 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
         self.loss_fn = config.loss.build(
             compile_config=config.compile,
         )
+        set_mtp_loss_weight = getattr(self.loss_fn, "set_mtp_loss_weight", None)
+        if callable(set_mtp_loss_weight):
+            set_mtp_loss_weight(config.training.mtp_loss_weight)
 
         # verify batch sizes
         global_batch_size = config.training.global_batch_size
@@ -487,7 +575,7 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
                 loss_fn=self.loss_fn,
                 validation_context=self.train_context,
                 metrics_processor=self.metrics_processor,
-                seq_len=config.training.seq_len,
+                seq_len=dataloader_seq_len,
                 local_batch_size=config.training.local_batch_size,
                 pp_schedule=pp_schedule,
                 pp_has_first_stage=pp_has_first_stage,
@@ -647,9 +735,10 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
         model_parts = self.model_parts
         parallel_dims = self.parallel_dims
 
-        inputs, labels, extra_inputs, extra_kwargs = self.post_dataloading_process(
-            input_dict, labels
-        )
+        with self._dsv4_additive_phase("forward_backward.post_dataloading_process"):
+            inputs, labels, extra_inputs, extra_kwargs = self.post_dataloading_process(
+                input_dict, labels
+            )
 
         if parallel_dims.pp_enabled:
             # Pipeline Parallel forward / backward inside step() call
@@ -658,24 +747,25 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
                 targets, losses = (
                     (labels, []) if self.pp_has_last_stage else (None, None)
                 )
-                if self.pp_has_first_stage:
-                    self.pp_schedule.step(
-                        inputs,
-                        **extra_inputs,
-                        **extra_kwargs,
-                        target=targets,
-                        losses=losses,
-                        loss_kwargs=loss_kwargs,
-                        return_outputs=False,
-                    )
-                else:
-                    self.pp_schedule.step(
-                        **extra_kwargs,
-                        target=targets,
-                        losses=losses,
-                        loss_kwargs=loss_kwargs,
-                        return_outputs=False,
-                    )
+                with self._dsv4_additive_phase("forward_backward.pipeline_step"):
+                    if self.pp_has_first_stage:
+                        self.pp_schedule.step(
+                            inputs,
+                            **extra_inputs,
+                            **extra_kwargs,
+                            target=targets,
+                            losses=losses,
+                            loss_kwargs=loss_kwargs,
+                            return_outputs=False,
+                        )
+                    else:
+                        self.pp_schedule.step(
+                            **extra_kwargs,
+                            target=targets,
+                            losses=losses,
+                            loss_kwargs=loss_kwargs,
+                            return_outputs=False,
+                        )
 
             # accumulate losses across pipeline microbatches
             # TODO: PP+FSDP unexpectedly puts the loss back to the CPU
@@ -688,8 +778,13 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
         else:
             # Non-PP forward / backward
             assert len(model_parts) == 1
-            with self.train_context():
-                pred = model_parts[0](inputs, **extra_inputs, **extra_kwargs)
+            train_context = self.train_context()
+            with self._dsv4_additive_phase("forward_backward.train_context_enter"):
+                train_context.__enter__()
+            try:
+                with dsv4_execution_region("forward"):
+                    with self._dsv4_additive_phase("forward_backward.model_forward"):
+                        pred = model_parts[0](inputs, **extra_inputs, **extra_kwargs)
                 # Under non-full_dtensor, labels stay as plain tensors. See
                 # ``cross_entropy_loss`` for why pred must also be plain.
                 # Remove once non-full_dtensor is no longer supported.
@@ -698,20 +793,79 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
                     and not self.config.parallelism.full_dtensor
                     and self.config.parallelism.disable_loss_parallel
                 ):
-                    pred = pred.to_local()
-                loss = self.loss_fn(pred, labels, global_valid_tokens)
-                del pred
-                loss.backward()
+                    with self._dsv4_additive_phase("forward_backward.pred_to_local"):
+                        pred = pred.to_local()
+                else:
+                    with self._dsv4_additive_phase("forward_backward.pred_to_local"):
+                        pass
+                with dsv4_execution_region("loss"):
+                    with self._dsv4_additive_phase("forward_backward.loss"):
+                        loss = self.loss_fn(pred, labels, global_valid_tokens)
+                with self._dsv4_additive_phase("forward_backward.drop_pred"):
+                    del pred
+                with dsv4_execution_region("backward"):
+                    with self._dsv4_additive_phase("forward_backward.backward"):
+                        clear_dsv4_module_backward_timing()
+                        loss.backward()
+                        flush_dsv4_module_backward_timing(
+                            {
+                                "step": self.step,
+                                "sequence_length": self.config.training.seq_len,
+                                "global_batch_size": (
+                                    self.config.training.global_batch_size
+                                ),
+                                "local_batch_size": (
+                                    self.config.training.local_batch_size
+                                ),
+                                "gradient_accumulation_steps": (
+                                    self.gradient_accumulation_steps
+                                ),
+                            }
+                        )
+            except BaseException:
+                exc_info = sys.exc_info()
+                with self._dsv4_additive_phase("forward_backward.train_context_exit"):
+                    train_context.__exit__(*exc_info)
+                raise
+            else:
+                with self._dsv4_additive_phase("forward_backward.train_context_exit"):
+                    train_context.__exit__(None, None, None)
+
+        with self._dsv4_additive_phase("forward_backward.post_backward_finalize"):
+            pass
+
+        with self._dsv4_additive_phase("forward_backward.release_tensors"):
+            del inputs, labels, extra_inputs, extra_kwargs
 
         # The returned loss here is local SUM loss / global_valid_tokens
-        return loss
+        with self._dsv4_additive_phase("forward_backward.return_loss"):
+            return_detached_loss = self._dsv4_env_flag(
+                "TORCHTITAN_DSV4_RETURN_DETACHED_LOSS"
+            )
+            returned_loss = loss.detach() if return_detached_loss else loss
+
+        if self._dsv4_env_flag("TORCHTITAN_DSV4_RETAIN_ORIGINAL_LOSS_AFTER_BACKWARD"):
+            with self._dsv4_additive_phase("forward_backward.retain_original_loss"):
+                retained_losses = getattr(self, "_dsv4_retained_original_losses", None)
+                if retained_losses is None:
+                    retained_losses = []
+                    self._dsv4_retained_original_losses = retained_losses
+                retained_losses.append(loss)
+
+        if self._dsv4_env_flag("TORCHTITAN_DSV4_DROP_ORIGINAL_LOSS_BEFORE_RETURN"):
+            with self._dsv4_additive_phase("forward_backward.drop_original_loss"):
+                del loss
+
+        return returned_loss
 
     def train_step(
         self, data_iterator: Iterator[tuple[dict[str, torch.Tensor], torch.Tensor]]
     ):
-        self.optimizers.zero_grad()
+        with self._dsv4_additive_phase("train_step.zero_grad"):
+            self.optimizers.zero_grad()
         # Save the current step learning rate for logging
-        lr = self.lr_schedulers.schedulers[0].get_last_lr()[0]
+        with self._dsv4_additive_phase("train_step.lr_read"):
+            lr = self.lr_schedulers.schedulers[0].get_last_lr()[0]
 
         # Keep these variables local to shorten the code as these are
         # the major variables that are used in the training loop.
@@ -720,101 +874,145 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
         # Collect all microbatches on CPU and count total valid tokens
         microbatches = []
         local_valid_tokens = torch.tensor(0, dtype=torch.int64)
-        for _microbatch in range(self.gradient_accumulation_steps):
-            with sl.log_trace_span("fetching_batch"):
-                input_dict, labels = next(data_iterator)
-                local_valid_tokens += (labels != IGNORE_INDEX).sum()
-                microbatches.append((input_dict, labels))
+        with self._dsv4_additive_phase("train_step.fetch_microbatches"):
+            for _microbatch in range(self.gradient_accumulation_steps):
+                with sl.log_trace_span("fetching_batch"):
+                    input_dict, labels = next(data_iterator)
+                    num_mtp_modules = max(
+                        0, int(getattr(self.config.training, "num_mtp_modules", 0))
+                    )
+                    main_labels = (
+                        labels[:, :-num_mtp_modules]
+                        if num_mtp_modules > 0
+                        else labels
+                    )
+                    local_valid_tokens += (main_labels != IGNORE_INDEX).sum()
+                    microbatches.append((input_dict, labels))
         sl.log_trace_scalar({"local_valid_tokens": int(local_valid_tokens)})
 
         # All-reduce to get global token count across DP ranks
         # Move to GPU for distributed communication
-        local_valid_tokens = local_valid_tokens.to(self.device)
+        with self._dsv4_additive_phase("train_step.valid_tokens_to_device"):
+            local_valid_tokens = local_valid_tokens.to(self.device)
         if parallel_dims.dp_enabled:
             batch_mesh = parallel_dims.get_mesh("batch")
-            global_valid_tokens = dist_utils.dist_sum(local_valid_tokens, batch_mesh)
+            with self._dsv4_additive_phase("train_step.valid_tokens_all_reduce"):
+                global_valid_tokens = dist_utils.dist_sum(
+                    local_valid_tokens, batch_mesh
+                )
         else:
             global_valid_tokens = local_valid_tokens.float()
 
         # Process each microbatch: move to GPU, forward/backward, then free
         accumulated_losses = []
-        for input_dict, labels in microbatches:
+        for microbatch_idx, (input_dict, labels) in enumerate(microbatches):
             # Move tensors to GPU
-            for k, v in input_dict.items():
-                if isinstance(v, torch.Tensor):
-                    input_dict[k] = v.to(self.device)
-            labels = labels.to(self.device)
+            with self._dsv4_additive_phase(
+                "train_step.microbatch_h2d", microbatch=microbatch_idx
+            ):
+                for k, v in input_dict.items():
+                    if isinstance(v, torch.Tensor):
+                        input_dict[k] = v.to(self.device)
+                labels = labels.to(self.device)
 
-            loss = self.forward_backward_step(
-                input_dict=input_dict,
-                labels=labels,
-                # pyrefly: ignore [bad-argument-type]
-                global_valid_tokens=global_valid_tokens,
-            )
-            accumulated_losses.append(loss.detach())
+            with dsv4_execution_region("microbatch", microbatch_idx):
+                with self._dsv4_additive_phase(
+                    "train_step.microbatch_forward_backward",
+                    microbatch=microbatch_idx,
+                ):
+                    with self._dsv4_additive_phase(
+                        "train_step.forward_backward_call",
+                        microbatch=microbatch_idx,
+                    ):
+                        loss = self.forward_backward_step(
+                            input_dict=input_dict,
+                            labels=labels,
+                            # pyrefly: ignore [bad-argument-type]
+                            global_valid_tokens=global_valid_tokens,
+                        )
+                    with self._dsv4_additive_phase(
+                        "train_step.forward_backward_call_returned",
+                        microbatch=microbatch_idx,
+                    ):
+                        pass
+            with self._dsv4_additive_phase(
+                "train_step.loss_detach_append", microbatch=microbatch_idx
+            ):
+                accumulated_losses.append(loss.detach())
 
         with sl.log_trace_span("optim"):
-            grad_norm = dist_utils.clip_grad_norm_(
-                [p for m in self.model_parts for p in m.parameters()],
-                self.config.training.max_norm,
-                foreach=True,
-                pp_mesh=parallel_dims.get_optional_mesh("pp"),
-                ep_enabled=parallel_dims.ep_enabled,
-            )
-            self.checkpointer.maybe_wait_for_staging()
-            self.optimizers.step()
-            self.lr_schedulers.step()
+            with self._dsv4_additive_phase("train_step.grad_nonfinite_scan"):
+                self._dsv4_maybe_scan_nonfinite_grads()
+            with self._dsv4_additive_phase("train_step.grad_clip"):
+                grad_norm = dist_utils.clip_grad_norm_(
+                    [p for m in self.model_parts for p in m.parameters()],
+                    self.config.training.max_norm,
+                    foreach=True,
+                    pp_mesh=parallel_dims.get_optional_mesh("pp"),
+                    ep_enabled=parallel_dims.ep_enabled,
+                )
+            with self._dsv4_additive_phase("train_step.checkpoint_wait_for_staging"):
+                self.checkpointer.maybe_wait_for_staging()
+            with self._dsv4_additive_phase("train_step.optimizer_step"):
+                self.optimizers.step()
+            with self._dsv4_additive_phase("train_step.lr_scheduler_step"):
+                self.lr_schedulers.step()
 
         # Reduce the data collected over gradient accumulation steps.
-        loss = torch.sum(torch.stack(accumulated_losses))
+        with self._dsv4_additive_phase("train_step.accumulated_loss_reduce"):
+            loss = torch.sum(torch.stack(accumulated_losses))
 
         # log metrics
         if not self.metrics_processor.should_log(self.step):
             return
 
-        with sl.log_trace_span("collect_dist_metrics"):
+        with self._dsv4_additive_phase("train_step.collect_dist_metrics"):
+            with sl.log_trace_span("collect_dist_metrics"):
 
-            sl.log_trace_scalar({"global_valid_tokens": int(global_valid_tokens)})
+                sl.log_trace_scalar({"global_valid_tokens": int(global_valid_tokens)})
 
-            if parallel_dims.dp_cp_enabled:
-                loss = loss.detach()
-                loss_mesh = parallel_dims.get_optional_mesh("loss")
+                if parallel_dims.dp_cp_enabled:
+                    loss = loss.detach()
+                    loss_mesh = parallel_dims.get_optional_mesh("loss")
 
-                # For global_avg_loss, we want the average loss across all ranks:
-                # loss = local_loss_sum / global_valid_tokens
-                # global_avg_loss = sum(local_loss_sum) / global_valid_tokens
-                #                 = sum(loss)
-                #
-                # For global_max_loss, we want the max of local average losses across ranks:
-                # local_avg_loss = local_loss_sum / local_valid_tokens
-                #                = (loss * global_valid_tokens) / local_valid_tokens
-                # global_max_loss = max(local_avg_loss)
-                local_avg_loss = loss * global_valid_tokens / local_valid_tokens
-                global_avg_loss, global_max_loss, global_ntokens_seen = (
-                    dist_utils.dist_sum(loss, loss_mesh),
-                    dist_utils.dist_max(local_avg_loss, loss_mesh),
-                    dist_utils.dist_sum(
-                        torch.tensor(
-                            self.ntokens_seen, dtype=torch.int64, device=self.device
+                    # For global_avg_loss, we want the average loss across all ranks:
+                    # loss = local_loss_sum / global_valid_tokens
+                    # global_avg_loss = sum(local_loss_sum) / global_valid_tokens
+                    #                 = sum(loss)
+                    #
+                    # For global_max_loss, we want the max of local average losses across ranks:
+                    # local_avg_loss = local_loss_sum / local_valid_tokens
+                    #                = (loss * global_valid_tokens) / local_valid_tokens
+                    # global_max_loss = max(local_avg_loss)
+                    local_avg_loss = loss * global_valid_tokens / local_valid_tokens
+                    global_avg_loss, global_max_loss, global_ntokens_seen = (
+                        dist_utils.dist_sum(loss, loss_mesh),
+                        dist_utils.dist_max(local_avg_loss, loss_mesh),
+                        dist_utils.dist_sum(
+                            torch.tensor(
+                                self.ntokens_seen,
+                                dtype=torch.int64,
+                                device=self.device,
+                            ),
+                            loss_mesh,
                         ),
-                        loss_mesh,
-                    ),
-                )
-            else:
-                global_avg_loss = global_max_loss = float(loss.detach().item())
-                global_ntokens_seen = self.ntokens_seen
+                    )
+                else:
+                    global_avg_loss = global_max_loss = float(loss.detach().item())
+                    global_ntokens_seen = self.ntokens_seen
 
         extra_metrics = {
             "n_tokens_seen": global_ntokens_seen,
             "lr": lr,
         }
-        self.metrics_processor.log(
-            self.step,
-            global_avg_loss,
-            global_max_loss,
-            float(grad_norm.item()),
-            extra_metrics=extra_metrics,
-        )
+        with self._dsv4_additive_phase("train_step.metrics_log"):
+            self.metrics_processor.log(
+                self.step,
+                global_avg_loss,
+                global_max_loss,
+                float(grad_norm.item()),
+                extra_metrics=extra_metrics,
+            )
 
     @record
     def train(self):
@@ -837,41 +1035,86 @@ class Trainer(torch.distributed.checkpoint.stateful.Stateful, Configurable):
             data_iterator = self.batch_generator(self.dataloader)
             while self.should_continue_training():
                 self.step += 1
-                sl.set_step(self.step, relative_step=self.step - loaded_step)
+                relative_step = self.step - loaded_step
+                sl.set_step(self.step, relative_step=relative_step)
+                self._dsv4_additive_timer = Dsv4AdditiveStepTimer(
+                    step=self.step,
+                    relative_step=relative_step,
+                    meta={
+                        "local_batch_size": config.training.local_batch_size,
+                        "global_batch_size": config.training.global_batch_size,
+                        "sequence_length": config.training.seq_len,
+                        "gradient_accumulation_steps": self.gradient_accumulation_steps,
+                        "parallelism": {
+                            "dp_replicate": self.parallel_dims.dp_replicate,
+                            "dp_shard": self.parallel_dims.dp_shard,
+                            "cp": self.parallel_dims.cp,
+                            "tp": self.parallel_dims.tp,
+                            "pp": self.parallel_dims.pp,
+                            "ep": self.parallel_dims.ep,
+                        },
+                        "activation_checkpoint_mode": config.activation_checkpoint.mode,
+                        "return_detached_loss": self._dsv4_env_flag(
+                            "TORCHTITAN_DSV4_RETURN_DETACHED_LOSS"
+                        ),
+                        "drop_original_loss_before_return": self._dsv4_env_flag(
+                            "TORCHTITAN_DSV4_DROP_ORIGINAL_LOSS_BEFORE_RETURN"
+                        ),
+                        "retain_original_loss_after_backward": self._dsv4_env_flag(
+                            "TORCHTITAN_DSV4_RETAIN_ORIGINAL_LOSS_AFTER_BACKWARD"
+                        ),
+                        "checkpoint_enabled": config.checkpoint.enable,
+                    },
+                )
+                self._dsv4_additive_timer.start()
+                step_outcome = "started"
 
-                with sl.log_trace_span("step"):
-                    self.gc_handler.run(self.step)
+                try:
+                    with sl.log_trace_span("step"):
+                        with self._dsv4_additive_phase("step.gc"):
+                            self.gc_handler.run(self.step)
 
-                    try:
-                        self.train_step(data_iterator)
-                    except DataloaderExhaustedError:
-                        logger.warning("Ran out of data; last step was canceled.")
-                        break
+                        try:
+                            with self._dsv4_additive_phase("step.train_step"):
+                                self.train_step(data_iterator)
+                        except DataloaderExhaustedError:
+                            step_outcome = "dataloader_exhausted"
+                            logger.warning("Ran out of data; last step was canceled.")
+                            break
 
-                    self.checkpointer.save(
-                        self.step,
-                        last_step=(self.step == config.training.steps),
-                    )
+                        with self._dsv4_additive_phase("step.checkpoint_save"):
+                            self.checkpointer.save(
+                                self.step,
+                                last_step=(self.step == config.training.steps),
+                            )
 
-                    # Run validation if validator is available
-                    if self.config.validator.enable and self.validator.should_validate(
-                        self.step
-                    ):
-                        self.validator.validate(self.model_parts, self.step)
+                        # Run validation if validator is available
+                        if (
+                            self.config.validator.enable
+                            and self.validator.should_validate(self.step)
+                        ):
+                            with self._dsv4_additive_phase("step.validation"):
+                                self.validator.validate(self.model_parts, self.step)
 
-                    # signal the profiler that the next profiling step has started
-                    profiler.step()
+                        # signal the profiler that the next profiling step has started
+                        with self._dsv4_additive_phase("step.profiler_step"):
+                            profiler.step()
 
-                    # Reduce timeout after the first train step of THIS process
-                    # (assuming lazy init and compilation are finished). Use the
-                    # relative step so this fires on resumed runs too.
-                    if self.step - loaded_step == 1:
-                        dist_utils.set_pg_timeouts(
-                            timeout=timedelta(
-                                seconds=config.comm.train_timeout_seconds
-                            ),
-                            parallel_dims=self.parallel_dims,
-                        )
+                        # Reduce timeout after the first train step of THIS process
+                        # (assuming lazy init and compilation are finished). Use the
+                        # relative step so this fires on resumed runs too.
+                        if relative_step == 1:
+                            with self._dsv4_additive_phase("step.set_pg_timeouts"):
+                                dist_utils.set_pg_timeouts(
+                                    timeout=timedelta(
+                                        seconds=config.comm.train_timeout_seconds
+                                    ),
+                                    parallel_dims=self.parallel_dims,
+                                )
+                        step_outcome = "completed"
+                finally:
+                    self._dsv4_additive_timer.finish({"step_outcome": step_outcome})
+                    self._dsv4_additive_timer = None
 
         if torch.distributed.get_rank() == 0:
             logger.info("Sleeping 2 seconds for other ranks to complete")

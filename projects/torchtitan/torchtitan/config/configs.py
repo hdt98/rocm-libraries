@@ -37,6 +37,12 @@ class TrainingConfig:
     seq_len: int = 2048
     """Sequence length"""
 
+    num_mtp_modules: int = 0
+    """Number of multi-token-prediction modules. DeepSeek-V4 Flash uses 1."""
+
+    mtp_loss_weight: float = 0.3
+    """Weight applied to the averaged MTP loss."""
+
     max_norm: float | int = 1.0
     """Max norm for gradient clipping"""
 

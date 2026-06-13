@@ -29,6 +29,7 @@ from torchtitan.models.common.token_dispatcher import (
     DeepEPTokenDispatcher,
     HybridEPTokenDispatcher,
     LocalTokenDispatcher,
+    MoriEPTokenDispatcher,
 )
 from torchtitan.protocols.module import Module
 
@@ -169,11 +170,13 @@ def make_router_config(
     num_experts: int,
     gate_param_init: dict[str, Callable],
     top_k: int = 1,
-    score_func: Literal["sigmoid", "softmax"] = "sigmoid",
+    score_func: Literal["sigmoid", "softmax", "sqrtsoftplus"] = "sigmoid",
     route_norm: bool = False,
     route_scale: float = 1.0,
     num_expert_groups: int | None = None,
     num_limited_groups: int | None = None,
+    hash_routing_vocab_size: int | None = None,
+    hash_routing_chunk_size: int = 8192,
     bias: bool = False,
 ) -> TokenChoiceTopKRouter.Config:
     """Build a fully-specified TokenChoiceTopKRouter.Config."""
@@ -191,6 +194,8 @@ def make_router_config(
         route_scale=route_scale,
         num_expert_groups=num_expert_groups,
         num_limited_groups=num_limited_groups,
+        hash_routing_vocab_size=hash_routing_vocab_size,
+        hash_routing_chunk_size=hash_routing_chunk_size,
     )
 
 
@@ -209,6 +214,8 @@ def make_token_dispatcher_config(
       dispatch when EP=1, i.e. ep_mesh is None at runtime)
     - "deepep": Uses DeepEP custom kernels for H100/NVLink Switch
     - "hybridep": Uses HybridEP with TMA optimization for GB200/NVLink72
+    - "mori": Selects the guarded AMD MORI EP boundary. This is a config
+      contract only until the training-safe autograd wrapper is implemented.
 
     DeepEP/HybridEP requires installation:
     https://github.com/deepseek-ai/DeepEP
@@ -230,6 +237,12 @@ def make_token_dispatcher_config(
             score_before_experts=score_before_experts,
             non_blocking_capacity_factor=non_blocking_capacity_factor,
         )
+    elif comm_backend == "mori":
+        return MoriEPTokenDispatcher.Config(
+            num_experts=num_experts,
+            top_k=top_k,
+            score_before_experts=score_before_experts,
+        )
     elif comm_backend == "standard":
         return AllToAllTokenDispatcher.Config(
             num_experts=num_experts,
@@ -239,7 +252,7 @@ def make_token_dispatcher_config(
     else:
         raise ValueError(
             f"Unknown comm_backend: '{comm_backend}'. "
-            "Must be one of 'standard', 'deepep', 'hybridep'."
+            "Must be one of 'standard', 'deepep', 'hybridep', 'mori'."
         )
 
 

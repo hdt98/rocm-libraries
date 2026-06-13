@@ -65,7 +65,7 @@ class Qwen3TransformerBlock(TransformerBlock):
         )
 
         if self.moe_enabled:
-            x = x + self.moe(self.ffn_norm(x))
+            x = x + self.moe(self.ffn_norm(x), input_ids=None)
         else:
             x = x + self.feed_forward(self.ffn_norm(x))
         return x

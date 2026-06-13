@@ -5,11 +5,13 @@
 # LICENSE file in the root directory of this source tree.
 
 import logging
+import os
 import unittest
 
 import torch
 import torch.nn as nn
 from torchtitan.components.optimizer import (
+    Muon,
     OptimizersContainer,
     OptimizersInBackwardContainer,
     ParamGroupConfig,
@@ -43,10 +45,43 @@ class SimpleModel(nn.Module):
         return self.output(x)
 
 
+class MixedOptimizerModel(nn.Module):
+    """Small model with rank-1, rank-2, and rank-3 trainable parameters."""
+
+    def __init__(self):
+        super().__init__()
+        self.embed_tokens = nn.Embedding(32, 16)
+        self.norm = nn.LayerNorm(16)
+        self.proj = nn.Linear(16, 16, bias=False)
+        self.expert_weight = nn.Parameter(torch.randn(2, 8, 16))
+
+    def forward(self, x):
+        return self.proj(self.norm(self.embed_tokens(x)))
+
+
+class UnusedParamModel(nn.Module):
+    """Small model with a trainable parameter outside the active forward path."""
+
+    def __init__(self):
+        super().__init__()
+        self.used = nn.Linear(4, 4, bias=False)
+        self.unused = nn.Parameter(torch.zeros(4))
+
+    def forward(self, x):
+        return self.used(x)
+
+
 def _get_param_names_in_group(model, group):
     """Return the set of parameter FQNs in an optimizer param group."""
     param_to_name = {p: n for n, p in model.named_parameters()}
     return {param_to_name[p] for p in group["params"]}
+
+
+def _is_muon_optimizer(opt):
+    return isinstance(opt, Muon) or type(opt).__name__ in {
+        "BatchedMuonExpertParams",
+        "NativeMuonWithBatchedParams",
+    }
 
 
 class TestParamGroupConfig(unittest.TestCase):
@@ -272,6 +307,277 @@ class TestOptimizersContainerWithParamGroups(unittest.TestCase):
         opt = container.optimizers[0]
         self.assertEqual(len(opt.param_groups), 1)
 
+    def test_build_mixed_optimizer_classes_with_rank_filters(self):
+        """Param groups can select Muon for matrix params and AdamW for the rest."""
+        model = MixedOptimizerModel()
+        config = OptimizersContainer.Config(
+            name="AdamW",
+            lr=1e-3,
+            weight_decay=0.1,
+            implementation="for-loop",
+            param_groups=[
+                ParamGroupConfig(pattern=r".*\.weight$", rank=1),
+                ParamGroupConfig(
+                    pattern=r"proj\.weight$", rank=2, optimizer_name="Muon"
+                ),
+                ParamGroupConfig(
+                    pattern=r"expert_weight$", rank=3, optimizer_name="Muon"
+                ),
+            ],
+        )
+
+        container = config.build(model_parts=[model])
+
+        self.assertEqual(len(container.optimizers), 2)
+        self.assertTrue(any(isinstance(opt, torch.optim.AdamW) for opt in container))
+        self.assertTrue(any(_is_muon_optimizer(opt) for opt in container))
+
+        muon_params = {
+            name
+            for opt in container
+            if _is_muon_optimizer(opt)
+            for group in opt.param_groups
+            for name in _get_param_names_in_group(model, group)
+        }
+        self.assertEqual(muon_params, {"proj.weight", "expert_weight"})
+
+        for param in model.parameters():
+            param.grad = torch.ones_like(param)
+        container.step()
+
+    def test_batched_muon_prealloc_matches_none_one_step(self):
+        """Preallocated expert-Muon workspace matches the non-prealloc update."""
+        env_keys = [
+            "TORCHTITAN_OPTIMIZER_MUON_IMPL",
+            "TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES",
+            "TORCHTITAN_OPTIMIZER_MUON_NS_COMPUTE_DTYPE",
+            "TORCHTITAN_OPTIMIZER_MUON_STATE_DTYPE",
+            "TORCHTITAN_OPTIMIZER_MUON_WORKSPACE_MODE",
+        ]
+        old_env = {key: os.environ.get(key) for key in env_keys}
+        try:
+            torch.manual_seed(1234)
+            reference = MixedOptimizerModel()
+            candidate = MixedOptimizerModel()
+            candidate.load_state_dict(reference.state_dict())
+
+            os.environ["TORCHTITAN_OPTIMIZER_MUON_IMPL"] = "batched"
+            os.environ["TORCHTITAN_OPTIMIZER_MUON_CHUNK_MATRICES"] = "1"
+            os.environ["TORCHTITAN_OPTIMIZER_MUON_NS_COMPUTE_DTYPE"] = "float32"
+            os.environ["TORCHTITAN_OPTIMIZER_MUON_STATE_DTYPE"] = "float32"
+
+            config = OptimizersContainer.Config(
+                name="AdamW",
+                lr=1e-3,
+                weight_decay=0.01,
+                implementation="for-loop",
+                muon_ns_steps=2,
+                param_groups=[
+                    ParamGroupConfig(
+                        pattern=r"expert_weight$",
+                        rank=3,
+                        optimizer_name="Muon",
+                    ),
+                ],
+            )
+
+            os.environ["TORCHTITAN_OPTIMIZER_MUON_WORKSPACE_MODE"] = "none"
+            reference_container = config.build(model_parts=[reference])
+            os.environ["TORCHTITAN_OPTIMIZER_MUON_WORKSPACE_MODE"] = "prealloc"
+            candidate_container = config.build(model_parts=[candidate])
+
+            self.assertTrue(any(_is_muon_optimizer(opt) for opt in candidate_container))
+
+            for idx, ((_, ref_param), (_, cand_param)) in enumerate(
+                zip(reference.named_parameters(), candidate.named_parameters())
+            ):
+                torch.manual_seed(9000 + idx)
+                grad = torch.randn_like(ref_param)
+                ref_param.grad = grad.clone()
+                cand_param.grad = grad.clone()
+
+            reference_container.step()
+            candidate_container.step()
+
+            for (name, actual), (_, expected) in zip(
+                candidate.named_parameters(),
+                reference.named_parameters(),
+            ):
+                self.assertTrue(
+                    torch.allclose(actual, expected, atol=1e-6, rtol=1e-6),
+                    f"Parameter mismatch for {name}",
+                )
+        finally:
+            for key, value in old_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_swap_opt_states_cpu_matches_adamw_one_step(self):
+        """CPU-swapped AdamW matches plain AdamW on a small float32 model."""
+        torch.manual_seed(1234)
+        model = SimpleModel()
+        reference = SimpleModel()
+        reference.load_state_dict(model.state_dict())
+        input_ids = torch.randint(0, 32, (2, 4))
+
+        config = OptimizersContainer.Config(
+            name="AdamW",
+            lr=1e-3,
+            beta1=0.9,
+            beta2=0.95,
+            eps=1e-8,
+            weight_decay=0.01,
+            implementation="swap_opt_states_cpu",
+        )
+        container = config.build(model_parts=[model])
+        reference_optimizer = torch.optim.AdamW(
+            reference.parameters(),
+            lr=1e-3,
+            betas=(0.9, 0.95),
+            eps=1e-8,
+            weight_decay=0.01,
+            fused=False,
+            foreach=False,
+        )
+
+        model(input_ids).sum().backward()
+        reference(input_ids).sum().backward()
+        container.step()
+        reference_optimizer.step()
+
+        for actual, expected in zip(model.parameters(), reference.parameters()):
+            self.assertTrue(torch.allclose(actual, expected, atol=1e-6, rtol=1e-6))
+
+        for optimizer in container.optimizers:
+            for state in optimizer.state.values():
+                self.assertEqual(state["exp_avg"].device.type, "cpu")
+                self.assertEqual(state["exp_avg_sq"].device.type, "cpu")
+
+    def test_swap_opt_states_cpu_defaults_to_fp32_states(self):
+        """Swapped AdamW defaults to FP32 moments even for BF16 parameters."""
+        old_state_dtype = os.environ.pop("TORCHTITAN_OPTIMIZER_SWAP_STATE_DTYPE", None)
+        old_pin_memory = os.environ.get("TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY")
+        os.environ["TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY"] = "false"
+        try:
+            model = nn.Linear(4, 4, bias=False, dtype=torch.bfloat16)
+            config = OptimizersContainer.Config(
+                name="AdamW",
+                implementation="swap_opt_states_cpu",
+            )
+            container = config.build(model_parts=[model])
+            for param in model.parameters():
+                param.grad = torch.ones_like(param)
+            container.step()
+
+            for optimizer in container.optimizers:
+                for state in optimizer.state.values():
+                    self.assertEqual(state["exp_avg"].dtype, torch.float32)
+                    self.assertEqual(state["exp_avg_sq"].dtype, torch.float32)
+        finally:
+            if old_state_dtype is not None:
+                os.environ["TORCHTITAN_OPTIMIZER_SWAP_STATE_DTYPE"] = old_state_dtype
+            if old_pin_memory is None:
+                os.environ.pop("TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY", None)
+            else:
+                os.environ["TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY"] = old_pin_memory
+
+    def test_swap_opt_states_cpu_state_dict_round_trip_keeps_cpu_states(self):
+        """Native state_dict load restores swapped AdamW states on CPU."""
+        model = SimpleModel()
+        config = OptimizersContainer.Config(
+            name="AdamW",
+            implementation="swap_opt_states_cpu",
+        )
+        container = config.build(model_parts=[model])
+        model(torch.randint(0, 32, (2, 4))).sum().backward()
+        container.step()
+
+        state_dict = container.state_dict()
+        self.assertEqual(set(state_dict), {"optimizer_0"})
+
+        model2 = SimpleModel()
+        container2 = config.build(model_parts=[model2])
+        container2.load_state_dict(state_dict)
+
+        for optimizer in container2.optimizers:
+            for state in optimizer.state.values():
+                self.assertEqual(state["exp_avg"].device.type, "cpu")
+                self.assertEqual(state["exp_avg_sq"].device.type, "cpu")
+
+    def test_swap_opt_states_cpu_foreach_param_matches_torch_param(self):
+        """Batched full-param swap update matches the scalar full-param path."""
+        old_update_mode = os.environ.get("TORCHTITAN_OPTIMIZER_SWAP_UPDATE_MODE")
+        old_state_dtype = os.environ.get("TORCHTITAN_OPTIMIZER_SWAP_STATE_DTYPE")
+        old_pin_memory = os.environ.get("TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY")
+        old_foreach_max = os.environ.get("TORCHTITAN_OPTIMIZER_SWAP_FOREACH_MAX_PARAMS")
+        try:
+            torch.manual_seed(1234)
+            reference = SimpleModel()
+            model = SimpleModel()
+            model.load_state_dict(reference.state_dict())
+            input_ids = torch.randint(0, 32, (2, 4))
+
+            os.environ["TORCHTITAN_OPTIMIZER_SWAP_STATE_DTYPE"] = "float32"
+            os.environ["TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY"] = "false"
+
+            os.environ["TORCHTITAN_OPTIMIZER_SWAP_UPDATE_MODE"] = "torch_param"
+            reference_container = OptimizersContainer.Config(
+                name="AdamW",
+                lr=1e-3,
+                beta1=0.9,
+                beta2=0.95,
+                eps=1e-8,
+                weight_decay=0.01,
+                implementation="swap_opt_states_cpu",
+            ).build(model_parts=[reference])
+
+            os.environ["TORCHTITAN_OPTIMIZER_SWAP_UPDATE_MODE"] = "foreach_param"
+            os.environ["TORCHTITAN_OPTIMIZER_SWAP_FOREACH_MAX_PARAMS"] = "2"
+            container = OptimizersContainer.Config(
+                name="AdamW",
+                lr=1e-3,
+                beta1=0.9,
+                beta2=0.95,
+                eps=1e-8,
+                weight_decay=0.01,
+                implementation="swap_opt_states_cpu",
+            ).build(model_parts=[model])
+
+            reference(input_ids).sum().backward()
+            model(input_ids).sum().backward()
+            reference_container.step()
+            container.step()
+
+            for actual, expected in zip(model.parameters(), reference.parameters()):
+                self.assertTrue(torch.allclose(actual, expected, atol=1e-6, rtol=1e-6))
+        finally:
+            if old_update_mode is None:
+                os.environ.pop("TORCHTITAN_OPTIMIZER_SWAP_UPDATE_MODE", None)
+            else:
+                os.environ["TORCHTITAN_OPTIMIZER_SWAP_UPDATE_MODE"] = old_update_mode
+            if old_state_dtype is None:
+                os.environ.pop("TORCHTITAN_OPTIMIZER_SWAP_STATE_DTYPE", None)
+            else:
+                os.environ["TORCHTITAN_OPTIMIZER_SWAP_STATE_DTYPE"] = old_state_dtype
+            if old_pin_memory is None:
+                os.environ.pop("TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY", None)
+            else:
+                os.environ["TORCHTITAN_OPTIMIZER_SWAP_PIN_MEMORY"] = old_pin_memory
+            if old_foreach_max is None:
+                os.environ.pop("TORCHTITAN_OPTIMIZER_SWAP_FOREACH_MAX_PARAMS", None)
+            else:
+                os.environ["TORCHTITAN_OPTIMIZER_SWAP_FOREACH_MAX_PARAMS"] = old_foreach_max
+
+    def test_swap_opt_states_cpu_rejects_non_adam_optimizer(self):
+        """The AMD swap port is Adam/AdamW-only for now."""
+        with self.assertRaisesRegex(ValueError, "Adam/AdamW"):
+            OptimizersContainer.Config(
+                name="Muon",
+                implementation="swap_opt_states_cpu",
+            )
+
 
 class TestOptimizersInBackwardWithParamGroups(unittest.TestCase):
     def test_build_with_param_groups(self):
@@ -304,6 +610,29 @@ class TestOptimizersInBackwardWithParamGroups(unittest.TestCase):
 
 
 class TestDCPWithParamGroups(unittest.TestCase):
+    def test_unused_trainable_param_gets_checkpointable_adam_state(self):
+        """Lazy Adam state is materialized for trainable branch-inactive params."""
+        model = UnusedParamModel()
+        config = OptimizersContainer.Config(
+            name="AdamW",
+            implementation="for-loop",
+        )
+        container = config.build(model_parts=[model])
+
+        output = model(torch.randn(2, 4))
+        output.sum().backward()
+        container.step()
+
+        state_dict = container.state_dict()
+        self.assertIn("state.unused.step", state_dict)
+        self.assertIn("state.unused.exp_avg", state_dict)
+        self.assertIn("state.unused.exp_avg_sq", state_dict)
+
+        model2 = UnusedParamModel()
+        container2 = config.build(model_parts=[model2])
+        container2.load_state_dict(state_dict)
+        self.assertEqual(set(state_dict.keys()), set(container2.state_dict().keys()))
+
     def test_state_dict_round_trip(self):
         """Optimizer state_dict save/load works with multiple param groups."""
         model = SimpleModel()
@@ -347,6 +676,80 @@ class TestDCPWithParamGroups(unittest.TestCase):
                     torch.equal(v1, v2),
                     f"State mismatch for key {key}",
                 )
+
+    def test_mixed_optimizer_state_dict_round_trip(self):
+        """Mixed optimizer-class state_dict save/load keeps states separated."""
+        model = MixedOptimizerModel()
+        config = OptimizersContainer.Config(
+            name="AdamW",
+            lr=1e-3,
+            weight_decay=0.1,
+            implementation="for-loop",
+            param_groups=[
+                ParamGroupConfig(pattern=r".*\.weight$", rank=1),
+                ParamGroupConfig(
+                    pattern=r"proj\.weight$", rank=2, optimizer_name="Muon"
+                ),
+                ParamGroupConfig(
+                    pattern=r"expert_weight$", rank=3, optimizer_name="Muon"
+                ),
+            ],
+        )
+        container = config.build(model_parts=[model])
+
+        for param in model.parameters():
+            param.grad = torch.ones_like(param)
+        container.step()
+
+        state_dict = container.state_dict()
+        self.assertEqual(set(state_dict), {"optimizer_0", "optimizer_1"})
+
+        model2 = MixedOptimizerModel()
+        container2 = config.build(model_parts=[model2])
+        container2.load_state_dict(state_dict)
+
+        state_dict2 = container2.state_dict()
+        self.assertEqual(set(state_dict.keys()), set(state_dict2.keys()))
+
+    def test_mixed_optimizer_two_model_parts_use_native_state_dict(self):
+        """Mixed optimizer state format is stable with several model parts."""
+        model1 = MixedOptimizerModel()
+        model2 = MixedOptimizerModel()
+        config = OptimizersContainer.Config(
+            name="AdamW",
+            lr=1e-3,
+            weight_decay=0.1,
+            implementation="for-loop",
+            param_groups=[
+                ParamGroupConfig(pattern=r".*\.weight$", rank=1),
+                ParamGroupConfig(
+                    pattern=r"proj\.weight$", rank=2, optimizer_name="Muon"
+                ),
+                ParamGroupConfig(
+                    pattern=r"expert_weight$", rank=3, optimizer_name="Muon"
+                ),
+            ],
+        )
+        container = config.build(model_parts=[model1, model2])
+
+        for model in (model1, model2):
+            for param in model.parameters():
+                param.grad = torch.ones_like(param)
+        container.step()
+
+        state_dict = container.state_dict()
+        self.assertEqual(
+            set(state_dict),
+            {"optimizer_0", "optimizer_1", "optimizer_2", "optimizer_3"},
+        )
+
+        model3 = MixedOptimizerModel()
+        model4 = MixedOptimizerModel()
+        container2 = config.build(model_parts=[model3, model4])
+        container2.load_state_dict(state_dict)
+
+        state_dict2 = container2.state_dict()
+        self.assertEqual(set(state_dict.keys()), set(state_dict2.keys()))
 
 
 if __name__ == "__main__":

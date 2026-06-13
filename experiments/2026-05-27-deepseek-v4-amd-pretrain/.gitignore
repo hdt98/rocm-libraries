@@ -1,17 +1,12 @@
-# Source repos are vendored snapshots in this experiment. Keep source files
-# reviewable from the platform repo, but never retain nested Git metadata.
-/sources/**/.git
-/sources/**/.git/
+# Source repos are tracked snapshots at repo root. Keep source files reviewable;
+# transient source-tree cache ignores live in the repo-root .gitignore.
 
 # Raw outputs stay outside the repo record.
 /run_artifacts/artifacts/
 /run_artifacts/logs/
 /run_artifacts/checkpoints/
-/sources/**/.pytest_cache/
-/sources/**/__pycache__/
-*.pyc
-# Keep raw logs/traces/profile directories outside the repo.
-run_artifacts/**/
+run_artifacts/**
+!run_artifacts/
 run_artifacts/*.jsonl
 run_artifacts/*.log
 run_artifacts/*.txt
@@ -23,3 +18,7 @@ run_artifacts/profile_*
 run_artifacts/structured_logs*
 run_artifacts/remote_logs*
 !run_artifacts/*.json
+__pycache__/
+.pytest_cache/
+.DS_Store
+*.pyc
