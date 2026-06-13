@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -53,10 +53,10 @@ void testing_rot_strided_batched_ex_bad_arg(const Arguments& arg)
                                                ? hipblasRotStridedBatchedEx_64Fortran
                                                : hipblasRotStridedBatchedEx_64;
 
-    hipDataType xType         = arg.a_type;
-    hipDataType yType         = arg.b_type;
-    hipDataType csType        = arg.c_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t xType         = arg.a_type;
+    hipblasDatatype_t yType         = arg.b_type;
+    hipblasDatatype_t csType        = arg.c_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     int64_t N           = 100;
     int64_t incx        = 1;
@@ -212,10 +212,10 @@ void testing_rot_strided_batched_ex(const Arguments& arg)
     if(!size_y)
         size_y = 1;
 
-    hipDataType xType         = arg.a_type;
-    hipDataType yType         = arg.b_type;
-    hipDataType csType        = arg.c_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t xType         = arg.a_type;
+    hipblasDatatype_t yType         = arg.b_type;
+    hipblasDatatype_t csType        = arg.c_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     hipblasLocalHandle handle(arg);
 
@@ -242,7 +242,7 @@ void testing_rot_strided_batched_ex(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     device_strided_batch_vector<Tx> dx(N, incx, stridex, batch_count);
     device_strided_batch_vector<Ty> dy(N, incy, stridey, batch_count);

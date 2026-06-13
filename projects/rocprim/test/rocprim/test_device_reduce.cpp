@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -464,8 +464,8 @@ TYPED_TEST(RocprimDeviceReduceTests, ReduceArgMinimum)
             const auto output = d_output.load();
 
             // Check if output values are as expected
-            ASSERT_NO_FATAL_FAILURE(test_utils::assert_eq(output[0].key, expected.key));
-            ASSERT_NO_FATAL_FAILURE(test_utils::assert_eq(output[0].value, expected.value));
+            test_utils::assert_eq(output[0].key, expected.key);
+            test_utils::assert_eq(output[0].value, expected.value);
 
             if (TestFixture::use_graphs)
             {
@@ -570,17 +570,11 @@ void testLargeIndices()
 
 TEST(RocprimDeviceReduceTests, LargeIndices)
 {
-    GTEST_SKIP_ASAN();
-    GTEST_SKIP_VALGRIND();
-
     testLargeIndices<>();
 }
 
 TEST(RocprimDeviceReduceTests, LargeIndicesWithGraphs)
 {
-    GTEST_SKIP_ASAN();
-    GTEST_SKIP_VALGRIND();
-
     testLargeIndices<true>();
 }
 

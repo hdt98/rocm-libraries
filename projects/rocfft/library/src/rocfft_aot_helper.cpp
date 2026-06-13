@@ -225,10 +225,8 @@ void build_stockham_function_pool(CompileQueue& queue)
     // build everything in the 64k LDS function pool
     function_pool fp(65536);
 
-    // fused Bluestein and partial-pass kernels are always built at runtime
+    // fused Bluestein kernels are always built at runtime
     auto fuseBlue = BluesteinFuseType::BFT_NONE;
-    auto ppType   = PartialPassType::PPT_NONE;
-    auto ppParams = StockhamPartialPassParams();
 
     for(const auto& i : fp.get_map())
     {
@@ -245,8 +243,7 @@ void build_stockham_function_pool(CompileQueue& queue)
 
         StockhamGeneratorSpecs specs{factors,
                                      {},
-                                     static_cast<unsigned int>(precision),
-                                     get_curr_gcn_arch_name(),
+                                     {static_cast<unsigned int>(precision)},
                                      static_cast<unsigned int>(i.second.workgroup_size),
                                      PrintScheme(scheme)};
         specs.threads_per_transform = i.second.threads_per_transform[0];
@@ -256,18 +253,18 @@ void build_stockham_function_pool(CompileQueue& queue)
         stockham_combo(
             scheme,
             i.second,
-            [=, &queue, &specs](int                     direction,
-                                rocfft_result_placement placement,
-                                rocfft_array_type       inArrayType,
-                                rocfft_array_type       outArrayType,
-                                EmbeddedType            ebtype,
-                                SBRC_TRANSPOSE_TYPE     sbrc_trans_type,
-                                DirectRegType           dir_reg_type,
-                                IntrinsicAccessType     intrinsic,
-                                int                     ltwd_base,
-                                int                     ltwd_step,
-                                bool                    unitstride,
-                                CallbackType            cbtype) {
+            [=, &queue](int                     direction,
+                        rocfft_result_placement placement,
+                        rocfft_array_type       inArrayType,
+                        rocfft_array_type       outArrayType,
+                        EmbeddedType            ebtype,
+                        SBRC_TRANSPOSE_TYPE     sbrc_trans_type,
+                        DirectRegType           dir_reg_type,
+                        IntrinsicAccessType     intrinsic,
+                        int                     ltwd_base,
+                        int                     ltwd_step,
+                        bool                    unitstride,
+                        CallbackType            cbtype) {
                 // intrinsic mode require non-callback and enable dir_reg
                 if((cbtype != CallbackType::NONE || dir_reg_type == FORCE_OFF_OR_NOT_SUPPORT)
                    && (intrinsic != IntrinsicAccessType::DISABLE_BOTH))
@@ -282,7 +279,6 @@ void build_stockham_function_pool(CompileQueue& queue)
                     if((scheme == CS_KERNEL_STOCKHAM && !unitstride) || length1D % 2 != 0)
                         return;
                 }
-                specs.ebtype = ebtype;
 
                 auto kernel_name = stockham_rtc_kernel_name(specs,
                                                             specs,
@@ -296,20 +292,26 @@ void build_stockham_function_pool(CompileQueue& queue)
                                                             ltwd_base,
                                                             ltwd_step,
                                                             false,
+                                                            ebtype,
                                                             dir_reg_type,
                                                             intrinsic,
                                                             sbrc_trans_type,
                                                             cbtype,
                                                             fuseBlue,
-                                                            ppType,
-                                                            ppParams,
                                                             {},
                                                             {});
                 std::function<std::string(const std::string&)> generate_src
                     = [=](const std::string& kernel_name) -> std::string {
+                    StockhamGeneratorSpecs specs{factors,
+                                                 {},
+                                                 {static_cast<unsigned int>(precision)},
+                                                 static_cast<unsigned int>(i.second.workgroup_size),
+                                                 PrintScheme(scheme)};
+                    specs.threads_per_transform = i.second.threads_per_transform[0];
+                    specs.half_lds              = i.second.half_lds;
+                    specs.direct_to_from_reg    = i.second.direct_to_from_reg;
                     return stockham_rtc(specs,
                                         specs,
-                                        ppParams,
                                         nullptr,
                                         kernel_name,
                                         scheme,
@@ -322,12 +324,12 @@ void build_stockham_function_pool(CompileQueue& queue)
                                         ltwd_base,
                                         ltwd_step,
                                         false,
+                                        ebtype,
                                         dir_reg_type,
                                         intrinsic,
                                         sbrc_trans_type,
                                         cbtype,
                                         fuseBlue,
-                                        ppType,
                                         {},
                                         {});
                 };
@@ -347,40 +349,30 @@ void build_realcomplex(CompileQueue& queue)
             {
                 for(size_t dim : {1, 2, 3})
                 {
-                    for(size_t lensz = dim; lensz <= 3; lensz++)
+                    for(bool Ndiv4 : {true, false})
                     {
-                        for(bool Ndiv4 : {true, false})
+                        // standalone even-length kernels may be
+                        // first/last in the plan, so allow for
+                        // callbacks
+                        for(auto cbtype : {CallbackType::NONE, CallbackType::USER_LOAD_STORE})
                         {
-                            // standalone even-length kernels may be
-                            // first/last in the plan, so allow for
-                            // callbacks
-                            for(auto cbtype : {CallbackType::NONE, CallbackType::USER_LOAD_STORE})
-                            {
-                                // r2c may have planar output, c2r may have planar input
-                                auto inArrayType  = (scheme == CS_KERNEL_CMPLX_TO_R && planar)
-                                                        ? rocfft_array_type_complex_planar
-                                                        : rocfft_array_type_complex_interleaved;
-                                auto outArrayType = (scheme == CS_KERNEL_R_TO_CMPLX && planar)
-                                                        ? rocfft_array_type_complex_planar
-                                                        : rocfft_array_type_complex_interleaved;
+                            // r2c may have planar output, c2r may have planar input
+                            auto inArrayType  = (scheme == CS_KERNEL_CMPLX_TO_R && planar)
+                                                    ? rocfft_array_type_complex_planar
+                                                    : rocfft_array_type_complex_interleaved;
+                            auto outArrayType = (scheme == CS_KERNEL_R_TO_CMPLX && planar)
+                                                    ? rocfft_array_type_complex_planar
+                                                    : rocfft_array_type_complex_interleaved;
 
-                                RealComplexEvenSpecs specs{{scheme,
-                                                            dim,
-                                                            lensz,
-                                                            precision,
-                                                            inArrayType,
-                                                            outArrayType,
-                                                            cbtype,
-                                                            {},
-                                                            {}},
-                                                           Ndiv4};
-                                auto kernel_name = realcomplex_even_rtc_kernel_name(specs);
-                                std::function<std::string(const std::string&)> generate_src
-                                    = [=](const std::string& kernel_name) -> std::string {
-                                    return realcomplex_even_rtc(kernel_name, specs);
-                                };
-                                queue.push({kernel_name, generate_src});
-                            }
+                            RealComplexEvenSpecs specs{
+                                {scheme, dim, precision, inArrayType, outArrayType, cbtype, {}, {}},
+                                Ndiv4};
+                            auto kernel_name = realcomplex_even_rtc_kernel_name(specs);
+                            std::function<std::string(const std::string&)> generate_src
+                                = [=](const std::string& kernel_name) -> std::string {
+                                return realcomplex_even_rtc(kernel_name, specs);
+                            };
+                            queue.push({kernel_name, generate_src});
                         }
                     }
                 }
@@ -395,24 +387,20 @@ void build_realcomplex(CompileQueue& queue)
                                         ? rocfft_array_type_complex_planar
                                         : rocfft_array_type_complex_interleaved;
 
-                for(size_t lensz = 1; lensz <= 3; lensz++)
-                {
-                    RealComplexEvenTransposeSpecs specs{{scheme,
-                                                         static_cast<size_t>(1),
-                                                         lensz,
-                                                         precision,
-                                                         inArrayType,
-                                                         outArrayType,
-                                                         CallbackType::NONE,
-                                                         {},
-                                                         {}}};
-                    auto kernel_name = realcomplex_even_transpose_rtc_kernel_name(specs);
-                    std::function<std::string(const std::string&)> generate_src
-                        = [=](const std::string& kernel_name) -> std::string {
-                        return realcomplex_even_transpose_rtc(kernel_name, specs);
-                    };
-                    queue.push({kernel_name, generate_src, ""});
-                }
+                RealComplexEvenTransposeSpecs specs{{scheme,
+                                                     static_cast<size_t>(1),
+                                                     precision,
+                                                     inArrayType,
+                                                     outArrayType,
+                                                     CallbackType::NONE,
+                                                     {},
+                                                     {}}};
+                auto kernel_name = realcomplex_even_transpose_rtc_kernel_name(specs);
+                std::function<std::string(const std::string&)> generate_src
+                    = [=](const std::string& kernel_name) -> std::string {
+                    return realcomplex_even_transpose_rtc(kernel_name, specs);
+                };
+                queue.push({kernel_name, generate_src, ""});
             }
         }
     }
@@ -505,7 +493,7 @@ void solution_kernel_combo(FMKey                             kernel_key,
         {
             placement_range = {rocfft_placement_inplace, rocfft_placement_notinplace};
         }
-        // sbcc can be used in 2D, 3D, for L1D, it's still pseudo-2D
+        // sbcc can be used in 2D, 3D, for L1D, it's still psuedo-2D
         if(static_dim == 0)
         {
             static_dims_range = {2, 3};
@@ -628,10 +616,8 @@ void build_solution_kernels(CompileQueue& queue)
     std::vector<SolutionNode> kernel_nodes;
     solmap.get_all_kernels(kernel_nodes, true);
 
-    // fused Bluestein and partial-pass kernels are always built at runtime
+    // fused Bluestein kernels are always built at runtime
     auto fuseBlue = BluesteinFuseType::BFT_NONE;
-    auto ppType   = PartialPassType::PPT_NONE;
-    auto ppParams = StockhamPartialPassParams();
 
     for(const SolutionNode& kernel_sol : kernel_nodes)
     {
@@ -678,8 +664,7 @@ void build_solution_kernels(CompileQueue& queue)
 
                 StockhamGeneratorSpecs specs{factors,
                                              {},
-                                             static_cast<unsigned int>(precision),
-                                             get_curr_gcn_arch_name(),
+                                             {static_cast<unsigned int>(precision)},
                                              static_cast<unsigned int>(config.workgroup_size),
                                              PrintScheme(scheme)};
                 specs.threads_per_transform = config.threads_per_transform[0];
@@ -689,7 +674,6 @@ void build_solution_kernels(CompileQueue& queue)
                 // kernel_sol should specify the static_dim, need to set here,
                 // so move specs to local instead of captured (need mutable if captured)
                 specs.static_dim = static_dim;
-                specs.ebtype     = ebtype;
 
                 auto kernel_name = stockham_rtc_kernel_name(specs,
                                                             specs,
@@ -703,13 +687,12 @@ void build_solution_kernels(CompileQueue& queue)
                                                             ltwd_base,
                                                             ltwd_step,
                                                             false,
+                                                            ebtype,
                                                             dir_reg_type,
                                                             intrinsic,
                                                             sbrc_trans_type,
                                                             cbtype,
                                                             fuseBlue,
-                                                            ppType,
-                                                            ppParams,
                                                             {},
                                                             {});
 
@@ -717,7 +700,6 @@ void build_solution_kernels(CompileQueue& queue)
                     = [=](const std::string& kernel_name) -> std::string {
                     return stockham_rtc(specs,
                                         specs,
-                                        ppParams,
                                         nullptr,
                                         kernel_name,
                                         scheme,
@@ -730,12 +712,12 @@ void build_solution_kernels(CompileQueue& queue)
                                         ltwd_base,
                                         ltwd_step,
                                         false,
+                                        ebtype,
                                         dir_reg_type,
                                         intrinsic,
                                         sbrc_trans_type,
                                         cbtype,
                                         fuseBlue,
-                                        ppType,
                                         {},
                                         {});
                 };

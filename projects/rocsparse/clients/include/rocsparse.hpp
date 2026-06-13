@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,36 +31,36 @@
 #ifndef ROCSPARSE_HPP
 #define ROCSPARSE_HPP
 
-#include "rocsparse.h"
 #include "rocsparse_traits.hpp"
+#include <rocsparse.h>
 
 #define REAL_TEMPLATE(NAME_, ...)                              \
     template <typename T>                                      \
-    inline rocsparse_status (*rocsparse_##NAME_)(__VA_ARGS__); \
+    rocsparse_status (*rocsparse_##NAME_)(__VA_ARGS__);        \
     template <>                                                \
-    inline auto rocsparse_##NAME_<float> = rocsparse_s##NAME_; \
+    static auto rocsparse_##NAME_<float> = rocsparse_s##NAME_; \
     template <>                                                \
-    inline auto rocsparse_##NAME_<double> = rocsparse_d##NAME_
+    static auto rocsparse_##NAME_<double> = rocsparse_d##NAME_
 
 #define COMPLEX_TEMPLATE(NAME_, ...)                                             \
     template <typename T>                                                        \
-    inline rocsparse_status (*rocsparse_##NAME_)(__VA_ARGS__);                   \
+    rocsparse_status (*rocsparse_##NAME_)(__VA_ARGS__);                          \
     template <>                                                                  \
-    inline auto rocsparse_##NAME_<rocsparse_float_complex> = rocsparse_c##NAME_; \
+    static auto rocsparse_##NAME_<rocsparse_float_complex> = rocsparse_c##NAME_; \
     template <>                                                                  \
-    inline auto rocsparse_##NAME_<rocsparse_double_complex> = rocsparse_z##NAME_
+    static auto rocsparse_##NAME_<rocsparse_double_complex> = rocsparse_z##NAME_
 
 #define REAL_COMPLEX_TEMPLATE(NAME_, ...)                                        \
     template <typename T>                                                        \
-    inline rocsparse_status (*rocsparse_##NAME_)(__VA_ARGS__);                   \
+    rocsparse_status (*rocsparse_##NAME_)(__VA_ARGS__);                          \
     template <>                                                                  \
-    inline auto rocsparse_##NAME_<float> = rocsparse_s##NAME_;                   \
+    static auto rocsparse_##NAME_<float> = rocsparse_s##NAME_;                   \
     template <>                                                                  \
-    inline auto rocsparse_##NAME_<double> = rocsparse_d##NAME_;                  \
+    static auto rocsparse_##NAME_<double> = rocsparse_d##NAME_;                  \
     template <>                                                                  \
-    inline auto rocsparse_##NAME_<rocsparse_float_complex> = rocsparse_c##NAME_; \
+    static auto rocsparse_##NAME_<rocsparse_float_complex> = rocsparse_c##NAME_; \
     template <>                                                                  \
-    inline auto rocsparse_##NAME_<rocsparse_double_complex> = rocsparse_z##NAME_
+    static auto rocsparse_##NAME_<rocsparse_double_complex> = rocsparse_z##NAME_
 
 /*
  * ===========================================================================
@@ -77,8 +77,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_csr_buffer_size,
                       const rocsparse_int*   csr_row_ptr,
                       const rocsparse_int*   csr_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       size_t*                buffer_size);
 
@@ -91,8 +89,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_csr,
                       const rocsparse_int*   csr_row_ptr,
                       const rocsparse_int*   csr_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       rocsparse_data_status* data_status,
                       void*                  temp_buffer);
@@ -107,8 +103,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_coo_buffer_size,
                       const rocsparse_int*   coo_row_ind,
                       const rocsparse_int*   coo_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       size_t*                buffer_size);
 
@@ -121,8 +115,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_coo,
                       const rocsparse_int*   coo_row_ind,
                       const rocsparse_int*   coo_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       rocsparse_data_status* data_status,
                       void*                  temp_buffer);
@@ -140,8 +132,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_gebsr_buffer_size,
                       const rocsparse_int*   bsr_row_ptr,
                       const rocsparse_int*   bsr_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       size_t*                buffer_size);
 
@@ -157,8 +147,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_gebsr,
                       const rocsparse_int*   bsr_row_ptr,
                       const rocsparse_int*   bsr_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       rocsparse_data_status* data_status,
                       void*                  temp_buffer);
@@ -176,8 +164,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_gebsc_buffer_size,
                       const rocsparse_int*   bsc_col_ptr,
                       const rocsparse_int*   bsc_row_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       size_t*                buffer_size);
 
@@ -193,8 +179,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_gebsc,
                       const rocsparse_int*   bsc_col_ptr,
                       const rocsparse_int*   bsc_row_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       rocsparse_data_status* data_status,
                       void*                  temp_buffer);
@@ -209,8 +193,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_csc_buffer_size,
                       const rocsparse_int*   csc_col_ptr,
                       const rocsparse_int*   csc_row_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       size_t*                buffer_size);
 
@@ -223,8 +205,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_csc,
                       const rocsparse_int*   csc_col_ptr,
                       const rocsparse_int*   csc_row_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       rocsparse_data_status* data_status,
                       void*                  temp_buffer);
@@ -238,8 +218,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_ell_buffer_size,
                       const T*               ell_val,
                       const rocsparse_int*   ell_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       size_t*                buffer_size);
 
@@ -251,8 +229,6 @@ REAL_COMPLEX_TEMPLATE(check_matrix_ell,
                       const T*               ell_val,
                       const rocsparse_int*   ell_col_ind,
                       rocsparse_index_base   idx_base,
-                      rocsparse_matrix_type  matrix_type,
-                      rocsparse_fill_mode    uplo,
                       rocsparse_storage_mode storage,
                       rocsparse_data_status* data_status,
                       void*                  temp_buffer);
@@ -335,8 +311,8 @@ REAL_COMPLEX_TEMPLATE(sctr,
  *    level 2 SPARSE
  * ===========================================================================
  */
-// bsrmv_analysis
-REAL_COMPLEX_TEMPLATE(bsrmv_analysis,
+// bsrmv_ex_analysis
+REAL_COMPLEX_TEMPLATE(bsrmv_ex_analysis,
                       rocsparse_handle          handle,
                       rocsparse_direction       dir,
                       rocsparse_operation       trans,
@@ -350,8 +326,8 @@ REAL_COMPLEX_TEMPLATE(bsrmv_analysis,
                       rocsparse_int             bsr_dim,
                       rocsparse_mat_info        info);
 
-// bsrmv
-REAL_COMPLEX_TEMPLATE(bsrmv,
+// bsrmv_ex
+REAL_COMPLEX_TEMPLATE(bsrmv_ex,
                       rocsparse_handle          handle,
                       rocsparse_direction       dir,
                       rocsparse_operation       trans,
@@ -555,10 +531,10 @@ REAL_COMPLEX_TEMPLATE(csritsv_analysis,
                       void*                     temp_buffer);
 
 REAL_COMPLEX_TEMPLATE(csritsv_solve,
-                      rocsparse_handle          handle,
                       rocsparse_int*            nmaxiter,
                       const floating_data_t<T>* host_tol,
                       floating_data_t<T>*       host_history,
+                      rocsparse_handle          handle,
                       rocsparse_operation       trans,
                       rocsparse_int             m,
                       rocsparse_int             nnz,
@@ -574,11 +550,11 @@ REAL_COMPLEX_TEMPLATE(csritsv_solve,
                       void*                     temp_buffer);
 
 REAL_COMPLEX_TEMPLATE(csritsv_solve_ex,
-                      rocsparse_handle          handle,
                       rocsparse_int*            nmaxiter,
                       rocsparse_int             nfreeiter,
                       const floating_data_t<T>* host_tol,
                       floating_data_t<T>*       host_history,
+                      rocsparse_handle          handle,
                       rocsparse_operation       trans,
                       rocsparse_int             m,
                       rocsparse_int             nnz,
@@ -1058,7 +1034,6 @@ REAL_COMPLEX_TEMPLATE(csrgemm_numeric,
                       const rocsparse_int*      csr_row_ptr_D,
                       const rocsparse_int*      csr_col_ind_D,
                       const rocsparse_mat_descr descr_C,
-                      rocsparse_int             nnz_C,
                       T*                        csr_val_C,
                       const rocsparse_int*      csr_row_ptr_C,
                       const rocsparse_int*      csr_col_ind_C,
@@ -1693,7 +1668,6 @@ REAL_COMPLEX_TEMPLATE(bsrpad_value,
                       rocsparse_handle          handle,
                       rocsparse_int             m,
                       rocsparse_int             mb,
-                      rocsparse_int             nnzb,
                       rocsparse_int             block_dim,
                       T                         value,
                       const rocsparse_mat_descr bsr_descr,
@@ -1962,7 +1936,7 @@ REAL_COMPLEX_TEMPLATE(csrcolor,
                       const T*                  csr_val,
                       const rocsparse_int*      csr_row_ptr,
                       const rocsparse_int*      csr_col_ind,
-                      const floating_data_t<T>* fraction_to_color,
+                      const T*                  fraction_to_color,
                       rocsparse_int*            ncolors,
                       rocsparse_int*            coloring,
                       rocsparse_int*            reordering,

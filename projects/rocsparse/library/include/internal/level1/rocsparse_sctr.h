@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,9 +28,7 @@
 #include "../../rocsparse-types.h"
 #include "rocsparse/rocsparse-export.h"
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 /*! \ingroup level1_module
 *  \brief Scatter elements from a dense vector across a sparse vector.
@@ -48,14 +46,14 @@ extern "C" {
 *  \endcode
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  nnz         number of non-zero entries of \f$x\f$.
 *  @param[in]
@@ -72,11 +70,57 @@ extern "C" {
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
 *  \retval     rocsparse_status_invalid_value \p idx_base is invalid.
 *  \retval     rocsparse_status_invalid_size \p nnz is invalid.
-*  \retval     rocsparse_status_invalid_pointer \p x_val, \p x_ind, or \p y pointer is
+*  \retval     rocsparse_status_invalid_pointer \p x_val, \p x_ind or \p y pointer is
 *              invalid.
 *
 *  \par Example
-*  \snippet example_rocsparse_sctr.cpp doc example
+*  \code{.c}
+*      // Number of non-zeros of the sparse vector
+*      rocsparse_int nnz = 3;
+*
+*      // Sparse index vector
+*      rocsparse_int hx_ind[3] = {0, 3, 5};
+*
+*      // Sparse value vector
+*      float hx_val[3] = {9.0, 2.0, 3.0};
+*
+*      // Dense vector
+*      float hy[9] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0};
+*
+*      // Index base
+*      rocsparse_index_base idx_base = rocsparse_index_base_zero;
+*
+*      // Offload data to device
+*      rocsparse_int* dx_ind;
+*      float*         dx_val;
+*      float*         dy;
+*
+*      hipMalloc((void**)&dx_ind, sizeof(rocsparse_int) * nnz);
+*      hipMalloc((void**)&dx_val, sizeof(float) * nnz);
+*      hipMalloc((void**)&dy, sizeof(float) * 9);
+*
+*      hipMemcpy(dx_ind, hx_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice);
+*      hipMemcpy(dx_val, hx_val, sizeof(float) * nnz, hipMemcpyHostToDevice);
+*      hipMemcpy(dy, hy, sizeof(float) * 9, hipMemcpyHostToDevice);
+*
+*      // rocSPARSE handle
+*      rocsparse_handle handle;
+*      rocsparse_create_handle(&handle);
+*
+*      // Call ssctr
+*      rocsparse_ssctr(handle, nnz, dx_val, dx_ind, dy, idx_base);
+*
+*      // Copy result back to host
+*      hipMemcpy(hy, dy, sizeof(float) * 9, hipMemcpyDeviceToHost);
+*
+*      // Clear rocSPARSE
+*      rocsparse_destroy_handle(handle);
+*
+*      // Clear device memory
+*      hipFree(dx_ind);
+*      hipFree(dx_val);
+*      hipFree(dy);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT
@@ -120,8 +164,6 @@ rocsparse_status rocsparse_isctr(rocsparse_handle     handle,
                                  rocsparse_index_base idx_base);
 
 /**@}*/
-#ifdef __cplusplus
 }
-#endif
 
 #endif // ROCSPARSE_SCTR_H

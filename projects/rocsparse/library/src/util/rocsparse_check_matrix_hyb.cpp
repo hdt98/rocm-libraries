@@ -22,10 +22,10 @@
  *
  * ************************************************************************ */
 #include "internal/util/rocsparse_check_matrix_hyb.h"
+#include "control.h"
 #include "rocsparse_check_matrix_coo.hpp"
 #include "rocsparse_check_matrix_ell.hpp"
-#include "rocsparse_control.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -121,7 +121,6 @@ namespace rocsparse
         case rocsparse_datatype_i32_r:
         case rocsparse_datatype_u32_r:
         case rocsparse_datatype_f16_r:
-        case rocsparse_datatype_bf16_r:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
@@ -224,7 +223,6 @@ namespace rocsparse
         case rocsparse_datatype_i32_r:
         case rocsparse_datatype_u32_r:
         case rocsparse_datatype_f16_r:
-        case rocsparse_datatype_bf16_r:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }

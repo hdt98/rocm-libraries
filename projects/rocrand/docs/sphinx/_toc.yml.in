@@ -5,9 +5,7 @@ subtrees:
   - caption: Install
     entries:
     - file: install/installing
-      title: Install rocRAND
-    - file: install/build
-      title: Build from source
+      title: Installation guide
 
   - caption: Conceptual
     entries:
@@ -15,12 +13,10 @@ subtrees:
       title: Programming guide
     - file: conceptual/curand-compatibility
     - file: conceptual/dynamic_ordering_configuration
-    - file: conceptual/generator-types
-      title: Random number generators
 
   - caption: Examples
     entries:
-    - url: https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocrand/python/rocrand/examples
+    - url: https://github.com/ROCm/rocRAND/tree/develop/python/rocrand/examples
       title: Examples
 
   - caption: API reference

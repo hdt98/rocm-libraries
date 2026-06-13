@@ -93,8 +93,6 @@ def addKernel(solutionPool, solution):
 # update dependant parameters if StaggerU == 0
 def sanitizeSolutions(solList):
     for sol in solList:
-        if "ProblemType" in sol:
-            del sol["ProblemType"] # remove ProblemType from solution
         if sol.get("StaggerU") == 0:
             sol["StaggerUMapping"] = 0
             sol["StaggerUStride"] = 0
@@ -147,7 +145,7 @@ def compareDestFolderToYaml(originalDir, incFile, incData):
     incAttribute = incData[11] # the last item in yaml file
     if not incAttribute:
         sys.exit(f"[Error] Empty YAML attribute. Need to set Equality or GridBased in {incFile}.")
-    # Check Equality and GridBased folders only
+    # Check Equality and GradBased folders only
     if destFolder in checkFolders and destFolder != incAttribute:
         restuls = f"\t{incFile} must be {destFolder} tuning"
         sys.exit(f"[Error] Destination folder(={destFolder}) failed to match YAML attribute(={incAttribute}): \n{restuls}")
@@ -165,8 +163,6 @@ def compareProblemType(oriData, incData):
         # Kernel ProblemType
         for i, _ in enumerate(oriData[5]):
             # TODO: delete this for loop if kernel ProblemType is removed in the future
-            if "ProblemType" not in oriData[5][i]:
-                continue
             oriKernelProblemType = oriData[5][i]["ProblemType"]
             for item in waivedItems:
                 try:
@@ -179,8 +175,6 @@ def compareProblemType(oriData, incData):
     solIdx = 0
     # Compare existing ProblemType items of originalFiles with incrementalFiles
     for i, _ in enumerate(incData[5]):
-        if "ProblemType" not in incData[5][i]:
-            continue
         # TODO: check header ProblemType if kernel ProblemType is removed in the future
         incKernelProblemType = incData[5][i]["ProblemType"]
         if oriProblemType !=  incKernelProblemType:
@@ -531,7 +525,4 @@ if __name__ == "__main__":
     elif forceMerge in ["true", "1"]: forceMerge=True
     elif forceMerge in ["false", "0"]: forceMerge=False
 
-    msg("***************************************************************")
-    msg("Warning: merge.py is deprecated, please use TensileMergeLibrary")
-    msg("***************************************************************")
     avoidRegressions(originalDir, incrementalDir, outputPath, forceMerge, trimSize, add_solution_tags, no_eff)

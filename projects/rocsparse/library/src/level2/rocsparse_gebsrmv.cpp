@@ -26,11 +26,11 @@
 #include "rocsparse_csrmv.hpp"
 #include "rocsparse_gebsrmv.hpp"
 
+#include "control.h"
 #include "gebsrmv_device.h"
+#include "handle.h"
 #include "rocsparse_common.h"
-#include "rocsparse_control.hpp"
-#include "rocsparse_handle.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include <hip/hip_runtime.h>
 
@@ -397,29 +397,23 @@ rocsparse_status rocsparse::gebsrmv_template(rocsparse_handle          handle, /
     // row_block_dim == 1 and col_block_dim == 1 is the CSR case
     if(row_block_dim == 1 && col_block_dim == 1)
     {
-        static constexpr bool fallback_algorithm = true;
-        static constexpr bool force_conj         = false;
-
-        RETURN_IF_ROCSPARSE_ERROR(
-            (rocsparse::csrmv_template<T, rocsparse_int, rocsparse_int, T, T, T>(
-                handle,
-                trans,
-                rocsparse::csrmv_alg_rowsplit,
-                mb,
-                nb,
-                nnzb,
-                alpha,
-                descr,
-                bsr_val,
-                bsr_row_ptr,
-                bsr_row_ptr + 1,
-                bsr_col_ind,
-                nullptr,
-                x,
-                beta,
-                y,
-                force_conj,
-                fallback_algorithm)));
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrmv_template(handle,
+                                                            trans,
+                                                            rocsparse::csrmv_alg_rowsplit,
+                                                            mb,
+                                                            nb,
+                                                            nnzb,
+                                                            alpha,
+                                                            descr,
+                                                            bsr_val,
+                                                            bsr_row_ptr,
+                                                            bsr_row_ptr + 1,
+                                                            bsr_col_ind,
+                                                            nullptr,
+                                                            x,
+                                                            beta,
+                                                            y,
+                                                            false));
         return rocsparse_status_success;
     }
 

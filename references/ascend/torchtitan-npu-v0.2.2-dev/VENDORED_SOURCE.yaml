@@ -1,0 +1,13 @@
+source:
+  name: torchtitan-npu
+  remote: https://gitcode.com/cann/torchtitan-npu.git
+  branch: v0.2.2-dev
+  commit: a239d25ba71a6c2ab99e2ed57a9b2de7ac8ebdf5
+  imported_at: 2026-06-01
+  local_state: shallow_reference_snapshot
+
+role: ascend_torchtitan_npu_sparse_attention_operator_source_reference
+
+notes:
+  - Provides the DeepSeek-V4 SparseAttnSharedkv, LightningIndexer, and SparseLightningIndexerGradKLLoss source wrappers referenced by the Ascend CANN recipe.
+  - Key files for the AMD port are torchtitan_npu/converters/kernels/deepseek_v4_sfa.py, torchtitan_npu/converters/kernels/dsa.py, and torchtitan_npu/ops/aclnn/sparse_lightning_indexer_grad_kl_loss/binding.cpp.

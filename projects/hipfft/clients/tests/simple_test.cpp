@@ -23,10 +23,8 @@
 #include <fftw3.h>
 #include <gtest/gtest.h>
 #include <hip/hip_vector_types.h>
-#include <random>
 #include <vector>
 
-#include "../../shared/fftw_transform.h"
 #include "../hipfft_params.h"
 
 DISABLE_WARNING_PUSH
@@ -35,102 +33,25 @@ DISABLE_WARNING_RETURN_TYPE
 #include <hip/hip_runtime_api.h>
 DISABLE_WARNING_POP
 
-// Function to return maximum error for float and double types for
-// the simple tests below
+// Function to return maximum error for float and double types.
 template <typename Tfloat>
-inline double type_epsilon_simple();
+inline double type_epsilon();
 template <>
-inline double type_epsilon_simple<float>()
+inline double type_epsilon<float>()
 {
     return 1e-6;
 }
 template <>
-inline double type_epsilon_simple<double>()
+inline double type_epsilon<double>()
 {
     return 1e-7;
 }
 
-/* Static utility class template helping with the definition of valid/invalid
-   values for arguments of (un)scoped enumeration types in API testing.
-   Usage: for an enumeration type of interest, say "enum_of_interest", define
-template <>
-const std::vector<enum_of_interest> enum_helper<enum_of_interest>::valid_values =
-        {all, the, known, valid, values, of, type, enum_of_interest};
-   before using any of this class' self-explanatory public member functions.
-*/
-template <typename T, std::enable_if_t<std::is_enum_v<T>, bool> = true>
-class enum_helper
-{
-    using base_t = typename std::underlying_type<T>::type;
-    // static class cannot be instantiated, copied, or moved
-    enum_helper()                    = delete;
-    ~enum_helper()                   = delete;
-    enum_helper(const enum_helper&)  = delete;
-    enum_helper(enum_helper&& other) = delete;
-    enum_helper& operator=(const enum_helper&) = delete;
-    enum_helper& operator=(enum_helper&& other) = delete;
-
-public:
-    static const std::vector<T> valid_values;
-
-    static bool has_value(const T& val)
-    {
-        return std::any_of(
-            valid_values.begin(), valid_values.end(), [&](const T& v) { return v == val; });
-    }
-
-    static size_t num_valid_values()
-    {
-        return valid_values.size();
-    }
-    static T get_any_valid_value(size_t prng_seed = 0)
-    {
-        const size_t nvals = num_valid_values();
-        if(nvals == 0)
-            throw std::runtime_error(
-                "enum_helper::get_any_valid_value: no valid value is defined.");
-        std::ranlux24_base gen(prng_seed);
-        return valid_values[static_cast<size_t>(gen()) % nvals];
-    }
-
-    static T get_invalid_value(size_t prng_seed = 0)
-    {
-        constexpr base_t max_base_val = std::numeric_limits<base_t>::max();
-        constexpr base_t min_base_val = std::numeric_limits<base_t>::min();
-
-        std::ranlux24_base                    gen(prng_seed);
-        std::uniform_int_distribution<base_t> dis(min_base_val, max_base_val);
-        // limit number of attempts to 10x the number of possible value
-        size_t num_attempts = 0;
-        T      made_up_value;
-        auto   generate_candidate = [&]() {
-            num_attempts++;
-            made_up_value = static_cast<T>(dis(gen));
-            return;
-        };
-        generate_candidate();
-        while(has_value(made_up_value) && num_attempts < 10 * num_valid_values())
-        {
-            generate_candidate();
-        }
-        if(has_value(made_up_value))
-            throw std::runtime_error(
-                "enum_helper::get_invalid_value failed to generate an invalid valid");
-        return made_up_value;
-    }
-};
-
-// definition of valid values for various enum types
-template <>
-const std::vector<hipfftLibraryPropertyType> enum_helper<hipfftLibraryPropertyType>::valid_values
-    = {hipfftLibraryPropertyType::HIPFFT_MAJOR_VERSION,
-       hipfftLibraryPropertyType::HIPFFT_MINOR_VERSION,
-       hipfftLibraryPropertyType::HIPFFT_PATCH_LEVEL};
-
 TEST(hipfftTest, Create1dPlan)
 {
-    hipfftHandle plan   = hipfft_params::INVALID_PLAN_HANDLE;
-    size_t       length = 1024;
+    hipfftHandle plan = hipfft_params::INVALID_PLAN_HANDLE;
+    ASSERT_EQ(hipfftCreate(&plan), HIPFFT_SUCCESS);
+    size_t length = 1024;
     ASSERT_EQ(hipfftPlan1d(&plan, length, HIPFFT_C2C, 1), HIPFFT_SUCCESS);
 
     ASSERT_EQ(hipfftDestroy(plan), HIPFFT_SUCCESS);
@@ -619,11 +540,11 @@ TEST(hipfftTest, RunR2C)
         ref_in[i] = in[i];
 
     fftw_complex* ref_out;
+    fftw_plan     ref_p;
 
     ref_out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * (N / 2 + 1));
-    fftw_plan_wrapper_t<double> ref_p
-        = fftw_trait<double>::make_wrapper(fftw_plan_dft_r2c_1d(N, ref_in, ref_out, FFTW_ESTIMATE));
-    fftw_execute_type<double>(ref_p);
+    ref_p   = fftw_plan_dft_r2c_1d(N, ref_in, ref_out, FFTW_ESTIMATE);
+    fftw_execute(ref_p);
 
     double maxv  = 0;
     double nrmse = 0; // normalized root mean square error
@@ -641,8 +562,9 @@ TEST(hipfftTest, RunR2C)
     nrmse = sqrt(nrmse);
     nrmse /= maxv;
 
+    EXPECT_TRUE(nrmse < type_epsilon<double>());
+    fftw_destroy_plan(ref_p);
     fftw_free(ref_out);
-    EXPECT_LT(nrmse, type_epsilon_simple<double>());
 }
 
 // ask for a transform whose parameters are only valid out-of-place.
@@ -696,11 +618,11 @@ TEST(hipfftTest, OutplaceOnly)
         ref_in[i] = in[i];
 
     fftw_complex* ref_out;
+    fftw_plan     ref_p;
 
-    ref_out                           = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * N_out);
-    fftw_plan_wrapper_t<double> ref_p = fftw_trait<double>::make_wrapper(
-        fftw_plan_dft_r2c_1d(N_in, ref_in, ref_out, FFTW_ESTIMATE));
-    fftw_execute_type<double>(ref_p);
+    ref_out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * N_out);
+    ref_p   = fftw_plan_dft_r2c_1d(N_in, ref_in, ref_out, FFTW_ESTIMATE);
+    fftw_execute(ref_p);
 
     double maxv  = 0;
     double nrmse = 0; // normalized root mean square error
@@ -718,33 +640,7 @@ TEST(hipfftTest, OutplaceOnly)
     nrmse = sqrt(nrmse);
     nrmse /= maxv;
 
+    ASSERT_TRUE(nrmse < type_epsilon<double>());
+    fftw_destroy_plan(ref_p);
     fftw_free(ref_out);
-    ASSERT_LT(nrmse, type_epsilon_simple<double>());
-}
-
-static constexpr int absurd_version_or_property = std::numeric_limits<int>::min();
-TEST(hipfftTest, GetVersion)
-{
-    // valid use case(s)
-    int tmp = absurd_version_or_property;
-    EXPECT_EQ(hipfftGetVersion(&tmp), HIPFFT_SUCCESS);
-    EXPECT_NE(tmp, absurd_version_or_property);
-    EXPECT_EQ(hipfftGetVersion(nullptr), HIPFFT_INVALID_VALUE);
-}
-
-TEST(hipfftTest, GetProperty)
-{
-    // valid use case(s)
-    int tmp;
-    for(auto prop_type : enum_helper<hipfftLibraryPropertyType>::valid_values)
-    {
-        tmp = absurd_version_or_property;
-        EXPECT_EQ(hipfftGetProperty(prop_type, &tmp), HIPFFT_SUCCESS);
-        EXPECT_NE(tmp, absurd_version_or_property);
-    }
-    // invalid use case(s)
-    const auto valid_property_type = enum_helper<hipfftLibraryPropertyType>::get_any_valid_value();
-    EXPECT_EQ(hipfftGetProperty(valid_property_type, nullptr), HIPFFT_INVALID_VALUE);
-    const auto invalid_property_type = enum_helper<hipfftLibraryPropertyType>::get_invalid_value();
-    EXPECT_EQ(hipfftGetProperty(invalid_property_type, &tmp), HIPFFT_INVALID_VALUE);
 }

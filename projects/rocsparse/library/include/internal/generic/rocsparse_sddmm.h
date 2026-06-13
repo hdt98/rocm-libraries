@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the Software), to deal
@@ -41,21 +41,21 @@ extern "C" {
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle       handle to the rocSPARSE library context queue.
+*  handle       handle to the rocsparse library context queue.
 *  @param[in]
-*  opA          dense matrix \f$A\f$ operation type.
+*  opA      dense matrix \f$A\f$ operation type.
 *  @param[in]
-*  opB          dense matrix \f$B\f$ operation type.
+*  opB      dense matrix \f$B\f$ operation type.
 *  @param[in]
 *  alpha        scalar \f$\alpha\f$.
 *  @param[in]
-*  mat_A        dense matrix \f$A\f$ descriptor.
+*  A            dense matrix \f$A\f$ descriptor.
 *  @param[in]
-*  mat_B        dense matrix \f$B\f$ descriptor.
+*  B            dense matrix \f$B\f$ descriptor.
 *  @param[in]
 *  beta         scalar \f$\beta\f$.
 *  @param[inout]
-*  mat_C        sparse matrix \f$C\f$ descriptor.
+*  C            sparse matrix \f$C\f$ descriptor.
 *  @param[in]
 *  compute_type floating point precision for the SDDMM computation.
 *  @param[in]
@@ -67,7 +67,7 @@ extern "C" {
 *  \retval rocsparse_status_invalid_value the value of \p opA or \p opB is incorrect.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
 *  \retval rocsparse_status_invalid_pointer \p alpha and \p beta are invalid,
-*          or the \p mat_A, \p mat_B, \p mat_C, or \p buffer_size pointer is invalid.
+*          \p A, \p B, \p D, \p C or \p buffer_size pointer is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p opA == \ref rocsparse_operation_conjugate_transpose or
 *          \p opB == \ref rocsparse_operation_conjugate_transpose.
@@ -77,10 +77,10 @@ rocsparse_status rocsparse_sddmm_buffer_size(rocsparse_handle            handle,
                                              rocsparse_operation         opA,
                                              rocsparse_operation         opB,
                                              const void*                 alpha,
-                                             rocsparse_const_dnmat_descr mat_A,
-                                             rocsparse_const_dnmat_descr mat_B,
+                                             rocsparse_const_dnmat_descr A,
+                                             rocsparse_const_dnmat_descr B,
                                              const void*                 beta,
-                                             rocsparse_spmat_descr       mat_C,
+                                             rocsparse_spmat_descr       C,
                                              rocsparse_datatype          compute_type,
                                              rocsparse_sddmm_alg         alg,
                                              size_t*                     buffer_size);
@@ -94,21 +94,21 @@ rocsparse_status rocsparse_sddmm_buffer_size(rocsparse_handle            handle,
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle       handle to the rocSPARSE library context queue.
+*  handle       handle to the rocsparse library context queue.
 *  @param[in]
-*  opA          dense matrix \f$A\f$ operation type.
+*  opA      dense matrix \f$A\f$ operation type.
 *  @param[in]
-*  opB          dense matrix \f$B\f$ operation type.
+*  opB      dense matrix \f$B\f$ operation type.
 *  @param[in]
 *  alpha        scalar \f$\alpha\f$.
 *  @param[in]
-*  mat_A        dense matrix \f$A\f$ descriptor.
+*  A            dense matrix \f$A\f$ descriptor.
 *  @param[in]
-*  mat_B        dense matrix \f$B\f$ descriptor.
+*  B            dense matrix \f$B\f$ descriptor.
 *  @param[in]
 *  beta         scalar \f$\beta\f$.
 *  @param[inout]
-*  mat_C        sparse matrix \f$C\f$ descriptor.
+*  C            sparse matrix \f$C\f$ descriptor.
 *  @param[in]
 *  compute_type floating point precision for the SDDMM computation.
 *  @param[in]
@@ -120,8 +120,8 @@ rocsparse_status rocsparse_sddmm_buffer_size(rocsparse_handle            handle,
 *  \retval rocsparse_status_success the operation completed successfully.
 *  \retval rocsparse_status_invalid_value the value of \p opA or \p opB is incorrect.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval rocsparse_status_invalid_pointer \p alpha and \p beta are invalid, or the
-*          \p mat_A, \p mat_B, \p mat_C, or \p temp_buffer pointer is invalid.
+*  \retval rocsparse_status_invalid_pointer \p alpha and \p beta are invalid,
+*          \p A, \p B, \p D, \p C or \p temp_buffer pointer is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p opA == \ref rocsparse_operation_conjugate_transpose or
 *          \p opB == \ref rocsparse_operation_conjugate_transpose.
@@ -131,10 +131,10 @@ rocsparse_status rocsparse_sddmm_preprocess(rocsparse_handle            handle,
                                             rocsparse_operation         opA,
                                             rocsparse_operation         opB,
                                             const void*                 alpha,
-                                            rocsparse_const_dnmat_descr mat_A,
-                                            rocsparse_const_dnmat_descr mat_B,
+                                            rocsparse_const_dnmat_descr A,
+                                            rocsparse_const_dnmat_descr B,
                                             const void*                 beta,
-                                            rocsparse_spmat_descr       mat_C,
+                                            rocsparse_spmat_descr       C,
                                             rocsparse_datatype          compute_type,
                                             rocsparse_sddmm_alg         alg,
                                             void*                       temp_buffer);
@@ -178,19 +178,19 @@ rocsparse_status rocsparse_sddmm_preprocess(rocsparse_handle            handle,
 *    \right.
 *  \f]
 *
-*  Computing the above sampled dense-dense multiplication requires three steps to complete. First, call
-*  \ref rocsparse_sddmm_buffer_size to determine the size of the required temporary storage buffer. Next,
-*  allocate this buffer and call \ref rocsparse_sddmm_preprocess, which performs any analysis of the input matrices
-*  that might be required. Finally, call \p rocsparse_sddmm to complete the computation. After all calls to
+*  Computing the above sampled dense-dense multiplication requires three steps to complete. First, the user calls
+*  \ref rocsparse_sddmm_buffer_size to determine the size of the required temporary storage buffer. Next, the user
+*  allocates this buffer and calls \ref rocsparse_sddmm_preprocess which performs any analysis of the input matrices
+*  that may be required. Finally, the user calls \p rocsparse_sddmm to complete the computation. Once all calls to
 *  \p rocsparse_sddmm are complete, the temporary buffer can be deallocated.
 *
 *  \p rocsparse_sddmm supports different algorithms which can provide better performance for different matrices.
 *
 *  <table>
 *  <caption id="sddmm_algorithms">Algorithms</caption>
-*  <tr><th>Algorithms                        <th>Deterministic  <th>Preprocessing  <th>Notes
-*  <tr><td>rocsparse_sddmm_alg_default</td>  <td>Yes</td>       <td>No</td>        <td>Uses the sparsity pattern of matrix C to perform a limited set of dot products. </td>
-*  <tr><td>rocsparse_sddmm_alg_dense</td>    <td>Yes</td>       <td>No</td>        <td>Explicitly converts the matrix C into a dense matrix to perform a dense matrix multiply and add. </td>
+*  <tr><th>CSR/CSC Algorithms                <th>Deterministic  <th>Preprocessing  <th>Notes
+*  <tr><td>rocsparse_sddmm_alg_default</td>  <td>Yes</td>       <td>No</td>        <td>Uses the sparsity pattern of matrix C to perform a limited set of dot products </td>
+*  <tr><td>rocsparse_sddmm_alg_dense</td>    <td>Yes</td>       <td>No</td>        <td>Explicitly converts the matrix C into a dense matrix to perform a dense matrix multiply and add </td>
 *  </table>
 *
 *  Currently, \p rocsparse_sddmm only supports the uniform precisions indicated in the table below. For the sparse matrix \f$C\f$, \p rocsparse_sddmm supports the index types
@@ -200,27 +200,14 @@ rocsparse_status rocsparse_sddmm_preprocess(rocsparse_handle            handle,
 *  <table>
 *  <caption id="sddmm_uniform">Uniform Precisions</caption>
 *  <tr><th>A / B / C / compute_type
-*  <tr><td>rocsparse_datatype_f16_r
 *  <tr><td>rocsparse_datatype_f32_r
 *  <tr><td>rocsparse_datatype_f64_r
 *  <tr><td>rocsparse_datatype_f32_c
 *  <tr><td>rocsparse_datatype_f64_c
 *  </table>
 *
-*  \par Mixed Precisions:
-*  <table>
-*  <caption id="sddmm_mixed">Mixed Precisions</caption>
-*  <tr><th>A / B                     <th>C                         <th>compute_type
-*  <tr><td>rocsparse_datatype_f16_r  <td>rocsparse_datatype_f32_r  <td>rocsparse_datatype_f32_r
-*  <tr><td>rocsparse_datatype_f16_r  <td>rocsparse_datatype_f16_r  <td>rocsparse_datatype_f32_r
-*  <tr><td>rocsparse_datatype_bf16_r <td>rocsparse_datatype_f32_r  <td>rocsparse_datatype_f32_r
-*  <tr><td>rocsparse_datatype_bf16_r <td>rocsparse_datatype_bf16_r <td>rocsparse_datatype_f32_r
-*  </table>
-*
 *  \note
-*  The sparse matrix formats currently supported are: \ref rocsparse_format_csr,
-*  \ref rocsparse_format_csc, \ref rocsparse_format_coo, \ref rocsparse_format_coo_aos,
-*  and \ref rocsparse_format_ell.
+*  The sparse matrix formats currently supported are: \ref rocsparse_format_csr.
 *
 *  \note \p opA == \ref rocsparse_operation_conjugate_transpose is not supported.
 *  \note \p opB == \ref rocsparse_operation_conjugate_transpose is not supported.
@@ -228,25 +215,22 @@ rocsparse_status rocsparse_sddmm_preprocess(rocsparse_handle            handle,
 *  \note
 *  This routine supports execution in a hipGraph context only when \p alg == \ref rocsparse_sddmm_alg_default.
 *
-*  \note
-*  This routine does not support batched computation.
-*
 *  @param[in]
-*  handle       handle to the rocSPARSE library context queue.
+*  handle       handle to the rocsparse library context queue.
 *  @param[in]
-*  opA          dense matrix \f$A\f$ operation type.
+*  opA      dense matrix \f$A\f$ operation type.
 *  @param[in]
-*  opB          dense matrix \f$B\f$ operation type.
+*  opB      dense matrix \f$B\f$ operation type.
 *  @param[in]
 *  alpha        scalar \f$\alpha\f$.
 *  @param[in]
-*  mat_A        dense matrix \f$A\f$ descriptor.
+*  A            dense matrix \f$A\f$ descriptor.
 *  @param[in]
-*  mat_B        dense matrix \f$B\f$ descriptor.
+*  B            dense matrix \f$B\f$ descriptor.
 *  @param[in]
 *  beta         scalar \f$\beta\f$.
 *  @param[inout]
-*  mat_C        sparse matrix \f$C\f$ descriptor.
+*  C            sparse matrix \f$C\f$ descriptor.
 *  @param[in]
 *  compute_type floating point precision for the SDDMM computation.
 *  @param[in]
@@ -256,28 +240,156 @@ rocsparse_status rocsparse_sddmm_preprocess(rocsparse_handle            handle,
 *  The size must be greater or equal to the size obtained with \ref rocsparse_sddmm_buffer_size.
 *
 *  \retval rocsparse_status_success the operation completed successfully.
-*  \retval rocsparse_status_invalid_value the value of \p opA, \p opB, \p compute\_type, or \p alg is incorrect.
+*  \retval rocsparse_status_invalid_value the value of \p opA, \p opB, \p compute\_type or alg is incorrect.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval rocsparse_status_invalid_pointer \p alpha and \p beta are invalid, or the
-*          \p mat_A, \p mat_B, \p mat_C, or \p temp_buffer pointer is invalid.
+*  \retval rocsparse_status_invalid_pointer \p alpha and \p beta are invalid,
+*          \p A, \p B, \p D, \p C or \p temp_buffer pointer is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p opA == \ref rocsparse_operation_conjugate_transpose or
 *          \p opB == \ref rocsparse_operation_conjugate_transpose.
 *
 *  \par Example
-*  This example performs a sampled dense-dense matrix product, \f$C := \alpha ( A \cdot B ) \circ spy(C) + \beta C\f$
-*  where \f$\circ\f$ is the Hadamard product.
-*  \snippet example_rocsparse_sddmm.cpp doc example
+*  This example performs sampled dense-dense matrix product, \f$C := \alpha ( A \cdot B ) \circ spy(C) + \beta C\f$
+*  where \f$\circ\f$ is the hadamard product
+*  \code{.c}
+*    // rocSPARSE handle
+*    rocsparse_handle handle;
+*    rocsparse_create_handle(&handle);
+*
+*    float halpha = 1.0f;
+*    float hbeta = -1.0f;
+*
+*    // A, B, and C are mxk, kxn, and mxn
+*    int m = 4;
+*    int k = 3;
+*    int n = 2;
+*    int nnzC = 5;
+*
+*    //     2  3  -1
+*    // A = 0  2   1
+*    //     0  0   5
+*    //     0 -2 0.5
+*
+*    //      0  4
+*    // B =  1  0
+*    //     -2  0.5
+*
+*    //      1 0            1 0
+*    // C =  2 3   spy(C) = 1 1
+*    //      0 0            0 0
+*    //      4 5            1 1
+*
+*    std::vector<float> hA = {2.0f, 3.0f, -1.0f, 0.0, 2.0f, 1.0f, 0.0f, 0.0f, 5.0f, 0.0f, -2.0f, 0.5f};
+*    std::vector<float> hB = {0.0f, 4.0f, 1.0f, 0.0, -2.0f, 0.5f};
+*
+*    std::vector<int> hcsr_row_ptrC = {0, 1, 3, 3, 5};
+*    std::vector<int> hcsr_col_indC = {0, 0, 1, 0, 1};
+*    std::vector<float> hcsr_valC = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+*
+*    float* dA = nullptr;
+*    float* dB = nullptr;
+*    hipMalloc((void**)&dA, sizeof(float) * m * k);
+*    hipMalloc((void**)&dB, sizeof(float) * k * n);
+*
+*    int* dcsr_row_ptrC = nullptr;
+*    int* dcsr_col_indC = nullptr;
+*    float* dcsr_valC = nullptr;
+*    hipMalloc((void**)&dcsr_row_ptrC, sizeof(int) * (m + 1));
+*    hipMalloc((void**)&dcsr_col_indC, sizeof(int) * nnzC);
+*    hipMalloc((void**)&dcsr_valC, sizeof(float) * nnzC);
+*
+*    hipMemcpy(dA, hA.data(), sizeof(float) * m * k, hipMemcpyHostToDevice);
+*    hipMemcpy(dB, hB.data(), sizeof(float) * k * n, hipMemcpyHostToDevice);
+*
+*    hipMemcpy(dcsr_row_ptrC, hcsr_row_ptrC.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice);
+*    hipMemcpy(dcsr_col_indC, hcsr_col_indC.data(), sizeof(int) * nnzC, hipMemcpyHostToDevice);
+*    hipMemcpy(dcsr_valC, hcsr_valC.data(), sizeof(float) * nnzC, hipMemcpyHostToDevice);
+*
+*    rocsparse_dnmat_descr matA;
+*    rocsparse_create_dnmat_descr(&matA, m, k, k, dA, rocsparse_datatype_f32_r, rocsparse_order_row);
+*
+*    rocsparse_dnmat_descr matB;
+*    rocsparse_create_dnmat_descr(&matB, k, n, n, dB, rocsparse_datatype_f32_r, rocsparse_order_row);
+*
+*    rocsparse_spmat_descr matC;
+*    rocsparse_create_csr_descr(&matC,
+*                               m,
+*                               n,
+*                               nnzC,
+*                               dcsr_row_ptrC,
+*                               dcsr_col_indC,
+*                               dcsr_valC,
+*                               rocsparse_indextype_i32,
+*                               rocsparse_indextype_i32,
+*                               rocsparse_index_base_zero,
+*                               rocsparse_datatype_f32_r);
+*
+*    size_t buffer_size = 0;
+*    rocsparse_sddmm_buffer_size(handle,
+*                                rocsparse_operation_none,
+*                                rocsparse_operation_none,
+*                                &halpha,
+*                                matA,
+*                                matB,
+*                                &hbeta,
+*                                matC,
+*                                rocsparse_datatype_f32_r,
+*                                rocsparse_sddmm_alg_default,
+*                                &buffer_size);
+*
+*    void* dbuffer = nullptr;
+*    hipMalloc((void**) &dbuffer, buffer_size);
+*
+*    rocsparse_sddmm_preprocess(handle,
+*                               rocsparse_operation_none,
+*                               rocsparse_operation_none,
+*                               &halpha,
+*                               matA,
+*                               matB,
+*                               &hbeta,
+*                               matC,
+*                               rocsparse_datatype_f32_r,
+*                               rocsparse_sddmm_alg_default,
+*                               dbuffer);
+*
+*    rocsparse_sddmm(handle,
+*                    rocsparse_operation_none,
+*                    rocsparse_operation_none,
+*                    &halpha,
+*                    matA,
+*                    matB,
+*                    &hbeta,
+*                    matC,
+*                    rocsparse_datatype_f32_r,
+*                    rocsparse_sddmm_alg_default,
+*                    dbuffer);
+*
+*    hipMemcpy(hcsr_row_ptrC.data(), dcsr_row_ptrC, sizeof(int) * (m + 1), hipMemcpyDeviceToHost);
+*    hipMemcpy(hcsr_col_indC.data(), dcsr_col_indC, sizeof(int) * nnzC, hipMemcpyDeviceToHost);
+*    hipMemcpy(hcsr_valC.data(), dcsr_valC, sizeof(float) * nnzC, hipMemcpyDeviceToHost);
+*
+*    rocsparse_destroy_dnmat_descr(matA);
+*    rocsparse_destroy_dnmat_descr(matB);
+*    rocsparse_destroy_spmat_descr(matC);
+*    rocsparse_destroy_handle(handle);
+*
+*    hipFree(dA);
+*    hipFree(dB);
+*    hipFree(dcsr_row_ptrC);
+*    hipFree(dcsr_col_indC);
+*    hipFree(dcsr_valC);
+*    hipFree(dbuffer);
+*  \endcode
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_sddmm(rocsparse_handle            handle,
                                  rocsparse_operation         opA,
                                  rocsparse_operation         opB,
                                  const void*                 alpha,
-                                 rocsparse_const_dnmat_descr mat_A,
-                                 rocsparse_const_dnmat_descr mat_B,
+                                 rocsparse_const_dnmat_descr A,
+                                 rocsparse_const_dnmat_descr B,
                                  const void*                 beta,
-                                 rocsparse_spmat_descr       mat_C,
+                                 rocsparse_spmat_descr       C,
                                  rocsparse_datatype          compute_type,
                                  rocsparse_sddmm_alg         alg,
                                  void*                       temp_buffer);

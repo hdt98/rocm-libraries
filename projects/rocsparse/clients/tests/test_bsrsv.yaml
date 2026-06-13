@@ -28,9 +28,12 @@ include: rocsparse_common.yaml
 Definitions:
   - &M_N_range_quick
     - { M:  50, N:  50 }
+    - { M: 186, N: 186 }
 
   - &M_N_range_checkin
     - { M:   0, N:   0 }
+    - { M:  79, N:  79 }
+    - { M: 141, N: 141 }
 
   - &M_N_range_nightly
     - { M:   9381, N:   9381 }
@@ -38,11 +41,11 @@ Definitions:
 
   - &alpha_range_quick
     - { alpha:   1.0, alphai: -0.25 }
-
+    - { alpha:  -0.5, alphai:  0.125 }
 
   - &alpha_range_checkin
     - { alpha:   2.0, alphai:  1.0 }
-
+    - { alpha:   0.0, alphai:  0.5 }
 
   - &alpha_range_nightly
     - { alpha:   0.0,  alphai: -0.75 }
@@ -62,13 +65,13 @@ Tests:
   function: bsrsv
   precision: *single_double_precisions_complex_real
   M_N: *M_N_range_checkin
-  block_dim: [5]
+  block_dim: [2, 5, 14, 23, 81]
   alpha_alphai: *alpha_range_checkin
   direction: [rocsparse_direction_column]
-  transA: [rocsparse_operation_none]
-  diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
-  apol: [rocsparse_analysis_policy_reuse]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
+  diag: [rocsparse_diag_type_non_unit, rocsparse_diag_type_unit]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
+  apol: [rocsparse_analysis_policy_force, rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_random]
@@ -79,10 +82,10 @@ Tests:
   precision: *single_double_precisions_complex
   M: 1
   N: 1
-  block_dim: [7]
+  block_dim: [7, 29]
   alpha_alphai: *alpha_range
   direction: [rocsparse_direction_row]
-  transA: [rocsparse_operation_none]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
   diag: [rocsparse_diag_type_non_unit]
   uplo: [rocsparse_fill_mode_lower]
   apol: [rocsparse_analysis_policy_force]
@@ -102,7 +105,7 @@ Tests:
   direction: [rocsparse_direction_column]
   transA: [rocsparse_operation_transpose]
   diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_zero]
@@ -114,14 +117,14 @@ Tests:
 - name: bsrsv
   category: quick
   function: bsrsv
-  precision: *single_double_precisions
+  precision: *single_double_precisions_complex_real
   M_N: *M_N_range_quick
-  block_dim: [9]
+  block_dim: [2, 9, 16, 33, 174]
   alpha_alphai: *alpha_range_quick
   direction: [rocsparse_direction_row]
-  transA: [rocsparse_operation_none]
-  diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
+  diag: [rocsparse_diag_type_non_unit, rocsparse_diag_type_unit]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_zero]
@@ -130,14 +133,14 @@ Tests:
 - name: bsrsv
   category: quick
   function: bsrsv
-  precision: *single_double_precisions
+  precision: *single_double_precisions_complex_real
   M_N: *M_N_range_quick
   block_dim: [174]
   alpha_alphai: *alpha_range_quick
   direction: [rocsparse_direction_row]
-  transA: [rocsparse_operation_none]
-  diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
+  diag: [rocsparse_diag_type_non_unit, rocsparse_diag_type_unit]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_zero]
@@ -149,12 +152,12 @@ Tests:
   precision: *single_double_precisions
   M: 1
   N: 1
-  block_dim: [16]
+  block_dim: [3, 16, 87]
   alpha_alphai: *alpha_range_quick
   direction: [rocsparse_direction_column]
   transA: [rocsparse_operation_none]
   diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_force]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_one]
@@ -167,14 +170,14 @@ Tests:
 - name: bsrsv_file
   category: quick
   function: bsrsv
-  precision: *single_only_precisions_complex
+  precision: *single_double_precisions_complex
   M: 1
   N: 1
-  block_dim: [10]
+  block_dim: [10, 19]
   alpha_alphai: *alpha_range_quick
   direction: [rocsparse_direction_row]
   transA: [rocsparse_operation_transpose]
-  diag: [rocsparse_diag_type_non_unit]
+  diag: [rocsparse_diag_type_non_unit, rocsparse_diag_type_unit]
   uplo: [rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
@@ -190,9 +193,9 @@ Tests:
   block_dim: [4, 11, 20]
   alpha_alphai: *alpha_range_nightly
   direction: [rocsparse_direction_row]
-  transA: [rocsparse_operation_none]
-  diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
+  diag: [rocsparse_diag_type_non_unit, rocsparse_diag_type_unit]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_one]
@@ -227,7 +230,7 @@ Tests:
   block_dim: [7]
   alpha_alphai: *alpha_range_nightly
   direction: [rocsparse_direction_column]
-  transA: [rocsparse_operation_none]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
   diag: [rocsparse_diag_type_unit]
   uplo: [rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
@@ -247,7 +250,7 @@ Tests:
   block_dim: [7]
   alpha_alphai: *alpha_range_nightly
   direction: [rocsparse_direction_column]
-  transA: [rocsparse_operation_none]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
   diag: [rocsparse_diag_type_unit]
   uplo: [rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
@@ -264,9 +267,9 @@ Tests:
   block_dim: [2, 9, 16, 33, 174]
   alpha_alphai: *alpha_range_quick
   direction: [rocsparse_direction_row]
-  transA: [rocsparse_operation_none]
-  diag: [rocsparse_diag_type_non_unit]
-  uplo: [rocsparse_fill_mode_lower]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
+  diag: [rocsparse_diag_type_non_unit, rocsparse_diag_type_unit]
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   apol: [rocsparse_analysis_policy_reuse]
   spol: [rocsparse_solve_policy_auto]
   baseA: [rocsparse_index_base_zero]

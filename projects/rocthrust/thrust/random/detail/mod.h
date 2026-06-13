@@ -26,15 +26,16 @@ namespace random
 namespace detail
 {
 
-template <typename T, T a, T c, T m, bool = (m == 0)>
-struct static_mod
+template<typename T, T a, T c, T m, bool = (m == 0)>
+  struct static_mod
 {
   static const T q = m / a;
   static const T r = m % a;
 
-  THRUST_HOST_DEVICE T operator()(T x) const
+  THRUST_HOST_DEVICE
+  T operator()(T x) const
   {
-    THRUST_IF_CONSTEXPR (a == 1)
+    THRUST_IF_CONSTEXPR(a == 1)
     {
       x %= m;
     }
@@ -42,7 +43,7 @@ struct static_mod
     {
       T t1 = a * (x % q);
       T t2 = r * (x / q);
-      if (t1 >= t2)
+      if(t1 >= t2)
       {
         x = t1 - t2;
       }
@@ -52,10 +53,10 @@ struct static_mod
       }
     }
 
-    THRUST_IF_CONSTEXPR (c != 0)
+    THRUST_IF_CONSTEXPR(c != 0)
     {
       const T d = m - x;
-      if (d > c)
+      if(d > c)
       {
         x += c;
       }
@@ -69,25 +70,29 @@ struct static_mod
   }
 }; // end static_mod
 
+
 // Rely on machine overflow handling
-template <typename T, T a, T c, T m>
-struct static_mod<T, a, c, m, true>
+template<typename T, T a, T c, T m>
+  struct static_mod<T,a,c,m,true>
 {
-  THRUST_HOST_DEVICE T operator()(T x) const
+  THRUST_HOST_DEVICE
+  T operator()(T x) const
   {
     return a * x + c;
   }
 }; // end static_mod
 
-template <typename T, T a, T c, T m>
-THRUST_HOST_DEVICE T mod(T x)
+template<typename T, T a, T c, T m>
+THRUST_HOST_DEVICE
+  T mod(T x)
 {
-  static_mod<T, a, c, m> f;
+  static_mod<T,a,c,m> f;
   return f(x);
 } // end static_mod
 
-} // namespace detail
+} // end detail
 
-} // namespace random
+} // end random
 
 THRUST_NAMESPACE_END
+

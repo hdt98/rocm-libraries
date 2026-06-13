@@ -1,4 +1,4 @@
-// Copyright (C) 2021 - 2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2021 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -104,7 +104,7 @@ const static std::vector<std::vector<size_t>> ooffset_range = {{0, 0}, {1, 1}};
 auto transform_types = {fft_transform_type_complex_forward, fft_transform_type_real_forward};
 
 #ifdef __HIP__
-INSTANTIATE_TEST_SUITE_P(DISABLED_callback_no_offset,
+INSTANTIATE_TEST_SUITE_P(callback,
                          accuracy_test,
                          ::testing::ValuesIn(param_generator_base(test_prob,
                                                                   transform_types,
@@ -118,11 +118,9 @@ INSTANTIATE_TEST_SUITE_P(DISABLED_callback_no_offset,
                                                                   ooffset_range_zero,
                                                                   place_range,
                                                                   false,
-                                                                  callbacks_full)),
+                                                                  true)),
                          accuracy_test::TestName);
 
-// function pointer callbacks need -fgpu-rdc, but that causes build
-// nondeterminism in kpack
 INSTANTIATE_TEST_SUITE_P(DISABLED_callback,
                          accuracy_test,
                          ::testing::ValuesIn(param_generator_base(test_prob,
@@ -137,7 +135,7 @@ INSTANTIATE_TEST_SUITE_P(DISABLED_callback,
                                                                   ooffset_range,
                                                                   place_range,
                                                                   false,
-                                                                  callbacks_full)),
+                                                                  true)),
                          accuracy_test::TestName);
 #endif
 

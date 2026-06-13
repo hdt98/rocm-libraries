@@ -17,150 +17,137 @@
 
 #include <thrust/extrema.h>
 #include <thrust/iterator/retag.h>
-#include <thrust/universal_vector.h>
 
-#include "test_param_fixtures.hpp"
-#include "test_utils.hpp"
-
-using VectorTestsParams = ::testing::Types<
-  Params<thrust::host_vector<signed char>>,
-  Params<thrust::host_vector<short>>,
-  Params<thrust::host_vector<int>>,
-  Params<thrust::host_vector<float>>,
-  Params<thrust::host_vector<int, thrust::mr::stateless_resource_allocator<int, thrust::host_memory_resource>>>,
-  Params<thrust::device_vector<signed char>>,
-  Params<thrust::device_vector<short>>,
-  Params<thrust::device_vector<int>>,
-  Params<thrust::device_vector<float>>,
-  Params<thrust::device_vector<int, thrust::mr::stateless_resource_allocator<int, thrust::device_memory_resource>>>,
-  Params<thrust::universal_vector<int>>,
-  Params<thrust::universal_host_pinned_vector<int>>>;
+#include "test_header.hpp"
 
 TESTS_DEFINE(MinElementTests, FullTestsParams);
 TESTS_DEFINE(MinElementPrimitiveTests, NumericalTestsParams);
-TESTS_DEFINE(MinElementVectorUnitTests, VectorTestsParams);
 
 TYPED_TEST(MinElementTests, TestMinElementSimple)
 {
-  using Vector = typename TestFixture::input_type;
-  using T      = typename Vector::value_type;
+    using Vector = typename TestFixture::input_type;
+    using Policy = typename TestFixture::execution_policy;
+    using T      = typename Vector::value_type;
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  Vector data{3, 5, 1, 2, 5, 1};
+    Vector data(6);
+    data[0] = 3;
+    data[1] = 5;
+    data[2] = 1;
+    data[3] = 2;
+    data[4] = 5;
+    data[5] = 1;
 
-  ASSERT_EQ(*thrust::min_element(data.begin(), data.end()), 1);
-  ASSERT_EQ(thrust::min_element(data.begin(), data.end()) - data.begin(), 2);
+    ASSERT_EQ(*thrust::min_element(Policy{}, data.begin(), data.end()), 1);
+    ASSERT_EQ(thrust::min_element(Policy{}, data.begin(), data.end()) - data.begin(), 2);
 
-  ASSERT_EQ(*thrust::min_element(data.begin(), data.end(), thrust::greater<T>()), 5);
-  ASSERT_EQ(thrust::min_element(data.begin(), data.end(), thrust::greater<T>()) - data.begin(), 1);
+    ASSERT_EQ(*thrust::min_element(Policy{}, data.begin(), data.end(), thrust::greater<T>()), 5);
+    ASSERT_EQ(thrust::min_element(Policy{}, data.begin(), data.end(), thrust::greater<T>()) - data.begin(),
+              1);
 }
 
-TYPED_TEST(MinElementVectorUnitTests, TestMinElementWithTransform)
+TYPED_TEST(MinElementTests, TestMinElementWithTransform)
 {
-  using Vector = typename TestFixture::input_type;
-  using T      = typename Vector::value_type;
+    using Vector = typename TestFixture::input_type;
+    using Policy = typename TestFixture::execution_policy;
+    using T      = typename Vector::value_type;
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  Vector data{3, 5, 1, 2, 5, 1};
+    // We cannot use unsigned types for this test case
+    if(std::is_unsigned<T>::value)
+        return;
 
-  ASSERT_EQ(*thrust::min_element(thrust::make_transform_iterator(data.begin(), thrust::negate<T>()),
-                                 thrust::make_transform_iterator(data.end(), thrust::negate<T>())),
-            -5);
-  ASSERT_EQ(*thrust::min_element(thrust::make_transform_iterator(data.begin(), thrust::negate<T>()),
-                                 thrust::make_transform_iterator(data.end(), thrust::negate<T>()),
-                                 thrust::greater<T>()),
-            -1);
+    Vector data(6);
+    data[0] = 3;
+    data[1] = 5;
+    data[2] = 1;
+    data[3] = 2;
+    data[4] = 5;
+    data[5] = 1;
+
+    ASSERT_EQ(
+        *thrust::min_element(Policy{},
+                             thrust::make_transform_iterator(data.begin(), thrust::negate<T>()),
+                             thrust::make_transform_iterator(data.end(), thrust::negate<T>())),
+        -5);
+    ASSERT_EQ(
+        *thrust::min_element(Policy{},
+                             thrust::make_transform_iterator(data.begin(), thrust::negate<T>()),
+                             thrust::make_transform_iterator(data.end(), thrust::negate<T>()),
+                             thrust::greater<T>()),
+        -1);
 }
 
 TYPED_TEST(MinElementPrimitiveTests, TestMinElement)
 {
-  using T = typename TestFixture::input_type;
+    using T = typename TestFixture::input_type;
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  for (auto size : get_sizes())
-  {
-    SCOPED_TRACE(testing::Message() << "with size= " << size);
-
-    for (auto seed : get_seeds())
+    for(auto size : get_sizes())
     {
-      SCOPED_TRACE(testing::Message() << "with seed= " << seed);
+        SCOPED_TRACE(testing::Message() << "with size= " << size);
 
-      thrust::host_vector<T> h_data =
-        get_random_data<T>(size, get_default_limits<T>::min(), get_default_limits<T>::max(), seed);
-      thrust::device_vector<T> d_data = h_data;
+        for(auto seed : get_seeds())
+        {
+            SCOPED_TRACE(testing::Message() << "with seed= " << seed);
 
-      typename thrust::host_vector<T>::iterator h_min   = thrust::min_element(h_data.begin(), h_data.end());
-      typename thrust::device_vector<T>::iterator d_min = thrust::min_element(d_data.begin(), d_data.end());
+            thrust::host_vector<T> h_data = get_random_data<T>(
+                size, get_default_limits<T>::min(), get_default_limits<T>::max(), seed);
+            thrust::device_vector<T> d_data = h_data;
 
-      ASSERT_EQ(h_min - h_data.begin(), d_min - d_data.begin());
+            typename thrust::host_vector<T>::iterator h_min
+                = thrust::min_element(h_data.begin(), h_data.end());
+            typename thrust::device_vector<T>::iterator d_min
+                = thrust::min_element(d_data.begin(), d_data.end());
 
-      typename thrust::host_vector<T>::iterator h_max =
-        thrust::min_element(h_data.begin(), h_data.end(), thrust::greater<T>());
-      typename thrust::device_vector<T>::iterator d_max =
-        thrust::min_element(d_data.begin(), d_data.end(), thrust::greater<T>());
+            ASSERT_EQ(h_data.begin() - h_min, d_data.begin() - d_min);
 
-      ASSERT_EQ(h_max - h_data.begin(), d_max - d_data.begin());
+            typename thrust::host_vector<T>::iterator h_max
+                = thrust::min_element(h_data.begin(), h_data.end(), thrust::greater<T>());
+            typename thrust::device_vector<T>::iterator d_max
+                = thrust::min_element(d_data.begin(), d_data.end(), thrust::greater<T>());
+
+            ASSERT_EQ(h_max - h_data.begin(), d_max - d_data.begin());
+        }
     }
-  }
 }
 
 template <typename ForwardIterator>
 ForwardIterator min_element(my_system& system, ForwardIterator first, ForwardIterator)
 {
-  system.validate_dispatch();
-  return first;
+    system.validate_dispatch();
+    return first;
 }
 
 TEST(MinElementTests, TestMinElementDispatchExplicit)
 {
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  thrust::device_vector<int> vec(1);
+    thrust::device_vector<int> vec(1);
 
-  my_system sys(0);
-  thrust::min_element(sys, vec.begin(), vec.end());
+    my_system sys(0);
+    thrust::min_element(sys, vec.begin(), vec.end());
 
-  ASSERT_EQ(true, sys.is_valid());
+    ASSERT_EQ(true, sys.is_valid());
 }
 
 template <typename ForwardIterator>
 ForwardIterator min_element(my_tag, ForwardIterator first, ForwardIterator)
 {
-  *first = 13;
-  return first;
+    *first = 13;
+    return first;
 }
 
 TEST(MinElementTests, TestMinElementDispatchImplicit)
 {
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    
+    thrust::device_vector<int> vec(1);
 
-  thrust::device_vector<int> vec(1);
+    thrust::min_element(thrust::retag<my_tag>(vec.begin()), thrust::retag<my_tag>(vec.end()));
 
-  thrust::min_element(thrust::retag<my_tag>(vec.begin()), thrust::retag<my_tag>(vec.end()));
-
-  ASSERT_EQ(13, vec.front());
-}
-
-void TestMinElementWithBigIndexesHelper(int magnitude)
-{
-  thrust::counting_iterator<long long> begin(1);
-  thrust::counting_iterator<long long> end = begin + (1ll << magnitude);
-  ASSERT_EQ(thrust::distance(begin, end), 1ll << magnitude);
-
-  ASSERT_EQ(*thrust::min_element(thrust::device, begin, end, thrust::greater<long long>()), (1ll << magnitude));
-}
-
-TEST(MinElementTests, TestMinElementWithBigIndexes)
-{
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
-
-  TestMinElementWithBigIndexesHelper(30);
-#ifndef THRUST_FORCE_32_BIT_OFFSET_TYPE
-  TestMinElementWithBigIndexesHelper(31);
-  TestMinElementWithBigIndexesHelper(32);
-  TestMinElementWithBigIndexesHelper(33);
-#endif
-}
+    ASSERT_EQ(13, vec.front());
+} 

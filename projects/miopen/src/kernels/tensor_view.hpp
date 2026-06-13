@@ -27,7 +27,6 @@
 #ifndef GUARD_TENSOR_VIEW_HPP
 #define GUARD_TENSOR_VIEW_HPP
 
-#include "miopen_cstdint.hpp"
 #include <initializer_list>
 
 template <int N>

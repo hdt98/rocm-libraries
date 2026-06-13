@@ -24,7 +24,7 @@
 #include "rocsparse_convert_array.hpp"
 #include "rocsparse_gcoo2csr.hpp"
 #include "rocsparse_gcoo_aos2coo.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 rocsparse_status rocsparse::gcoo_aos2csr(rocsparse_handle     handle,
                                          int64_t              m,

@@ -1,9 +1,8 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
-#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_wmmaops_v1.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_wmmaops_v3.hpp"
 
 namespace ck {
@@ -27,38 +26,10 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t NPerWmma,
           index_t MRepeat,
           index_t NRepeat,
-          index_t KPack,
-          index_t KInner,
-          bool TransposeC = false,
-          bool BSkipLDS   = false>
+          index_t KPack>
 constexpr auto BlockGemmPipeline_Selector()
 {
-    if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
-    {
-        return BlockwiseGemmWmmaops_pipeline_v1<BlkGemmPipeSche,
-                                                BlockSize,
-                                                ADataType,
-                                                BDataType,
-                                                ComputeTypeA,
-                                                ComputeTypeB,
-                                                AccDataType,
-                                                AWmmaTileDesc,
-                                                BWmmaTileDesc,
-                                                ABlockTransferSrcScalarPerVector,
-                                                BBlockTransferSrcScalarPerVector,
-                                                MPerBlock,
-                                                NPerBlock,
-                                                KPerBlock,
-                                                MPerWmma,
-                                                NPerWmma,
-                                                MRepeat,
-                                                NRepeat,
-                                                KPack,
-                                                KInner,
-                                                TransposeC,
-                                                BSkipLDS>{};
-    }
-    else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
+    if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
     {
         return BlockwiseGemmWmmaops_pipeline_v3<BlkGemmPipeSche,
                                                 BlockSize,
@@ -78,10 +49,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                 NPerWmma,
                                                 MRepeat,
                                                 NRepeat,
-                                                KPack,
-                                                KInner,
-                                                TransposeC,
-                                                BSkipLDS>{};
+                                                KPack>{};
     }
     else
     {

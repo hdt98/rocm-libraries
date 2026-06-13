@@ -1,8 +1,7 @@
 TestParameters:
-  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx940, skip-gfx941, skip-gfx942, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201, skip-gfx1250] # not supported by arch
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201] # not supported by arch
 
 GlobalParameters:
-  SyncsPerBenchmark: 0
   NumElementsToValidate: -1
   BoundsCheck: False
   KernelTime: False
@@ -28,8 +27,8 @@ BenchmarkProblems:
       DestDataType: I8
       ComputeDataType: I
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: False
+      TransposeA: 0
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -49,8 +48,6 @@ BenchmarkProblems:
         - InnerUnroll: [1]
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]  # 16x16
-          - [16,16,64, 1, 1, 1,1, 1,1]
-          - [32,32,32, 1, 1, 1,1, 1,1]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
         - LdsPadA: [0]
@@ -83,8 +80,8 @@ BenchmarkProblems:
       DestDataType: B
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: True
+      TransposeA: 0
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -108,8 +105,6 @@ BenchmarkProblems:
         - InnerUnroll: [1]
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]  # 16x16
-          - [16,16,64, 1, 1, 1,1, 1,1]
-          - [32,32,32, 1, 1, 1,1, 1,1]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
         - LdsPadA: [0]
@@ -143,8 +138,8 @@ BenchmarkProblems:
       DestDataType: H
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -168,8 +163,6 @@ BenchmarkProblems:
         - InnerUnroll: [1]
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]  # 16x16
-          - [16,16,64, 1, 1, 1,1, 1,1]
-          - [32,32,32, 1, 1, 1,1, 1,1]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
         - LdsPadA: [0]
@@ -203,8 +196,8 @@ BenchmarkProblems:
       DestDataType: I
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: True
+      TransposeA: 1
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -228,8 +221,6 @@ BenchmarkProblems:
         - InnerUnroll: [1]
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]  # 16x16
-          - [16,16,64, 1, 1, 1,1, 1,1]
-          - [32,32,32, 1, 1, 1,1, 1,1]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
         - LdsPadA: [0]

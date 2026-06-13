@@ -34,7 +34,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <typename T, typename U>
 void sterf_checkBadArgs(const rocblas_handle handle, const rocblas_int n, T dD, T dE, U dInfo)
@@ -182,7 +181,7 @@ void sterf_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -198,11 +197,11 @@ void sterf_getPerfData(const rocblas_handle handle,
     {
         sterf_initData<false, true, T>(handle, n, dD, dE, dInfo, hD, hE, hInfo);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_sterf(handle, n, dD.data(), dE.data(), dInfo.data());
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <typename T>
@@ -253,16 +252,20 @@ void testing_sterf(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         CHECK_ALLOC_QUERY(rocsolver_sterf(handle, n, (T*)nullptr, (T*)nullptr, (rocblas_int*)nullptr));
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // memory allocations
@@ -296,7 +299,7 @@ void testing_sterf(Arguments& argus)
         sterf_getError<T>(handle, n, dD, dE, dInfo, hD, hDRes, hE, hERes, hInfo, &max_error);
 
     // collect performance data
-    if(argus.timing && hot_calls > 0)
+    if(argus.timing)
         sterf_getPerfData<T>(handle, n, dD, dE, dInfo, hD, hE, hInfo, &gpu_time_used, &cpu_time_used,
                              hot_calls, argus.profile, argus.profile_kernels, argus.perf);
 

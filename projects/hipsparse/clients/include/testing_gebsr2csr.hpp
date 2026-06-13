@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,6 @@
 #include "gbyte.hpp"
 #include "hipsparse.hpp"
 #include "hipsparse_arguments.hpp"
-#include "hipsparse_graph.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -43,7 +42,7 @@ using namespace hipsparse;
 using namespace hipsparse_test;
 
 template <typename T>
-void testing_gebsr2csr_bad_arg(const Arguments& argus)
+void testing_gebsr2csr_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION))
     int                  m             = 1;
@@ -55,11 +54,12 @@ void testing_gebsr2csr_bad_arg(const Arguments& argus)
     hipsparseIndexBase_t bsr_idx_base  = HIPSPARSE_INDEX_BASE_ZERO;
     hipsparseDirection_t dir           = HIPSPARSE_DIRECTION_ROW;
 
-    hipsparseLocalHandle_t        handle;
-    std::unique_ptr<descr_struct> unique_ptr_csr_descr(new descr_struct);
-    hipsparseMatDescr_t           csr_descr = unique_ptr_csr_descr->descr;
-    std::unique_ptr<descr_struct> unique_ptr_bsr_descr(new descr_struct);
-    hipsparseMatDescr_t           bsr_descr = unique_ptr_bsr_descr->descr;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
+    std::unique_ptr<descr_struct>  unique_ptr_csr_descr(new descr_struct);
+    hipsparseMatDescr_t            csr_descr = unique_ptr_csr_descr->descr;
+    std::unique_ptr<descr_struct>  unique_ptr_bsr_descr(new descr_struct);
+    hipsparseMatDescr_t            bsr_descr = unique_ptr_bsr_descr->descr;
 
     hipsparseSetMatIndexBase(csr_descr, csr_idx_base);
     hipsparseSetMatIndexBase(bsr_descr, bsr_idx_base);
@@ -285,7 +285,7 @@ void testing_gebsr2csr_bad_arg(const Arguments& argus)
 }
 
 template <typename T>
-void testing_gebsr2csr(Arguments argus)
+hipsparseStatus_t testing_gebsr2csr(Arguments argus)
 {
     int                  m             = argus.M;
     int                  n             = argus.N;
@@ -296,14 +296,23 @@ void testing_gebsr2csr(Arguments argus)
     hipsparseDirection_t dir           = argus.dirA;
     std::string          filename      = argus.filename;
 
-    hipsparseLocalHandle_t        handle(argus);
-    std::unique_ptr<descr_struct> unique_ptr_csr_descr(new descr_struct);
-    hipsparseMatDescr_t           csr_descr = unique_ptr_csr_descr->descr;
-    std::unique_ptr<descr_struct> unique_ptr_bsr_descr(new descr_struct);
-    hipsparseMatDescr_t           bsr_descr = unique_ptr_bsr_descr->descr;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
+    std::unique_ptr<descr_struct>  unique_ptr_csr_descr(new descr_struct);
+    hipsparseMatDescr_t            csr_descr = unique_ptr_csr_descr->descr;
+    std::unique_ptr<descr_struct>  unique_ptr_bsr_descr(new descr_struct);
+    hipsparseMatDescr_t            bsr_descr = unique_ptr_bsr_descr->descr;
 
     hipsparseSetMatIndexBase(csr_descr, csr_idx_base);
     hipsparseSetMatIndexBase(bsr_descr, bsr_idx_base);
+
+    if(m == 0 || n == 0)
+    {
+#ifdef __HIP_PLATFORM_NVIDIA__
+        // cusparse does not support m == 0 for csr2bsr
+        return HIPSPARSE_STATUS_SUCCESS;
+#endif
+    }
 
     int mb = m * row_block_dim;
     int nb = n * col_block_dim;
@@ -317,8 +326,12 @@ void testing_gebsr2csr(Arguments argus)
 
     // Read or construct CSR matrix
     int nnzb = 0;
-    CHECK_GENERATE_MATRIX_ERROR(generate_csr_matrix(
-        filename, mb, nb, nnzb, bsr_row_ptr, bsr_col_ind, bsr_val, bsr_idx_base));
+    if(!generate_csr_matrix(
+           filename, mb, nb, nnzb, bsr_row_ptr, bsr_col_ind, bsr_val, bsr_idx_base))
+    {
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
 
     m          = mb * row_block_dim;
     n          = nb * col_block_dim;
@@ -523,7 +536,7 @@ void testing_gebsr2csr(Arguments argus)
                             get_gpu_time_msec(gpu_time_used));
     }
 
-    return;
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_GEBSR2CSR_HPP

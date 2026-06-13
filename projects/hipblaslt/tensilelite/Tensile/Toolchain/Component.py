@@ -30,7 +30,7 @@ from shlex import split
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE, run
 from typing import List
 
-from Tensile.Common import SemanticVersion, print2
+from Tensile.Common import SemanticVersion, print1
 from .Validators import ToolchainDefaults, validateToolchain
 
 def _invoke(args: List[str], desc: str=""):
@@ -43,7 +43,7 @@ def _invoke(args: List[str], desc: str=""):
   Return:
       subprocess output
   """
-  print2(f"{desc}: {' '.join(args)}")
+  #print1(f"{desc}: {' '.join(args)}")
   try:
       out = check_output(args, stderr=STDOUT)
   except CalledProcessError as err:
@@ -139,7 +139,7 @@ class Assembler(Component):
     """
 
     def __init__(self, component_path: Path, co_version: str, debug: bool=False):
-        """Constructs an instance of an Assembler.
+        """Constructs instance of assmebler.
 
         Args:
             assembler_path: The path to the assember.
@@ -169,9 +169,6 @@ class Assembler(Component):
             destPath: The destination path for the generated object file.
         """
         args = self._default_args
-        # Enable true16 syntax on targets that support +real-true16.
-        if targetGfx in ("gfx1250", "gfx1201", "gfx1200", "gfx1100"):
-            args = args + ["-Xclangas", "-target-feature", "-Xclangas", "+real-true16"]
         args = [
             *args,
             f"-mcpu={targetGfx}",
@@ -208,7 +205,7 @@ class Compiler(Component):
     """
 
     def __init__(self, compiler_path: Path, build_id_kind: str, asan_build: bool=False, save_temps: bool=False):
-        """Constructs an instance of a Compiler."""
+        """Constructs and instance of a Compiler."""
         super(Compiler, self).__init__(compiler_path)
 
         self.default_args = [
@@ -227,11 +224,6 @@ class Compiler(Component):
             self.default_args.append("--save-temps")
         if os_name == "nt":                                                    # should we use fPIIC on all arches?
             self.default_args.extend(["-fms-extensions", "-fms-compatibility", "-fPIC", "-Wno-deprecated-declarations"])
-            # amdclang++ on Windows does not read ROCM_PATH from the environment;
-            # it requires --rocm-path on the command line to locate HIP headers.
-            rocm_path = environ.get("ROCM_PATH", "")
-            if rocm_path:
-                self.default_args.append(f"--rocm-path={rocm_path}")
 
 
     def __call__(self, include_path: str, target_list: List[str], srcPath: str, destPath: str):
@@ -275,7 +267,7 @@ class Bundler(Component):
     """
 
     def __init__(self, bundler_path: Path):
-        """Constructs an instance of a Bunder."""
+        """Constructs and instance of a Bunder."""
         super(Bundler, self).__init__(bundler_path)
 
     def targets(self, objFile: str):
@@ -294,14 +286,13 @@ class Bundler(Component):
         Raises:
             RuntimeError: If compressing the code object file fails.
         """
-        devnull = "/dev/null" if os_name != "nt" else "NUL"
         args = [
             self._component_path,
             "--compress",
             "--type=o",
             "--bundle-align=4096",
             f"--targets=host-x86_64-unknown-linux-gnu,hipv4-amdgcn-amd-amdhsa-unknown-{target}",
-            f"--input={devnull}",
+            "--input=/dev/null",
             f"--input={srcPath}",
             f"--output={destPath}",
         ]
@@ -347,7 +338,7 @@ class Linker(Component):
     """
 
     def __init__(self, linker_path: Path, build_id_kind: str):
-        """Constructs an instance of a Linker."""
+        """Constructs and instance of a Linker."""
         super(Linker, self).__init__(linker_path)
         self.default_args = [
                 self._component_path,
@@ -355,34 +346,9 @@ class Linker(Component):
                 "-Xlinker", f"--build-id={build_id_kind}",
         ]
 
-    def _response_file_args(self, srcPaths: List[str], destPath: str) -> List[str]:
-        """
-        Create a response file and return the arguments to pass to the linker.
-
-        Since it is possible for the character limit of the operating system to be exceeded
-        when invoking the linker, LLVM allows the provision of arguments via a "response file"
-        Reference: https://llvm.org/docs/CommandLine.html#response-files
-        """
-        with open(Path.cwd() / "clang_args.txt", "wt") as file:
-            file.write(" ".join(srcPaths).replace('\\', '\\\\') if os_name == "nt" else " ".join(srcPaths))
-        return [*(self.default_args), "-o", destPath, "@clang_args.txt"]
-
-    def _use_response_file(self, args: List[str]) -> bool:
-        """
-        Determine if a response file should be used for the linker arguments.
-
-        On Windows: always use response file due to 8191 char limit
-        On Unix: check against system argument length limit
-        """
-        if os_name == "nt":
-            return True
-        from os import sysconf
-        line_length = sum(len(arg) for arg in args) + len(args) - 1
-        return line_length >= sysconf("SC_ARG_MAX")
 
     def __call__(self, srcPaths: List[str], destPath: str):
-        """
-        Links object files into a code object file.
+        """Links object files into a code object file.
 
         Args:
             srcPaths: A list of paths to object files.
@@ -390,9 +356,14 @@ class Linker(Component):
         Raises:
             RuntimeError: If linker invocation fails.
         """
-        args = [*(self.default_args), *srcPaths, "-o", destPath]
-        if self._use_response_file(args):
-            args = self._response_file_args(srcPaths, destPath)
+        if os_name == "nt":
+            # Use args file on Windows b/c the command may exceed the limit of 8191 characters
+            with open(Path.cwd() / "clang_args.txt", "wt") as file:
+                file.write(" ".join(srcPaths))
+                file.flush()
+            args = [*(self.default_args), "-o", destPath, "@clang_args.txt"]
+        else:
+            args = [*(self.default_args), *srcPaths, "-o", destPath]
         return _invoke(args, "Linking assembly object files into code object (*.o -> .co)")
 
 

@@ -21,22 +21,13 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/mr/fancy_pointer_resource.h>
 #include <thrust/mr/new.h>
+#include <thrust/mr/fancy_pointer_resource.h>
+
 #include <thrust/system/omp/pointer.h>
 
 THRUST_NAMESPACE_BEGIN
-namespace system
-{
-namespace omp
+namespace system { namespace omp
 {
 
 //! \cond
@@ -62,14 +53,12 @@ using memory_resource = detail::native_resource;
  *  \p mr::new_delete_resource and tags it with \p omp::universal_pointer.
  */
 using universal_memory_resource = detail::universal_native_resource;
-// FIXME(bgruber): comment below is wrong or alias should be to universal_memory_resource
 /*! An alias for \p omp::universal_memory_resource. */
 using universal_host_pinned_memory_resource = detail::native_resource;
 
 /*! \}
  */
 
-} // namespace omp
-} // namespace system
+}} // namespace system::omp
 
 THRUST_NAMESPACE_END

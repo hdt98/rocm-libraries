@@ -135,14 +135,14 @@ std::ptrdiff_t integer_division_ceil(X x, Y y)
     return (tx + ty - 1) / ty;
 }
 
-struct TensorDescriptor : miopenTensorDescriptor
+struct MIOPEN_INTERNALS_EXPORT TensorDescriptor : miopenTensorDescriptor
 {
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor();
+    TensorDescriptor();
 
     // This constructor is only used in test/tensor_holder.hpp
     // clang-format off
     [[deprecated("Use constructor with lengths instead")]]
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t);
+    TensorDescriptor(miopenDataType_t t);
     // clang-format on
 
     // It is preferable to use constructors with lengths and strides with the std::size_t
@@ -151,46 +151,42 @@ struct TensorDescriptor : miopenTensorDescriptor
     // The delegation constructor should be placed above the target constructor in the
     // code for better dependency tracking
 
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             const std::initializer_list<int>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t, const std::vector<int>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             const std::initializer_list<std::size_t>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             const std::vector<std::size_t>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             std::vector<std::size_t>&& lens_in);
+    TensorDescriptor(miopenDataType_t t, const std::initializer_list<int>& lens_in);
+    TensorDescriptor(miopenDataType_t t, const std::vector<int>& lens_in);
+    TensorDescriptor(miopenDataType_t t, const std::initializer_list<std::size_t>& lens_in);
+    TensorDescriptor(miopenDataType_t t, const std::vector<std::size_t>& lens_in);
+    TensorDescriptor(miopenDataType_t t, std::vector<std::size_t>&& lens_in);
 
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             miopenTensorLayout_t layout_in,
-                                             const std::vector<int>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             miopenTensorLayout_t layout_in,
-                                             const std::initializer_list<std::size_t>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             miopenTensorLayout_t layout_in,
-                                             const std::vector<std::size_t>& lens_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             miopenTensorLayout_t layout_in,
-                                             std::vector<std::size_t>&& lens_in);
+    TensorDescriptor(miopenDataType_t t,
+                     miopenTensorLayout_t layout_in,
+                     const std::vector<int>& lens_in);
+    TensorDescriptor(miopenDataType_t t,
+                     miopenTensorLayout_t layout_in,
+                     const std::initializer_list<std::size_t>& lens_in);
+    TensorDescriptor(miopenDataType_t t,
+                     miopenTensorLayout_t layout_in,
+                     const std::vector<std::size_t>& lens_in);
+    TensorDescriptor(miopenDataType_t t,
+                     miopenTensorLayout_t layout_in,
+                     std::vector<std::size_t>&& lens_in);
 
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             const std::vector<int>& lens_in,
-                                             const std::vector<int>& strides_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             const std::initializer_list<std::size_t>& lens_in,
-                                             const std::initializer_list<std::size_t>& strides_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             const std::vector<std::size_t>& lens_in,
-                                             const std::vector<std::size_t>& strides_in);
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             std::vector<std::size_t>&& lens_in,
-                                             std::vector<std::size_t>&& strides_in);
+    TensorDescriptor(miopenDataType_t t,
+                     const std::vector<int>& lens_in,
+                     const std::vector<int>& strides_in);
+    TensorDescriptor(miopenDataType_t t,
+                     const std::initializer_list<std::size_t>& lens_in,
+                     const std::initializer_list<std::size_t>& strides_in);
+    TensorDescriptor(miopenDataType_t t,
+                     const std::vector<std::size_t>& lens_in,
+                     const std::vector<std::size_t>& strides_in);
+    TensorDescriptor(miopenDataType_t t,
+                     std::vector<std::size_t>&& lens_in,
+                     std::vector<std::size_t>&& strides_in);
 
-    MIOPEN_INTERNALS_EXPORT TensorDescriptor(miopenDataType_t t,
-                                             miopenTensorLayout_t layout_in,
-                                             const std::vector<std::size_t>& lens_in,
-                                             const std::vector<std::size_t>& strides_in);
+    TensorDescriptor(miopenDataType_t t,
+                     miopenTensorLayout_t layout_in,
+                     const std::vector<std::size_t>& lens_in,
+                     const std::vector<std::size_t>& strides_in);
     TensorDescriptor(miopenDataType_t t,
                      miopenTensorLayout_t layout_in,
                      std::vector<std::size_t>&& lens_in,
@@ -214,30 +210,30 @@ struct TensorDescriptor : miopenTensorDescriptor
 
     bool IsVectorized() const;
 
-    MIOPEN_INTERNALS_EXPORT const std::vector<std::size_t>& GetLengths() const;
-    MIOPEN_INTERNALS_EXPORT const std::vector<std::size_t>& GetStrides() const;
-    MIOPEN_INTERNALS_EXPORT unsigned GetNumDims() const;
+    const std::vector<std::size_t>& GetLengths() const;
+    const std::vector<std::size_t>& GetStrides() const;
+    unsigned GetNumDims() const;
 
-    MIOPEN_INTERNALS_EXPORT miopenDataType_t GetType() const;
+    miopenDataType_t GetType() const;
     // clang-format off
     [[deprecated("Use GetLayoutEnum() instead")]]
-    MIOPEN_INTERNALS_EXPORT miopenTensorLayout_t GetLayout_t() const;
+    miopenTensorLayout_t GetLayout_t() const;
     // clang-format on
-    MIOPEN_INTERNALS_EXPORT const std::optional<miopenTensorLayout_t>& GetLayoutEnum() const;
-    MIOPEN_INTERNALS_EXPORT static std::string LayoutEnumToStr(miopenTensorLayout_t layout);
-    MIOPEN_INTERNALS_EXPORT const std::string& GetLayout_str() const;
+    const std::optional<miopenTensorLayout_t>& GetLayoutEnum() const;
+    static std::string LayoutEnumToStr(miopenTensorLayout_t layout);
+    const std::string& GetLayout_str() const;
 
-    MIOPEN_INTERNALS_EXPORT std::size_t GetVectorLength() const;
+    std::size_t GetVectorLength() const;
     std::optional<miopenDataType_t> GetCastType() const;
     void SetCastType(miopenDataType_t cast_type_);
 
-    MIOPEN_INTERNALS_EXPORT std::size_t GetElementSize() const;
+    std::size_t GetElementSize() const;
 
-    MIOPEN_INTERNALS_EXPORT std::size_t GetElementSpace() const;
+    std::size_t GetElementSpace() const;
 
-    MIOPEN_INTERNALS_EXPORT std::size_t GetNumBytes() const;
+    std::size_t GetNumBytes() const;
 
-    MIOPEN_INTERNALS_EXPORT std::size_t GetIndex(std::initializer_list<int> l) const;
+    std::size_t GetIndex(std::initializer_list<int> l) const;
 
     template <class... Ts>
     std::size_t GetIndex(Ts... is) const
@@ -245,46 +241,34 @@ struct TensorDescriptor : miopenTensorDescriptor
         return this->GetIndex({static_cast<int>(is)...});
     }
 
-    MIOPEN_INTERNALS_EXPORT bool IsPacked() const;
+    bool IsPacked() const;
     bool IsContiguous() const;
     /// Checks all lengths and strides.
-    MIOPEN_INTERNALS_EXPORT bool AllDimsFitIntoInt() const;
+    bool AllDimsFitIntoInt() const;
     /// Checks only lengths.
-    MIOPEN_INTERNALS_EXPORT bool AllLengthsFitIntoInt() const;
+    bool AllLengthsFitIntoInt() const;
 
-    MIOPEN_INTERNALS_EXPORT bool operator==(const TensorDescriptor& rhs) const;
+    bool operator==(const TensorDescriptor& rhs) const;
     bool operator!=(const TensorDescriptor& rhs) const;
     bool operator<(const TensorDescriptor& rhs) const;
     bool operator>(const TensorDescriptor& rhs) const;
 
-    MIOPEN_INTERNALS_EXPORT std::string ToString() const;
-
-    enum class LayoutValidationMode
-    {
-        StrictDecreasingStrides = 0, // Layout matches require all strides to be strictly decreasing
-        IgnoreDegenerateStrides = 1, // Layout matches skip decreasing check if dim == 1
-    };
+    std::string ToString() const;
 
     // For vectorized layouts storage_layout must be without the ending 'c'
     // \todo make private
-    MIOPEN_INTERNALS_EXPORT bool IsPossibleLayout(const std::string& storage_layout,
-                                                  const std::string& layout,
-                                                  LayoutValidationMode validationMode) const;
+    bool IsPossibleLayout(const std::string& storage_layout, const std::string& layout) const;
     // Layout could be NCHW, NHWC, NCDHW, NDHWC, NCHWc, ...
-    MIOPEN_INTERNALS_EXPORT bool IsPossibleLayout4D5D(const std::string& layout,
-                                                      LayoutValidationMode validationMode) const;
+    bool IsPossibleLayout4D5D(const std::string& layout) const;
 
     static std::vector<int64_t> find_permutation(const std::vector<std::size_t>& lens,
                                                  const std::vector<std::size_t>& strides);
 
     // storage_layout must be NCHW or NCHWc for NCHWc, CHWN or CHWNc for CHWNc, NCHW for other 4D
     // layouts, NCDHW for 5D layouts
-    MIOPEN_INTERNALS_EXPORT std::string GetLayout(std::string storage_layout) const;
+    std::string GetLayout(std::string storage_layout) const;
 
-    static miopenTensorLayout_t
-    StringToLayoutType(std::string layout_str, bool vectorized, int vector_length);
-
-    MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream& stream,
+    friend MIOPEN_INTERNALS_EXPORT std::ostream& operator<<(std::ostream& stream,
                                                             const TensorDescriptor& t);
 
     friend void to_json(nlohmann::json& j, const TensorDescriptor& descriptor);

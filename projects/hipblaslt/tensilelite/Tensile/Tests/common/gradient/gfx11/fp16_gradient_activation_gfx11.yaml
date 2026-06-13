@@ -1,10 +1,9 @@
 #TODO
 TestParameters:
-  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx940, skip-gfx941, skip-gfx942, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201, skip-gfx1250] # not supported by arch
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx940, skip-gfx941, skip-gfx942, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201] # not supported by arch
 
 GlobalParameters:
-  SyncsPerBenchmark: 0
-  MinimumRequiredVersion: 5.0.0
+  MinimumRequiredVersion: 4.14.0
   SleepPercent: 50
   NumElementsToValidate: 128
   DataInitTypeE: 16
@@ -28,13 +27,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: False
+      TransposeA: 0
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: True
-      UseBias:       0
+      UseBias:       False
       Activation:    True
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
@@ -71,7 +70,7 @@ BenchmarkProblems:
           - Exact: [128,  128,1, 640]
           - Exact: [4608,1408,1, 640]
         - ActivationArgs:
-          - [Enum: Dgelu, Drelu]
+          - [Enum: Dgelu]
 
   ########################################
   # TN - standard
@@ -83,13 +82,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: True
-      UseBias:       0
+      UseBias:       False
       Activation:    True
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
@@ -126,4 +125,4 @@ BenchmarkProblems:
           - Exact: [128,  128,1, 640]
           - Exact: [4608,1408,1, 640]
         - ActivationArgs:
-          - [Enum: Dgelu, Drelu]
+          - [Enum: Dgelu]

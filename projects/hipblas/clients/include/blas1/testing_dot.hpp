@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -143,7 +143,7 @@ void testing_dot(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dy.memcheck());
     CHECK_DEVICE_ALLOCATION(d_hipblas_result.memcheck());
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_vector(hx, arg, hipblas_client_alpha_sets_nan, true, true);
@@ -163,14 +163,7 @@ void testing_dot(const Arguments& arg)
         DAPI_CHECK(hipblasDotFn, (handle, N, dx, incx, dy, incy, d_hipblas_result));
 
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
-        DAPI_CHECK(hipblasDotFn,
-                   (handle,
-                    N,
-                    dx,
-                    incx,
-                    dy,
-                    incy,
-                    reinterpret_cast<hipblas_internal_type<T>*>(&h_hipblas_result_1)));
+        DAPI_CHECK(hipblasDotFn, (handle, N, dx, incx, dy, incy, &h_hipblas_result_1));
 
         CHECK_HIP_ERROR(
             hipMemcpy(&h_hipblas_result_2, d_hipblas_result, sizeof(T), hipMemcpyDeviceToHost));

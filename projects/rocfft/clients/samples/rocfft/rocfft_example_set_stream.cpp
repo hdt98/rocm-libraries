@@ -38,8 +38,10 @@ int main(int argc, char* argv[])
 {
     std::cout << "rocfft example of 2 inplace transforms with 2 streams.\n" << std::endl;
 
-    const size_t length      = 8;
-    const size_t total_bytes = length * sizeof(double2);
+    size_t        length      = 8;
+    size_t        total_bytes = length * sizeof(double2);
+    hipError_t    hip_status;
+    rocfft_status fft_status;
 
     fft_fixture_t ffts[2];
 
@@ -67,7 +69,7 @@ int main(int argc, char* argv[])
             throw std::runtime_error("hipStreamCreate failed.");
 
         // create execution info
-        rocfft_status fft_status = rocfft_execution_info_create(&(it.info));
+        fft_status = rocfft_execution_info_create(&(it.info));
         if(fft_status != rocfft_status_success)
             throw std::runtime_error("rocfft_execution_info_create failed.");
 
@@ -101,8 +103,7 @@ int main(int argc, char* argv[])
     /// execution
     for(auto& it : ffts)
     {
-        rocfft_status fft_status
-            = rocfft_execute(it.plan, (void**)&(it.gpu_buf), (void**)&(it.gpu_buf), nullptr);
+        fft_status = rocfft_execute(it.plan, (void**)&(it.gpu_buf), (void**)&(it.gpu_buf), nullptr);
         if(fft_status != rocfft_status_success)
             throw std::runtime_error("rocfft_execute failed.");
     }
@@ -112,8 +113,7 @@ int main(int argc, char* argv[])
     {
         if(hipStreamSynchronize(it.stream) != hipSuccess)
             throw std::runtime_error("hipStreamSynchronize failed.");
-        hipError_t hip_status
-            = hipMemcpy(it.cpu_buf.data(), it.gpu_buf, total_bytes, hipMemcpyDeviceToHost);
+        hip_status = hipMemcpy(it.cpu_buf.data(), it.gpu_buf, total_bytes, hipMemcpyDeviceToHost);
         if(hip_status != hipSuccess)
             throw std::runtime_error("hipMemcpy failed.");
     }
@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
     /// clean up
     for(auto& it : ffts)
     {
-        rocfft_status fft_status = rocfft_plan_destroy(it.plan);
+        fft_status = rocfft_plan_destroy(it.plan);
         if(fft_status != rocfft_status_success)
             throw std::runtime_error("rocfft_plan_destroy failed.");
 

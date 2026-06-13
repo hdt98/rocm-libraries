@@ -85,13 +85,12 @@ hipsparseStatus_t hipsparseGetGitRevision(hipsparseHandle_t handle, char* rev)
     RETURN_IF_CUSPARSE_ERROR(cusparseGetVersion((cusparseHandle_t)handle, &cusparse_ver));
 
     // Combine
-    snprintf(rev,
-             256,
-             "%.64s (cuSPARSE %d.%d.%d)",
-             hipsparse_rev,
-             cusparse_ver / 100000,
-             cusparse_ver / 100 % 1000,
-             cusparse_ver % 100);
+    sprintf(rev,
+            "%s (cuSPARSE %d.%d.%d)",
+            hipsparse_rev,
+            cusparse_ver / 100000,
+            cusparse_ver / 100 % 1000,
+            cusparse_ver % 100);
 
     return HIPSPARSE_STATUS_SUCCESS;
 }

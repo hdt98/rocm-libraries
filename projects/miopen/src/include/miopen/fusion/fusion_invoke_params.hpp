@@ -65,14 +65,13 @@ struct TensorScaleAddOpInvokeParam : public FusionOpInvokeParamBase
 
 struct ActivationOpInvokeParam : FusionOpInvokeParamBase
 {
-    ActivationOpInvokeParam(double alpha, double beta, double gamma, miopenActivationMode_t mode)
-        : activAlpha(alpha), activBeta(beta), activGamma(gamma), activMode(mode)
+    ActivationOpInvokeParam(double alpha, double beta, double gamma)
+        : activAlpha(alpha), activBeta(beta), activGamma(gamma)
     {
     }
     double activAlpha;
     double activBeta;
     double activGamma;
-    miopenActivationMode_t activMode = miopenActivationRELU;
 };
 
 struct ActivationBwdOpInvokeParam : FusionOpInvokeParamBase
@@ -181,25 +180,6 @@ struct FusionInvokeParams : InvokeParams
     {
     }
 
-    FusionInvokeParams(const miopen::OperatorArgs& op_args_,
-                       TensorDescriptor in_desc,
-                       ConstData_t in_,
-                       TensorDescriptor out_desc,
-                       Data_t out_,
-                       bool gfx90aFp16alt_,
-                       Data_t workSpace_,
-                       size_t workSpaceSize_)
-        : op_args(op_args_),
-          inDesc(in_desc),
-          in(in_),
-          outDesc(out_desc),
-          out(out_),
-          gfx90aFp16alt(gfx90aFp16alt_),
-          workSpace(workSpace_),
-          workSpaceSize(workSpaceSize_)
-    {
-    }
-
     FusionInvokeParams(InvokeType type_, const OperatorArgs& op_args_, bool gfx90aFp16alt_)
         : InvokeParams{type_}, op_args(op_args_), gfx90aFp16alt(gfx90aFp16alt_)
     {
@@ -210,12 +190,18 @@ struct FusionInvokeParams : InvokeParams
     TensorDescriptor outDesc;
     Data_t out = nullptr;
     bool gfx90aFp16alt;
-    Data_t workSpace          = nullptr;
-    std::size_t workSpaceSize = 0;
 
-    Data_t GetWorkspace() const { return workSpace; }
+    Data_t GetWorkspace() const
+    {
+        MIOPEN_THROW(miopenStatusNotImplemented);
+        return {};
+    }
 
-    std::size_t GetWorkspaceSize() const { return workSpaceSize; }
+    std::size_t GetWorkspaceSize() const
+    {
+        MIOPEN_THROW(miopenStatusNotImplemented);
+        return {};
+    }
 };
 
 } // namespace fusion

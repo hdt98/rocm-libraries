@@ -17,12 +17,11 @@
 
 #include <thrust/detail/config.h>
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
+#if THRUST_CPP_DIALECT >= 2014
 
-#if THRUST_CPP_DIALECT >= 2017
+#include <async/test_policy_overloads.h>
 
-#  include <async/exclusive_scan/mixin.h>
-#  include <async/test_policy_overloads.h>
+#include <async/exclusive_scan/mixin.h>
 
 // Compilation test with discard iterators. No runtime validation is actually
 // performed, other than testing whether the algorithm completes without
@@ -34,15 +33,13 @@ template <typename input_value_type,
 struct discard_invoker
     : testing::async::mixin::input::device_vector<input_value_type>
     , testing::async::mixin::output::discard_iterator
-    , testing::async::exclusive_scan::mixin::postfix_args::all_overloads<initial_value_type, alternate_binary_op>
+    , testing::async::exclusive_scan::mixin::postfix_args::
+        all_overloads<initial_value_type, alternate_binary_op>
     , testing::async::mixin::invoke_reference::noop
     , testing::async::exclusive_scan::mixin::invoke_async::simple
     , testing::async::mixin::compare_outputs::noop
 {
-  static std::string description()
-  {
-    return "discard output";
-  }
+  static std::string description() { return "discard output"; }
 };
 
 template <typename T>
@@ -55,9 +52,4 @@ struct test_discard
 };
 DECLARE_GENERIC_SIZED_UNITTEST_WITH_TYPES(test_discard, NumericTypes);
 
-#endif // C++17
-
-// we need to leak the suppression on clang/MSVC to suppresses warnings from the cudafe1.stub.c file
-#if THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
-THRUST_SUPPRESS_DEPRECATED_POP
-#endif // THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
+#endif // C++14

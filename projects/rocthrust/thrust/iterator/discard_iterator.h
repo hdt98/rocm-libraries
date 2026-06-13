@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file thrust/iterator/discard_iterator.h
  *  \brief An iterator which "discards" (ignores) values assigned to it upon dereference
  */
@@ -21,21 +22,10 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
 #include <thrust/iterator/detail/discard_iterator_base.h>
 #include <thrust/iterator/iterator_facade.h>
 
-THRUST_DIAG_PUSH
-#ifndef THRUST_DOXYGEN_INVOKED
-THRUST_DIAG_SUPPRESS_MSVC(4244 4267) // possible loss of data
-#endif
+THRUST_DISABLE_MSVC_POSSIBLE_LOSS_OF_DATA_WARNING_BEGIN
 
 THRUST_NAMESPACE_BEGIN
 
@@ -99,48 +89,51 @@ THRUST_NAMESPACE_BEGIN
  *
  *  \see make_discard_iterator
  */
-template <typename System = use_default>
-class discard_iterator : public detail::discard_iterator_base<System>::type
+template<typename System = use_default>
+  class discard_iterator
+    : public detail::discard_iterator_base<System>::type
 {
-  /*! \cond
-   */
-  friend class iterator_core_access;
-  using super_t       = typename detail::discard_iterator_base<System>::type;
-  using incrementable = typename detail::discard_iterator_base<System>::incrementable;
-  using base_iterator = typename detail::discard_iterator_base<System>::base_iterator;
+    /*! \cond
+     */
+    friend class thrust::iterator_core_access;
+    using super_t       = typename detail::discard_iterator_base<System>::type;
+    using incrementable = typename detail::discard_iterator_base<System>::incrementable;
+    using base_iterator = typename detail::discard_iterator_base<System>::base_iterator;
 
-public:
-  using reference  = typename super_t::reference;
-  using value_type = typename super_t::value_type;
+  public:
+    using reference  = typename super_t::reference;
+    using value_type = typename super_t::value_type;
 
-  /*! \endcond
-   */
+    /*! \endcond
+     */
 
-  /*! This constructor receives an optional index specifying the position of this
-   *  \p discard_iterator in a range.
-   *
-   *  \p i The index of this \p discard_iterator in a range. Defaults to the
-   *       value returned by \c Incrementable's null constructor. For example,
-   *       when <tt>Incrementable == int</tt>, \c 0.
-   */
-  THRUST_HOST_DEVICE discard_iterator(incrementable const& i = incrementable())
-      : super_t(base_iterator(i))
-  {}
+    /*! This constructor receives an optional index specifying the position of this
+     *  \p discard_iterator in a range.
+     *
+     *  \p i The index of this \p discard_iterator in a range. Defaults to the
+     *       value returned by \c Incrementable's null constructor. For example,
+     *       when <tt>Incrementable == int</tt>, \c 0.
+     */
+    THRUST_HOST_DEVICE
+    discard_iterator(incrementable const &i = incrementable())
+      : super_t(base_iterator(i)) {}
 
-  /*! \cond
-   */
+    /*! \cond
+     */
 
-private: // Core iterator interface
-  THRUST_HOST_DEVICE reference dereference() const
-  {
-    return m_element;
-  }
+  private: // Core iterator interface
+    THRUST_HOST_DEVICE
+    reference dereference() const
+    {
+      return m_element;
+    }
 
-  mutable value_type m_element;
+    mutable value_type m_element;
 
-  /*! \endcond
-   */
+    /*! \endcond
+     */
 }; // end constant_iterator
+
 
 /*! \p make_discard_iterator creates a \p discard_iterator from an optional index parameter.
  *
@@ -151,8 +144,8 @@ private: // Core iterator interface
  *
  *  \see constant_iterator
  */
-inline THRUST_HOST_DEVICE discard_iterator<>
-make_discard_iterator(discard_iterator<>::difference_type i = discard_iterator<>::difference_type(0))
+inline THRUST_HOST_DEVICE
+discard_iterator<> make_discard_iterator(discard_iterator<>::difference_type i = discard_iterator<>::difference_type(0))
 {
   return discard_iterator<>(i);
 } // end make_discard_iterator()
@@ -165,4 +158,4 @@ make_discard_iterator(discard_iterator<>::difference_type i = discard_iterator<>
 
 THRUST_NAMESPACE_END
 
-THRUST_DIAG_POP
+THRUST_DISABLE_MSVC_POSSIBLE_LOSS_OF_DATA_WARNING_END

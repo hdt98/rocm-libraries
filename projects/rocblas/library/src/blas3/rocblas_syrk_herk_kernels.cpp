@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -104,10 +104,10 @@ rocblas_status rocblas_internal_syrk_herk_template(rocblas_handle    handle,
 
         // Launch kernel to copy the data from triangular matrix to the workspace memory
         if(rocblas_fill_upper == uplo)
-            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_syrk_herk<true, true, HERM>(
+            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_excluding_diagonal<true, true>(
                 handle, n, C, ldc, stride_C, (T*)w_mem, batch_count)));
         else
-            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_syrk_herk<true, false, HERM>(
+            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_excluding_diagonal<true, false>(
                 handle, n, C, ldc, stride_C, (T*)w_mem, batch_count)));
 
         RETURN_IF_ROCBLAS_ERROR((rocblas_internal_gemm_64<BATCHED>(handle,
@@ -134,10 +134,10 @@ rocblas_status rocblas_internal_syrk_herk_template(rocblas_handle    handle,
 
         // Launch kernel to copy the data from workspace memory back to triangular matrix
         if(rocblas_fill_upper == uplo)
-            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_syrk_herk<false, true, HERM>(
+            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_excluding_diagonal<false, true>(
                 handle, n, C, ldc, stride_C, (T*)w_mem, batch_count)));
         else
-            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_syrk_herk<false, false, HERM>(
+            RETURN_IF_ROCBLAS_ERROR((rocblas_copy_triangular_excluding_diagonal<false, false>(
                 handle, n, C, ldc, stride_C, (T*)w_mem, batch_count)));
 
         return rocblas_status_success;
@@ -534,14 +534,5 @@ INSTANTIATE_HERK_SYRK_NUMERICS(false,
 INSTANTIATE_HERK_SYRK_NUMERICS(true,
                                rocblas_double_complex const* const*,
                                rocblas_double_complex* const*)
-
-// instantiate for rocblas_syrk_ex missing and mixed types
-INSTANTIATE_HERK_SYRK_NUMERICS(false, rocblas_bfloat16 const*, rocblas_bfloat16*)
-INSTANTIATE_HERK_SYRK_NUMERICS(false, rocblas_bfloat16 const*, float*)
-INSTANTIATE_HERK_SYRK_NUMERICS(false, rocblas_half const*, rocblas_half*)
-INSTANTIATE_HERK_SYRK_NUMERICS(false, rocblas_half const*, float*)
-INSTANTIATE_HERK_SYRK_NUMERICS(false, float const*, double*)
-// instantiate for rocblas_herk_ex missing and mixed types
-INSTANTIATE_HERK_SYRK_NUMERICS(true, rocblas_float_complex const*, rocblas_double_complex*)
 
 #undef INSTANTIATE_HERK_SYRK_NUMERICS

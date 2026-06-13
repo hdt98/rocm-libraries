@@ -136,10 +136,10 @@ program example_fortran_gemm_ex
     integer(kind(HIPBLAS_OP_N)), parameter :: transA = HIPBLAS_OP_N
     integer(kind(HIPBLAS_OP_N)), parameter :: transB = HIPBLAS_OP_N
 
-    integer(kind(HIP_R_32F)), parameter :: aType = HIP_R_32F
-    integer(kind(HIP_R_32F)), parameter :: bType = HIP_R_32F
-    integer(kind(HIP_R_32F)), parameter :: cType = HIP_R_32F
-    integer(kind(HIP_R_32F)), parameter :: computeType = HIPBLAS_COMPUTE_32F
+    integer(kind(HIPBLAS_R_32F)), parameter :: aType = HIPBLAS_R_32F
+    integer(kind(HIPBLAS_R_32F)), parameter :: bType = HIPBLAS_R_32F
+    integer(kind(HIPBLAS_R_32F)), parameter :: cType = HIPBLAS_R_32F
+    integer(kind(HIPBLAS_R_32F)), parameter :: computeType = HIPBLAS_R_32F
     integer(kind(HIPBLAS_GEMM_DEFAULT)), parameter :: algo = HIPBLAS_GEMM_DEFAULT
 
     real(c_float), target :: alpha = 2
@@ -154,7 +154,7 @@ program example_fortran_gemm_ex
 
     real :: gpu_time_used = 0.0
 
-    integer(c_int) :: i, element
+    integer(c_int) :: i, element    
 
     ! Create hipBLAS handle
     type(c_ptr), target :: handle
@@ -208,7 +208,7 @@ program example_fortran_gemm_ex
                                      bType, ldb, c_loc(beta), dC, Ctype,&
                                      ldc, computeType, algo))
     call HIP_CHECK(hipDeviceSynchronize())
-
+    
     ! Stop time
     call date_and_time(values = tend)
 

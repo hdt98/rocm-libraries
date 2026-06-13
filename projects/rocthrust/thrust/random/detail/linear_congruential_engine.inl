@@ -169,3 +169,4 @@ operator>>(std::basic_istream<CharT,Traits> &is,
 } // end random
 
 THRUST_NAMESPACE_END
+

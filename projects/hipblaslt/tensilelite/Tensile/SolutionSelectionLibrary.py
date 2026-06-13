@@ -22,7 +22,7 @@
 #
 ################################################################################
 
-from Tensile.SolutionStructs.Naming import getSolutionNameMin, getKernelNameMin
+from Tensile.SolutionStructs.Naming import getNameMin
 
 import csv
 
@@ -60,7 +60,7 @@ def updateIfGT(theDictionary, theKey, theValue):
       theDictionary[theKey] = theValue
 
 
-def updateValidSolutions(validSolutions, analyzerSolutions):
+def updateValidSolutions(validSolutions, analyzerSolutions, solutionMinNaming):
   solutionsStartIndex = len(analyzerSolutions)
   validSelectionSolutionsIncluded = []
   validSelectionSolutionsRemainder = []
@@ -90,8 +90,8 @@ def updateValidSolutions(validSolutions, analyzerSolutions):
     selectionSolutionIndex = solutionsStartIndex + i
     selectionSolutionsIds.add(selectionSolutionIndex)
     splitGSU = False # this is a reminder that we need to add this in to the function signature
-    validSolution["SolutionNameMin"] = getSolutionNameMin(validSolution, splitGSU)
-    validSolution["KernelNameMin"]   = getKernelNameMin(validSolution, splitGSU)
+    validSolution["SolutionNameMin"] = getNameMin(validSolution, solutionMinNaming, splitGSU)
+    validSolution["KernelNameMin"]   = getNameMin(validSolution, solutionMinNaming, splitGSU, True)
     validSolution["Ideals"] = validSolutionInfo
     selectionSolutions.append(validSolution)
 
@@ -164,3 +164,4 @@ def analyzeSolutionSelection(problemType, selectionFileNameList, numSolutionsPer
     validSolutions.append((validSolution,dataMap))
 
   return validSolutions
+

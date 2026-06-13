@@ -17,9 +17,8 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#include <thrust/system/detail/generic/adjacent_difference.h>
 #include <thrust/system/omp/detail/execution_policy.h>
+#include <thrust/system/detail/generic/adjacent_difference.h>
 
 THRUST_NAMESPACE_BEGIN
 namespace system
@@ -29,19 +28,22 @@ namespace omp
 namespace detail
 {
 
-template <typename DerivedPolicy, typename InputIterator, typename OutputIterator, typename BinaryFunction>
-OutputIterator adjacent_difference(
-  execution_policy<DerivedPolicy>& exec,
-  InputIterator first,
-  InputIterator last,
-  OutputIterator result,
-  BinaryFunction binary_op)
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename OutputIterator,
+         typename BinaryFunction>
+  OutputIterator adjacent_difference(execution_policy<DerivedPolicy> &exec,
+                                     InputIterator first,
+                                     InputIterator last,
+                                     OutputIterator result,
+                                     BinaryFunction binary_op)
 {
   // omp prefers generic::adjacent_difference to cpp::adjacent_difference
   return thrust::system::detail::generic::adjacent_difference(exec, first, last, result, binary_op);
 } // end adjacent_difference()
 
-} // namespace detail
-} // namespace omp
-} // namespace system
+} // end detail
+} // end omp
+} // end system
 THRUST_NAMESPACE_END
+

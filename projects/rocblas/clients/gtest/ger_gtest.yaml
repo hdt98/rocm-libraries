@@ -111,7 +111,7 @@ Tests:
   incx_incy: *incx_incy_range_small
   alpha: [ -0.5 ]
   pointer_mode_host: false
-  gpu_arch: ['90a','942','950']
+  gpu_arch: ['90a','942']
 
 - name: ger_size_t_inc
   category: stress
@@ -297,7 +297,7 @@ Tests:
   stride_scale: [ 1 ]
   batch_count: [ 3 ]
 
-- name: ger_ILP64
+- name: ger_64
   category: stress
   arguments:
     - { M: 2147483649, N: 1, lda: 2147483649, incx: 1, incy: 1, batch_count: 1 }

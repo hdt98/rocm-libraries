@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-/*! \file
+/*! \file 
  *  \brief A reference to an object which resides in memory associated with the
  *  device system.
  */
@@ -22,17 +22,9 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/reference.h>
-#include <thrust/detail/type_traits.h>
 #include <thrust/device_ptr.h>
+#include <thrust/detail/type_traits.h>
+#include <thrust/detail/reference.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -42,7 +34,7 @@ THRUST_NAMESPACE_BEGIN
 
 /*! \p device_reference acts as a reference-like object to an object stored in device memory.
  *  \p device_reference is not intended to be used directly; rather, this type
- *  is the result of dereferencing a \p device_ptr. Similarly, taking the address of
+ *  is the result of deferencing a \p device_ptr. Similarly, taking the address of
  *  a \p device_reference yields a \p device_ptr.
  *
  *  \p device_reference may often be used from host code in place of operations defined on
@@ -52,7 +44,7 @@ THRUST_NAMESPACE_BEGIN
  *  \code
  *  #include <thrust/device_vector.h>
  *
- *  int main()
+ *  int main(void)
  *  {
  *    thrust::device_vector<int> vec(1, 13);
  *
@@ -73,7 +65,7 @@ THRUST_NAMESPACE_BEGIN
  *  #include <thrust/device_vector.h>
  *  #include <iostream>
  *
- *  int main()
+ *  int main(void)
  *  {
  *    thrust::device_vector<int> vec(1, 13);
  *
@@ -95,7 +87,7 @@ THRUST_NAMESPACE_BEGIN
  *  #include <thrust/device_vector.h>
  *  #include <iostream>
  *
- *  int main()
+ *  int main(void)
  *  {
  *    thrust::device_vector<int> vec(1, 13);
  *
@@ -125,7 +117,7 @@ THRUST_NAMESPACE_BEGIN
  *    int x;
  *  };
  *
- *  int main()
+ *  int main(void)
  *  {
  *    thrust::device_vector<foo> foo_vec(1);
  *
@@ -147,7 +139,7 @@ THRUST_NAMESPACE_BEGIN
  *    int x;
  *  };
  *
- *  int main()
+ *  int main(void)
  *  {
  *    thrust::device_vector<foo> foo_vec(1);
  *
@@ -174,7 +166,7 @@ THRUST_NAMESPACE_BEGIN
  *  #include <stdio.h>
  *  #include <thrust/device_vector.h>
  *
- *  int main()
+ *  int main(void)
  *  {
  *    thrust::device_vector<int> vec(1,13);
  *
@@ -188,117 +180,131 @@ THRUST_NAMESPACE_BEGIN
  *  \see device_ptr
  *  \see device_vector
  */
-template <typename T>
-class device_reference : public thrust::reference<T, thrust::device_ptr<T>, thrust::device_reference<T>>
+template<typename T>
+  class device_reference
+    : public thrust::reference<
+               T,
+               thrust::device_ptr<T>,
+               thrust::device_reference<T>
+             >
 {
-private:
-  using super_t = thrust::reference<T, thrust::device_ptr<T>, thrust::device_reference<T>>;
+  private:
+    using super_t = thrust::reference<
+                    T,
+                    thrust::device_ptr<T>,
+                    thrust::device_reference<T> >;
 
-public:
-  /*! The type of the value referenced by this type of \p device_reference.
-   */
-  using value_type = typename super_t::value_type;
+  public:
+    /*! The type of the value referenced by this type of \p device_reference.
+     */
+    using value_type = typename super_t::value_type;
 
-  /*! The type of the expression <tt>&ref</tt>, where <tt>ref</tt> is a \p device_reference.
-   */
-  using pointer = typename super_t::pointer;
+    /*! The type of the expression <tt>&ref</tt>, where <tt>ref</tt> is a \p device_reference.
+     */
+    using pointer = typename super_t::pointer;
 
-  /*! This copy constructor accepts a const reference to another
-   *  \p device_reference. After this \p device_reference is constructed,
-   *  it shall refer to the same object as \p other.
-   *
-   *  \param other A \p device_reference to copy from.
-   *
-   *  The following code snippet demonstrates the semantics of this
-   *  copy constructor.
-   *
-   *  \code
-   *  #include <thrust/device_vector.h>
-   *  #include <assert.h>
-   *  ...
-   *  thrust::device_vector<int> v(1,0);
-   *  thrust::device_reference<int> ref = v[0];
-   *
-   *  // ref equals the object at v[0]
-   *  assert(ref == v[0]);
-   *
-   *  // the address of ref equals the address of v[0]
-   *  assert(&ref == &v[0]);
-   *
-   *  // modifying v[0] modifies ref
-   *  v[0] = 13;
-   *  assert(ref == 13);
-   *  \endcode
-   *
-   *  \note This constructor is templated primarily to allow initialization of
-   *  <tt>device_reference<const T></tt> from <tt>device_reference<T></tt>.
-   */
-  template <typename OtherT>
-  THRUST_HOST_DEVICE
-  device_reference(const device_reference<OtherT>& other,
-                   thrust::detail::enable_if_convertible_t<typename device_reference<OtherT>::pointer, pointer>* = 0)
+    /*! This copy constructor accepts a const reference to another
+     *  \p device_reference. After this \p device_reference is constructed,
+     *  it shall refer to the same object as \p other.
+     *
+     *  \param other A \p device_reference to copy from.
+     *
+     *  The following code snippet demonstrates the semantics of this
+     *  copy constructor.
+     *
+     *  \code
+     *  #include <thrust/device_vector.h>
+     *  #include <assert.h>
+     *  ...
+     *  thrust::device_vector<int> v(1,0);
+     *  thrust::device_reference<int> ref = v[0];
+     *
+     *  // ref equals the object at v[0]
+     *  assert(ref == v[0]);
+     *
+     *  // the address of ref equals the address of v[0]
+     *  assert(&ref == &v[0]);
+     *
+     *  // modifying v[0] modifies ref
+     *  v[0] = 13;
+     *  assert(ref == 13);
+     *  \endcode
+     *
+     *  \note This constructor is templated primarily to allow initialization of
+     *  <tt>device_reference<const T></tt> from <tt>device_reference<T></tt>.
+     */
+    template<typename OtherT>
+    THRUST_HOST_DEVICE
+    device_reference(const device_reference<OtherT> &other,
+                     typename thrust::detail::enable_if_convertible<
+                       typename device_reference<OtherT>::pointer,
+                       pointer
+                     >::type * = 0)
       : super_t(other)
-  {}
+    {}
 
-  /*! This copy constructor initializes this \p device_reference
-   *  to refer to an object pointed to by the given \p device_ptr. After
-   *  this \p device_reference is constructed, it shall refer to the
-   *  object pointed to by \p ptr.
-   *
-   *  \param ptr A \p device_ptr to copy from.
-   *
-   *  The following code snippet demonstrates the semantic of this
-   *  copy constructor.
-   *
-   *  \code
-   *  #include <thrust/device_vector.h>
-   *  #include <assert.h>
-   *  ...
-   *  thrust::device_vector<int> v(1,0);
-   *  thrust::device_ptr<int> ptr = &v[0];
-   *  thrust::device_reference<int> ref(ptr);
-   *
-   *  // ref equals the object pointed to by ptr
-   *  assert(ref == *ptr);
-   *
-   *  // the address of ref equals ptr
-   *  assert(&ref == ptr);
-   *
-   *  // modifying *ptr modifies ref
-   *  *ptr = 13;
-   *  assert(ref == 13);
-   *  \endcode
-   */
-  THRUST_HOST_DEVICE explicit device_reference(const pointer& ptr)
+    /*! This copy constructor initializes this \p device_reference
+     *  to refer to an object pointed to by the given \p device_ptr. After
+     *  this \p device_reference is constructed, it shall refer to the
+     *  object pointed to by \p ptr.
+     *
+     *  \param ptr A \p device_ptr to copy from.
+     *
+     *  The following code snippet demonstrates the semantic of this
+     *  copy constructor.
+     *
+     *  \code
+     *  #include <thrust/device_vector.h>
+     *  #include <assert.h>
+     *  ...
+     *  thrust::device_vector<int> v(1,0);
+     *  thrust::device_ptr<int> ptr = &v[0];
+     *  thrust::device_reference<int> ref(ptr);
+     *
+     *  // ref equals the object pointed to by ptr
+     *  assert(ref == *ptr);
+     *
+     *  // the address of ref equals ptr
+     *  assert(&ref == ptr);
+     *
+     *  // modifying *ptr modifies ref
+     *  *ptr = 13;
+     *  assert(ref == 13);
+     *  \endcode
+     */
+    THRUST_HOST_DEVICE
+    explicit device_reference(const pointer &ptr)
       : super_t(ptr)
-  {}
+    {}
 
-  /*! This assignment operator assigns the value of the object referenced by
-   *  the given \p device_reference to the object referenced by this
-   *  \p device_reference.
-   *
-   *  \param other The \p device_reference to assign from.
-   *  \return <tt>*this</tt>
-   */
-  template <typename OtherT>
-  THRUST_HOST_DEVICE device_reference& operator=(const device_reference<OtherT>& other)
-  {
-    return super_t::operator=(other);
-  }
+    /*! This assignment operator assigns the value of the object referenced by
+     *  the given \p device_reference to the object referenced by this
+     *  \p device_reference.
+     *
+     *  \param other The \p device_reference to assign from.
+     *  \return <tt>*this</tt>
+     */
+    template<typename OtherT>
+    THRUST_HOST_DEVICE
+    device_reference &operator=(const device_reference<OtherT> &other)
+    {
+      return super_t::operator=(other);
+    }
 
-  /*! Assignment operator assigns the value of the given value to the
-   *  value referenced by this \p device_reference.
-   *
-   *  \param x The value to assign from.
-   *  \return <tt>*this</tt>
-   */
-  THRUST_HOST_DEVICE device_reference& operator=(const value_type& x)
-  {
-    return super_t::operator=(x);
-  }
+    /*! Assignment operator assigns the value of the given value to the
+     *  value referenced by this \p device_reference.
+     *
+     *  \param x The value to assign from.
+     *  \return <tt>*this</tt>
+     */
+    THRUST_HOST_DEVICE
+    device_reference &operator=(const value_type &x)
+    {
+      return super_t::operator=(x);
+    }
 
 // declare these members for the purpose of Doxygenating them
-// they actually exist in a base class
+// they actually exist in a derived-from class
 #if 0
     /*! Address-of operator returns a \p device_ptr pointing to the object
      *  referenced by this \p device_reference. It does not return the
@@ -947,28 +953,31 @@ public:
      */
     device_reference &operator^=(const T &rhs);
 #endif // end doxygen-only members
-
-  /*! swaps the value of one \p device_reference with another.
-   *  \p x The first \p device_reference of interest.
-   *  \p y The second \p device_reference of interest.
-   */
-  THRUST_HOST_DEVICE friend void swap(device_reference& x, device_reference& y) noexcept(noexcept(x.swap(y)))
-  {
-    x.swap(y);
-  }
 }; // end device_reference
 
+/*! swaps the value of one \p device_reference with another.
+ *  \p x The first \p device_reference of interest.
+ *  \p y The second \p device_reference of interest.
+ */
+template<typename T>
+THRUST_HOST_DEVICE
+void swap(device_reference<T>& x, device_reference<T>& y)
+{
+  x.swap(y);
+}
+
 // declare these methods for the purpose of Doxygenating them
-// they actually are defined for a base class
-#ifdef THRUST_DOXYGEN_INVOKED
+// they actually are defined for a derived-from class
+#if THRUST_DOXYGEN
 /*! Writes to an output stream the value of a \p device_reference.
  *
  *  \param os The output stream.
  *  \param y The \p device_reference to output.
  *  \return os.
  */
-template <typename T, typename charT, typename traits>
-std::basic_ostream<charT, traits>& operator<<(std::basic_ostream<charT, traits>& os, const device_reference<T>& y);
+template<typename T, typename charT, typename traits>
+std::basic_ostream<charT, traits> &
+operator<<(std::basic_ostream<charT, traits> &os, const device_reference<T> &y);
 #endif
 
 /*! \} // memory_management

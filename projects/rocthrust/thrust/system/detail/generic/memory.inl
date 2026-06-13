@@ -18,6 +18,7 @@
 
 #include <thrust/detail/config.h>
 #include <thrust/detail/type_traits/pointer_traits.h>
+#include <thrust/system/detail/generic/memory.h>
 #include <thrust/system/detail/adl/malloc_and_free.h>
 #include <thrust/detail/static_assert.h>
 #include <thrust/detail/malloc_and_free.h>
@@ -101,3 +102,4 @@ void iter_swap(thrust::execution_policy<DerivedPolicy> &, Pointer1, Pointer2)
 } // end detail
 } // end system
 THRUST_NAMESPACE_END
+

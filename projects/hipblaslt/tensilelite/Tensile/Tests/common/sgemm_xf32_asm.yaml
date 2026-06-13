@@ -1,20 +1,21 @@
 TestParameters:
-  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201, skip-gfx1250] # not supported by arch
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201] # not supported by arch
 
 # benchmark assembly and source kernels
 GlobalParameters:
-  MinimumRequiredVersion: 5.0.0
+  MinimumRequiredVersion: 4.2.0
   CMakeBuildType: Release
   # PrintLevel: 1
   #ForceRedoBenchmarkProblems: True
   #ForceRedoLibraryLogic: True
   #ForceRedoLibraryClient: True
   EnqueuesPerSync: 1
-  SyncsPerBenchmark: 0
+  SyncsPerBenchmark: 1
   NumElementsToValidate: -1
   BoundsCheck: False
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
+  ShortNames: False
   KernelTime: True
   NewClient: 2
   PrintIndexAssignments: 1

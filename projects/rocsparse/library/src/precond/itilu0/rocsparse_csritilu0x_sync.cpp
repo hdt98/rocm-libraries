@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +24,8 @@
 
 #include "../conversion/rocsparse_csr2csc.hpp"
 #include "../conversion/rocsparse_identity.hpp"
+#include "common.h"
 #include "common.hpp"
-#include "rocsparse_common.hpp"
 #include "rocsparse_csritilu0x_driver.hpp"
 #include <iomanip>
 
@@ -56,9 +56,6 @@ namespace rocsparse
                              floating_data_t<T>* __restrict__ nrm_,
                              const floating_data_t<T>* __restrict__ nrm0_)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
         __shared__ floating_data_t<T> sdata[BLOCKSIZE / WFSIZE];
         floating_data_t<T>            nrm  = static_cast<floating_data_t<T>>(0);
         static constexpr uint32_t     nid  = BLOCKSIZE / WFSIZE;
@@ -238,9 +235,6 @@ namespace rocsparse
                            const T* __restrict__ dval0_,
                            T* __restrict__ dval_)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
         static constexpr uint32_t nid = BLOCKSIZE / WFSIZE;
         const J                   lid = hipThreadIdx_x & (WFSIZE - 1);
         const J                   wid = hipThreadIdx_x / WFSIZE;
@@ -413,65 +407,9 @@ public:
                                     size_t buffer_size_,
                                     void* __restrict__ buffer_)
         {
-            if(buffer_size_ == 0)
-            {
-                *niter_ = static_cast<J>(0);
-                return rocsparse_status_success;
-            }
-
-            rocsparse::itilu0x_convergence_info_t<T, J> convergence_info;
-            buffer_ = convergence_info.init(handle_, buffer_);
-            J options;
-
-            RETURN_IF_HIP_ERROR(hipMemcpyAsync(&options,
-                                               convergence_info.info.options,
-                                               sizeof(J),
-                                               hipMemcpyDeviceToHost,
-                                               handle_->stream));
-
-            RETURN_IF_HIP_ERROR(hipMemcpyAsync(niter_,
-                                               convergence_info.info.iter,
-                                               sizeof(J),
-                                               hipMemcpyDeviceToHost,
-                                               handle_->stream));
-
-            RETURN_IF_HIP_ERROR(hipStreamSynchronize(handle_->stream));
-
-            J          niter = niter_[0];
-            const bool convergence_history
-                = (options & rocsparse_itilu0_option_convergence_history) > 0;
-            if(!convergence_history)
-            {
-                std::cerr << "convergence history has not been activated." << std::endl;
-                RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_internal_error);
-            }
-
-            const bool compute_nrm_residual
-                = (options & rocsparse_itilu0_option_compute_nrm_residual) > 0;
-            const bool compute_nrm_corr
-                = (options & rocsparse_itilu0_option_compute_nrm_correction) > 0;
-
-            if(compute_nrm_corr)
-            {
-                RETURN_IF_HIP_ERROR(hipMemcpyAsync(data_,
-                                                   convergence_info.log_mxcorr,
-                                                   sizeof(T) * niter,
-                                                   hipMemcpyDeviceToHost,
-                                                   handle_->stream));
-            }
-
-            if(compute_nrm_residual)
-            {
-                RETURN_IF_HIP_ERROR(hipMemcpyAsync(data_ + niter,
-                                                   convergence_info.log_mxresidual,
-                                                   sizeof(T) * niter,
-                                                   hipMemcpyDeviceToHost,
-                                                   handle_->stream));
-            }
-
-            //
-            // No stream synchronization needed here,
-            //
+            RETURN_IF_ROCSPARSE_ERROR(
+                (rocsparse::csritilu0x_driver_t<rocsparse_itilu0_alg_sync_split_fusion>::
+                     history<T, J>::run(handle_, niter_, data_, buffer_size_, buffer_)));
             return rocsparse_status_success;
         }
     };
@@ -543,7 +481,6 @@ public:
             case rocsparse_datatype_i32_r:
             case rocsparse_datatype_u32_r:
             case rocsparse_datatype_f16_r:
-            case rocsparse_datatype_bf16_r:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
@@ -571,7 +508,6 @@ public:
             case rocsparse_datatype_i32_r:
             case rocsparse_datatype_u32_r:
             case rocsparse_datatype_f16_r:
-            case rocsparse_datatype_bf16_r:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }

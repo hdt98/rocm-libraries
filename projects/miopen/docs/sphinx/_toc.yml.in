@@ -6,14 +6,16 @@ subtrees:
 
 - caption: Install
   entries:
+  - file: install/prerequisites.rst
+    title: MIOpen prerequisites
   - file: install/install.rst
     title: Install MIOpen
   - file: install/build-source.rst
-    title: Build from source
-  - file: install/embed.rst
-    title: Build for embedded systems
+    title: Build MIOpen from source
   - file: install/docker-build.rst
     title: Build MIOpen using Docker
+  - file: install/embed.rst
+    title: Build MIOpen for embedded systems
 
 - caption: Conceptual
   entries:
@@ -23,8 +25,6 @@ subtrees:
     title: Kernel cache
   - file: conceptual/perfdb.rst
     title: Performance database
-  - file: conceptual/tuningdb.rst
-    title: Manual tuning
   - file: conceptual/MI200-alt-implementation.rst
     title: MI200 alternate implementation
   - file: conceptual/porting-guide.rst
@@ -33,18 +33,12 @@ subtrees:
 - caption: How to
   entries:
   - file: how-to/use-fusion-api.rst
-    title: Use the fusion API
+    title: Use the Fusion API
   - file: how-to/debug-log.rst
     title: Log and debug
   - file: how-to/find-and-immediate.rst
     title: Use the find APIs and immediate mode
-  - file: how-to/use-nhwc-batchnorm-in-pytorch.rst
-    title: Use NHWC Batch Normalization with PyTorch
 
-- caption: Samples
-  entries:
-  - url: https://github.com/ROCm/rocm-libraries/tree/develop/projects/miopen/samples
-    title: MIOpen samples
 
 - caption: Reference
   entries:
@@ -56,8 +50,6 @@ subtrees:
         title: Modules
       - file: reference/datatypes.rst
         title: Datatypes
-      - file: reference/env_variables.rst
-        title: Environment variables
 
 - caption: About
   entries:

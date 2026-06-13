@@ -23,7 +23,7 @@
 * ************************************************************************ */
 #include "../../coomm_device_segmented.h"
 #include "../coomm_common.h"
-#include "rocsparse_scalar.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {

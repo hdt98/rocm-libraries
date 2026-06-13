@@ -22,7 +22,7 @@
  * ************************************************************************ */
 
 #include "rocsparse_extract.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -77,9 +77,6 @@ namespace rocsparse
         ROCSPARSE_CHECKARG_POINTER(3, target);
         ROCSPARSE_CHECKARG_ENUM(4, stage);
         ROCSPARSE_CHECKARG_POINTER(5, buffer_size_in_bytes);
-
-        ROCSPARSE_CHECKARG(2, source, (source->batch_count != 1), rocsparse_status_not_implemented);
-        ROCSPARSE_CHECKARG(3, target, (target->batch_count != 1), rocsparse_status_not_implemented);
 
         const rocsparse_status status = rocsparse::extract_buffer_size_quickreturn(
             handle, descr, source, target, stage, buffer_size_in_bytes);

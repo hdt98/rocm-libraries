@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,14 +22,11 @@
  *
  * ************************************************************************ */
 
+#include "common.h"
+#include "control.h"
 #include "rocsparse_common.h"
-#include "rocsparse_common.hpp"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csrmv.hpp"
-#include "rocsparse_utility.hpp"
-
-#include "internal/generic/rocsparse_v2_spmv.h"
-#include "rocsparse_spmv_helpers.h"
+#include "utility.h"
 
 #include "csrmv_device.h"
 #include "csrmv_symm_device.h"
@@ -301,7 +298,7 @@ namespace rocsparse
             *rowBlocks = nRows;
             if((nRows - last_i) > static_cast<I>(ROWS_FOR_VECTOR))
             {
-                *(wgIds - 1) |= numThreadsForReduction(nRows - last_i);
+                *(wgIds - 1) |= numThreadsForReduction(i - last_i);
             }
 
             ++rowBlocks;
@@ -363,12 +360,15 @@ rocsparse_status
                                                          const A*                  csr_val,
                                                          const I*                  csr_row_ptr,
                                                          const J*                  csr_col_ind,
-                                                         rocsparse_csrmv_info*     p_csrmv_info)
+                                                         rocsparse_mat_info        info)
 {
     ROCSPARSE_ROUTINE_TRACE;
 
-    p_csrmv_info[0]                 = new _rocsparse_csrmv_info();
-    rocsparse_csrmv_info csrmv_info = p_csrmv_info[0];
+    // Clear csrmv info
+    RETURN_IF_ROCSPARSE_ERROR(rocsparse::destroy_csrmv_info(info->csrmv_info));
+
+    // Create csrmv info
+    RETURN_IF_ROCSPARSE_ERROR(rocsparse::create_csrmv_info(&info->csrmv_info));
 
     if(trans == rocsparse_operation_none)
     {
@@ -376,7 +376,7 @@ rocsparse_status
         hipStream_t stream = handle->stream;
 
         // row blocks size
-        csrmv_info->adaptive.size = 0;
+        info->csrmv_info->adaptive.size = 0;
 
         // Temporary arrays to hold device data
         std::vector<I> hptr(m + 1);
@@ -389,59 +389,63 @@ rocsparse_status
         // Determine row blocks array size
         ComputeRowBlocks<I, J>((I*)NULL,
                                (J*)NULL,
-                               csrmv_info->adaptive.size,
-                               csrmv_info->adaptive.first_row,
-                               csrmv_info->adaptive.last_row,
+                               info->csrmv_info->adaptive.size,
+                               info->csrmv_info->adaptive.first_row,
+                               info->csrmv_info->adaptive.last_row,
                                hptr.data(),
                                m,
                                false);
 
-        // Create row blocks and workgroup data structures
-        std::vector<I> row_blocks(csrmv_info->adaptive.size, 0);
-        std::vector<J> wg_ids(csrmv_info->adaptive.size, 0);
+        // Create row blocks, workgroup flag, and workgroup data structures
+        std::vector<I>        row_blocks(info->csrmv_info->adaptive.size, 0);
+        std::vector<uint32_t> wg_flags(info->csrmv_info->adaptive.size, 0);
+        std::vector<J>        wg_ids(info->csrmv_info->adaptive.size, 0);
 
         ComputeRowBlocks<I, J>(row_blocks.data(),
                                wg_ids.data(),
-                               csrmv_info->adaptive.size,
-                               csrmv_info->adaptive.first_row,
-                               csrmv_info->adaptive.last_row,
+                               info->csrmv_info->adaptive.size,
+                               info->csrmv_info->adaptive.first_row,
+                               info->csrmv_info->adaptive.last_row,
                                hptr.data(),
                                m,
                                true);
 
         if(descr->type == rocsparse_matrix_type_symmetric)
         {
-            csrmv_info->max_rows = maxRowsInABlock(row_blocks.data(), csrmv_info->adaptive.size);
+            info->csrmv_info->max_rows
+                = maxRowsInABlock(row_blocks.data(), info->csrmv_info->adaptive.size);
         }
 
         // Allocate memory on device to hold csrmv info, if required
-        if(csrmv_info->adaptive.size > 0)
+        if(info->csrmv_info->adaptive.size > 0)
         {
-
-            RETURN_IF_HIP_ERROR(rocsparse_hipMallocAsync(&csrmv_info->adaptive.row_blocks,
-                                                         sizeof(I) * csrmv_info->adaptive.size,
-                                                         handle->stream));
             RETURN_IF_HIP_ERROR(
-                rocsparse_hipMallocAsync(&csrmv_info->adaptive.wg_flags,
-                                         sizeof(uint32_t) * csrmv_info->adaptive.size,
+                rocsparse_hipMallocAsync((void**)&info->csrmv_info->adaptive.row_blocks,
+                                         sizeof(I) * info->csrmv_info->adaptive.size,
                                          handle->stream));
-            RETURN_IF_HIP_ERROR(rocsparse_hipMallocAsync(&csrmv_info->adaptive.wg_ids,
-                                                         sizeof(J) * csrmv_info->adaptive.size,
-                                                         handle->stream));
+            RETURN_IF_HIP_ERROR(
+                rocsparse_hipMallocAsync((void**)&info->csrmv_info->adaptive.wg_flags,
+                                         sizeof(uint32_t) * info->csrmv_info->adaptive.size,
+                                         handle->stream));
+            RETURN_IF_HIP_ERROR(
+                rocsparse_hipMallocAsync((void**)&info->csrmv_info->adaptive.wg_ids,
+                                         sizeof(J) * info->csrmv_info->adaptive.size,
+                                         handle->stream));
 
             // Copy row blocks information to device
-            RETURN_IF_HIP_ERROR(hipMemcpyAsync(csrmv_info->adaptive.row_blocks,
+            RETURN_IF_HIP_ERROR(hipMemcpyAsync(info->csrmv_info->adaptive.row_blocks,
                                                row_blocks.data(),
-                                               sizeof(I) * csrmv_info->adaptive.size,
+                                               sizeof(I) * info->csrmv_info->adaptive.size,
                                                hipMemcpyHostToDevice,
                                                stream));
-            RETURN_IF_HIP_ERROR(hipMemsetAsync(csrmv_info->adaptive.wg_flags,
-                                               0,
-                                               sizeof(uint32_t) * csrmv_info->adaptive.size,
+            RETURN_IF_HIP_ERROR(hipMemcpyAsync(info->csrmv_info->adaptive.wg_flags,
+                                               wg_flags.data(),
+                                               sizeof(uint32_t) * info->csrmv_info->adaptive.size,
+                                               hipMemcpyHostToDevice,
                                                stream));
-            RETURN_IF_HIP_ERROR(hipMemcpyAsync(csrmv_info->adaptive.wg_ids,
+            RETURN_IF_HIP_ERROR(hipMemcpyAsync(info->csrmv_info->adaptive.wg_ids,
                                                wg_ids.data(),
-                                               sizeof(J) * csrmv_info->adaptive.size,
+                                               sizeof(J) * info->csrmv_info->adaptive.size,
                                                hipMemcpyHostToDevice,
                                                stream));
 
@@ -450,16 +454,16 @@ rocsparse_status
         }
     }
     // Store some pointers to verify correct execution
-    csrmv_info->trans       = trans;
-    csrmv_info->m           = m;
-    csrmv_info->n           = n;
-    csrmv_info->nnz         = nnz;
-    csrmv_info->descr       = descr;
-    csrmv_info->csr_row_ptr = csr_row_ptr;
-    csrmv_info->csr_col_ind = csr_col_ind;
+    info->csrmv_info->trans       = trans;
+    info->csrmv_info->m           = m;
+    info->csrmv_info->n           = n;
+    info->csrmv_info->nnz         = nnz;
+    info->csrmv_info->descr       = descr;
+    info->csrmv_info->csr_row_ptr = csr_row_ptr;
+    info->csrmv_info->csr_col_ind = csr_col_ind;
 
-    csrmv_info->index_type_I = rocsparse::get_indextype<I>();
-    csrmv_info->index_type_J = rocsparse::get_indextype<J>();
+    info->csrmv_info->index_type_I = rocsparse::get_indextype<I>();
+    info->csrmv_info->index_type_J = rocsparse::get_indextype<J>();
 
     return rocsparse_status_success;
 }
@@ -482,10 +486,9 @@ namespace rocsparse
         }
     }
 
-    template <typename I, typename J, typename A, typename X, typename Y, typename Z, typename T>
+    template <typename I, typename J, typename A, typename X, typename Y, typename T>
     ROCSPARSE_KERNEL(WG_SIZE)
     void csrmvn_adaptive_kernel(bool conj,
-                                J    m,
                                 I    nnz,
                                 const I* __restrict__ row_blocks,
                                 uint32_t* __restrict__ wg_flags,
@@ -497,20 +500,16 @@ namespace rocsparse
                                 const X* __restrict__ x,
                                 ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, beta),
                                 Y* __restrict__ y,
-                                rocsparse_int        num_extra,
-                                const T*             gamma_device_array,
-                                const Z* const*      z_arrays,
                                 rocsparse_index_base idx_base,
                                 bool                 is_host_mode)
     {
         ROCSPARSE_DEVICE_HOST_SCALAR_GET(alpha);
         ROCSPARSE_DEVICE_HOST_SCALAR_GET(beta);
-        if(alpha != 0 || beta != 1 || num_extra > 0)
+        if(alpha != 0 || beta != 1)
         {
             rocsparse::
                 csrmvn_adaptive_device<BLOCK_SIZE, BLOCK_MULTIPLIER, ROWS_FOR_VECTOR, WG_SIZE>(
                     conj,
-                    m,
                     nnz,
                     row_blocks,
                     wg_flags,
@@ -522,9 +521,6 @@ namespace rocsparse
                     x,
                     beta,
                     y,
-                    num_extra,
-                    gamma_device_array,
-                    z_arrays,
                     idx_base);
         }
     }
@@ -533,7 +529,6 @@ namespace rocsparse
     ROCSPARSE_KERNEL(WG_SIZE)
     void csrmvn_symm_adaptive_kernel(bool conj,
                                      I    nnz,
-                                     J    m,
                                      I    max_rows,
                                      const I* __restrict__ row_blocks,
                                      ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),
@@ -552,7 +547,6 @@ namespace rocsparse
         {
             rocsparse::csrmvn_symm_adaptive_device<BLOCK_SIZE, WG_SIZE>(conj,
                                                                         nnz,
-                                                                        m,
                                                                         max_rows,
                                                                         row_blocks,
                                                                         alpha,
@@ -571,7 +565,6 @@ template <typename I, typename J, typename A, typename X, typename Y, typename T
 ROCSPARSE_KERNEL(WG_SIZE)
 void csrmvn_symm_large_adaptive_kernel(bool conj,
                                        I    nnz,
-                                       J    m,
                                        const I* __restrict__ row_blocks,
                                        ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),
                                        const I* __restrict__ csr_row_ptr,
@@ -587,18 +580,8 @@ void csrmvn_symm_large_adaptive_kernel(bool conj,
     ROCSPARSE_DEVICE_HOST_SCALAR_GET(beta);
     if(alpha != 0 || beta != 1)
     {
-        rocsparse::csrmvn_symm_large_adaptive_device<BLOCK_SIZE, WG_SIZE>(conj,
-                                                                          nnz,
-                                                                          m,
-                                                                          row_blocks,
-                                                                          alpha,
-                                                                          csr_row_ptr,
-                                                                          csr_col_ind,
-                                                                          csr_val,
-                                                                          x,
-                                                                          beta,
-                                                                          y,
-                                                                          idx_base);
+        rocsparse::csrmvn_symm_large_adaptive_device<BLOCK_SIZE, WG_SIZE>(
+            conj, nnz, row_blocks, alpha, csr_row_ptr, csr_col_ind, csr_val, x, beta, y, idx_base);
     }
 }
 
@@ -619,71 +602,7 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
                                                              Y*       y,
                                                              bool     force_conj)
 {
-    return rocsparse::csrmv_adaptive_template_dispatch(handle,
-                                                       trans,
-                                                       m,
-                                                       n,
-                                                       nnz,
-                                                       alpha_device_host,
-                                                       descr,
-                                                       csr_val,
-                                                       csr_row_ptr,
-                                                       csr_col_ind,
-                                                       info,
-                                                       x,
-                                                       beta_device_host,
-                                                       y,
-                                                       0,
-                                                       nullptr,
-                                                       nullptr,
-                                                       force_conj);
-}
-
-template <typename T, typename I, typename J, typename A, typename X, typename Y>
-rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle    handle,
-                                                             rocsparse_operation trans,
-                                                             J                   m,
-                                                             J                   n,
-                                                             I                   nnz,
-                                                             const T*            alpha_device_host,
-                                                             const rocsparse_mat_descr descr,
-                                                             const A*                  csr_val,
-                                                             const I*                  csr_row_ptr,
-                                                             const J*                  csr_col_ind,
-                                                             rocsparse_csrmv_info      info,
-                                                             const X*                  x,
-                                                             const T*      beta_device_host,
-                                                             Y*            y,
-                                                             rocsparse_int num_extra,
-                                                             rocsparse_const_dnvec_descr  gamma_vec,
-                                                             rocsparse_const_dnvec_descr* z_vecs,
-                                                             bool force_conj)
-{
     ROCSPARSE_ROUTINE_TRACE;
-
-    // Extract gamma arrays and z vectors for batched operation
-    using Z                      = Y;
-    T*        gamma_device_array = nullptr;
-    const Z** z_array            = nullptr;
-    bool      temp_alloc         = false;
-    void*     temp_storage_ptr   = nullptr;
-
-    // Check if pre-extracted arrays are available in spmv descriptor
-    if(num_extra > 0)
-    {
-        if(handle && handle->temp_spmv_descr && spmv_has_device_arrays(handle->temp_spmv_descr))
-        {
-            gamma_device_array = rocsparse::spmv_get_gamma_device_array<T>(handle->temp_spmv_descr);
-            z_array            = rocsparse::spmv_get_z_array<Z>(handle->temp_spmv_descr);
-        }
-        else
-        {
-            // throw an error here as the extra data cannot be retrieved
-            // LCOV_EXCL_START
-            return rocsparse_status_invalid_value;
-            // LCOV_EXCL_STOP
-        }
-    }
 
     ROCSPARSE_CHECKARG_HANDLE(0, handle);
     ROCSPARSE_CHECKARG_POINTER(6, descr);
@@ -725,7 +644,6 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
             0,
             stream,
             conj,
-            m,
             nnz,
             static_cast<I*>(info->adaptive.row_blocks),
             info->adaptive.wg_flags,
@@ -737,9 +655,6 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
             x,
             ROCSPARSE_DEVICE_HOST_SCALAR_ARGS(handle, beta_device_host),
             y,
-            num_extra,
-            gamma_device_array,
-            z_array,
             descr->base,
             handle->pointer_mode == rocsparse_pointer_mode_host);
 
@@ -793,7 +708,6 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
                 stream,
                 conj,
                 nnz,
-                m,
                 max_rows,
                 static_cast<I*>(info->adaptive.row_blocks),
                 ROCSPARSE_DEVICE_HOST_SCALAR_ARGS(handle, alpha_device_host),
@@ -816,7 +730,6 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
                 stream,
                 conj,
                 nnz,
-                m,
                 static_cast<I*>(info->adaptive.row_blocks),
                 ROCSPARSE_DEVICE_HOST_SCALAR_ARGS(handle, alpha_device_host),
                 csr_row_ptr,
@@ -836,12 +749,6 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
         // LCOV_EXCL_STOP
     }
 
-    // Clean up temp_storage_ptr
-    if(temp_alloc)
-    {
-        RETURN_IF_HIP_ERROR(rocsparse_hipFreeAsync(temp_storage_ptr, handle->stream));
-    }
-
     return rocsparse_status_success;
 }
 
@@ -856,7 +763,7 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
         const ATYPE*              csr_val,                                          \
         const ITYPE*              csr_row_ptr,                                      \
         const JTYPE*              csr_col_ind,                                      \
-        rocsparse_csrmv_info*     info);
+        rocsparse_mat_info        info);
 
 // Uniform precision
 INSTANTIATE(int32_t, int32_t, float);
@@ -876,12 +783,6 @@ INSTANTIATE(int64_t, int64_t, rocsparse_double_complex);
 INSTANTIATE(int32_t, int32_t, int8_t);
 INSTANTIATE(int64_t, int32_t, int8_t);
 INSTANTIATE(int64_t, int64_t, int8_t);
-INSTANTIATE(int32_t, int32_t, _Float16);
-INSTANTIATE(int64_t, int32_t, _Float16);
-INSTANTIATE(int64_t, int64_t, _Float16);
-INSTANTIATE(int32_t, int32_t, rocsparse_bfloat16);
-INSTANTIATE(int64_t, int32_t, rocsparse_bfloat16);
-INSTANTIATE(int64_t, int64_t, rocsparse_bfloat16);
 
 #undef INSTANTIATE
 
@@ -954,18 +855,6 @@ INSTANTIATE(int32_t, int64_t, int64_t, int8_t, int8_t, int32_t);
 INSTANTIATE(float, int32_t, int32_t, int8_t, int8_t, float);
 INSTANTIATE(float, int64_t, int32_t, int8_t, int8_t, float);
 INSTANTIATE(float, int64_t, int64_t, int8_t, int8_t, float);
-INSTANTIATE(float, int32_t, int32_t, _Float16, _Float16, float);
-INSTANTIATE(float, int64_t, int32_t, _Float16, _Float16, float);
-INSTANTIATE(float, int64_t, int64_t, _Float16, _Float16, float);
-INSTANTIATE(float, int32_t, int32_t, _Float16, _Float16, _Float16);
-INSTANTIATE(float, int64_t, int32_t, _Float16, _Float16, _Float16);
-INSTANTIATE(float, int64_t, int64_t, _Float16, _Float16, _Float16);
-INSTANTIATE(float, int32_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, float);
-INSTANTIATE(float, int64_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, float);
-INSTANTIATE(float, int64_t, int64_t, rocsparse_bfloat16, rocsparse_bfloat16, float);
-INSTANTIATE(float, int32_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, rocsparse_bfloat16);
-INSTANTIATE(float, int64_t, int32_t, rocsparse_bfloat16, rocsparse_bfloat16, rocsparse_bfloat16);
-INSTANTIATE(float, int64_t, int64_t, rocsparse_bfloat16, rocsparse_bfloat16, rocsparse_bfloat16);
 INSTANTIATE(rocsparse_float_complex,
             int32_t,
             int32_t,

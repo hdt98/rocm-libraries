@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 #define ROCPRIM_DEVICE_DEVICE_SEARCH_N_CONFIG_HPP_
 
 #include "config_types.hpp"
-#include "detail/config/device_search_n.hpp"
+
 #include "detail/device_config_helper.hpp"
 
 BEGIN_ROCPRIM_NAMESPACE
@@ -30,18 +30,39 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<class Value>
-struct search_n_config_selector
+// generic struct that instantiates custom configurations
+template<typename Config, typename>
+struct wrapped_search_n_config
 {
-    using targets    = search_n_targets;
-    using param_type = search_n_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr search_n_config_selector(Target) : params(search_n_config_picker<Target, Value>())
-    {}
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr search_n_config_params params = Config{};
+    };
 };
+
+// specialized for rocprim::default_config, which instantiates the default_search_n_config
+template<typename Type>
+struct wrapped_search_n_config<default_config, Type>
+{
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr search_n_config_params params = {8, kernel_config<256, 4>()};
+    };
+};
+
+#ifndef DOXYGEN_DOCUMENTATION_BUILD
+template<typename Config, typename Type>
+template<target_arch Arch>
+constexpr search_n_config_params
+    wrapped_search_n_config<Config, Type>::architecture_config<Arch>::params;
+
+template<typename Type>
+template<target_arch Arch>
+constexpr search_n_config_params
+    wrapped_search_n_config<default_config, Type>::architecture_config<Arch>::params;
+#endif // DOXYGEN_DOCUMENTATION_BUILD
 
 } // namespace detail
 

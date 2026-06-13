@@ -43,7 +43,7 @@ namespace cba_find2_infer {
 
 bool IsTestSupportedForDevice()
 {
-    using e_mask = enabled<Gpu::gfx94X, Gpu::gfx103X, Gpu::gfx110X, Gpu::gfx115X>;
+    using e_mask = enabled<Gpu::gfx94X, Gpu::gfx103X, Gpu::gfx110X>;
     // gfx120X is not enabled due to WORKAROUND_SWDEV_479810
     using d_mask = disabled<Gpu::None>;
     return ::IsTestSupportedForDevMask<d_mask, e_mask>();
@@ -122,9 +122,9 @@ TEST_P(GPU_ConvBiasActivFind2Infer_FP32, ConvBiasActivAsm1x1UFind2Float)
     RunTunableSolver<miopen::solver::fusion::ConvBiasActivAsm1x1U>(
         fused_problem, invoke_params, conv_config, test_skipped);
 }
-TEST_P(GPU_ConvBiasActivFind2Infer_FP32, ConvHipDirectFwdFind2Fused)
+TEST_P(GPU_ConvBiasActivFind2Infer_FP32, ConvOclDirectFwdFind2Fused)
 {
-    RunTunableSolver<miopen::solver::fusion::ConvHipDirectFwdFused>(
+    RunTunableSolver<miopen::solver::fusion::ConvOclDirectFwdFused>(
         fused_problem, invoke_params, conv_config, test_skipped);
 }
 TEST_P(GPU_ConvBiasActivFind2Infer_FP32, ConvBinWinogradRxSFind2Fused)
@@ -140,11 +140,6 @@ TEST_P(GPU_ConvBiasActivFind2Infer_FP32, ConvBinWinogradRxSf2x3g1Find2Fused)
 TEST_P(GPU_ConvBiasActivFind2Infer_FP16, ConvWinoFuryRxSf2x3Find2Fused)
 {
     RunSolver<miopen::solver::fusion::ConvWinoFuryRxSFused<2, 3>>(
-        fused_problem, invoke_params, conv_config, test_skipped);
-}
-TEST_P(GPU_ConvBiasActivFind2Infer_FP16, ConvWinoRageRxSf2x3Find2Fused)
-{
-    RunSolver<miopen::solver::fusion::ConvWinoRageRxSFused<2, 3>>(
         fused_problem, invoke_params, conv_config, test_skipped);
 }
 
@@ -182,12 +177,9 @@ TEST_P(GPU_ConvBiasActivFind2InferFusionFind_FP32, ConvBiasActivFind2Float_testF
         {miopenTensorBias, bias_dev.get()},
     };
 
-    Workspace wspace;
     for(auto& solution : solutions)
     {
-        auto cur_sol_ws = solution.GetWorkspaceSize();
-        wspace.resize(cur_sol_ws);
-        ASSERT_NO_THROW(solution.Run(get_handle(), tensors, wspace.ptr(), cur_sol_ws));
+        ASSERT_NO_THROW(solution.Run(get_handle(), tensors, nullptr, 0));
         ValidateResult();
     }
 }
@@ -209,10 +201,6 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_ConvBiasActivFind2Infer_FP16,
-                         testing::Combine(testing::Values(miopenActivationPASTHRU,
-                                                          miopenActivationLOGISTIC,
-                                                          miopenActivationTANH,
-                                                          miopenActivationRELU,
-                                                          miopenActivationLEAKYRELU),
+                         testing::Combine(testing::Values(miopenActivationRELU),
                                           testing::ValuesIn(GetNetwork1<ConvTestCaseBase>()),
-                                          testing::Values(miopenTensorNCHW)));
+                                          testing::Values(miopenTensorNHWC)));

@@ -16,7 +16,6 @@ function display_help()
   echo "    [-d|--dependencies] install build dependencies"
   echo "    [-r]--relocatable] create a package to support relocatable ROCm"
   echo "    [-c|--clients] build library clients too (combines with -i & -d)"
-  echo "    [-o|--clients-only] build clients only"
   echo "    [-g|--debug] -DCMAKE_BUILD_TYPE=Debug (default is =Release)"
   echo "    [-k|--relwithdebinfo] -DCMAKE_BUILD_TYPE=RelWithDebInfo"
   echo "    [--codecoverage] build with code coverage profiling enabled"
@@ -26,6 +25,7 @@ function display_help()
   echo "    [--address-sanitizer] build with address sanitizer enabled. Uses hip-clang to compile"
   echo "    [--matrices-dir] existing client matrices directory"
   echo "    [--matrices-dir-install] install client matrices directory"
+  echo "    [--rm-legacy-include-dir] Remove legacy include dir Packaging added for file/folder reorg backward compatibility."
 }
 
 # This function is helpful for dockerfiles that do not have sudo installed, but the default user is root
@@ -39,10 +39,10 @@ supported_distro( )
   fi
 
   case "${ID}" in
-    ubuntu|debian|centos|rhel|fedora|sles|opensuse-leap|almalinux|rocky|ol)
+    ubuntu|centos|rhel|fedora|sles|opensuse-leap)
         true
         ;;
-    *)  printf "This script is currently supported on Ubuntu, Debian, CentOS, RHEL, Fedora, SLES, OpenSUSE-Leap, Alma Linux, Rocky Linux (rocky), and Oracle Linux (ol) (detected: ${ID})\n"
+    *)  printf "This script is currently supported on Ubuntu, CentOS, RHEL, Fedora, SLES, and OpenSUSE-Leap\n"
         exit 2
         ;;
   esac
@@ -139,7 +139,6 @@ install_packages( )
   local library_dependencies_centos_7=( "epel-release" "make" "cmake3" "gcc-c++" "rpm-build" )
   local library_dependencies_centos_8=( "epel-release" "make" "cmake3" "gcc-c++" "rpm-build" )
   local library_dependencies_centos_9=( "epel-release" "make" "cmake3" "gcc-c++" "rpm-build" )
-  local library_dependencies_centos_10=( "epel-release" "make" "cmake" "gcc-c++" "rpm-build" )
   local library_dependencies_fedora=( "make" "cmake" "gcc-c++" "libcxx-devel" "rpm-build" "numactl-libs" )
   local library_dependencies_sles=( "make" "cmake" "gcc-c++" "rpm-build" "pkg-config" "dpkg" )
 
@@ -147,18 +146,16 @@ install_packages( )
   local client_dependencies_centos_7=( "devtoolset-7-gcc-gfortran" )
   local client_dependencies_centos_8=( "gcc-gfortran" )
   local client_dependencies_centos_9=( "gcc-gfortran" )
-  local client_dependencies_centos_10=( "gcc-gfortran" )
   local client_dependencies_fedora=( "gcc-gfortran" )
   local client_dependencies_sles=( "gcc-fortran" )
 
-  if [[ ( "${ID}" == "centos" ) || ( "${ID}" == "rhel" ) || ( "${ID}" == "almalinux" ) || ( "${ID}" == "rocky" ) || ( "${ID}" == "ol" ) ]]; then
+  if [[ ( "${ID}" == "centos" ) || ( "${ID}" == "rhel" ) ]]; then
     if [[ "${MAJORVERSION}" == "6" ]]; then
       library_dependencies_centos_6+=( "numactl" )
     else
       library_dependencies_centos_7+=( "numactl-libs" )
       library_dependencies_centos_8+=( "numactl-libs" )
       library_dependencies_centos_9+=( "numactl-libs" )
-      library_dependencies_centos_10+=( "numactl-libs" )
     fi
   fi
 
@@ -176,22 +173,16 @@ install_packages( )
   fi
 
   case "${ID}" in
-    ubuntu|debian)
+    ubuntu)
       elevate_if_not_root apt update
       install_apt_packages "${library_dependencies_ubuntu[@]}"
       ;;
 
-    centos|rhel|almalinux|rocky|ol)
+    centos|rhel)
 #     yum -y update brings *all* installed packages up to date
 #     without seeking user approval
 #     elevate_if_not_root yum -y update
-      if [[ "${MAJORVERSION}" -ge 10 ]]; then
-        install_yum_packages "${library_dependencies_centos_10[@]}"
-
-        if [[ "${build_clients}" == true ]]; then
-          install_yum_packages "${client_dependencies_centos_10[@]}"
-        fi
-      elif [[ "${MAJORVERSION}" == 9 ]]; then
+      if [[ "${MAJORVERSION}" == 9 ]]; then
         install_yum_packages "${library_dependencies_centos_9[@]}"
 
         if [[ "${build_clients}" == true ]]; then
@@ -236,7 +227,7 @@ install_packages( )
       fi
       ;;
     *)
-      echo "This script is currently supported on Ubuntu, Debian, CentOS, RHEL and Fedora"
+      echo "This script is currently supported on Ubuntu, CentOS, RHEL and Fedora"
       exit 2
       ;;
   esac
@@ -277,7 +268,6 @@ supported_distro
 install_package=false
 install_dependencies=false
 build_clients=false
-build_clients_only=false
 build_cuda=false
 build_static=false
 build_release=true
@@ -287,8 +277,8 @@ install_prefix=hipsparse-install
 rocm_path=/opt/rocm
 build_relocatable=false
 build_address_sanitizer=false
+build_freorg_bkwdcomp=false
 compiler=${CXX}
-c_compiler=${CC}
 
 # #################################################
 # Parameter parsing
@@ -297,7 +287,7 @@ c_compiler=${CC}
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,clients,clients-only,dependencies,debug,compiler:,cuda,static,relocatable,codecoverage,relwithdebinfo,address-sanitizer,matrices-dir:,matrices-dir-install:,rm-legacy-include-dir --options hicodgrk -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,clients,dependencies,debug,compiler:,cuda,static,relocatable,codecoverage,relwithdebinfo,address-sanitizer,matrices-dir:,matrices-dir-install:,rm-legacy-include-dir --options hicdgrk -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -325,9 +315,6 @@ while true; do
     -c|--clients)
         build_clients=true
         shift ;;
-    -o|--clients-only)
-        build_clients_only=true
-        shift ;;
     -r|--relocatable)
         build_relocatable=true
         shift ;;
@@ -353,7 +340,9 @@ while true; do
     --address-sanitizer)
         build_address_sanitizer=true
         compiler=amdclang++
-        c_compiler=amdclang
+        shift ;;
+    --rm-legacy-include-dir)
+        build_freorg_bkwdcomp=false
         shift ;;
     --matrices-dir)
         matrices_dir=${2}
@@ -381,10 +370,9 @@ done
 
 # Note 'compiler' variable not changed after this point. This ensures that everything is built with the same compiler
 # provided by the user through either setting CXX externally (in which case compiler=${CXX} followed by CXX=${compiler})
-# or through using --compiler option. This is important so that googletest and hipsparse are built with the same
+# or through using --compiler option. This is important so that googletest and hipsparse are built with the same 
 # compiler to ensure settings like position independent code is consistent when linking.
 CXX=${compiler}
-CC=${c_compiler}
 
 if [[ "${build_relocatable}" == true ]]; then
     if ! [ -z ${ROCM_PATH+x} ]; then
@@ -442,12 +430,8 @@ fi
 cmake_executable=cmake
 
 case "${ID}" in
-  centos|rhel|almalinux|rocky|ol)
-  if [[ "${MAJORVERSION}" -ge 10 ]]; then
-    cmake_executable=cmake
-  else
-    cmake_executable=cmake3
-  fi
+  centos|rhel)
+  cmake_executable=cmake3
   ;;
 esac
 
@@ -511,6 +495,13 @@ pushd .
     cmake_common_options="$cmake_common_options -DBUILD_ADDRESS_SANITIZER=ON"
   fi
 
+  # freorg backward compatible support enable
+  if [[ "${build_freorg_bkwdcomp}" == true ]]; then
+    cmake_common_options="${cmake_common_options} -DBUILD_FILE_REORG_BACKWARD_COMPATIBILITY=ON"
+  else
+    cmake_common_options="${cmake_common_options} -DBUILD_FILE_REORG_BACKWARD_COMPATIBILITY=OFF"
+  fi
+ 
   # library type
   if [[ "${build_static}" == true ]]; then
     cmake_common_options="${cmake_common_options} -DBUILD_SHARED_LIBS=OFF"
@@ -519,18 +510,7 @@ pushd .
 
   # clients
   if [[ "${build_clients}" == true ]]; then
-    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DBUILD_CLIENTS_BENCHMARKS=ON"
-    #
-    # Add matrices_dir if exists.
-    #
-    if ! [[ "${matrices_dir}" == "" ]];then
-        cmake_client_options="${cmake_client_options} -DCMAKE_MATRICES_DIR=${matrices_dir}"
-    fi
-  fi
-
-  # clients only
-  if [[ "${build_clients_only}" == true ]]; then
-    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_ONLY=ON -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DBUILD_CLIENTS_BENCHMARKS=ON"
+    cmake_client_options="${cmake_client_options} -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON"
     #
     # Add matrices_dir if exists.
     #
@@ -555,7 +535,7 @@ pushd .
 
   # Build library
   if [[ "${build_relocatable}" == true ]]; then
-    CXX=${compiler} CC=${c_compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} \
+    CXX=${compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} \
       -DCMAKE_INSTALL_PREFIX="${install_prefix}" \
       -DCMAKE_SHARED_LINKER_FLAGS="${rocm_rpath}" \
       -DCMAKE_PREFIX_PATH="${rocm_path} ${rocm_path}/hip" \
@@ -564,7 +544,7 @@ pushd .
       -DROCM_DISABLE_LDCONFIG=ON \
       -DROCM_PATH="${rocm_path}" ../..
   else
-    CXX=${compiler} CC=${c_compiler} ${cmake_executable} -DCMAKE_EXE_LINKER_FLAGS=" ${cmake_build_static_options}" ${cmake_common_options} ${cmake_client_options} -DCMAKE_INSTALL_PREFIX=hipsparse-install -DROCM_PATH=${rocm_path} ../..
+    CXX=${compiler} ${cmake_executable} -DCMAKE_EXE_LINKER_FLAGS=" ${cmake_build_static_options}" ${cmake_common_options} ${cmake_client_options} -DCMAKE_INSTALL_PREFIX=hipsparse-install -DROCM_PATH=${rocm_path} ../..
   fi
 
   check_exit_code "$?"
@@ -581,10 +561,10 @@ pushd .
     check_exit_code "$?"
 
     case "${ID}" in
-      ubuntu|debian)
+      ubuntu)
         elevate_if_not_root dpkg -i hipsparse[-\_]*.deb
       ;;
-      centos|rhel|almalinux|rocky|ol)
+      centos|rhel)
         elevate_if_not_root yum -y localinstall hipsparse-*.rpm
       ;;
       fedora)

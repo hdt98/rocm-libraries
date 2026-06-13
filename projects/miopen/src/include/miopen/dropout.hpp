@@ -54,9 +54,9 @@ using prngStates = xorwowStates;
 
 namespace miopen {
 
-struct DropoutDescriptor : miopenDropoutDescriptor
+struct MIOPEN_INTERNALS_EXPORT DropoutDescriptor : miopenDropoutDescriptor
 {
-    MIOPEN_INTERNALS_EXPORT DropoutDescriptor();
+    DropoutDescriptor();
 
     float dropout;
     Data_t pstates;
@@ -68,23 +68,23 @@ struct DropoutDescriptor : miopenDropoutDescriptor
 
     miopenDataType_t dataType_;
 
-    MIOPEN_INTERNALS_EXPORT void InitPRNGState(const Handle& handle,
-                                               Data_t prng_states,
-                                               size_t prng_stateSizeInBytes,
-                                               unsigned long long prng_seed) const;
+    void InitPRNGState(const Handle& handle,
+                       Data_t prng_states,
+                       size_t prng_stateSizeInBytes,
+                       unsigned long long prng_seed) const;
 
-    MIOPEN_INTERNALS_EXPORT void Dropout(const Handle& handle,
-                                         const TensorDescriptor& noise_shape,
-                                         const TensorDescriptor& xDesc,
-                                         ConstData_t x,
-                                         const TensorDescriptor& yDesc,
-                                         Data_t y,
-                                         Data_t reserveSpace,
-                                         size_t reserveSpaceSizeInBytes,
-                                         size_t in_offset    = 0,
-                                         size_t out_offset   = 0,
-                                         size_t rsvsp_offset = 0,
-                                         bool is_backward    = false) const;
+    void Dropout(const Handle& handle,
+                 const TensorDescriptor& noise_shape,
+                 const TensorDescriptor& xDesc,
+                 ConstData_t x,
+                 const TensorDescriptor& yDesc,
+                 Data_t y,
+                 Data_t reserveSpace,
+                 size_t reserveSpaceSizeInBytes,
+                 size_t in_offset    = 0,
+                 size_t out_offset   = 0,
+                 size_t rsvsp_offset = 0,
+                 bool is_backward    = false) const;
 };
 
 std::ostream& operator<<(std::ostream& stream, const DropoutDescriptor& x);

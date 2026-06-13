@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     November 2017
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,8 +38,8 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename S, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
-__device__ void run_set_taubeta(T* tau, T* norms, T* alpha, S* beta)
+template <typename T, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
+__device__ void run_set_taubeta(T* tau, T* norms, T* alpha, T* beta)
 {
     const auto ignore_beta = (beta == nullptr);
     if(norms[0] > 0)
@@ -78,9 +78,10 @@ __device__ void run_set_taubeta(T* tau, T* norms, T* alpha, S* beta)
     }
 }
 
-template <typename T, typename S, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
-__device__ void run_set_taubeta(T* tau, T* norms, T* alpha, S* beta)
+template <typename T, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
+__device__ void run_set_taubeta(T* tau, T* norms, T* alpha, T* beta)
 {
+    using S = decltype(std::real(T{}));
     S r, rr, ri, ar, ai;
 
     ar = alpha[0].real();
@@ -126,20 +127,20 @@ __device__ void run_set_taubeta(T* tau, T* norms, T* alpha, S* beta)
         // beta:
         if(!ignore_beta)
         {
-            beta[0] = alpha[0].real();
+            beta[0] = alpha[0];
             alpha[0] = 1;
         }
     }
 }
 
-template <typename T, typename I, typename S, typename U>
+template <typename T, typename I, typename U, typename UB>
 ROCSOLVER_KERNEL void set_taubeta(T* tauA,
                                   const rocblas_stride strideP,
                                   T* norms,
                                   U alphaA,
                                   const rocblas_stride shiftA,
                                   const rocblas_stride strideA,
-                                  S* betaA,
+                                  UB betaA,
                                   const rocblas_stride shiftb,
                                   const rocblas_stride strideb)
 {
@@ -147,10 +148,10 @@ ROCSOLVER_KERNEL void set_taubeta(T* tauA,
 
     // select batch instance
     T* alpha = load_ptr_batch<T>(alphaA, bid, shiftA, strideA);
-    S* beta = betaA ? load_ptr_batch<S>(betaA, bid, shiftb, strideb) : nullptr;
+    T* beta = betaA ? load_ptr_batch<T>(betaA, bid, shiftb, strideb) : nullptr;
     T* tau = tauA + bid * strideP;
 
-    run_set_taubeta<T, S>(tau, norms + bid, alpha, beta);
+    run_set_taubeta<T>(tau, norms + bid, alpha, beta);
 }
 
 template <typename T, typename I>
@@ -176,9 +177,9 @@ rocblas_status rocsolver_larfg_getMemorySize(const I n,
         // TODO: Some architectures have failures in sygvx with small-size kernels enabled, more investigation needed
         int device;
         HIP_CHECK(hipGetDevice(&device));
-        hipDeviceProp_t props;
-        HIP_CHECK(hipGetDeviceProperties(&props, device));
-        if(props.warpSize >= 64)
+        hipDeviceProp_t deviceProperties;
+        HIP_CHECK(hipGetDeviceProperties(&deviceProperties, device));
+        if(deviceProperties.warpSize >= 64)
             return rocblas_status_success;
     }
 
@@ -218,12 +219,12 @@ rocblas_status
     return rocblas_status_continue;
 }
 
-template <typename T, typename I, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
+template <typename T, typename I, typename U, bool COMPLEX = rocblas_is_complex<T>>
 rocblas_status rocsolver_larfg_template(rocblas_handle handle,
                                         const I n,
                                         U alpha,
                                         const rocblas_stride shifta,
-                                        S* beta,
+                                        T* beta,
                                         const rocblas_stride shiftb,
                                         const rocblas_stride strideb,
                                         U x,
@@ -264,11 +265,14 @@ rocblas_status rocsolver_larfg_template(rocblas_handle handle,
     }
 
     // if n is small, use small-size kernel
-    if(true)
+    if(n <= LARFG_SSKER_MAX_N)
     {
         // TODO: Some architectures have failures in sygvx with small-size kernels enabled, more investigation needed
-        const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
-        if(props->warpSize >= 64)
+        int device;
+        HIP_CHECK(hipGetDevice(&device));
+        hipDeviceProp_t deviceProperties;
+        HIP_CHECK(hipGetDeviceProperties(&deviceProperties, device));
+        if(deviceProperties.warpSize >= 64)
         {
             return larfg_run_small(handle, n, alpha, shifta, stridex, beta, shiftb, strideb, x,
                                    shiftx, incx, stridex, tau, strideP, batch_count);
@@ -311,9 +315,8 @@ rocblas_status rocsolver_larfg_template(rocblas_handle handle,
                                         T* work,
                                         T* norms)
 {
-    using S = decltype(std::real(T{}));
-    return rocsolver_larfg_template<T, I, S>(handle, n, alpha, shifta, (S*)nullptr, 0, 0, x, shiftx,
-                                             incx, stridex, tau, strideP, batch_count, work, norms);
+    return rocsolver_larfg_template(handle, n, alpha, shifta, (T*)nullptr, 0, 0, x, shiftx, incx,
+                                    stridex, tau, strideP, batch_count, work, norms);
 }
 
 ROCSOLVER_END_NAMESPACE

@@ -16,21 +16,14 @@ of the AMD ROCm runtime and toolchains and optimized for AMD discrete GPUs.
 
 For more information, see :doc:`What is hipSPARSE? <./what-is-hipsparse>`
 
-The hipSPARSE public repository is located at `<https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsparse>`_.
-
-
-.. note::
-
-   The hipSPARSE repository for ROCm 6.4.2 and earlier is located at `<https://github.com/ROCm/hipSPARSE>`_.
+The hipSPARSE public repository is located at `<https://github.com/ROCm/hipSPARSE>`_.
 
 .. grid:: 2
   :gutter: 3
 
   .. grid-item-card:: Install
 
-    * :doc:`Install hipSPARSE <./install/install>`
-    * :doc:`Build from source on Linux <./install/build-linux>`
-    * :doc:`Build from source on Windows <./install/build-windows>`
+    * :doc:`Installation guide <./install/install>`
 
   .. grid-item-card:: How to
 
@@ -38,12 +31,12 @@ The hipSPARSE public repository is located at `<https://github.com/ROCm/rocm-lib
 
   .. grid-item-card:: Examples
 
-    * `Client samples <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsparse/clients/samples>`_
+    * `Client samples <https://github.com/ROCm/hipSPARSE/tree/develop/clients/samples>`_
 
   .. grid-item-card:: API reference
 
     * :doc:`Exported functions <./reference/api>`
-    * :doc:`hipSPARSE data types <./reference/types>`
+    * :doc:`hipSPARSE datatypes <./reference/types>`
     * :doc:`hipSPARSE precision support <./reference/precision>`
     * :doc:`Sparse auxiliary functions <./reference/auxiliary>`
     * :doc:`Sparse level 1 functions <./reference/level1>`
@@ -58,3 +51,5 @@ The hipSPARSE public repository is located at `<https://github.com/ROCm/rocm-lib
 To contribute to the documentation, see `Contributing to ROCm <https://rocm.docs.amd.com/en/latest/contribute/contributing.html>`_.
 
 You can find licensing information on the `Licensing <https://rocm.docs.amd.com/en/latest/about/license.html>`_ page.
+
+

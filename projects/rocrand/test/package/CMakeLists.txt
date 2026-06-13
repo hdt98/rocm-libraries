@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -52,8 +52,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 
-if(NOT CMAKE_CXX_STANDARD EQUAL 17)
-  message(FATAL_ERROR "Only C++17 is supported")
+if (CMAKE_CXX_STANDARD EQUAL 14)
+  message(WARNING "C++14 will be deprecated in the next major release")
+elseif(NOT CMAKE_CXX_STANDARD EQUAL 17)
+  message(FATAL_ERROR "Only C++14 and C++17 are supported")
 endif()
 
 # Find rocRAND
@@ -105,11 +107,7 @@ endfunction()
 foreach(test_src ${rocrand_pkg_TEST_SRCS})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} "${test_src}")
-    if(USE_SYSTEM_LIB)
-        target_link_libraries(${test_name} PRIVATE roc::rocrand)
-    else()
-        target_link_libraries(${test_name} PRIVATE rocrand)
-    endif()
+    target_link_libraries(${test_name} PRIVATE roc::rocrand)
     if(HIP_COMPILER STREQUAL "nvcc")
         # Get HIP options
         execute_process(

@@ -741,7 +741,7 @@ public:
                              std::next(strides.rbegin()),
                              std::multiplies<size_t>{});
             strides[0] *= bias_cnt;
-            return std::move(strides);
+            return strides;
         }(bias_lens, bias_mode * 2);
 
         return {input_vector_filter_sz,

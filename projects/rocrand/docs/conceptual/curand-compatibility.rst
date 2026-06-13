@@ -1,5 +1,5 @@
 .. meta::
-   :description: rocRAND compatibility with cuRAND
+   :description: rocRAND documentation and API reference library
    :keywords: rocRAND, ROCm, API, documentation, cuRAND
 
 .. _curand-compatibility:
@@ -10,7 +10,7 @@ cuRAND compatibility
 
 The following table shows which rocRAND generators produce the exact same sequence as the equivalent NVIDIA CUDA cuRAND generator when using legacy ordering, given the same seed, number of dimensions, and offset.
 
-.. table:: cuRAND compatibility
+.. table:: cuRAND Compatibility
     :widths: auto
 
     =================  =====================

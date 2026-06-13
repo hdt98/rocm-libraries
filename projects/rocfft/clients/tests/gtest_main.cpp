@@ -1,4 +1,4 @@
-// Copyright (C) 2016 - 2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -37,11 +37,9 @@
 #include <list>
 
 #include "../../shared/CLI11.hpp"
-#include "../../shared/client_except.h"
 #include "../../shared/concurrency.h"
 #include "../../shared/device_properties.h"
 #include "../../shared/environment.h"
-#include "../../shared/fft_enums.h"
 #include "../../shared/hostbuf.h"
 #include "../../shared/rocfft_accuracy_test.h"
 #include "../../shared/sys_mem.h"
@@ -55,14 +53,11 @@
 int verbose;
 
 // User-defined random seed
-size_t             random_seed;
-std::random_device default_seed_dev;
+size_t random_seed;
 // Overall probability of running conventional tests
 double test_prob;
-// Probability of running tests from the emulation/simulation suite
+// Probability of running tests from the emulation suite
 double emulation_prob;
-// Probability of running unit tests
-double unittest_prob;
 // Modifier for probability of running tests with complex interleaved data
 double complex_interleaved_prob_factor;
 // Modifier for probability of running tests with real data
@@ -80,11 +75,19 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(bitwise_repro_test);
 // Transform parameters for manual test:
 fft_params manual_params;
 
+// Host memory limitation for tests (GiB):
+size_t ramgb;
+
+// Device memory limitation for tests (GiB):
+size_t vramgb;
+
 // Number of hip devices to use.
 int ngpus{};
 
 // Allow skipping tests if there is a runtime error
 bool skip_runtime_fails;
+// But count the number of failures
+int n_hip_failures = 0;
 
 // Pointer to a bitwise repro-db file
 std::unique_ptr<fft_hash_db> repro_db;
@@ -109,7 +112,7 @@ bool use_fftw_wisdom = false;
 bool fftw_compare = true;
 
 // Cache the last cpu fft that was requested
-reference_fft_data_t reference_fft_data_t::cached_data = reference_fft_data_t::make_default();
+last_cpu_fft_cache last_cpu_fft_data;
 
 // Number of devices to distribute the FFT to for manual tests
 int manual_devices = 1;
@@ -138,7 +141,7 @@ void init_gtest_flags()
     std::swap(temp_list_tests, testing::GTEST_FLAG(list_tests));
 
     // move stdout to devnull
-#ifdef _WIN32
+#ifdef WIN32
     int stdout_fd   = _fileno(stdout);
     int devnull     = _open("NUL", _O_WRONLY);
     int stdout_copy = _dup(stdout_fd);
@@ -153,7 +156,7 @@ void init_gtest_flags()
     (void)RUN_ALL_TESTS();
 
     // put stdout back
-#ifdef _WIN32
+#ifdef WIN32
     _dup2(stdout_copy, stdout_fd);
     _close(stdout_copy);
     _close(devnull);
@@ -255,14 +258,10 @@ void precompile_test_kernels(const std::string& precompile_file)
 
                     params_forward.free();
 
-                    // some adhoc tokens might be inverse already
-                    if(params_forward.is_forward())
-                    {
-                        rocfft_params params_inverse;
-                        params_inverse.inverse_from_forward(params_forward);
-                        params_inverse.validate();
-                        params_inverse.setup_structs();
-                    }
+                    rocfft_params params_inverse;
+                    params_inverse.inverse_from_forward(params_forward);
+                    params_inverse.validate();
+                    params_inverse.setup_structs();
                 }
                 catch(std::exception& e)
                 {
@@ -297,10 +296,6 @@ int main(int argc, char* argv[])
     // we re-parse the arguments with gtest and CLI.
     std::string argv0 = argv[0];
 
-    // Unless specified otherwise by the user, no limit on host/device memory usage
-    // (see corresponding default values)
-    size_t ramgb_limit, vramgb_limit;
-
     CLI::App app{
         "\n"
         "rocFFT Runtime Test command line options\n"
@@ -320,29 +315,29 @@ int main(int argc, char* argv[])
         "      HP - hermitian planar\n"
         "\n"
         "Usage"};
-    // Override CLI11 help to print it along gtest's help
-    app.set_help_flag("");
-    const auto opt_help = app.add_flag("-h, --help", "Produces this help message");
+
+    // Override CLI11 help to print after later CLI11 options that are defined, and allow gtest's
+    // help.
+    // After removing the stage-1 options, individual options are set to null (even if set), but we
+    // can still capture the behaviour by using a flag.
+
+    for(auto opt : app.get_options())
+    {
+        app.remove_option(opt);
+    }
     app.add_option("-v, --verbose", verbose, "Print out detailed information for the tests")
         ->default_val(0);
     app.add_option("--nrand", n_random_tests, "Number of extra randomized tests")->default_val(0);
-    app.add_option("--R", ramgb_limit, "RAM limit in GiB for tests")
-        ->default_val(system_memory::singleton().get_total_gbytes());
-    app.add_option("--V", vramgb_limit, "VRAM limit in GiB for tests (per device)")
-        ->default_val(DivRoundingUp(
-            device_memory_accountant::singleton().get_max_total_mem_on_devices(), ONE_GiB));
+
     app.add_option("--ngpus", ngpus, "Number of GPUs to use per rank")
         ->default_val(-1)
         ->check(CLI::NonNegativeNumber);
+    app.add_option("--gpus", n_random_tests, "Number of extra randomized tests")->default_val(0);
     app.add_option("--test_prob", test_prob, "Probability of running individual tests")
         ->default_val(1.0)
         ->check(CLI::Range(0.0, 1.0));
-    app.add_option("--unittest_prob", unittest_prob, "Probability of running individual unit tests")
-        ->default_val(1.0)
-        ->check(CLI::Range(0.0, 1.0));
-    app.add_option("--emulation_prob,--simulation_prob",
-                   emulation_prob,
-                   "Probability of running individual emulation/simulation tests")
+    app.add_option(
+           "--emulation_prob", test_prob, "Probability of running individual emulation tests")
         ->default_val(1.0)
         ->check(CLI::Range(0.0, 1.0));
     app.add_option("--real_prob",
@@ -364,25 +359,19 @@ int main(int argc, char* argv[])
     app.add_option("--callback_prob",
                    callback_prob_factor,
                    "Probability multiplier for running individual callback transforms")
-        ->default_val(0.0)
+        ->default_val(0.1)
         ->check(CLI::PositiveNumber);
 
-    constexpr auto emulation_quick      = "quick";
-    constexpr auto emulation_smoke      = "smoke";
-    constexpr auto emulation_regression = "regression";
-    constexpr auto emulation_extended   = "extended";
-    app.add_option("--emulation,--simulation",
-                   "Run emulation/simulation tests only (targeted scopes)")
-        ->check(CLI::IsMember(
-            {emulation_quick, emulation_smoke, emulation_regression, emulation_extended}))
-        ->expected(1)
-        ->excludes("--test_prob",
-                   "--emulation_prob",
-                   "--unittest_prob",
-                   "--nrand",
-                   "--callback_prob",
-                   "--R")
+    constexpr std::array<std::string_view, 4> emulation_types
+        = {"none", "smoke", "regression", "extended"};
+    app.add_option("--emulation", "Run emulation tests")
+        ->check(CLI::IsMember(emulation_types))
         ->each([&](const std::string& emulationtype) {
+            constexpr auto nidx = [emulation_types](const auto name) {
+                return std::find(emulation_types.begin(), emulation_types.end(), name)
+                       - emulation_types.begin();
+            };
+
             // Emulation test suites focus on well-established software paths; we are looking for
             // information about the hardware, which means that we aren't trying to find out a lot
             // of information about the software.  Thus, no randomly-generated tests.
@@ -394,38 +383,29 @@ int main(int argc, char* argv[])
             // Callbacks are not an emulation test target.
             callback_prob_factor = 0;
 
-            if(emulationtype == emulation_quick)
-            {
-                // Configuration specific for "quick simulation test" category, the whole test run
-                // should complete under 2 hours in the simulation environment (configuration parameters
-                // based on observations)
-                vramgb_limit   = 2;
-                emulation_prob = 0.002;
-                test_prob      = 0;
-                unittest_prob  = 0;
-            }
-            else if(emulationtype == emulation_smoke)
+            // We can do a switch on nidx(emulationtype) when we have C++20
+            // switch(nidx(emulationtype))
+            // {
+            // case nidx("smoke"):
+            // etc.
+
+            if(nidx(emulationtype) == nidx("smoke"))
             {
                 // 2GB vram limit, approx 1 minute GPU time with short tests.
-                vramgb_limit   = 2;
-                emulation_prob = 0.005;
+                vramgb         = 2;
                 test_prob      = 0;
-                unittest_prob  = 0;
+                emulation_prob = 0.005;
             }
-            else if(emulationtype == emulation_regression)
+            if(nidx(emulationtype) == nidx("regression"))
             {
-                vramgb_limit   = 16;
+                vramgb         = 16;
                 emulation_prob = 1;
                 test_prob      = 0.01;
-                unittest_prob  = 0.01;
             }
-            else
+            if(nidx(emulationtype) == nidx("extended"))
             {
-                // emulationtype == emulation_extended given CLI11's check above
-                assert(emulationtype == emulation_extended);
                 emulation_prob = 1;
                 test_prob      = 0.02;
-                unittest_prob  = 0.02;
             }
         });
 
@@ -438,11 +418,8 @@ int main(int argc, char* argv[])
         ->check(CLI::NonNegativeNumber);
     app.add_option("--mp_launch",
                    mp_launch,
-                   "Command line prefix to launch multi-process transforms, e.g. \n"
-                   "\"mpirun --np 4 /path/to/rocfft_mpi_worker\"\n"
-                   "NOTE: embedded quotes must be used for all command arguments that contain "
-                   "space character(s). For instance,\n"
-                   "\"mpirun --np 4 \\\"/path with spaces/to/rocfft_mpi_worker\\\"\"")
+                   "Command line prefix to launch multi-process transforms, e.g. \"mpirun --np 4 "
+                   "/path/to/rocfft_mpi_worker\"")
         ->default_val("")
         ->each([&](const std::string&) {
             if(mp_lib == fft_params::fft_mp_lib_none)
@@ -454,22 +431,65 @@ int main(int argc, char* argv[])
         ->needs("--mp_lib");
 
     app.add_flag("--smoketest", "Run a short (approx 5 minute) randomized selection of tests")
-        ->excludes("--emulation", "--test_prob", "--emulation_prob", "--unittest_prob", "--nrand")
         ->each([&](const std::string&) {
-            // The objective is to have a test that takes about 5 minutes, so just set the
+            // The objective is to have an test that takes about 5 minutes, so just set the
             // probability per test to a small value to achieve this result.
-            test_prob      = 0.0005;
-            emulation_prob = 0.005;
-            unittest_prob  = 0.2;
+            test_prob      = 0.001;
+            emulation_prob = 0.01;
             n_random_tests = 10;
         });
 
-    app.add_flag(
-           "--callback", manual_params.run_callbacks, "Inject load/store callbacks: none, funcptr")
-        ->default_val("none");
+    app.add_flag("--callback", "Inject load/store callbacks")->each([&](const std::string&) {
+        manual_params.run_callbacks = true;
+    });
 
-    app.add_option("--seed", random_seed, "Random seed; if unset, use an actual random seed")
-        ->default_val(default_seed_dev());
+    {
+        // We explicitly scope opt_seed so that the object falls out of scope before the final
+        // parsing of the command line arguments.  Otherwise, the second parsing would mark the
+        // option as not having been specified, which can get rather confusing.
+
+        auto opt_seed = app.add_option(
+            "--seed", random_seed, "Random seed; if unset, use an actual random seed");
+
+        // Try parsing initial args that will be used to configure tests.
+        // Allow extras to pass on gtest and rocFFT arguments without error.
+        app.allow_extras();
+        try
+        {
+            app.parse(argc, argv);
+        }
+        catch(const CLI::ParseError& e)
+        {
+            return app.exit(e);
+        }
+
+        if(!*opt_seed)
+        {
+            std::cout << "Generating random seed: ";
+            std::random_device dev;
+            random_seed = dev();
+            std::cout << random_seed << std::endl;
+        }
+    }
+
+    app.set_help_flag("");
+    auto opt_help = app.add_flag("-h, --help", "Produces this help message");
+
+    std::vector<std::string> remaining_args = app.remaining();
+    // Google test ignores the first element, so add something there so that it parses all of hte
+    // arguments that we want it to parse.:
+    remaining_args.insert(remaining_args.begin(), argv0);
+    // NB: If we initialize gtest first, then it removes all of its own command-line
+    // arguments and sets argc and argv correctly;
+    std::vector<char*> carg;
+    for(std::string& s : remaining_args)
+    {
+        carg.push_back(&s[0]);
+    }
+    carg.push_back(NULL);
+    decltype(argc) cargc = carg.size() - 1;
+    ::testing::InitGoogleTest(&cargc, carg.data());
+
     // Filename for fftw and fftwf wisdom.
     std::string fftw_wisdom_filename;
 
@@ -512,11 +532,6 @@ int main(int argc, char* argv[])
                      "forward\n3) real inverse")
         ->default_val(fft_transform_type_complex_forward);
     non_token
-        ->add_option("--auto_allocation",
-                     manual_params.auto_allocate,
-                     "rocFFT's auto-allocation behavior: \"on\", \"off\", or \"default\"")
-        ->default_val("default");
-    non_token
         ->add_option("--precision",
                      manual_params.precision,
                      "Transform precision: single (default), double, half")
@@ -551,6 +566,9 @@ int main(int argc, char* argv[])
     non_token->add_option("--ooffset", manual_params.ooffset, "Output offset");
     app.add_option("--isize", manual_params.isize, "Logical size of input buffer");
     app.add_option("--osize", manual_params.osize, "Logical size of output buffer");
+    app.add_option("--R", ramgb, "RAM limit in GiB for tests")
+        ->default_val(host_memory::singleton().get_total_gbytes());
+    app.add_option("--V", vramgb, "VRAM limit in GiB for tests")->default_val(0);
     app.add_option("--half_epsilon", half_epsilon)->default_val(9.77e-4);
     app.add_option("--single_epsilon", single_epsilon)->default_val(3.75e-5);
     app.add_option("--double_epsilon", double_epsilon)->default_val(1e-15);
@@ -584,50 +602,29 @@ int main(int argc, char* argv[])
                    "2) linearly-spaced sequence (device)\n"
                    "3) linearly-spaced sequence (host)");
 
-    // Try parsing initial args that will be used to configure tests
-    // Allow extras to pass on gtest arguments without error
-    app.allow_extras();
+    // Parse rest of args and catch any errors here
     try
     {
-        app.parse(argc, argv);
+        app.parse(cargc, carg.data());
     }
     catch(const CLI::ParseError& e)
     {
         return app.exit(e);
     }
 
-    // extract remaining arguments for subsequent gtest initialization
-    std::vector<std::string> remaining_args = app.remaining();
-    std::string              gtest_help_opt = "--help";
-    // NB: If we initialize gtest first, then it removes all of its own command-line
-    // arguments and sets argc and argv correctly;
-    std::vector<char*> gtest_argv;
-    gtest_argv.insert(gtest_argv.begin(), argv[0]);
-    for(std::string& s : remaining_args)
-    {
-        gtest_argv.push_back(&s[0]);
-    }
-    if(*opt_help)
-    {
-        // make sure gtest prints its help as well
-        gtest_argv.push_back(&gtest_help_opt[0]);
-    }
-    gtest_argv.push_back(NULL);
-    decltype(argc) gtest_argc = gtest_argv.size() - 1;
-    ::testing::InitGoogleTest(&gtest_argc, gtest_argv.data()); // gtest-relevant args are removed
-
     if(*opt_help)
     {
         std::cout << app.help() << "\n";
         return EXIT_SUCCESS;
     }
-    // no help was used, gtest_argc is expected to be 1 at this point. If not, some of the
-    // used options were not recognized at all
-    if(gtest_argc > 1)
+
+    // Ensure there are no leftover options used by neither gtest nor CLI11
+    const auto leftover_args = app.remaining();
+    if(!leftover_args.empty())
     {
         std::cout << "Unrecognised option(s) found:\n  ";
-        for(auto i = 1; i < gtest_argc; i++)
-            std::cout << gtest_argv[i] << " ";
+        for(auto i : leftover_args)
+            std::cout << i << " ";
         std::cout << "\nRun with --help for more information.\n";
         return EXIT_FAILURE;
     }
@@ -662,25 +659,8 @@ int main(int argc, char* argv[])
     fftwf_plan_with_nthreads(rocfft_concurrency());
 #endif
 
-    system_memory::singleton().set_limit_bytes(ramgb_limit * ONE_GiB);
-    std::cout << "Refraining from using more than "
-              << byte_size_to_str(system_memory::singleton().get_limit_bytes())
-              << " of system memory." << std::endl;
-    device_memory_accountant::singleton().set_limit_bytes_for_all_devices(vramgb_limit * ONE_GiB);
-    std::cout << "Refraining from using more than ";
-    for(size_t dev_id = 0; dev_id < device_memory_accountant::singleton().num_devices(); dev_id++)
-    {
-        if(device_memory_accountant::singleton().num_devices() > 1)
-            std::cout << "\n\t";
-        std::cout << byte_size_to_str(
-            device_memory_accountant::singleton().get_limit_bytes_on_device(dev_id))
-                  << " of device memory";
-        if(device_memory_accountant::singleton().num_devices() > 1)
-            std::cout << " on device ID " << dev_id;
-        std::cout << (dev_id == device_memory_accountant::singleton().num_devices() - 1 ? "."
-                                                                                        : ";");
-    }
-    std::cout << std::endl;
+    // Set host memory limit from command-line options
+    host_memory::singleton().set_limit_gbytes(ramgb);
 
     if(use_fftw_wisdom)
     {
@@ -809,7 +789,7 @@ int main(int argc, char* argv[])
     std::cout << "single precision max l2 epsilon:     " << max_l2_eps_single << "\n";
     std::cout << "double precision max l-inf epsilon: " << max_linf_eps_double << "\n";
     std::cout << "double precision max l2 epsilon:     " << max_l2_eps_double << "\n";
-    std::cout << "Number of runtime issues: " << hip_runtime_error::get_count() << "\n";
+    std::cout << "Number of runtime issues: " << n_hip_failures << "\n";
     std::cout << "Number of successful tests: "
               << ::testing::UnitTest::GetInstance()->successful_test_count() << "\n";
     std::cout << "Number of skipped tests: "
@@ -830,8 +810,8 @@ TEST(manual, vs_fftw) // MANUAL TESTS HERE
         std::vector<unsigned int> deviceGrid(params.length.size() + 1, 1);
         deviceGrid[1] = manual_devices;
 
-        params.distribute_field<fft_io::fft_io_in>(manual_devices, deviceGrid);
-        params.distribute_field<fft_io::fft_io_out>(manual_devices, deviceGrid);
+        params.distribute_input(manual_devices, deviceGrid);
+        params.distribute_output(manual_devices, deviceGrid);
     }
 
     // Run an individual test using the provided command-line parameters.
@@ -851,7 +831,24 @@ TEST(manual, vs_fftw) // MANUAL TESTS HERE
     {
         fft_vs_reference(params);
     }
-    ROCFFT_CATCH_TEST_EXCEPTIONS;
+    catch(std::bad_alloc&)
+    {
+        GTEST_SKIP() << "host memory allocation failure";
+    }
+    catch(HOSTBUF_MEM_USAGE& e)
+    {
+        // explicitly clear test cache
+        last_cpu_fft_data = last_cpu_fft_cache();
+        GTEST_SKIP() << e.msg;
+    }
+    catch(ROCFFT_SKIP& e)
+    {
+        GTEST_SKIP() << e.msg;
+    }
+    catch(ROCFFT_FAIL& e)
+    {
+        GTEST_FAIL() << e.msg;
+    }
 }
 
 TEST(manual, bitwise_reproducibility) // MANUAL TESTS HERE
@@ -878,7 +875,17 @@ TEST(manual, bitwise_reproducibility) // MANUAL TESTS HERE
     {
         bitwise_repro(params);
     }
-    ROCFFT_CATCH_TEST_EXCEPTIONS;
-
+    catch(std::bad_alloc&)
+    {
+        GTEST_SKIP() << "host memory allocation failure";
+    }
+    catch(ROCFFT_SKIP& e)
+    {
+        GTEST_SKIP() << e.msg;
+    }
+    catch(ROCFFT_FAIL& e)
+    {
+        GTEST_FAIL() << e.msg;
+    }
     SUCCEED();
 }

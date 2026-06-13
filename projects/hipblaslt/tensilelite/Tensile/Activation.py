@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,25 +24,16 @@ import ctypes
 import math
 import struct
 from collections import OrderedDict
-from copy import deepcopy
-from enum import Enum, IntFlag
-from typing import List, Union
+from enum import IntFlag
 
-from rocisa import rocIsa
-from rocisa.code import Module, TextBlock
-from rocisa.container import VCC, EXEC, vgpr, sgpr, HolderContainer, RegisterContainer, Holder
-from rocisa.enum import InstType
-from rocisa.instruction import Instruction, SMovB32, SNop, SSetMask, VAddF16, VAddF32, \
-    VAddPKF16, VAndB32, VCmpGEF16, VCmpGEF32, VCmpGEF64, VCmpGEI32, VCmpGTF16, VCmpGTF32, \
-    VCmpGTF64, VCmpGTI32, VCmpXClassF32, VCmpXLtF32, VCndMaskB32, VExpF16, VExpF32, VFmaF16, \
-    VFmaF32, VFmaPKF16, VMaxF32, VMaxF64, VMaxI32, VMaxPKF16, VMed3I32, VMinF16, VMinF32, \
-    VMinF64, VMinI32, VMovB32, VMulF16, VMulF32, VMulF64, VMulLOU32, VMulPKF16, VRcpF16, \
-    VRcpF32, VSubF32, VSubI32
-
-from Tensile.Common.DataType import DataType
+from .TensileInstructions import Module, TextBlock, HolderContainer, RegisterContainer, \
+                          VCC, EXEC, vgpr, sgpr, Holder, fastdeepcopy, DataType, SNop, \
+                          TensileInstructions
+from .TensileInstructions.Enums import *
+from .TensileInstructions.Instructions import *
 from Tensile.Common.Utilities import printExit, printWarning
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 ################################################################################
 # How to add an activation
@@ -166,15 +157,12 @@ class ActivationType:
                             'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
                           ('sigmoid', { \
                             'instance': ActivationTypeRegister('sigmoid', False, 0,     True,  True, False,   False, False, False, False), \
-                            'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
+                            'supported_by': SupportedBy.TENSILE}), \
                           ('tanh', {  \
                             'instance': ActivationTypeRegister('tanh', False, 2,        True,  True, False,   False, False, False, False), \
                             'supported_by': SupportedBy.TENSILE}), \
                           ('dgelu', { \
                             'instance': ActivationTypeRegister('dgelu', True, 0,       False,  True, False,   False, False, False, False), \
-                            'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
-                          ('drelu', { \
-                            'instance': ActivationTypeRegister('drelu', True, 0,       False,  True, False,   False, False, False, False), \
                             'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
                           ('geluscaling', { \
                             'instance': ActivationTypeRegister('geluscaling', False, 1, True,  True, False,   False, False, False, False), \
@@ -185,9 +173,6 @@ class ActivationType:
                           ('swish', { \
                             'instance': ActivationTypeRegister('swish', False, 1,        True,  True, False,   False, False, False, False), \
                             'supported_by': SupportedBy.TENSILE}), \
-                          ('clamp', { \
-                            'instance': ActivationTypeRegister('clamp', False, 2, True,  True,  True,   False, False, False,  True), \
-                            'supported_by': SupportedBy.TENSILE | SupportedBy.HIPBLASLT}), \
                           ('hipblaslt_all', { \
                             'instance': ActivationTypeRegister('hipblaslt_all', False, 0), \
                             'supported_by': SupportedBy.HIPBLASLT}), \
@@ -342,9 +327,6 @@ class ActivationModule:
         self.enableGuard = False
         self.isAlt       = False
 
-    def __reduce__(self):
-        return (ActivationModule, ())
-
     # Public function
     def getModule(self, cDataType, activationType, vgprIn, vgprOut):
         if self.useCache:
@@ -374,14 +356,10 @@ class ActivationModule:
             module = self.getTanhModule(cDataType, vgprIn, vgprOut, "activationAlpha", "activationBeta")
         elif (activationType == 'dgelu'):
             module = self.getDGeluModule(cDataType, vgprIn, vgprOut)
-        elif (activationType == 'drelu'):
-            module = self.getDReluModule(cDataType, vgprIn, vgprOut)    
         elif (activationType == 'silu'):
             module = self.getSiluModule(cDataType, vgprIn, vgprOut)
         elif (activationType == 'swish'):
             module = self.getSwishModule(cDataType, vgprIn, vgprOut, "activationAlpha")
-        elif (activationType == 'clamp'):
-            module = self.getClampModule(cDataType, vgprIn, vgprOut, "activationAlpha", "activationBeta")
         elif (activationType == 'none'):
             return Module("No activation")
         else:
@@ -504,7 +482,6 @@ class ActivationModule:
     def getClippedReluModule(self, cDataType, vgprIn, vgprOut, activationAlpha, activationBeta):
         module = Module("ClippedRelu")
         if cDataType.isHalf():
-            vgprTemp = self.getVgpr(1)
             for i in range(0, 2):
                 select_bit = SelectBit.WORD_0 if i == 0 else SelectBit.WORD_1
                 module.add(VCmpGTF16(dst=VCC(), src0=self.vgprPrefix(vgprIn), src1=sgpr(activationAlpha), \
@@ -513,38 +490,28 @@ class ActivationModule:
                            sdwa=SDWAModifiers(dst_sel=select_bit, dst_unused=UnusedBit.UNUSED_PRESERVE, \
                                               src0_sel=select_bit, src1_sel=select_bit), \
                            comment="min(x, beta)"))
-                module.add(VMinF16(dst=vgpr(Holder(idx=vgprTemp)), src0=sgpr(activationBeta), src1=0.0, \
+                module.add(VCndMaskB32(dst=self.vgprPrefix(vgprOut), src0=0.0, src1=self.vgprPrefix(vgprOut), \
                            sdwa=SDWAModifiers(dst_sel=select_bit, dst_unused=UnusedBit.UNUSED_PRESERVE, \
                                               src0_sel=select_bit, src1_sel=select_bit), \
-                           comment="min(0, beta)"))
-                module.add(VCndMaskB32(dst=self.vgprPrefix(vgprOut), src0=vgpr(Holder(idx=vgprTemp)), src1=self.vgprPrefix(vgprOut), \
-                           sdwa=SDWAModifiers(dst_sel=select_bit, dst_unused=UnusedBit.UNUSED_PRESERVE, \
-                                              src0_sel=select_bit, src1_sel=select_bit), \
-                           comment="set x to min(0, beta) if <= alpha"))
+                           comment="set x to 0 if <= alpha"))
             module.add(SNop(waitState=0, comment="1 wait states")) # workaround for emulator
         elif cDataType.isSingle():
             module.add(VCmpGTF32(dst=VCC(), src0=self.vgprPrefix(vgprIn), src1=sgpr(activationAlpha), comment="x > alpha ?"))
             module.add(VMinF32(dst=self.vgprPrefix(vgprIn), src0=sgpr(activationBeta), src1=self.vgprPrefix(vgprIn), comment="min(x, beta)"))
-            vgprTemp = self.getVgpr(1)
-            module.add(VMinF32(dst=vgpr(Holder(idx=vgprTemp)), src0=sgpr(activationBeta), src1=0.0, comment="min(0, beta)"))
-            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn), src0=vgpr(Holder(idx=vgprTemp)), src1=self.vgprPrefix(vgprIn), comment="set x to min(0, beta) if <= alpha"))
+            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn), src0=0.0, src1=self.vgprPrefix(vgprIn), comment="set x to 0 if <= alpha"))
         elif cDataType.isDouble():
             module.add(VCmpGTF64(dst=VCC(), src0=self.vgprPrefix(vgprIn, 2), src1=sgpr(activationAlpha, 2), comment="x > alpha ?"))
             module.add(VMinF64(dst=self.vgprPrefix(vgprIn, 2), src0=sgpr(activationBeta, 2), src1=self.vgprPrefix(vgprIn, 2), comment="min(x, beta)"))
-            vgprTemp = self.getVgpr(2)
-            module.add(VMinF64(dst=vgpr(Holder(idx=vgprTemp), 2), src0=sgpr(activationBeta, 2), src1=0.0, comment="min(0, beta)"))
-            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn), src0=vgpr(Holder(idx=vgprTemp)), src1=self.vgprPrefix(vgprIn), comment="set x to min(0, beta) if <= alpha"))
-            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn+1), src0=vgpr(Holder(idx=vgprTemp+1)), src1=self.vgprPrefix(vgprIn+1), comment="set x to min(0, beta) if <= alpha"))
+            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn), src0=0, src1=self.vgprPrefix(vgprIn), comment="set x to 0 if <= alpha"))
+            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn+1), src0=0, src1=self.vgprPrefix(vgprIn+1), comment="set x to 0 if <= alpha"))
         elif cDataType.isInt32():
             module.add(VCmpGTI32(dst=VCC(), src0=self.vgprPrefix(vgprIn), src1=sgpr(activationAlpha), comment="x > alpha ?"))
             module.add(VMinI32(dst=self.vgprPrefix(vgprIn), src0=sgpr(activationBeta), src1=self.vgprPrefix(vgprIn), comment="min(x, beta)"))
-            vgprTemp = self.getVgpr(1)
-            module.add(VMinI32(dst=vgpr(Holder(idx=vgprTemp)), src0=sgpr(activationBeta), src1=0, comment="min(0, beta)"))
-            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn), src0=vgpr(Holder(idx=vgprTemp)), src1=self.vgprPrefix(vgprIn), comment="set x to min(0, beta) if <= alpha"))
+            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprIn), src0=0.0, src1=self.vgprPrefix(vgprIn), comment="set x to 0 if <= alpha"))
         return module
 
     def getExpModule(self, cDataType, vgprIn, vgprOut):
-        ti = rocIsa.getInstance()
+        ti = TensileInstructions()
         module = Module("Exp")
         if cDataType.isHalf():
             sgprMagic = self.getSgpr(1)
@@ -693,7 +660,7 @@ class ActivationModule:
         return module
 
     def getSigmoidModule(self, cDataType, vgprIn, vgprOut):
-        ti = rocIsa.getInstance()
+        ti = TensileInstructions()
         self.needCombine = True
         module = Module("Sigmoid")
         if cDataType.isHalf():
@@ -728,7 +695,7 @@ class ActivationModule:
         return module
 
     def getTanhModule(self, cDataType, vgprIn, vgprOut, activationAlpha, activationBeta):
-        ti = rocIsa.getInstance()
+        ti = TensileInstructions()
         self.needCombine = True
         module = Module("Tanh")
         if cDataType.isHalf():
@@ -788,7 +755,7 @@ class ActivationModule:
         return module
 
     def getDGeluModule(self, cDataType, vgprIn, vgprOut):
-        ti = rocIsa.getInstance()
+        ti = TensileInstructions()
         self.needCombine = True
         module = Module("Gradient Gelu")
         # x1 = (0.0535161 * pow(x, 3) + 0.398942 * x)
@@ -851,17 +818,6 @@ class ActivationModule:
         else:
             raise RuntimeError("Unsupported data type %s."%cDataType.toDevice("HIP"))
         return module
-    
-    def getDReluModule(self, cDataType, vgprIn, vgprOut):
-        ti = rocIsa.getInstance()
-        self.needCombine = True
-        module = Module("Gradient Relu")
-        if cDataType.isSingle():
-            module.add(VCmpGTF32(dst=VCC(), src0=self.vgprPrefix(vgprIn), src1=0.0, comment=" VCC = (x > 0) ? 1 : 0" ))
-            module.add(VCndMaskB32(dst=self.vgprPrefix(vgprOut), src0=0.0, src1=1.0, src2=VCC(), comment=" y = VCC ? 1.0 : 0.0" ))
-        else:
-            raise RuntimeError("Unsupported data type %s."%cDataType.toDevice("HIP"))
-        return module
 
     def getSiluModule(self, cDataType, vgprIn, vgprOut):
         self.needCombine = True
@@ -899,35 +855,6 @@ class ActivationModule:
         module.add(mulFunction(dst=self.vgprPrefix(vgprOut), src0=self.vgprPrefix(vgprIn), src1=self.vgprPrefix(Holder(idx=vgprTempOut)), comment="x / (1 + exp(-x * beta))"))
         return module
 
-    def getClampModule(self, cDataType, vgprIn, vgprOut, activationAlpha, activationBeta):
-        module = Module("Clamp")
-        if cDataType.isDouble():
-            Vin, Vout = self.vgprPrefix(vgprIn, 2), self.vgprPrefix(vgprOut, 2)
-            alpha, beta = sgpr(activationAlpha, 2), sgpr(activationBeta, 2)
-        else:
-            Vin, Vout = self.vgprPrefix(vgprIn), self.vgprPrefix(vgprOut)
-            alpha, beta = sgpr(activationAlpha), sgpr(activationBeta)
-        if cDataType.isHalf():
-            MIN, MAX = VMinF16, VMaxF16
-        elif cDataType.isSingle():
-            MIN, MAX = VMinF32, VMaxF32
-        elif cDataType.isDouble():
-            MIN, MAX = VMinF64, VMaxF64
-        elif cDataType.isInt32():
-            MIN, MAX = VMinI32, VMaxI32
-
-        if cDataType.isHalf():
-            for i in range(0, 2):
-                select_bit = SelectBit.WORD_0 if i == 0 else SelectBit.WORD_1
-                sdwa = SDWAModifiers(dst_sel = select_bit, dst_unused = UnusedBit.UNUSED_PRESERVE,
-                                     src0_sel = select_bit, src1_sel = select_bit)
-                module.add(MIN(dst = Vout, src0 = beta, src1 = Vin, sdwa = sdwa, comment = "min(x, beta)"))
-                module.add(MAX(dst = Vout, src0 = alpha, src1 = Vout, sdwa = sdwa, comment = "max(alpha, min(x, beta))"))
-        else:
-            module.add(MIN(dst = Vout, src0 = beta, src1 = Vin, comment = "min(x, beta)"))
-            module.add(MAX(dst = Vout, src0 = alpha, src1 = Vout, comment = "max(alpha, min(x, beta))"))
-        return module
-
     ################################################################################
     ################################################################################
     ###
@@ -941,7 +868,7 @@ class ActivationModule:
         if activationType not in self.cacheDict:
             self.cacheDict[activationType] = {}
         actDict = self.cacheDict[activationType]
-        copied = deepcopy(module)
+        copied = fastdeepcopy(module)
         # Get reg name
         regName = self.vgprPrefixFormat.split("+")[0] if self.vgprPrefixFormat else ""
         vgprIdxList = createVgprIdxList(copied, [vgprIn, vgprOut], regName)
@@ -964,9 +891,9 @@ class ActivationModule:
                                       enableGuard=self.enableGuard, prefix=self.vgprPrefixFormat):
                         if self.vgprPrefixFormat:
                             for vgpr in actInfo.vgprIdxList[0]:
-                                vgpr.regName.setOffset(0, vgprIn)
+                                vgpr.regName.offsets[0] = vgprIn
                             for vgpr in actInfo.vgprIdxList[1]:
-                                vgpr.regName.setOffset(0, vgprOut)
+                                vgpr.regName.offsets[0] = vgprOut
                         else:
                             for vgpr in actInfo.vgprIdxList[0]:
                                 vgpr.regIdx = vgprIn
@@ -974,7 +901,7 @@ class ActivationModule:
                                 vgpr.regIdx = vgprOut
                         self.vgprCounter = actInfo.vgprCounter
                         self.sgprCounter = actInfo.sgprCounter
-                        return deepcopy(actInfo.module)
+                        return fastdeepcopy(actInfo.module)
         return None
 
 ################################################################################
@@ -1019,7 +946,7 @@ def RemoveEmptyBlocks(module):
     for idx, item in enumerate(module.items()):
         if isinstance(item, Module):
             newItem = RemoveEmptyBlocks(item)
-            module.setItem(idx, newItem)
+            module.items()[idx] = newItem
     if len(module.items()) == 1 and isinstance(module.items()[0], Module):
         return module.items()[0]
     return module
@@ -1058,7 +985,7 @@ def FuseInstruction(currentInst, moduleAndIndex, fuseDebug):
                     # used before the current instruction
                     if not FindAssignAndUse(oldInst, currentInst, outVgpr, outVgpr):
                         newInst = type(oldInst)(oldInst.dst, *oldInst.srcs, oldInst.sdwa)
-                        newInst.setSrc(2, addConst + newInst.srcs[2])
+                        newInst.srcs[2] = addConst + newInst.srcs[2]
                         newInst.comment += " ( + 1 (fused))"
                         replaceInst(currentInst, newInst, fuseDebug)
                         removeOldInst(oldInst, currentInst, newInst, fuseDebug)
@@ -1108,11 +1035,11 @@ def FuseInstruction(currentInst, moduleAndIndex, fuseDebug):
                                 newValue = param * mulConst
                                 formatting = " (fused %f)" if isinstance(param, float) else " (fused %d)"
                                 if newFuseInst:
-                                    newFuseInst.setSrc(0, newValue)
-                                    newInst.setSrc(paramIdx, newFuseInst.dst)
+                                    newFuseInst.srcs[0] = newValue
+                                    newInst.srcs[paramIdx] = newFuseInst.dst
                                     newFuseInst.comment += formatting%newValue
                                 else:
-                                    newInst.setSrc(paramIdx, newValue)
+                                    newInst.srcs[paramIdx] = newValue
                                 newInst.comment += formatting%newValue
                                 replaceInst(currentInst, newInst, fuseDebug)
                                 removeOldInst(oldInst, currentInst, newInst, fuseDebug)
@@ -1205,7 +1132,7 @@ def removeOldInst(removeInst, dstInst, fusedInst, debug):
             if debug:
                 tb = TextBlock("\n/* Fused to block %s + %s -> %s */\n"%(str(removeInst), str(dstInst), str(fusedInst)))
                 tb.name = __FUSE_MAGIC_NAME__
-                module.setItem(idx, tb)
+                module.items()[idx] = tb
             else:
                 targetIdx = idx
             break
@@ -1263,20 +1190,20 @@ def HexToStr(cDataType, isPack, *args):
 
 def ConvertCoeffToHex(module, cDataType, isPack):
     if (module.name == "Exp"):
-        param = module.getItem(0).srcs[0]
-        module.getItem(0).setSrc(0, getMagic(cDataType, param, isPack))
+        param = module.items()[0].srcs[0]
+        module.items()[0].srcs[0] = getMagic(cDataType, param, isPack)
         return module
     for itemIdx, item in enumerate(module.items()):
         if isinstance(item, Module):
             newItem = ConvertCoeffToHex(item, cDataType, isPack)
-            module.setItem(itemIdx, newItem)
+            module.items()[itemIdx] = newItem
     return module
 
 def HolderToGpr(module, idx, pf):
     for itemIdx, item in enumerate(module.items()):
         if isinstance(item, Module):
             newItem = HolderToGpr(item, idx, pf)
-            module.setItem(itemIdx, newItem)
+            module.items()[itemIdx] = newItem
         elif isinstance(item, SNop):
             pass
         elif isinstance(item, Instruction):
@@ -1287,7 +1214,7 @@ def HolderToGpr(module, idx, pf):
                 for itemIdx, param in enumerate(item.srcs):
                     if isinstance(param, HolderContainer) and param.regType == pf:
                         param.setRegNum(idx)
-                        item.setSrc(itemIdx, param.getCopiedRC())
+                        item.srcs[itemIdx] = param.getCopiedRC()
     return module
 
 def addSpace(alignStr, str):
@@ -1350,14 +1277,14 @@ class ActivationInline:
         kStr += (padSpacesStr + "%s.s = %s.s & 0x7fff;\n"%(unionName, unionName))
         kStr += (padSpacesStr + "value = %s.f;\n"%unionName)
       elif (self.dataType.isSingle() or self.dataType.isDouble() or self.dataType.isInt32()):
-        kStr += (padSpacesStr + "value = (value < decltype(value)(0)) ? -value : value;\n")
+        kStr += (padSpacesStr + "value = abs(value);\n")
       else:
         raise RuntimeError("Unrecognized data type %s."%self.dataType)
     elif (activationType == 'clippedrelu'):
       if (self.dataType.isSingle() or self.dataType.isHalf() or self.dataType.isDouble()):
-        kStr += (padSpacesStr + "value = (value > alpha) ? std::min(value, beta) : std::min(decltype(beta)(0), beta);\n")
+        kStr += (padSpacesStr + "value = (value > alpha) ? min(value, beta) : 0.0;\n")
       elif self.dataType.isInt32():
-        kStr += (padSpacesStr + "value = (value > alpha) ? std::min(value, beta) : std::min(0, beta);\n")
+        kStr += (padSpacesStr + "value = (value > alpha) ? min(value, beta) : 0;\n")
     elif (activationType == 'exp'):
       kStr += (asm + " // Exp\n")
       module = activation.getExpModule(self.dataType, 0, 0)
@@ -1374,7 +1301,7 @@ class ActivationInline:
       kStr += (asm + " // geluscaling\n")
       module = activation.getGeluModule(self.dataType, 0, 0, 1)
       kStr += self.getActivationAsmStr(activation, module, (len(asm) * " "))
-      kStr += addSpace(asm, ": \"+v\"(value) : \"s\"(alpha)\n")
+      kStr += addSpace(asm, ": \"+v\"(value) : \"s\"(alpha)\n")        
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter)
     elif (activationType == 'leakyrelu'):
       if (self.dataType.isSingle() or self.dataType.isHalf() or self.dataType.isDouble()):
@@ -1385,9 +1312,9 @@ class ActivationInline:
         raise RuntimeError("Unsupported data type %s."%ptrStr)
     elif (activationType == 'relu'):
       if (self.dataType.isSingle() or self.dataType.isHalf() or self.dataType.isDouble()):
-        kStr += (padSpacesStr + "value = std::max(decltype(value)(0), value);\n")
+        kStr += (padSpacesStr + "value = max(0.0, value);\n")
       elif self.dataType.isInt32():
-        kStr += (padSpacesStr + "value = std::max(0, value);\n")
+        kStr += (padSpacesStr + "value = max(0, value);\n")
       else:
         raise RuntimeError("Unsupported data type %s."%ptrStr)
     elif (activationType == 'sigmoid'):
@@ -1409,11 +1336,6 @@ class ActivationInline:
       kStr += addSpace(asm, ": \"+v\"(value) : \n")
       needExec = True if self.enableGuard else False
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter, needExec=needExec)
-    elif (activationType == 'drelu'):
-      if (self.dataType.isSingle()):
-        kStr += (padSpacesStr + "value = (value > 0.0f) ? 1.0f : 0.0f;\n")
-      else:
-        raise RuntimeError("Unsupported data type %s."%ptrStr)
     elif (activationType == 'silu'):
       kStr += (asm + " // Silu\n")
       module = activation.getSiluModule(self.dataType, 0, 0)
@@ -1426,8 +1348,6 @@ class ActivationInline:
       kStr += self.getActivationAsmStr(activation, module, (len(asm) * " "))
       kStr += addSpace(asm, ": \"+v\"(value) : \"s\"(alpha)\n")
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter)
-    elif (activationType == 'clamp'):
-      kStr += (padSpacesStr + "value = std::max(alpha, std::min(value, beta));\n")  # clamp
     else:
       if (activationType != 'none'):
         raise RuntimeError("Unrecognized type %s."%activationType)
@@ -1464,7 +1384,7 @@ def createVgprIdxList(module, vgprList: list, regName):
             for param in item.getParams():
                 if isinstance(param, RegisterContainer):
                     for index, vgprIdx in enumerate(vgprList):
-                        if param.regName and (param.regName.name == regName) and (param.regName.getOffset()[0] == vgprIdx):
+                        if param.regName and (param.regName.name == regName) and (param.regName.offsets[0] == vgprIdx):
                             vlist[index].append(param)
                         elif param.regIdx == vgprIdx:
                             vlist[index].append(param)

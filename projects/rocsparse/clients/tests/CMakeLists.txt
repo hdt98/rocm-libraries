@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+# Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,13 +20,6 @@
 # THE SOFTWARE.
 #
 # ########################################################################
-
-# Optional: CTest test categorization when building in rocm-libraries with shared/ctest.
-# Skipped when shared/ is not present (e.g. standalone rocblas or sparse checkout in CI).
-if(DEFINED ROCM_LIBRARIES_ROOT AND EXISTS "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
-  include("${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
-  set(ROCSPARSE_HAS_CTEST_CATEGORIES ON)
-endif()
 
 find_package(GTest 1.11.0 REQUIRED)
 
@@ -49,7 +42,7 @@ if(NOT EXISTS "${CMAKE_MATRICES_DIR}")
   set(CMAKE_MATRICES_DIR ${PROJECT_BINARY_DIR}/matrices CACHE STRING "Matrices directory.")
   file(MAKE_DIRECTORY ${CMAKE_MATRICES_DIR})
 
-  if(NOT TARGET rocsparse AND NOT BUILD_CLIENTS_ONLY)
+  if(NOT TARGET rocsparse)
     set(CONVERT_SOURCE ${CMAKE_SOURCE_DIR}/../deps/convert.cpp CACHE STRING "Convert tool mtx2csr.")
     include(${CMAKE_SOURCE_DIR}/../cmake/ClientMatrices.cmake)
   else()
@@ -64,7 +57,7 @@ else()
   if(NOT CMAKE_MATRICES_DIR STREQUAL "${PROJECT_BINARY_DIR}/matrices")
     message("Copy matrix files from ${CMAKE_MATRICES_DIR} to ${PROJECT_BINARY_DIR}/matrices")
 
-    file(COPY ${CMAKE_MATRICES_DIR}/ DESTINATION ${PROJECT_BINARY_DIR}/matrices)
+    execute_process(COMMAND cp -r ${CMAKE_MATRICES_DIR} ${PROJECT_BINARY_DIR}/matrices RESULT_VARIABLE STATUS WORKING_DIRECTORY ${CMAKE_MATRICES_DIR})
 
     if(STATUS AND NOT STATUS EQUAL 0)
       message(FATAL_ERROR "Failed to copy matrix .csr files, aborting.")
@@ -110,9 +103,6 @@ set(ROCSPARSE_TEST_SOURCES
   test_bsric0.cpp
   test_bsrilu0.cpp
   test_csric0.cpp
-  test_spic0.cpp
-  test_spilu0.cpp
-  test_sptrsv.cpp
   test_csrilu0.cpp
   test_csritilu0.cpp
   test_csritilu0_ex.cpp
@@ -166,22 +156,11 @@ set(ROCSPARSE_TEST_SOURCES
   test_spmv_csr.cpp
   test_spmv_csc.cpp
   test_spmv_ell.cpp
-  test_v2_spmv_bsr.cpp
-  test_v2_spmv_coo.cpp
-  test_v2_spmv_coo_aos.cpp
-  test_v2_spmv_csr.cpp
-  test_v2_spmv_csc.cpp
-  test_v2_spmv_ell.cpp
-  test_v2_spmv_sell.cpp
   test_spsv_csr.cpp
-  test_sptrsv_csr.cpp
   test_spitsv_csr.cpp
   test_spsv_coo.cpp
-  test_sptrsv_coo.cpp
   test_spsm_csr.cpp
   test_spsm_coo.cpp
-  test_sptrsm_csr.cpp
-  test_sptrsm_coo.cpp
   test_spmm_bsr.cpp
   test_spmm_csr.cpp
   test_spmm_csc.cpp
@@ -260,9 +239,6 @@ set(ROCSPARSE_CLIENTS_TESTINGS
 ../testings/testing_bsric0.cpp
 ../testings/testing_bsrilu0.cpp
 ../testings/testing_csric0.cpp
-../testings/testing_spic0.cpp
-../testings/testing_spilu0.cpp
-../testings/testing_sptrsv.cpp
 ../testings/testing_csrilu0.cpp
 ../testings/testing_csritilu0.cpp
 ../testings/testing_csritilu0_ex.cpp
@@ -316,22 +292,11 @@ set(ROCSPARSE_CLIENTS_TESTINGS
 ../testings/testing_spmv_csr.cpp
 ../testings/testing_spmv_csc.cpp
 ../testings/testing_spmv_ell.cpp
-../testings/testing_v2_spmv_coo.cpp
-../testings/testing_v2_spmv_coo_aos.cpp
-../testings/testing_v2_spmv_csr.cpp
-../testings/testing_v2_spmv_bsr.cpp
-../testings/testing_v2_spmv_csc.cpp
-../testings/testing_v2_spmv_ell.cpp
-../testings/testing_v2_spmv_sell.cpp
 ../testings/testing_spsv_csr.cpp
-../testings/testing_sptrsv_csr.cpp
 ../testings/testing_spitsv_csr.cpp
 ../testings/testing_spsv_coo.cpp
-../testings/testing_sptrsv_coo.cpp
 ../testings/testing_spsm_csr.cpp
 ../testings/testing_spsm_coo.cpp
-../testings/testing_sptrsm_csr.cpp
-../testings/testing_sptrsm_coo.cpp
 ../testings/testing_spmm_bsr.cpp
 ../testings/testing_spmm_csr.cpp
 ../testings/testing_spmm_csc.cpp
@@ -371,7 +336,6 @@ set(ROCSPARSE_CLIENTS_TESTINGS
 ../testings/testing_check_matrix_hyb.cpp
 ../testings/testing_check_spmat.cpp
 ../testings/testing_bsrpad_value.cpp
-rocsparse_test_listeners.cpp
   )
 
 
@@ -412,16 +376,10 @@ set(ROCSPARSE_CLIENTS_COMMON
   ../common/rocsparse_importer_format_t.cpp
   ../common/rocsparse_clients_envariables.cpp
   ../common/rocsparse_clients_matrices_dir.cpp
-  ../common/rocsparse_clients_spmat_descr.cpp
-  ../common/rocsparse_clients_dnvec_descr.cpp
- ../common/rocsparseio.cpp
+  ../common/rocsparseio.cpp
   )
 
-if (BUILD_CLIENTS_ONLY)
-  add_executable(rocsparse-test rocsparse_test_main.cpp ${ROCSPARSE_TEST_SOURCES} ${ROCSPARSE_CLIENTS_COMMON} ${ROCSPARSE_CLIENTS_TESTINGS})
-else()
-  add_executable(rocsparse-test rocsparse_test_main.cpp test_atomic_add.cpp test_bfloat16.cpp test_complex_types.cpp test_auxiliary.cpp ${ROCSPARSE_TEST_SOURCES} ${ROCSPARSE_CLIENTS_COMMON} ${ROCSPARSE_CLIENTS_TESTINGS})
-endif()
+add_executable(rocsparse-test rocsparse_test_main.cpp ${ROCSPARSE_TEST_SOURCES} ${ROCSPARSE_CLIENTS_COMMON} ${ROCSPARSE_CLIENTS_TESTINGS})
 
 # Set GOOGLE_TEST definition
 target_compile_definitions(rocsparse-test PRIVATE GOOGLE_TEST)
@@ -431,31 +389,19 @@ target_compile_options(rocsparse-test PRIVATE -ffp-contract=on -mfma -Wno-deprec
 
 # Internal common header
 target_include_directories(rocsparse-test PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-if (BUILD_CLIENTS_ONLY)
-  target_include_directories(rocsparse-test PRIVATE ${rocsparse_INCLUDE_DIRS}/rocsparse)
-else()
-  # Library internal headers for standalone tests (e.g., atomic_add)
-  target_include_directories(rocsparse-test PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/include>)
-endif()
-
-# Add OpenMP if available
-apply_omp_settings(rocsparse-test)
 
 # Target link libraries
-target_link_libraries(rocsparse-test PRIVATE GTest::gtest roc::rocsparse hip::host hip::device ${ROCSPARSE_CLIENT_LIBS})
+target_link_libraries(rocsparse-test PRIVATE GTest::gtest roc::rocsparse hip::host hip::device)
 
+# Add OpenMP if available
+if(OPENMP_FOUND)
 if (NOT WIN32)
-  if (BUILD_WITH_ROCTX)
-    if(ROCTRACER_INCLUDE_DIR AND ROCTX_LIBRARY)
-      # Add the include directory
-      target_include_directories(rocsparse-test PRIVATE ${ROCTRACER_INCLUDE_DIR})
-
-      # Link the rocTx lib
-      target_link_libraries(rocsparse-test PRIVATE ${ROCTX_LIBRARY})
-      target_compile_definitions( rocsparse-test PRIVATE ROCSPARSE_CLIENTS_WITH_ROCTX )
-    endif()
+   target_link_libraries(rocsparse-test PRIVATE OpenMP::OpenMP_CXX -Wl,-rpath=${HIP_CLANG_ROOT}/lib)
+  else()
+   target_link_libraries(rocsparse-test PRIVATE libomp)
   endif()
 endif()
+
 
 # Set test output directory
 set_target_properties(rocsparse-test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging")
@@ -466,12 +412,8 @@ string(REGEX REPLACE ".cpp" ".yaml" ROCSPARSE_TEST_YAMLS "${ROCSPARSE_TEST_SOURC
 
 # Prepare testing data
 set(ROCSPARSE_TEST_DATA "${PROJECT_BINARY_DIR}/staging/rocsparse_test.data")
-set(ROCSPARSE_GENTEST_FLAGS "")
-if(BUILD_ROCSPARSE_ILP64)
-  set(ROCSPARSE_GENTEST_FLAGS "--ilp64")
-endif()
 add_custom_command(OUTPUT "${ROCSPARSE_TEST_DATA}"
-                   COMMAND ${Python3_EXECUTABLE} ../common/rocsparse_gentest.py -m ${PROJECT_BINARY_DIR}/matrices -I ../include rocsparse_test.yaml -o "${ROCSPARSE_TEST_DATA}" ${ROCSPARSE_GENTEST_FLAGS}
+                   COMMAND ${python} ../common/rocsparse_gentest.py -m ${PROJECT_BINARY_DIR}/matrices -I ../include rocsparse_test.yaml -o "${ROCSPARSE_TEST_DATA}"
                    DEPENDS ../common/rocsparse_gentest.py rocsparse_test.yaml ../include/rocsparse_common.yaml ${ROCSPARSE_TEST_YAMLS}
                    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 add_custom_target(rocsparse-test-data
@@ -480,45 +422,6 @@ add_custom_target(rocsparse-test-data
 add_dependencies(rocsparse-test  rocsparse-test-data rocsparse-common)
 
 rocm_install(FILES ${ROCSPARSE_TEST_DATA} DESTINATION "${CMAKE_INSTALL_DATADIR}/rocsparse/test" COMPONENT tests)
-
-# Only when both test_categories.yaml and shared/ctest exist (full rocm-libraries tree).
-set(ROCSPARSE_CTEST_INSTALL_FILE "")
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml")
-  if(ROCSPARSE_HAS_CTEST_CATEGORIES)
-    enable_testing()
-    message(STATUS "rocSPARSE: YAML-based test categorization")
-    file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/staging")
-    # Install-time CTestTestfile for TheRock: relative paths so ctest can run from installed location
-    set(ROCSPARSE_CTEST_INSTALL_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_CTestTestfile.cmake")
-    file(WRITE "${ROCSPARSE_CTEST_INSTALL_FILE}"
-[=[
-# This is a test file generated by rocSPARSE for install time.
-# Tests are defined with relative paths to work in the installed location.
-]=]
-    )
-    apply_test_category_labels(
-      rocsparse-test
-      "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml"
-      "${PROJECT_BINARY_DIR}/staging"
-      "${ROCSPARSE_CTEST_INSTALL_FILE}"
-    )
-  else()
-    message(STATUS "rocSPARSE: shared/ctest not found (e.g. standalone checkout), skipping CTest categories")
-  endif()
-else()
-  message(STATUS "rocSPARSE: No test_categories.yaml (CTest categories not used)")
-endif()
-
-# Install CTestTestfile.cmake to bin/rocsparse/ for TheRock (relocatable tests; run ctest from that dir)
-if(ROCSPARSE_CTEST_INSTALL_FILE)
-  rocm_install(
-      FILES "${ROCSPARSE_CTEST_INSTALL_FILE}"
-      DESTINATION "${CMAKE_INSTALL_BINDIR}/rocsparse"
-      COMPONENT tests
-      RENAME "CTestTestfile.cmake"
-  )
-endif()
 
 if (WIN32)
   # for now adding in all .dll as dependency chain is not cmake based on win32

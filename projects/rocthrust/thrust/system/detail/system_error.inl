@@ -109,3 +109,4 @@ const char *system_error
 } // end system
 
 THRUST_NAMESPACE_END
+

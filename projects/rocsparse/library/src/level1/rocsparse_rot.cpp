@@ -22,7 +22,7 @@
  * ************************************************************************ */
 
 #include "internal/generic/rocsparse_rot.h"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_roti.hpp"
 
 namespace rocsparse
@@ -83,9 +83,6 @@ try
     // Check if descriptors are initialized
     ROCSPARSE_CHECKARG(3, x, x->init == false, rocsparse_status_not_initialized);
     ROCSPARSE_CHECKARG(4, y, y->init == false, rocsparse_status_not_initialized);
-
-    ROCSPARSE_CHECKARG(3, x, (x->batch_count != 1), rocsparse_status_not_implemented);
-    ROCSPARSE_CHECKARG(4, y, (y->batch_count != 1), rocsparse_status_not_implemented);
 
     // Check for matching types while we do not support mixed precision computation
     ROCSPARSE_CHECKARG(4, y, (y->data_type != x->data_type), rocsparse_status_not_implemented);

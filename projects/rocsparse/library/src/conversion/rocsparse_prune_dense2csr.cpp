@@ -23,14 +23,14 @@
 * ************************************************************************ */
 
 #include "internal/conversion/rocsparse_prune_dense2csr.h"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_prune_dense2csr.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "csr2csr_compress_device.h"
 #include "prune_dense2csr_device.h"
 #include "rocsparse_common.h"
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 namespace rocsparse
 {

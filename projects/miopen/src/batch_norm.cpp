@@ -68,14 +68,8 @@ TensorDescriptor BuildReshaped4DTensorDescriptor(const miopen::TensorDescriptor&
 {
     std::vector<size_t> dims(tDesc.GetLengths());
 
-    auto dataType   = tDesc.GetType();
-    auto layout_opt = tDesc.GetLayoutEnum();
-    if(!layout_opt)
-    {
-        MIOPEN_THROW(miopenStatusInternalError, "Unset layout");
-    }
-
-    auto layout = layout_opt.value();
+    auto dataType = tDesc.GetType();
+    auto layout   = tDesc.GetLayout_t();
     if(layout == miopenTensorNCDHW)
     {
         layout = miopenTensorNCHW;

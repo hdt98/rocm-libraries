@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file thrust/iterator/zip_iterator.h
  *  \brief An iterator which returns a tuple of the result of dereferencing
  *         a tuple of iterators when dereferenced
@@ -21,7 +22,7 @@
 
 /*
  * Copyright David Abrahams and Thomas Becker 2000-2006.
- *
+ * 
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying NOTICE file for the complete license)
  *
@@ -31,18 +32,9 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/attributes.h>
-#include <thrust/detail/type_traits.h>
 #include <thrust/iterator/detail/zip_iterator_base.h>
 #include <thrust/iterator/iterator_facade.h>
+#include <thrust/detail/type_traits.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -64,7 +56,7 @@ THRUST_NAMESPACE_BEGIN
  *
  *  The following code snippet demonstrates how to create a \p zip_iterator
  *  which represents the result of "zipping" multiple ranges together.
- *
+ *  
  *  \code
  *  #include <thrust/iterator/zip_iterator.h>
  *  #include <thrust/tuple.h>
@@ -131,85 +123,93 @@ THRUST_NAMESPACE_BEGIN
  *  \see tuple
  *  \see get
  */
-
 template <typename IteratorTuple>
-class THRUST_DECLSPEC_EMPTY_BASES zip_iterator : public detail::zip_iterator_base<IteratorTuple>::type
+  class zip_iterator
+    : public detail::zip_iterator_base<IteratorTuple>::type
 {
-public:
-  /*! The underlying iterator tuple type. Alias to zip_iterator's first template argument.
-   */
-  using iterator_tuple = IteratorTuple;
+  public:
+    /*! The underlying iterator tuple type. Alias to zip_iterator's first template argument.
+    */
+    using iterator_tuple = IteratorTuple;
 
-  /*! Default constructor does nothing.
-   */
+    /*! Default constructor does nothing.
+     */
 #if THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC && THRUST_MSVC_VERSION < 1920
-  inline THRUST_HOST_DEVICE zip_iterator() {}
+    inline THRUST_HOST_DEVICE zip_iterator() {}
 #else
-  zip_iterator() = default;
+    zip_iterator() = default;
 #endif
 
-  /*! This constructor creates a new \p zip_iterator from a
-   *  \p tuple of iterators.
-   *
-   *  \param iterator_tuple The \p tuple of iterators to copy from.
-   */
-  inline THRUST_HOST_DEVICE zip_iterator(IteratorTuple iterator_tuple);
+    /*! This constructor creates a new \p zip_iterator from a
+     *  \p tuple of iterators.
+     *  
+     *  \param iterator_tuple The \p tuple of iterators to copy from.
+     */
+    inline THRUST_HOST_DEVICE
+    zip_iterator(IteratorTuple iterator_tuple);
 
-  /*! This copy constructor creates a new \p zip_iterator from another
-   *  \p zip_iterator.
-   *
-   *  \param other The \p zip_iterator to copy.
-   */
-  template <typename OtherIteratorTuple, detail::enable_if_convertible_t<OtherIteratorTuple, IteratorTuple, int> = 0>
-  inline THRUST_HOST_DEVICE zip_iterator(const zip_iterator<OtherIteratorTuple>& other)
-      : m_iterator_tuple(other.get_iterator_tuple())
-  {}
+    /*! This copy constructor creates a new \p zip_iterator from another
+     *  \p zip_iterator.
+     *
+     *  \param other The \p zip_iterator to copy.
+     */
+    template <typename OtherIteratorTuple,
+              detail::enable_if_convertible_t<OtherIteratorTuple, IteratorTuple, int> = 0>
+    inline THRUST_HOST_DEVICE zip_iterator(const zip_iterator<OtherIteratorTuple>& other)
+        : m_iterator_tuple(other.get_iterator_tuple())
+    {}
 
-  /*! This method returns a \c const reference to this \p zip_iterator's
-   *  \p tuple of iterators.
-   *
-   *  \return A \c const reference to this \p zip_iterator's \p tuple
-   *          of iterators.
-   */
-  inline THRUST_HOST_DEVICE const IteratorTuple& get_iterator_tuple() const;
+    /*! This method returns a \c const reference to this \p zip_iterator's
+     *  \p tuple of iterators.
+     *
+     *  \return A \c const reference to this \p zip_iterator's \p tuple
+     *          of iterators.
+     */
+    inline THRUST_HOST_DEVICE
+    const IteratorTuple &get_iterator_tuple() const;
 
-  /*! \cond
-   */
+    /*! \cond
+     */
+  private:
+    using super_t = typename detail::zip_iterator_base<IteratorTuple>::type;
 
-private:
-  using super_t = typename detail::zip_iterator_base<IteratorTuple>::type;
+    friend class thrust::iterator_core_access;
 
-  friend class iterator_core_access;
+    // Dereferencing returns a tuple built from the dereferenced
+    // iterators in the iterator tuple.
+    THRUST_HOST_DEVICE
+    typename super_t::reference dereference() const;
 
-  // Dereferencing returns a tuple built from the dereferenced
-  // iterators in the iterator tuple.
-  THRUST_HOST_DEVICE typename super_t::reference dereference() const;
+    // Two zip_iterators are equal if the two first iterators of the
+    // tuple are equal. Note this differs from Boost's implementation, which
+    // considers the entire tuple.
+    template<typename OtherIteratorTuple>
+    inline THRUST_HOST_DEVICE
+    bool equal(const zip_iterator<OtherIteratorTuple> &other) const;
 
-  // Two zip_iterators are equal if the two first iterators of the
-  // tuple are equal. Note this differs from Boost's implementation, which
-  // considers the entire tuple.
-  template <typename OtherIteratorTuple>
-  inline THRUST_HOST_DEVICE bool equal(const zip_iterator<OtherIteratorTuple>& other) const;
+    // Advancing a zip_iterator means to advance all iterators in the tuple
+    inline THRUST_HOST_DEVICE
+    void advance(typename super_t::difference_type n);
 
-  // Advancing a zip_iterator means to advance all iterators in the tuple
-  inline THRUST_HOST_DEVICE void advance(typename super_t::difference_type n);
+    // Incrementing a zip iterator means to increment all iterators in the tuple
+    inline THRUST_HOST_DEVICE
+    void increment();
 
-  // Incrementing a zip iterator means to increment all iterators in the tuple
-  inline THRUST_HOST_DEVICE void increment();
+    // Decrementing a zip iterator means to decrement all iterators in the tuple
+    inline THRUST_HOST_DEVICE
+    void decrement();
 
-  // Decrementing a zip iterator means to decrement all iterators in the tuple
-  inline THRUST_HOST_DEVICE void decrement();
+    // Distance is calculated using the first iterator in the tuple.
+    template<typename OtherIteratorTuple>
+    inline THRUST_HOST_DEVICE
+      typename super_t::difference_type
+        distance_to(const zip_iterator<OtherIteratorTuple> &other) const;
 
-  // Distance is calculated using the first iterator in the tuple.
-  template <typename OtherIteratorTuple>
-  inline THRUST_HOST_DEVICE typename super_t::difference_type
-  distance_to(const zip_iterator<OtherIteratorTuple>& other) const;
+    // The iterator tuple.
+    IteratorTuple m_iterator_tuple;
 
-  // The iterator tuple.
-  IteratorTuple m_iterator_tuple;
-
-  /*! \endcond
-   */
+    /*! \endcond
+     */
 }; // end zip_iterator
 
 /*! \p make_zip_iterator creates a \p zip_iterator from a \p tuple
@@ -220,8 +220,10 @@ private:
  *
  *  \see zip_iterator
  */
-template <typename... Iterators>
-inline THRUST_HOST_DEVICE zip_iterator<thrust::tuple<Iterators...>> make_zip_iterator(thrust::tuple<Iterators...> t);
+template<typename... Iterators>
+inline THRUST_HOST_DEVICE
+zip_iterator<thrust::tuple<Iterators...>> make_zip_iterator(thrust::tuple<Iterators...> t);
+
 
 /*! \p make_zip_iterator creates a \p zip_iterator from
  *  iterators.
@@ -231,8 +233,10 @@ inline THRUST_HOST_DEVICE zip_iterator<thrust::tuple<Iterators...>> make_zip_ite
  *
  *  \see zip_iterator
  */
-template <typename... Iterators>
-inline THRUST_HOST_DEVICE zip_iterator<thrust::tuple<Iterators...>> make_zip_iterator(Iterators... its);
+template<typename... Iterators>
+inline THRUST_HOST_DEVICE
+zip_iterator<thrust::tuple<Iterators...>> make_zip_iterator(Iterators... its);
+
 
 /*! \} // end fancyiterators
  */
@@ -243,3 +247,4 @@ inline THRUST_HOST_DEVICE zip_iterator<thrust::tuple<Iterators...>> make_zip_ite
 THRUST_NAMESPACE_END
 
 #include <thrust/iterator/detail/zip_iterator.inl>
+

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -107,10 +107,6 @@ public:
         if(valid_parameters)
         {
             this->m_data = this->device_vector_setup();
-        }
-        else
-        {
-            this->mem_status = hipErrorInvalidValue;
         }
     }
 
@@ -236,11 +232,14 @@ public:
 
     //!
     //! @brief Check if memory exists.
-    //! @return The status of memory allocation and initialization.
+    //! @return hipSuccess if memory exists, hipErrorOutOfMemory otherwise.
     //!
     hipError_t memcheck() const
     {
-        return this->mem_status;
+        if(*this)
+            return hipSuccess;
+        else
+            return hipErrorOutOfMemory;
     }
 
 private:

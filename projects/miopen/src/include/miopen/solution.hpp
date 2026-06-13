@@ -38,6 +38,8 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <boost/optional.hpp>
+
 #include <optional>
 #include <unordered_map>
 
@@ -45,7 +47,7 @@ namespace miopen {
 
 struct Handle;
 
-struct Solution : miopenSolution
+struct MIOPEN_INTERNALS_EXPORT Solution : miopenSolution
 {
     std::vector<std::uint8_t> serialization_cache;
 
@@ -69,7 +71,7 @@ struct Solution : miopenSolution
 
     struct RunInput
     {
-        std::optional<TensorDescriptor> descriptor;
+        boost::optional<TensorDescriptor> descriptor;
         Data_t buffer = nullptr;
 
         inline RunInput() = default;
@@ -107,11 +109,10 @@ struct Solution : miopenSolution
     const ProblemContainer& GetProblem() const { return problem; }
     void SetProblem(ProblemContainer value) { problem = std::move(value); }
 
-    MIOPEN_INTERNALS_EXPORT void
-    Run(const Handle& handle,
-        const std::unordered_map<miopenTensorArgumentId_t, RunInput>& inputs,
-        Data_t workspace,
-        size_t workspace_size);
+    void Run(const Handle& handle,
+             const std::unordered_map<miopenTensorArgumentId_t, RunInput>& inputs,
+             Data_t workspace,
+             size_t workspace_size);
 
     void LogDriverCommand() const;
 

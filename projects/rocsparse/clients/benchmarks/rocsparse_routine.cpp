@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
-* Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights Reserved.
+* Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights Reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -148,7 +148,6 @@ rocsparse_status rocsparse_routine::dispatch_precision(const char       precisio
     case rocsparse_datatype_i32_r:
     case rocsparse_datatype_u32_r:
     case rocsparse_datatype_f16_r:
-    case rocsparse_datatype_bf16_r:
         return rocsparse_status_invalid_value;
     }
     return rocsparse_status_invalid_value;
@@ -216,8 +215,6 @@ constexpr const char* rocsparse_routine::to_string() const
 #include "testing_gebsrmv.hpp"
 #include "testing_gemvi.hpp"
 #include "testing_hybmv.hpp"
-#include "testing_spic0.hpp"
-#include "testing_spilu0.hpp"
 #include "testing_spitsv_csr.hpp"
 #include "testing_spmv_bsr.hpp"
 #include "testing_spmv_coo.hpp"
@@ -227,14 +224,6 @@ constexpr const char* rocsparse_routine::to_string() const
 #include "testing_spmv_ell.hpp"
 #include "testing_spsv_coo.hpp"
 #include "testing_spsv_csr.hpp"
-#include "testing_sptrsv.hpp"
-#include "testing_v2_spmv_bsr.hpp"
-#include "testing_v2_spmv_coo.hpp"
-#include "testing_v2_spmv_coo_aos.hpp"
-#include "testing_v2_spmv_csc.hpp"
-#include "testing_v2_spmv_csr.hpp"
-#include "testing_v2_spmv_ell.hpp"
-#include "testing_v2_spmv_sell.hpp"
 
 // Level3
 #include "testing_bsrmm.hpp"
@@ -506,7 +495,7 @@ rocsparse_status rocsparse_routine::dispatch_call(const Arguments& arg)
     switch(FNAME)
     {
         DEFINE_CASE_T(axpyi);
-        DEFINE_CASE_IABCT_X(bellmm, testing_spmm_bell);
+        DEFINE_CASE_IT_X(bellmm, testing_spmm_bell);
         DEFINE_CASE_IT_X(bellmm_batched, testing_spmm_batched_bell);
         DEFINE_CASE_T(bsrgeam);
         DEFINE_CASE_T(bsric0);
@@ -544,7 +533,6 @@ rocsparse_status rocsparse_routine::dispatch_call(const Arguments& arg)
         DEFINE_CASE_IJT_X(csrgemm_reuse, testing_spgemm_reuse_csr);
         DEFINE_CASE_IJAXYT_X(bsrmv, testing_spmv_bsr);
         DEFINE_CASE_IJAXYT_X(csrmv, testing_spmv_csr);
-        DEFINE_CASE_IJAXYT_X(csrmv_analysis, testing_spmv_csr_analysis);
         DEFINE_CASE_T(csrmv_managed);
         DEFINE_CASE_IJABCT_X(bsrmm, testing_spmm_bsr);
         DEFINE_CASE_IJAXYT_X(cscmv, testing_spmv_csc);
@@ -556,9 +544,6 @@ rocsparse_status rocsparse_routine::dispatch_call(const Arguments& arg)
         DEFINE_CASE_T_FLOAT_ONLY(csrsort);
         DEFINE_CASE_IJT_X(csrsv, testing_spsv_csr);
         DEFINE_CASE_IJT_X(spitsv_csr, testing_spitsv_csr);
-        DEFINE_CASE_IJT(spic0);
-        DEFINE_CASE_IJT(spilu0);
-        DEFINE_CASE_IJT(sptrsv);
         DEFINE_CASE_T(csritsv);
         DEFINE_CASE_T(csr2dense);
         DEFINE_CASE_T(csr2bsr);
@@ -577,7 +562,6 @@ rocsparse_status rocsparse_routine::dispatch_call(const Arguments& arg)
         DEFINE_CASE_T(doti);
         DEFINE_CASE_T_REAL_VS_COMPLEX(dotci, testing_doti, testing_dotci);
         DEFINE_CASE_IAXYT_X(ellmv, testing_spmv_ell);
-        DEFINE_CASE_IJAXYT_X(sellmv, testing_v2_spmv_sell);
         DEFINE_CASE_T(ell2csr);
         DEFINE_CASE_T(gebsr2csr);
         DEFINE_CASE_T(gebsr2gebsr);
@@ -604,19 +588,12 @@ rocsparse_status rocsparse_routine::dispatch_call(const Arguments& arg)
         DEFINE_CASE_T_REAL_ONLY(prune_dense2csr_by_percentage);
         DEFINE_CASE_T_REAL_ONLY(roti);
         DEFINE_CASE_T(sctr);
-        DEFINE_CASE_IJABCT(sddmm);
+        DEFINE_CASE_IJT(sddmm);
         DEFINE_CASE_IT(sparse_to_dense_coo);
         DEFINE_CASE_IJT(sparse_to_dense_csc);
         DEFINE_CASE_IJT(sparse_to_dense_csr);
         DEFINE_CASE_IJT(sparse_to_sparse);
         DEFINE_CASE_IJT(extract);
-        DEFINE_CASE_IJAXYT_X(v2_spmv_bsr, testing_v2_spmv_bsr);
-        DEFINE_CASE_IJAXYT_X(v2_spmv_csr, testing_v2_spmv_csr);
-        DEFINE_CASE_IJAXYT_X(v2_spmv_csc, testing_v2_spmv_csc);
-        DEFINE_CASE_IJAXYT_X(v2_spmv_sell, testing_v2_spmv_sell);
-        DEFINE_CASE_IAXYT_X(v2_spmv_coo, testing_v2_spmv_coo);
-        DEFINE_CASE_IAXYT_X(v2_spmv_coo_aos, testing_v2_spmv_coo_aos);
-        DEFINE_CASE_IAXYT_X(v2_spmv_ell, testing_v2_spmv_ell);
     }
 
 #undef DEFINE_CASE_IT_X

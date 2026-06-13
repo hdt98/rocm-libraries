@@ -1,0 +1,8 @@
+remote: https://github.com/pytorch/torchtitan.git
+branch: main
+commit: 7fcd9beacde733f3ceca4a4da7e2f0518d64f68e
+local_state: clean_shallow_clone_snapshot_from_remote_branch_head
+refreshed_at: 2026-05-27
+notes:
+  - Pretraining backend candidate and implementation reference.
+  - No nested Git metadata is retained in the vendored tree.

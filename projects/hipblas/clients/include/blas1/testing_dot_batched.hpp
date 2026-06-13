@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -134,7 +134,7 @@ void testing_dot_batched(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Naming: dX is in GPU (device) memory. hK is in CPU (host) memory, plz follow this practice
     host_batch_vector<T> hx(N, incx, batch_count);
@@ -183,7 +183,7 @@ void testing_dot_batched(const Arguments& arg)
                     dy.ptr_on_device(),
                     incy,
                     batch_count,
-                    reinterpret_cast<hipblas_internal_type<T>*>(h_hipblas_result1.data())));
+                    h_hipblas_result1));
 
         CHECK_HIP_ERROR(hipMemcpy(
             h_hipblas_result2, d_hipblas_result, sizeof(T) * batch_count, hipMemcpyDeviceToHost));

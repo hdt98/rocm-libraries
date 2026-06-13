@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,52 +21,74 @@
 // SOFTWARE.
 
 #include "benchmark_device_radix_sort.hpp"
-#include "primbench.hpp"
+#include "benchmark_utils.hpp"
+// CmdParser
+#include "cmdparser.hpp"
 
+// Google Benchmark
+#include <benchmark/benchmark.h>
+
+// HIP API
 #include <hip/hip_runtime.h>
 
 #include <cstddef>
 #include <string>
 #include <vector>
 
-#define CREATE_RADIX_SORT_BENCHMARK(...) executor.queue<device_radix_sort_benchmark<__VA_ARGS__>>();
+#ifndef DEFAULT_BYTES
+const size_t DEFAULT_BYTES = 1024 * 1024 * 32 * 4;
+#endif
 
 int main(int argc, char* argv[])
 {
-    primbench::settings settings;
-    settings.size = 128 * primbench::MiB;
-    primbench::executor executor(argc, argv, settings);
+    cli::Parser parser(argc, argv);
+    parser.set_optional<size_t>("size", "size", DEFAULT_BYTES, "number of bytes");
+    parser.set_optional<int>("trials", "trials", -1, "number of iterations");
+    parser.set_optional<std::string>("name_format",
+                                     "name_format",
+                                     "human",
+                                     "either: json,human,txt");
+    parser.set_optional<std::string>("seed", "seed", "random", get_seed_message());
+    parser.run_and_exit_if_error();
 
-    CREATE_RADIX_SORT_BENCHMARK(int32_t)
-    CREATE_RADIX_SORT_BENCHMARK(float)
-    CREATE_RADIX_SORT_BENCHMARK(int64_t)
-    CREATE_RADIX_SORT_BENCHMARK(int8_t)
-    CREATE_RADIX_SORT_BENCHMARK(uint8_t)
-    CREATE_RADIX_SORT_BENCHMARK(rocprim::half)
-    CREATE_RADIX_SORT_BENCHMARK(int16_t)
-    CREATE_RADIX_SORT_BENCHMARK(custom_f32_i16)
-    CREATE_RADIX_SORT_BENCHMARK(rocprim::int128_t)
-    CREATE_RADIX_SORT_BENCHMARK(rocprim::uint128_t)
+    // Parse argv
+    benchmark::Initialize(&argc, argv);
+    const size_t bytes  = parser.get<size_t>("size");
+    const int    trials = parser.get<int>("trials");
+    bench_naming::set_format(parser.get<std::string>("name_format"));
+    const std::string  seed_type = parser.get<std::string>("seed");
+    const managed_seed seed(seed_type);
 
-    CREATE_RADIX_SORT_BENCHMARK(int32_t, float)
-    CREATE_RADIX_SORT_BENCHMARK(int32_t, double)
-    CREATE_RADIX_SORT_BENCHMARK(int32_t, float2)
-    CREATE_RADIX_SORT_BENCHMARK(int32_t, custom_f32_f32)
-    CREATE_RADIX_SORT_BENCHMARK(int32_t, double2)
-    CREATE_RADIX_SORT_BENCHMARK(int32_t, custom_f64_f64)
+    // HIP
+    hipStream_t stream = 0; // default
 
-    CREATE_RADIX_SORT_BENCHMARK(int64_t, float)
-    CREATE_RADIX_SORT_BENCHMARK(int64_t, double)
-    CREATE_RADIX_SORT_BENCHMARK(int64_t, float2)
-    CREATE_RADIX_SORT_BENCHMARK(int64_t, custom_f32_f32)
-    CREATE_RADIX_SORT_BENCHMARK(int64_t, double2)
-    CREATE_RADIX_SORT_BENCHMARK(int64_t, custom_f64_f64)
-    CREATE_RADIX_SORT_BENCHMARK(int8_t, int8_t)
-    CREATE_RADIX_SORT_BENCHMARK(uint8_t, uint8_t)
-    CREATE_RADIX_SORT_BENCHMARK(rocprim::half, rocprim::half)
-    CREATE_RADIX_SORT_BENCHMARK(custom_f32_i16, double)
-    CREATE_RADIX_SORT_BENCHMARK(rocprim::int128_t, rocprim::int128_t)
-    CREATE_RADIX_SORT_BENCHMARK(rocprim::uint128_t, rocprim::uint128_t)
+    // Benchmark info
+    add_common_benchmark_info();
+    benchmark::AddCustomContext("bytes", std::to_string(bytes));
+    benchmark::AddCustomContext("seed", seed_type);
 
-    executor.run();
+    // Add benchmarks
+    std::vector<benchmark::internal::Benchmark*> benchmarks = {};
+    add_sort_keys_benchmarks(benchmarks, bytes, seed, stream);
+    add_sort_pairs_benchmarks(benchmarks, bytes, seed, stream);
+
+    // Use manual timing
+    for(auto& b : benchmarks)
+    {
+        b->UseManualTime();
+        b->Unit(benchmark::kMillisecond);
+    }
+
+    // Force number of iterations
+    if(trials > 0)
+    {
+        for(auto& b : benchmarks)
+        {
+            b->Iterations(trials);
+        }
+    }
+
+    // Run benchmarks
+    benchmark::RunSpecifiedBenchmarks();
+    return 0;
 }

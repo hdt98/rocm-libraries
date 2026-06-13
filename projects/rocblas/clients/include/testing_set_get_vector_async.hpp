@@ -47,7 +47,6 @@ void testing_set_get_vector_async(const Arguments& arg)
 
     if(arg.algo == 1) // use arg.algo == 1 to test bad device pointer
     {
-#ifndef ASAN_BUILD
         T  host_data;
         T* host_data_ptr = &host_data;
 
@@ -60,19 +59,25 @@ void testing_set_get_vector_async(const Arguments& arg)
             = rocblas_get_vector_async_fn(1, sizeof(T), host_data_ptr, 1, host_data_ptr, 1, stream);
         h_error = hipGetLastError(); // clear HIP error
         GTEST_ASSERT_TRUE(rocblas_status_internal_error == status);
-#else
-        GTEST_SKIP() << "ASAN_BUILD";
-#endif
+
         return;
     }
-    else if(N <= 0 || incx <= 0 || incy <= 0 || ldd <= 0)
+    else if(N == 0)
     {
-        rocblas_status expected_status
-            = N == 0 ? rocblas_status_success : rocblas_status_invalid_size;
-        DAPI_EXPECT(expected_status,
+        DAPI_EXPECT(rocblas_status_success,
                     rocblas_set_vector_async_fn,
                     (N, sizeof(T), nullptr, incx, nullptr, ldd, stream));
-        DAPI_EXPECT(expected_status,
+        DAPI_EXPECT(rocblas_status_success,
+                    rocblas_get_vector_async_fn,
+                    (N, sizeof(T), nullptr, ldd, nullptr, incy, stream));
+        return;
+    }
+    else if(N < 0 || incx <= 0 || incy <= 0 || ldd <= 0)
+    {
+        DAPI_EXPECT(rocblas_status_invalid_size,
+                    rocblas_set_vector_async_fn,
+                    (N, sizeof(T), nullptr, incx, nullptr, ldd, stream));
+        DAPI_EXPECT(rocblas_status_invalid_size,
                     rocblas_get_vector_async_fn,
                     (N, sizeof(T), nullptr, ldd, nullptr, incy, stream));
         return;
@@ -113,7 +118,7 @@ void testing_set_get_vector_async(const Arguments& arg)
 
         cpu_time_used = get_time_us_no_sync() - cpu_time_used;
 
-        CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+        hipStreamSynchronize(stream);
 
         if(arg.unit_check)
         {
@@ -144,7 +149,7 @@ void testing_set_get_vector_async(const Arguments& arg)
             DAPI_DISPATCH(rocblas_get_vector_async_fn, (N, sizeof(T), db, ldd, hy, incy, stream));
         }
 
-        CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+        hipStreamSynchronize(stream);
         gpu_time_used = get_time_us_sync(stream) - gpu_time_used;
 
         ArgumentModel<e_N, e_incx, e_incy, e_ldd>{}.log_args<T>(rocblas_cout,

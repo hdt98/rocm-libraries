@@ -1,20 +1,23 @@
 .. meta::
-  :description: Summary of the rocSOLVER API reference library
-  :keywords: rocSOLVER, ROCm, API, documentation, introduction, summary
+  :description: rocSOLVER documentation and API reference library
+  :keywords: rocSOLVER, ROCm, API, documentation
 
 .. _intro:
 
 ********************************************************************
-rocSOLVER API summary
+Introduction to rocSOLVER API
 ********************************************************************
 
-The following tables summarize the functionality implemented for the different supported precisions in rocSOLVER.
-All LAPACK and LAPACK-like main functions include ``_batched`` and ``_strided_batched`` versions. For a complete description of the listed
-routines, see the corresponding reference guides.
-
 .. note::
+    The rocSOLVER library is in the early stages of active development. New features are being continuously added,
+    with new functionality documented at each `release of the ROCm platform <https://rocm.docs.amd.com/en/latest/release.html>`_.
 
-   The rocSOLVER library is in the early stages of active development, with new features being continuously added and documented.
+Currently implemented functionality
+====================================
+
+The following tables summarize the functionality implemented for the different supported precisions in rocSOLVER's latest release.
+All LAPACK and LAPACK-like main functions include *_batched* and *_strided_batched* versions. For a complete description of the listed
+routines, please see the corresponding reference guides.
 
 LAPACK auxiliary functions
 ----------------------------
@@ -25,12 +28,6 @@ LAPACK auxiliary functions
     :ref:`rocsolver_lacgv <lacgv>`, x, x, x, x
     :ref:`rocsolver_laswp <laswp>`, x, x, x, x
     :ref:`rocsolver_lauum <lauum>`, x, x, x, x
-
-.. csv-table:: Norms and condition number estimators
-    :header: "Function", "single", "double", "single complex", "double complex"
-
-    :ref:`rocsolver_lange <lange>`, x, x, x, x
-    :ref:`rocsolver_gecon <gecon>`, x, x, x, x
 
 .. csv-table:: Householder reflections
     :header: "Function", "single", "double", "single complex", "double complex"
@@ -156,7 +153,6 @@ LAPACK main functions
     :ref:`rocsolver_potri <potri>`, x, x, x, x
     :ref:`rocsolver_potrs <potrs>`, x, x, x, x
     :ref:`rocsolver_posv <posv>`, x, x, x, x
-    :ref:`rocsolver_sytrs <sytrs>`, x, x, x, x
 
 .. csv-table:: Least-square solvers
     :header: "Function", "single", "double", "single complex", "double complex"
@@ -184,7 +180,6 @@ LAPACK main functions
 
     :ref:`rocsolver_gesvd <gesvd>`, x, x, x, x
     :ref:`rocsolver_gesvdx <gesvdx>`, x, x, x, x
-    :ref:`rocsolver_gesdd <gesdd>`, x, x, x, x
 
 LAPACK-like functions
 ----------------------------
@@ -226,10 +221,10 @@ LAPACK-like functions
     :ref:`rocsolver_gesvdj <gesvdj>`, x, x, x, x
 
 
-Refactorization and direct solvers
+Re-factorization and direct solvers
 ----------------------------------------
 
-.. csv-table:: Triangular refactorization
+.. csv-table:: Triangular re-factorization
     :header: "Function", "single", "double", "single complex", "double complex"
 
     :ref:`rocsolver_csrrf_sumlu <rfsumlu>`, x, x, ,

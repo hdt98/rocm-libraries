@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +23,10 @@
  * ************************************************************************ */
 #include "internal/util/rocsparse_check_matrix_gebsr.h"
 #include "rocsparse_check_matrix_gebsr.hpp"
-#include "rocsparse_enum_utils.hpp"
-#include "rocsparse_utility.hpp"
+#include "to_string.hpp"
+#include "utility.h"
 
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 #include "check_matrix_gebsr_device.h"
 
@@ -74,8 +74,8 @@ rocsparse_status rocsparse::check_matrix_gebsr_core(rocsparse_handle       handl
     rocsparse_data_status* d_data_status = reinterpret_cast<rocsparse_data_status*>(ptr);
     ptr += ((sizeof(rocsparse_data_status) - 1) / 256 + 1) * 256;
 
-    RETURN_IF_HIP_ERROR(
-        hipMemsetAsync(d_data_status, 0, sizeof(rocsparse_data_status), handle->stream));
+    RETURN_IF_HIP_ERROR(hipMemsetAsync(d_data_status, 0, sizeof(rocsparse_data_status)));
+    RETURN_IF_HIP_ERROR(hipStreamSynchronize(handle->stream));
 
     RETURN_IF_HIPLAUNCHKERNELGGL_ERROR((rocsparse::check_row_ptr_array<256>),
                                        dim3((mb - 1) / 256 + 1),
@@ -95,7 +95,7 @@ rocsparse_status rocsparse::check_matrix_gebsr_core(rocsparse_handle       handl
 
     if(*data_status != rocsparse_data_status_success)
     {
-        rocsparse::log_debug(handle, rocsparse::enum_utils::to_string(*data_status));
+        rocsparse::log_debug(handle, rocsparse::to_string(*data_status));
 
         return rocsparse_status_success;
     }
@@ -109,7 +109,7 @@ rocsparse_status rocsparse::check_matrix_gebsr_core(rocsparse_handle       handl
     {
         // offsets buffer
         tmp_offsets = reinterpret_cast<I*>(ptr);
-        ptr += ((sizeof(I) * (mb + 1)) / 256 + 1) * 256;
+        ptr += ((sizeof(I) * mb) / 256 + 1) * 256;
 
         // columns 1 buffer
         tmp_cols1 = reinterpret_cast<J*>(ptr);
@@ -168,7 +168,7 @@ rocsparse_status rocsparse::check_matrix_gebsr_core(rocsparse_handle       handl
 
     if(*data_status != rocsparse_data_status_success)
     {
-        rocsparse::log_debug(handle, rocsparse::enum_utils::to_string(*data_status));
+        rocsparse::log_debug(handle, rocsparse::to_string(*data_status));
     }
 
     return rocsparse_status_success;
@@ -248,7 +248,7 @@ rocsparse_status rocsparse::check_matrix_gebsr_checkarg(rocsparse_handle       h
         {
             rocsparse::log_debug(handle,
                                  ("Matrix was specified to be "
-                                  + std::string(rocsparse::enum_utils::to_string(matrix_type))
+                                  + std::string(rocsparse::to_string(matrix_type))
                                   + " but (row_block_dim != col_block_dim || mb != nb)"));
         }
     }

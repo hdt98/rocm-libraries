@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -31,8 +31,7 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t NPerXDL,
           index_t MRepeat,
           index_t NRepeat,
-          index_t KPack,
-          bool TransposeC = false>
+          index_t KPack>
 constexpr auto BlockGemmPipeline_Selector()
 {
     if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
@@ -56,8 +55,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                        NPerXDL,
                                                        MRepeat,
                                                        NRepeat,
-                                                       KPack,
-                                                       TransposeC>{};
+                                                       KPack>{};
     }
     else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v2)
     {
@@ -80,8 +78,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                        NPerXDL,
                                                        MRepeat,
                                                        NRepeat,
-                                                       KPack,
-                                                       TransposeC>{};
+                                                       KPack>{};
     }
     else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
     {
@@ -104,8 +101,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                        NPerXDL,
                                                        MRepeat,
                                                        NRepeat,
-                                                       KPack,
-                                                       TransposeC>{};
+                                                       KPack>{};
     }
     else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
     {
@@ -128,8 +124,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                        NPerXDL,
                                                        MRepeat,
                                                        NRepeat,
-                                                       KPack,
-                                                       TransposeC>{};
+                                                       KPack>{};
     }
     else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v5)
     {
@@ -152,8 +147,7 @@ constexpr auto BlockGemmPipeline_Selector()
                                                NPerXDL,
                                                MRepeat,
                                                NRepeat,
-                                               KPack,
-                                               TransposeC>{};
+                                               KPack>{};
     }
     else
     {

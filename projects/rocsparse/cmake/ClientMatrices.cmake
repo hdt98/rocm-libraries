@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
+# Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -101,11 +101,15 @@ else()
 endif()
 
 if(BUILD_ADDRESS_SANITIZER)
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} ${CONVERT_SOURCE} -O3 -fsanitize=address -shared-libasan -Wl,--build-id=sha1 -o ${PROJECT_BINARY_DIR}/mtx2csr.exe
-    COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} ${CONVERT_SOURCE} -O3 -fsanitize=address -shared-libasan -L${ROCM_PATH}/${CMAKE_INSTALL_LIBDIR} -Wl,--enable-new-dtags,--build-id=sha1,--rpath${rpath_sep}$ENV{ROCM_ASAN_EXE_RPATH} -o ${PROJECT_BINARY_DIR}/mtx2csr.exe
+    RESULT_VARIABLE STATUS)
 else()
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} ${CONVERT_SOURCE} -O3 -Wl,--build-id=sha1 -o ${PROJECT_BINARY_DIR}/mtx2csr.exe
-    COMMAND_ERROR_IS_FATAL ANY)
+	execute_process(COMMAND ${CMAKE_CXX_COMPILER} ${CONVERT_SOURCE} -O3 -L${ROCM_PATH}/${CMAKE_INSTALL_LIBDIR} -Wl,--enable-new-dtags,--build-id=sha1,--rpath${rpath_sep}$ENV{ROCM_EXE_RPATH} -o ${PROJECT_BINARY_DIR}/mtx2csr.exe
+    RESULT_VARIABLE STATUS)
+endif()
+
+if(STATUS AND NOT STATUS EQUAL 0)
+  message(FATAL_ERROR "mtx2csr.exe failed to build, aborting.")
 endif()
 
 list(LENGTH TEST_MATRICES len)
@@ -169,8 +173,11 @@ foreach(i RANGE 0 ${len1})
       endif()
 
       execute_process(COMMAND tar xf ${mat}.tar.gz
-        WORKING_DIRECTORY ${CMAKE_MATRICES_DIR}
-        COMMAND_ERROR_IS_FATAL ANY)
+        RESULT_VARIABLE STATUS
+        WORKING_DIRECTORY ${CMAKE_MATRICES_DIR})
+      if(STATUS AND NOT STATUS EQUAL 0)
+        message(FATAL_ERROR "uncompressing failed, aborting.")
+      endif()
 
       file(RENAME ${CMAKE_MATRICES_DIR}/${mat}/${mat}.mtx ${CMAKE_MATRICES_DIR}/${mat}.mtx)
     else()
@@ -180,9 +187,14 @@ foreach(i RANGE 0 ${len1})
     # Set LD_LIBRARY_PATH for running the executable from build directory
     set(ENV{LD_LIBRARY_PATH} "$ENV{LD_LIBRARY_PATH}:${ROCM_PATH}/${CMAKE_INSTALL_LIBDIR}")
     execute_process(COMMAND ${PROJECT_BINARY_DIR}/mtx2csr.exe ${mat}.mtx ${mat}.csr
-      WORKING_DIRECTORY ${CMAKE_MATRICES_DIR}
-      COMMAND_ERROR_IS_FATAL ANY)
-    message(STATUS "${mat} success.")
+      RESULT_VARIABLE STATUS
+      WORKING_DIRECTORY ${CMAKE_MATRICES_DIR})
+    if(STATUS AND NOT STATUS EQUAL 0)
+      message(FATAL_ERROR "mtx2csr.exe failed, aborting.")
+    else()
+      message(STATUS "${mat} success.")
+    endif()
+    # TODO: add 'COMMAND_ERROR_IS_FATAL ANY' once cmake supported version is 3.19
     file(REMOVE_RECURSE ${CMAKE_MATRICES_DIR}/${mat}.tar.gz ${CMAKE_MATRICES_DIR}/${mat} ${CMAKE_MATRICES_DIR}/${mat}.mtx)
 
   endif()

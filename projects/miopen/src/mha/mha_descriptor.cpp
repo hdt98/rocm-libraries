@@ -53,7 +53,8 @@ extern "C" miopenStatus_t miopenGetMhaDescriptor(miopenMhaDescriptor_t mhaDesc, 
 
 std::ostream& operator<<(std::ostream& stream, const MhaDescriptor& x)
 {
-    stream << "mha," << "scale" << x.GetScale() << ",";
+    stream << "mha,"
+           << "scale" << x.GetScale() << ",";
 
     return stream;
 }

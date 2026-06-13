@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,7 @@
 #ifndef ROCSPARSE_DATATYPE2STRING_HPP
 #define ROCSPARSE_DATATYPE2STRING_HPP
 
-#include "rocsparse.h"
+#include <rocsparse.h>
 #include <string>
 
 #include <algorithm>
@@ -112,8 +112,6 @@ constexpr auto rocsparse_datatype2string(rocsparse_datatype type)
 {
     switch(type)
     {
-    case rocsparse_datatype_f16_r:
-        return "f16_r";
     case rocsparse_datatype_f32_r:
         return "f32_r";
     case rocsparse_datatype_f64_r:
@@ -130,8 +128,8 @@ constexpr auto rocsparse_datatype2string(rocsparse_datatype type)
         return "i32_r";
     case rocsparse_datatype_u32_r:
         return "u32_r";
-    case rocsparse_datatype_bf16_r:
-        return "bf16_r";
+    case rocsparse_datatype_f16_r:
+        return "f16_r";
     }
     return "invalid";
 }
@@ -304,8 +302,6 @@ constexpr auto rocsparse_format2string(rocsparse_format format)
         return "ell";
     case rocsparse_format_bell:
         return "bell";
-    case rocsparse_format_sell:
-        return "sell";
     }
     return "invalid";
 }
@@ -367,10 +363,6 @@ constexpr auto rocsparse_spmvalg2string(rocsparse_spmv_alg alg)
         return "cooatomic";
     case rocsparse_spmv_alg_csr_lrb:
         return "csrlrb";
-    case rocsparse_spmv_alg_csr_nnzsplit:
-        return "csrnnzsplit";
-    case rocsparse_spmv_alg_sell:
-        return "sell";
     }
     return "invalid";
 }
@@ -380,16 +372,6 @@ constexpr auto rocsparse_spsvalg2string(rocsparse_spsv_alg alg)
     switch(alg)
     {
     case rocsparse_spsv_alg_default:
-        return "default";
-    }
-    return "invalid";
-}
-
-constexpr auto rocsparse_sptrsvalg2string(rocsparse_sptrsv_alg alg)
-{
-    switch(alg)
-    {
-    case rocsparse_sptrsv_alg_default:
         return "default";
     }
     return "invalid";
@@ -410,16 +392,6 @@ constexpr auto rocsparse_spsmalg2string(rocsparse_spsm_alg alg)
     switch(alg)
     {
     case rocsparse_spsm_alg_default:
-        return "default";
-    }
-    return "invalid";
-}
-
-constexpr auto rocsparse_sptrsmalg2string(rocsparse_sptrsm_alg alg)
-{
-    switch(alg)
-    {
-    case rocsparse_sptrsm_alg_default:
         return "default";
     }
     return "invalid";

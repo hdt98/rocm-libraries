@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,7 +35,7 @@
 #include <omp.h>
 #endif
 
-template <typename T, typename I, typename J, typename A, typename B, typename C>
+template <typename T, typename I, typename J>
 struct rocsparse_host
 {
 
@@ -48,14 +48,14 @@ struct rocsparse_host
                         J                    K,
                         I                    nnz,
                         const T*             alpha,
-                        const A*             dense_A,
+                        const T*             A,
                         int64_t              lda,
-                        const B*             dense_B,
+                        const T*             B,
                         int64_t              ldb,
                         const T*             beta,
                         const I*             csr_row_ptr_C,
                         const J*             csr_col_ind_C,
-                        C*                   csr_val_C,
+                        T*                   csr_val_C,
                         rocsparse_index_base base_C);
 
     static void cscddmm(rocsparse_operation  trans_A,
@@ -67,14 +67,14 @@ struct rocsparse_host
                         J                    K,
                         I                    nnz,
                         const T*             alpha,
-                        const A*             dense_A,
+                        const T*             A,
                         int64_t              lda,
-                        const B*             dense_B,
+                        const T*             B,
                         int64_t              ldb,
                         const T*             beta,
                         const I*             csr_row_ptr_C,
                         const J*             csr_col_ind_C,
-                        C*                   csr_val_C,
+                        T*                   csr_val_C,
                         rocsparse_index_base base_C);
 
     static void cooddmm(rocsparse_operation  trans_A,
@@ -86,14 +86,14 @@ struct rocsparse_host
                         J                    K,
                         I                    nnz,
                         const T*             alpha,
-                        const A*             dense_A,
+                        const T*             A,
                         int64_t              lda,
-                        const B*             dense_B,
+                        const T*             B,
                         int64_t              ldb,
                         const T*             beta,
                         const I*             coo_row_ind_C,
                         const I*             coo_col_ind_C,
-                        C*                   coo_val_C,
+                        T*                   coo_val_C,
                         rocsparse_index_base base_C);
 
     static void cooaosddmm(rocsparse_operation  trans_A,
@@ -105,14 +105,14 @@ struct rocsparse_host
                            J                    K,
                            I                    nnz,
                            const T*             alpha,
-                           const A*             dense_A,
+                           const T*             A,
                            int64_t              lda,
-                           const B*             dense_B,
+                           const T*             B,
                            int64_t              ldb,
                            const T*             beta,
                            const I*             coo_row_ind_C,
                            const I*             coo_col_ind_C,
-                           C*                   coo_val_C,
+                           T*                   coo_val_C,
                            rocsparse_index_base base_C);
 
     static void ellddmm(rocsparse_operation  trans_A,
@@ -124,14 +124,14 @@ struct rocsparse_host
                         J                    K,
                         I                    nnz,
                         const T*             alpha,
-                        const A*             dense_A,
+                        const T*             A,
                         int64_t              lda,
-                        const B*             dense_B,
+                        const T*             B,
                         int64_t              ldb,
                         const T*             beta,
                         const J              ell_width,
                         const I*             ell_ind_C,
-                        C*                   ell_val_C,
+                        T*                   ell_val_C,
                         rocsparse_index_base base_C);
 };
 
@@ -146,14 +146,14 @@ struct rocsparse_host
  *    level 1 SPARSE
  * ===========================================================================
  */
-template <typename T, typename I, typename X, typename Y>
+template <typename I, typename T>
 void host_axpby(I                    size,
                 I                    nnz,
                 T                    alpha,
-                const X*             x_val,
+                const T*             x_val,
                 const I*             x_ind,
                 T                    beta,
-                Y*                   y,
+                T*                   y,
                 rocsparse_index_base base);
 
 template <typename I, typename X, typename Y, typename T>
@@ -354,22 +354,6 @@ void host_ellmv(rocsparse_operation  trans,
                 T                    beta,
                 Y*                   y,
                 rocsparse_index_base base);
-
-template <typename T, typename I, typename J, typename A, typename X, typename Y>
-void host_sellmv(rocsparse_operation  trans,
-                 J                    M,
-                 J                    N,
-                 I                    nnz,
-                 J                    sell_slice_size,
-                 I                    sell_colval_size,
-                 T                    alpha,
-                 const I*             sell_slice_offsets,
-                 const J*             sell_col_ind,
-                 const A*             sell_val,
-                 const X*             x,
-                 T                    beta,
-                 Y*                   y,
-                 rocsparse_index_base base);
 
 template <typename T>
 void host_hybmv(rocsparse_operation  trans,
@@ -1182,19 +1166,6 @@ void host_csr_to_ell(J                     M,
                      J&                    ell_width,
                      rocsparse_index_base  csr_base,
                      rocsparse_index_base  ell_base);
-
-template <typename I, typename J, typename T>
-void host_csr_to_sell(J                     M,
-                      J                     sell_slice_size,
-                      const std::vector<I>& csr_row_ptr,
-                      const std::vector<J>& csr_col_ind,
-                      const std::vector<T>& csr_val,
-                      std::vector<I>&       sell_slice_offsets,
-                      std::vector<J>&       sell_col_ind,
-                      std::vector<T>&       sell_val,
-                      I&                    sell_colval_size,
-                      rocsparse_index_base  csr_base,
-                      rocsparse_index_base  sell_base);
 
 template <typename T>
 void host_csr_to_hyb(rocsparse_int                     M,

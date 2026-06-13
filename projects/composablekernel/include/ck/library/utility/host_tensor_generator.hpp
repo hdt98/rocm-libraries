@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -67,18 +67,6 @@ struct GeneratorTensor_1<ck::f8_t>
         return ck::type_convert<ck::f8_t>(value);
     }
 };
-
-template <>
-struct GeneratorTensor_1<ck::bf8_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::bf8_t operator()(Is...)
-    {
-        return ck::type_convert<ck::bf8_t>(value);
-    }
-};
 #endif
 
 template <>
@@ -90,50 +78,6 @@ struct GeneratorTensor_1<ck::f4_t>
     ck::f4_t operator()(Is...)
     {
         return ck::type_convert<ck::f4_t>(value);
-    }
-};
-
-template <>
-struct GeneratorTensor_1<ck::f4x2_pk_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::f4x2_pk_t operator()(Is...)
-    {
-        return ck::f4x2_pk_t{ck::type_convert<ck::f4x2_t>(ck::float2_t{value, value})};
-    }
-};
-
-template <>
-struct GeneratorTensor_1<ck::f6x32_pk_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::f6x32_pk_t operator()(Is...)
-    {
-        ck::f6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            r.pack(ck::type_convert<ck::f6_t>(value), static_cast<ck::index_t>(i));
-        });
-        return r;
-    }
-};
-
-template <>
-struct GeneratorTensor_1<ck::bf6x32_pk_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::bf6x32_pk_t operator()(Is...)
-    {
-        ck::bf6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            r.pack(ck::type_convert<ck::bf6_t>(value), static_cast<ck::index_t>(i));
-        });
-        return r;
     }
 };
 
@@ -163,42 +107,6 @@ struct GeneratorTensor_1<ck::pk_i4_t>
     }
 };
 
-template <>
-struct GeneratorTensor_1<ck::e8m0_bexp_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::e8m0_bexp_t operator()(Is...)
-    {
-        return ck::type_convert<ck::e8m0_bexp_t>(value);
-    }
-};
-
-template <>
-struct GeneratorTensor_1<ck::e4m3_scale_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::e4m3_scale_t operator()(Is...)
-    {
-        return ck::type_convert<ck::e4m3_scale_t>(value);
-    }
-};
-
-template <>
-struct GeneratorTensor_1<ck::e5m3_scale_t>
-{
-    float value = 1.0;
-
-    template <typename... Is>
-    ck::e5m3_scale_t operator()(Is...)
-    {
-        return ck::type_convert<ck::e5m3_scale_t>(value);
-    }
-};
-
 template <typename T>
 struct GeneratorTensor_2
 {
@@ -209,44 +117,6 @@ struct GeneratorTensor_2
     T operator()(Is...)
     {
         return static_cast<T>((std::rand() % (max_value - min_value)) + min_value);
-    }
-};
-
-template <>
-struct GeneratorTensor_2<ck::f6x32_pk_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::f6x32_pk_t operator()(Is...)
-    {
-        ck::f6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            float tmp = (std::rand() % (max_value - min_value)) + min_value;
-            r.pack(ck::type_convert<ck::f6_t>(tmp), static_cast<ck::index_t>(i));
-        });
-
-        return r;
-    }
-};
-
-template <>
-struct GeneratorTensor_2<ck::bf6x32_pk_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::bf6x32_pk_t operator()(Is...)
-    {
-        ck::bf6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            float tmp = (std::rand() % (max_value - min_value)) + min_value;
-            r.pack(ck::type_convert<ck::bf6_t>(tmp), static_cast<ck::index_t>(i));
-        });
-
-        return r;
     }
 };
 
@@ -288,7 +158,7 @@ struct GeneratorTensor_2<ck::pk_i4_t>
     {
         int hi        = std::rand() % (max_value - min_value) + min_value + 8;
         int lo        = std::rand() % (max_value - min_value) + min_value + 8;
-        ck::pk_i4_t r = (((hi & 0xf) << 4) + (lo & 0xf));
+        ck::pk_i4_t r = ((hi << 4) + lo) & 0xff;
         return r;
     }
 };
@@ -336,63 +206,6 @@ struct GeneratorTensor_2<ck::f4_t>
     {
         float tmp = (std::rand() % (max_value - min_value)) + min_value;
         return ck::type_convert<ck::f4_t>(tmp);
-    }
-};
-
-template <>
-struct GeneratorTensor_2<ck::f4x2_pk_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::f4x2_pk_t operator()(Is...)
-    {
-        float tmp0 = (std::rand() % (max_value - min_value)) + min_value;
-        float tmp1 = (std::rand() % (max_value - min_value)) + min_value;
-        return ck::f4x2_pk_t{ck::type_convert<ck::f4x2_t>(ck::float2_t{tmp0, tmp1})};
-    }
-};
-
-template <>
-struct GeneratorTensor_2<ck::e8m0_bexp_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::e8m0_bexp_t operator()(Is...)
-    {
-        float tmp = (std::rand() % (max_value - min_value)) + min_value;
-        return ck::type_convert<ck::e8m0_bexp_t>(tmp);
-    }
-};
-
-template <>
-struct GeneratorTensor_2<ck::e4m3_scale_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::e4m3_scale_t operator()(Is...)
-    {
-        float tmp = (std::rand() % (max_value - min_value)) + min_value;
-        return ck::type_convert<ck::e4m3_scale_t>(tmp);
-    }
-};
-
-template <>
-struct GeneratorTensor_2<ck::e5m3_scale_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::e5m3_scale_t operator()(Is...)
-    {
-        float tmp = (std::rand() % (max_value - min_value)) + min_value;
-        return ck::type_convert<ck::e5m3_scale_t>(tmp);
     }
 };
 
@@ -483,126 +296,6 @@ struct GeneratorTensor_3<ck::f4_t>
     }
 };
 
-template <>
-struct GeneratorTensor_3<ck::f4x2_pk_t>
-{
-    float min_value = 0;
-    float max_value = 1;
-
-    template <typename... Is>
-    ck::f4x2_pk_t operator()(Is...)
-    {
-        float tmp0 = float(std::rand()) / float(RAND_MAX);
-        float tmp1 = float(std::rand()) / float(RAND_MAX);
-
-        float fp32_tmp0 = min_value + tmp0 * (max_value - min_value);
-        float fp32_tmp1 = min_value + tmp1 * (max_value - min_value);
-
-        return ck::f4x2_pk_t{ck::type_convert<ck::f4x2_t>(ck::float2_t{fp32_tmp0, fp32_tmp1})};
-    }
-};
-
-template <>
-struct GeneratorTensor_3<ck::pk_i4_t>
-{
-    int min_value = 0;
-    int max_value = 1;
-
-    template <typename... Is>
-    ck::pk_i4_t operator()(Is...)
-    {
-        int hi        = std::rand() % (max_value - min_value) + min_value + 8;
-        int lo        = std::rand() % (max_value - min_value) + min_value + 8;
-        ck::pk_i4_t r = (((hi & 0xf) << 4) + (lo & 0xf));
-        return r;
-    }
-};
-
-template <>
-struct GeneratorTensor_3<ck::f6x32_pk_t>
-{
-    float min_value = 0;
-    float max_value = 1;
-
-    template <typename... Is>
-    ck::f6x32_pk_t operator()(Is...)
-    {
-        ck::f6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            float rnd  = float(std::rand()) / float(RAND_MAX);
-            float fp32 = min_value + rnd * (max_value - min_value);
-            r.pack(ck::type_convert<ck::f6_t>(fp32), static_cast<ck::index_t>(i));
-        });
-
-        return r;
-    }
-};
-
-template <>
-struct GeneratorTensor_3<ck::bf6x32_pk_t>
-{
-    float min_value = 0;
-    float max_value = 1;
-
-    template <typename... Is>
-    ck::bf6x32_pk_t operator()(Is...)
-    {
-        ck::bf6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            float rnd  = float(std::rand()) / float(RAND_MAX);
-            float fp32 = min_value + rnd * (max_value - min_value);
-            r.pack(ck::type_convert<ck::bf6_t>(fp32), static_cast<ck::index_t>(i));
-        });
-
-        return r;
-    }
-};
-
-template <>
-struct GeneratorTensor_3<ck::e8m0_bexp_t>
-{
-    float min_value = 0;
-    float max_value = 1;
-
-    template <typename... Is>
-    ck::e8m0_bexp_t operator()(Is...)
-    {
-        float tmp      = float(std::rand()) / float(RAND_MAX);
-        float fp32_tmp = min_value + tmp * (max_value - min_value);
-        return ck::type_convert<ck::e8m0_bexp_t>(fp32_tmp);
-    }
-};
-
-template <>
-struct GeneratorTensor_3<ck::e4m3_scale_t>
-{
-    float min_value = 0;
-    float max_value = 1;
-
-    template <typename... Is>
-    ck::e4m3_scale_t operator()(Is...)
-    {
-        float tmp      = float(std::rand()) / float(RAND_MAX);
-        float fp32_tmp = min_value + tmp * (max_value - min_value);
-        return ck::type_convert<ck::e4m3_scale_t>(fp32_tmp);
-    }
-};
-
-template <>
-struct GeneratorTensor_3<ck::e5m3_scale_t>
-{
-    float min_value = 0;
-    float max_value = 1;
-
-    template <typename... Is>
-    ck::e5m3_scale_t operator()(Is...)
-    {
-        float tmp      = float(std::rand()) / float(RAND_MAX);
-        float fp32_tmp = min_value + tmp * (max_value - min_value);
-        return ck::type_convert<ck::e5m3_scale_t>(fp32_tmp);
-    }
-};
-
 template <typename T>
 struct GeneratorTensor_4
 {
@@ -618,69 +311,6 @@ struct GeneratorTensor_4
         float tmp = distribution(generator);
 
         return ck::type_convert<T>(tmp);
-    }
-};
-
-template <>
-struct GeneratorTensor_4<ck::f4x2_pk_t>
-{
-    std::mt19937 generator;
-    std::normal_distribution<float> distribution;
-
-    GeneratorTensor_4(float mean, float stddev, unsigned int seed = 1)
-        : generator(seed), distribution(mean, stddev){};
-
-    template <typename... Is>
-    ck::f4x2_pk_t operator()(Is...)
-    {
-        float fp32_tmp0 = distribution(generator);
-        float fp32_tmp1 = distribution(generator);
-
-        return ck::f4x2_pk_t{ck::type_convert<ck::f4x2_t>(ck::float2_t{fp32_tmp0, fp32_tmp1})};
-    }
-};
-
-template <>
-struct GeneratorTensor_4<ck::f6x32_pk_t>
-{
-    std::mt19937 generator;
-    std::normal_distribution<float> distribution;
-
-    GeneratorTensor_4(float mean, float stddev, unsigned int seed = 1)
-        : generator(seed), distribution(mean, stddev){};
-
-    template <typename... Is>
-    ck::f6x32_pk_t operator()(Is...)
-    {
-        ck::f6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            r.pack(ck::type_convert<ck::f6_t>(distribution(generator)),
-                   static_cast<ck::index_t>(i));
-        });
-
-        return r;
-    }
-};
-
-template <>
-struct GeneratorTensor_4<ck::bf6x32_pk_t>
-{
-    std::mt19937 generator;
-    std::normal_distribution<float> distribution;
-
-    GeneratorTensor_4(float mean, float stddev, unsigned int seed = 1)
-        : generator(seed), distribution(mean, stddev){};
-
-    template <typename... Is>
-    ck::bf6x32_pk_t operator()(Is...)
-    {
-        ck::bf6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}([&](auto i) {
-            r.pack(ck::type_convert<ck::bf6_t>(distribution(generator)),
-                   static_cast<ck::index_t>(i));
-        });
-
-        return r;
     }
 };
 
@@ -726,56 +356,6 @@ struct GeneratorTensor_Sequential
 
         float tmp = dims[Dim];
         return ck::type_convert<T>(tmp);
-    }
-};
-
-template <ck::index_t Dim>
-struct GeneratorTensor_Sequential<ck::f4x2_pk_t, Dim>
-{
-    template <typename... Ts>
-    ck::f4x2_pk_t operator()(Ts... Xs) const
-    {
-        std::array<ck::index_t, sizeof...(Ts)> dims = {{static_cast<ck::index_t>(Xs)...}};
-
-        float tmp0_1 = dims[Dim] - 1;
-        float tmp0   = dims[Dim];
-        float tmp1   = dims[Dim] + 1;
-        return dims[Dim] % 2 == 1 ? ck::type_convert<ck::f4x2_t>(ck::float2_t{tmp0_1, tmp0})
-                                  : ck::type_convert<ck::f4x2_t>(ck::float2_t{tmp0, tmp1});
-    }
-};
-
-template <ck::index_t Dim>
-struct GeneratorTensor_Sequential<ck::f6x32_pk_t, Dim>
-{
-    template <typename... Ts>
-    ck::f6x32_pk_t operator()(Ts... Xs) const
-    {
-        std::array<ck::index_t, sizeof...(Ts)> dims = {{static_cast<ck::index_t>(Xs)...}};
-
-        float tmp = dims[Dim];
-
-        ck::f6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}(
-            [&](auto i) { r.pack(ck::type_convert<ck::f6_t>(tmp), static_cast<ck::index_t>(i)); });
-        return r;
-    }
-};
-
-template <ck::index_t Dim>
-struct GeneratorTensor_Sequential<ck::bf6x32_pk_t, Dim>
-{
-    template <typename... Ts>
-    ck::bf6x32_pk_t operator()(Ts... Xs) const
-    {
-        std::array<ck::index_t, sizeof...(Ts)> dims = {{static_cast<ck::index_t>(Xs)...}};
-
-        float tmp = dims[Dim];
-
-        ck::bf6x32_pk_t r;
-        ck::static_for<0, 32, 1>{}(
-            [&](auto i) { r.pack(ck::type_convert<ck::bf6_t>(tmp), static_cast<ck::index_t>(i)); });
-        return r;
     }
 };
 

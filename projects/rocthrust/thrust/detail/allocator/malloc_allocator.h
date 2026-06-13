@@ -17,30 +17,33 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#include <thrust/detail/allocator/tagged_allocator.h>
 #include <thrust/detail/type_traits/pointer_traits.h>
+#include <thrust/detail/allocator/tagged_allocator.h>
 
 THRUST_NAMESPACE_BEGIN
 namespace detail
 {
 
-template <typename T, typename System, typename Pointer>
-class malloc_allocator : public thrust::detail::tagged_allocator<T, System, Pointer>
+template<typename T, typename System, typename Pointer>
+  class malloc_allocator
+    : public thrust::detail::tagged_allocator<
+               T, System, Pointer
+             >
 {
-private:
-  using super_t = thrust::detail::tagged_allocator<T, System, Pointer>;
+  private:
+    using super_t = thrust::detail::tagged_allocator<T, System, Pointer>;
 
-public:
-  using pointer   = typename super_t::pointer;
-  using size_type = typename super_t::size_type;
+  public:
+    using pointer   = typename super_t::pointer;
+    using size_type = typename super_t::size_type;
 
-  pointer allocate(size_type cnt);
+    pointer allocate(size_type cnt);
 
-  void deallocate(pointer p, size_type n) noexcept;
+    void deallocate(pointer p, size_type n);
 };
 
-} // namespace detail
+} // end detail
 THRUST_NAMESPACE_END
 
 #include <thrust/detail/allocator/malloc_allocator.inl>
+

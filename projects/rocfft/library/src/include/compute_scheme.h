@@ -30,9 +30,7 @@ enum ComputeScheme
 {
     CS_NONE,
     CS_KERNEL_STOCKHAM,
-    CS_KERNEL_STOCKHAM_PP,
     CS_KERNEL_STOCKHAM_BLOCK_CC,
-    CS_KERNEL_STOCKHAM_PP_BLOCK_CC,
     CS_KERNEL_STOCKHAM_BLOCK_RC,
     CS_KERNEL_STOCKHAM_BLOCK_CR,
     CS_KERNEL_TRANSPOSE,
@@ -56,7 +54,6 @@ enum ComputeScheme
     CS_KERNEL_TRANSPOSE_CMPLX_TO_R,
     CS_REAL_2D_EVEN,
     CS_REAL_3D_EVEN,
-    CS_REAL_3D_PP,
 
     CS_BLUESTEIN,
     CS_KERNEL_CHIRP,
@@ -81,7 +78,6 @@ enum ComputeScheme
     CS_3D_BLOCK_RC,
     CS_3D_BLOCK_CR,
     CS_3D_RC,
-    CS_3D_PP,
     CS_KERNEL_3D_STOCKHAM_BLOCK_CC, // not implemented yet
     CS_KERNEL_3D_SINGLE // not implemented yet
 };

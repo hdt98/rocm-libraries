@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file uninitialized_copy.h
  *  \brief Copy construction into a range of uninitialized elements from a source range
  */
@@ -21,7 +22,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/execution_policy.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -29,6 +29,7 @@ THRUST_NAMESPACE_BEGIN
 /*! \addtogroup copying
  *  \{
  */
+
 
 /*! In \c thrust, the function \c thrust::device_new allocates memory for
  *  an object and then creates an object at that location by calling a constructor.
@@ -49,14 +50,12 @@ THRUST_NAMESPACE_BEGIN
  *  \return An iterator pointing to the last element of the output range.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>. \tparam ForwardIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>, \p ForwardIterator is
- * mutable, and \p ForwardIterator's \c value_type has a constructor that takes a single argument whose type is \p
- * InputIterator's \c value_type.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>.
+ *  \tparam ForwardIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>,
+ *          \p ForwardIterator is mutable, and \p ForwardIterator's \c value_type has a constructor that takes
+ *          a single argument whose type is \p InputIterator's \c value_type.
  *
- *  \pre \p first may equal \p result, but the range <tt>[first, last)</tt> and the range <tt>[result, result + (last -
- * first))</tt> shall not overlap otherwise.
+ *  \pre \p first may equal \p result, but the range <tt>[first, last)</tt> and the range <tt>[result, result + (last - first))</tt> shall not overlap otherwise.
  *
  *  The following code snippet demonstrates how to use \p uninitialized_copy to initialize
  *  a range of uninitialized memory using the \p thrust::device execution policy for
@@ -67,13 +66,13 @@ THRUST_NAMESPACE_BEGIN
  *  #include <thrust/device_malloc.h>
  *  #include <thrust/device_vector.h>
  *  #include <thrust/execution_policy.h>
- *
+ *  
  *  struct Int
  *  {
  *    THRUST_HOST_DEVICE
  *    Int(int x) : val(x) {}
  *    int val;
- *  };
+ *  };  
  *  ...
  *  const int N = 137;
  *
@@ -92,12 +91,13 @@ THRUST_NAMESPACE_BEGIN
  *  \see \c device_new
  *  \see \c device_malloc
  */
-template <typename DerivedPolicy, typename InputIterator, typename ForwardIterator>
-THRUST_HOST_DEVICE ForwardIterator uninitialized_copy(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  InputIterator first,
-  InputIterator last,
-  ForwardIterator result);
+template<typename DerivedPolicy, typename InputIterator, typename ForwardIterator>
+THRUST_HOST_DEVICE
+  ForwardIterator uninitialized_copy(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                                     InputIterator first,
+                                     InputIterator last,
+                                     ForwardIterator result);
+
 
 /*! In \c thrust, the function \c thrust::device_new allocates memory for
  *  an object and then creates an object at that location by calling a constructor.
@@ -114,14 +114,12 @@ THRUST_HOST_DEVICE ForwardIterator uninitialized_copy(
  *  \param result The first element of the output range to copy to.
  *  \return An iterator pointing to the last element of the output range.
  *
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>. \tparam ForwardIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>, \p ForwardIterator is
- * mutable, and \p ForwardIterator's \c value_type has a constructor that takes a single argument whose type is \p
- * InputIterator's \c value_type.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>.
+ *  \tparam ForwardIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>,
+ *          \p ForwardIterator is mutable, and \p ForwardIterator's \c value_type has a constructor that takes
+ *          a single argument whose type is \p InputIterator's \c value_type.
  *
- *  \pre \p first may equal \p result, but the range <tt>[first, last)</tt> and the range <tt>[result, result + (last -
- * first))</tt> shall not overlap otherwise.
+ *  \pre \p first may equal \p result, but the range <tt>[first, last)</tt> and the range <tt>[result, result + (last - first))</tt> shall not overlap otherwise.
  *
  *  The following code snippet demonstrates how to use \p uninitialized_copy to initialize
  *  a range of uninitialized memory.
@@ -130,13 +128,13 @@ THRUST_HOST_DEVICE ForwardIterator uninitialized_copy(
  *  #include <thrust/uninitialized_copy.h>
  *  #include <thrust/device_malloc.h>
  *  #include <thrust/device_vector.h>
- *
+ *  
  *  struct Int
  *  {
  *    THRUST_HOST_DEVICE
  *    Int(int x) : val(x) {}
  *    int val;
- *  };
+ *  };  
  *  ...
  *  const int N = 137;
  *
@@ -155,8 +153,11 @@ THRUST_HOST_DEVICE ForwardIterator uninitialized_copy(
  *  \see \c device_new
  *  \see \c device_malloc
  */
-template <typename InputIterator, typename ForwardIterator>
-ForwardIterator uninitialized_copy(InputIterator first, InputIterator last, ForwardIterator result);
+template<typename InputIterator, typename ForwardIterator>
+  ForwardIterator uninitialized_copy(InputIterator first,
+                                     InputIterator last,
+                                     ForwardIterator result);
+
 
 /*! In \c thrust, the function \c thrust::device_new allocates memory for
  *  an object and then creates an object at that location by calling a constructor.
@@ -177,14 +178,13 @@ ForwardIterator uninitialized_copy(InputIterator first, InputIterator last, Forw
  *  \return An iterator pointing to the last element of the output range.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>. \tparam Size is an integral type. \tparam ForwardIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>, \p ForwardIterator is
- * mutable, and \p ForwardIterator's \c value_type has a constructor that takes a single argument whose type is \p
- * InputIterator's \c value_type.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>.
+ *  \tparam Size is an integral type.
+ *  \tparam ForwardIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>,
+ *          \p ForwardIterator is mutable, and \p ForwardIterator's \c value_type has a constructor that takes
+ *          a single argument whose type is \p InputIterator's \c value_type.
  *
- *  \pre \p first may equal \p result, but the range <tt>[first, first + n)</tt> and the range <tt>[result, result +
- * n)</tt> shall not overlap otherwise.
+ *  \pre \p first may equal \p result, but the range <tt>[first, first + n)</tt> and the range <tt>[result, result + n)</tt> shall not overlap otherwise.
  *
  *  The following code snippet demonstrates how to use \p uninitialized_copy to initialize
  *  a range of uninitialized memory using the \p thrust::device execution policy for
@@ -195,13 +195,13 @@ ForwardIterator uninitialized_copy(InputIterator first, InputIterator last, Forw
  *  #include <thrust/device_malloc.h>
  *  #include <thrust/device_vector.h>
  *  #include <thrust/execution_policy.h>
- *
+ *  
  *  struct Int
  *  {
  *    THRUST_HOST_DEVICE
  *    Int(int x) : val(x) {}
  *    int val;
- *  };
+ *  };  
  *  ...
  *  const int N = 137;
  *
@@ -221,9 +221,13 @@ ForwardIterator uninitialized_copy(InputIterator first, InputIterator last, Forw
  *  \see \c device_new
  *  \see \c device_malloc
  */
-template <typename DerivedPolicy, typename InputIterator, typename Size, typename ForwardIterator>
-THRUST_HOST_DEVICE ForwardIterator uninitialized_copy_n(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec, InputIterator first, Size n, ForwardIterator result);
+template<typename DerivedPolicy, typename InputIterator, typename Size, typename ForwardIterator>
+THRUST_HOST_DEVICE
+  ForwardIterator uninitialized_copy_n(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                                       InputIterator first,
+                                       Size n,
+                                       ForwardIterator result);
+
 
 /*! In \c thrust, the function \c thrust::device_new allocates memory for
  *  an object and then creates an object at that location by calling a constructor.
@@ -240,14 +244,13 @@ THRUST_HOST_DEVICE ForwardIterator uninitialized_copy_n(
  *  \param result The first element of the output range to copy to.
  *  \return An iterator pointing to the last element of the output range.
  *
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>. \tparam Size is an integral type. \tparam ForwardIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>, \p ForwardIterator is
- * mutable, and \p ForwardIterator's \c value_type has a constructor that takes a single argument whose type is \p
- * InputIterator's \c value_type.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>.
+ *  \tparam Size is an integral type.
+ *  \tparam ForwardIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/forward_iterator">Forward Iterator</a>,
+ *          \p ForwardIterator is mutable, and \p ForwardIterator's \c value_type has a constructor that takes
+ *          a single argument whose type is \p InputIterator's \c value_type.
  *
- *  \pre \p first may equal \p result, but the range <tt>[first, first + n)</tt> and the range <tt>[result, result +
- * n)</tt> shall not overlap otherwise.
+ *  \pre \p first may equal \p result, but the range <tt>[first, first + n)</tt> and the range <tt>[result, result + n)</tt> shall not overlap otherwise.
  *
  *  The following code snippet demonstrates how to use \p uninitialized_copy to initialize
  *  a range of uninitialized memory.
@@ -256,13 +259,13 @@ THRUST_HOST_DEVICE ForwardIterator uninitialized_copy_n(
  *  #include <thrust/uninitialized_copy.h>
  *  #include <thrust/device_malloc.h>
  *  #include <thrust/device_vector.h>
- *
+ *  
  *  struct Int
  *  {
  *    THRUST_HOST_DEVICE
  *    Int(int x) : val(x) {}
  *    int val;
- *  };
+ *  };  
  *  ...
  *  const int N = 137;
  *
@@ -282,8 +285,11 @@ THRUST_HOST_DEVICE ForwardIterator uninitialized_copy_n(
  *  \see \c device_new
  *  \see \c device_malloc
  */
-template <typename InputIterator, typename Size, typename ForwardIterator>
-ForwardIterator uninitialized_copy_n(InputIterator first, Size n, ForwardIterator result);
+template<typename InputIterator, typename Size, typename ForwardIterator>
+  ForwardIterator uninitialized_copy_n(InputIterator first,
+                                       Size n,
+                                       ForwardIterator result);
+
 
 /*! \} // copying
  */

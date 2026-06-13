@@ -41,79 +41,85 @@ namespace test_utils_with_rocrand
 
 template<typename T, class StateT, typename U, typename V>
 inline __device__
-auto generate_casting(T* output, StateT& state, U min, V max, unsigned int global_id)
+auto generate_casting(T* output, StateT& state, U min, V max)
+    -> std::enable_if_t<rocprim::is_integral<T>::value>
 {
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    float f_value = (static_cast<float>(rocrand(&state)) / static_cast<float>(UINT_MAX))
+    output[tid]
+        = static_cast<T>((static_cast<float>(rocrand(&state)) / static_cast<float>((UINT_MAX)))
+                             * (static_cast<float>(max) - static_cast<float>(min))
+                         + static_cast<float>(min));
+}
+
+template<typename T, class StateT, typename U, typename V>
+inline __device__
+auto generate_casting(T* output, StateT& state, U min, V max)
+    -> std::enable_if_t<!rocprim::is_integral<T>::value>
+{
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    float f_value = (static_cast<float>(rocrand(&state)) / static_cast<float>((UINT_MAX)))
                         * (static_cast<float>(max) - static_cast<float>(min))
                     + static_cast<float>(min);
 
-    if constexpr(std::is_same<T, half>::value)
+    if ROCPRIM_IF_CONSTEXPR(std::is_same<T, half>::value)
     {
-        output[global_id] = static_cast<T>(__float2half_rn(f_value));
-    }
-    else if constexpr(common::is_custom_type_copyable<T>::value)
-    {
-        output[global_id].x = static_cast<typename T::first_type>(f_value);
-        output[global_id].y = static_cast<typename T::second_type>(f_value);
+        output[tid] = static_cast<T>(__float2half_rn(f_value));
     }
     else
     {
-        output[global_id] = static_cast<T>(f_value);
+        output[tid] = f_value;
     }
 }
 
 template<typename T, class StateT, typename U, typename V>
 __global__
-void generate_random_kernel(T*                       output,
-                            U                        min,
-                            V                        max,
-                            const unsigned long long size,
-                            const unsigned long long seed   = 0,
-                            const unsigned long long offset = 0)
+void generate_random_kernel(
+    T* output, U min, V max, const unsigned long long seed = 0, const unsigned long long offset = 0)
 {
-    const unsigned int flat_id = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int flat_id = ::rocprim::detail::block_thread_id<0>();
 
-    if(flat_id < size)
-    {
-        StateT             state;
-        const unsigned int subsequence = flat_id;
-        rocrand_init(seed, subsequence, offset, &state);
-        generate_casting(output, state, min, max, flat_id);
-    }
+    StateT             state;
+    const unsigned int subsequence = flat_id;
+    rocrand_init(seed, subsequence, offset, &state);
+
+    generate_casting(output, state, min, max);
 }
 
 template<class OutputIter, class U, class V>
 inline auto
-    generate_random_data_n(OutputIter& it, size_t size, U min, V max, unsigned long long seed_value)
+    generate_random_data_n(OutputIter it, size_t size, U min, V max, unsigned long long seed_value)
 {
-    if(size == 0)
-        return it.begin() + size;
 
-    using T = typename OutputIter::value_type;
+    if(size == 0)
+        return it;
+
+    using T = typename std::iterator_traits<OutputIter>::value_type;
 
     // Allocate device memory
     common::device_ptr<T> d_random_data(size);
 
     using state_t = rocrand_state_xorwow;
 
-    constexpr int threadsPerBlock = 512;
+    constexpr int threadsPerBlock = 1024;
     int           blocksPerGrid   = (size + threadsPerBlock - 1) / threadsPerBlock;
 
     generate_random_kernel<T, state_t, U, V>
-        <<<blocksPerGrid, threadsPerBlock>>>(d_random_data.get(), min, max, size, seed_value, 0);
+        <<<blocksPerGrid, threadsPerBlock>>>(d_random_data.get(), min, max, seed_value, 0);
     HIP_CHECK(hipGetLastError());
 
-    HIP_CHECK(hipMemcpy(it.data(), d_random_data.get(), size * sizeof(T), hipMemcpyDeviceToHost));
+    // Copy generated data from device to host memory
+    HIP_CHECK(hipMemcpy(&(*it), d_random_data.get(), size * sizeof(T), hipMemcpyDeviceToHost));
 
-    return it.begin() + size;
+    return it + size;
 }
 
 template<class T, class U, class V>
 std::vector<T> get_random_data(size_t size, U min, V max, unsigned long long seed_value)
 {
     std::vector<T> data(size);
-    generate_random_data_n(data, size, min, max, seed_value);
+    generate_random_data_n(data.begin(), size, min, max, seed_value);
     return data;
 }
 

@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -80,7 +80,7 @@ namespace
         return 0;
     }
 #endif
-
+    
     std::string rocsparselt_internal_get_so_path(const std::string& keyword)
     {
         std::pair<std::string, std::string> result{"", keyword};
@@ -117,42 +117,29 @@ namespace
     };
 
     /********************************************************************
-     * Variable template to map a rocsparselt type into a rocisa::DataType *
+     * Variable template to map a rocsparselt type into a TensileLite::DataType *
      ********************************************************************/
     template <typename>
     constexpr auto tensile_datatype = nullptr;
 
     // int8_t -> int8_t (supported for MI-kernel) / rocsparselt_int8x4 -> PackedInt8x4
     template <>
-    constexpr auto tensile_datatype<int8_t> = rocisa::DataType::Int8;
+    constexpr auto tensile_datatype<int8_t> = TensileLite::DataType::Int8;
 
     template <>
-    constexpr auto tensile_datatype<int32_t> = rocisa::DataType::Int32;    
+    constexpr auto tensile_datatype<__half> = TensileLite::DataType::Half;
 
     template <>
-    constexpr auto tensile_datatype<__half> = rocisa::DataType::Half;
+    constexpr auto tensile_datatype<hip_bfloat16> = TensileLite::DataType::BFloat16;
 
     template <>
-    constexpr auto tensile_datatype<hip_bfloat16> = rocisa::DataType::BFloat16;
+    constexpr auto tensile_datatype<float> = TensileLite::DataType::Float;
 
     template <>
-    constexpr auto tensile_datatype<float> = rocisa::DataType::Float;
-
-#if HIP_FP8_TYPE_OCP
-    template <>
-    constexpr auto tensile_datatype<__hip_fp8_e4m3> = rocisa::DataType::Float8;
+    constexpr auto tensile_datatype<__hip_fp8_e4m3> = TensileLite::DataType::Float8;
 
     template <>
-    constexpr auto tensile_datatype<__hip_fp8_e5m2> = rocisa::DataType::BFloat8;
-#endif
-
-#if HIP_FP8_TYPE_FNUZ
-    template <>
-    constexpr auto tensile_datatype<__hip_fp8_e4m3_fnuz> = rocisa::DataType::Float8_fnuz;
-
-    template <>
-    constexpr auto tensile_datatype<__hip_fp8_e5m2_fnuz> = rocisa::DataType::BFloat8_fnuz;
-#endif
+    constexpr auto tensile_datatype<__hip_fp8_e5m2> = TensileLite::DataType::BFloat8;
 
     /*************************************************************************
      * Class for converting alpha and beta between rocsparselt and Tensile types *
@@ -175,35 +162,25 @@ namespace
     /******************************************************
     * Map a rocsparselt data type to a corresponding Tensile type *
     ******************************************************/
-    inline rocisa::DataType hipDataType_to_tensile_type(hipDataType type)
+    inline TensileLite::DataType hipDataType_to_tensile_type(hipDataType type)
     {
         switch(type)
         {
         case HIP_R_16F:
-            return rocisa::DataType::Half;
+            return TensileLite::DataType::Half;
         case HIP_R_32F:
-            return rocisa::DataType::Float;
+            return TensileLite::DataType::Float;
         case HIP_R_16BF:
-            return rocisa::DataType::BFloat16;
+            return TensileLite::DataType::BFloat16;
         case HIP_R_8I:
-            return rocisa::DataType::Int8;
-        case HIP_R_32I:
-            return rocisa::DataType::Int32;            
-#if HIP_FP8_TYPE_OCP
+            return TensileLite::DataType::Int8;
         case HIP_R_8F_E4M3:
-            return rocisa::DataType::Float8;
+            return TensileLite::DataType::Float8;
         case HIP_R_8F_E5M2:
-            return rocisa::DataType::BFloat8;
-#endif
-#if HIP_FP8_TYPE_FNUZ
-        case HIP_R_8F_E4M3_FNUZ:
-            return rocisa::DataType::Float8_fnuz;
-        case HIP_R_8F_E5M2_FNUZ:
-            return rocisa::DataType::BFloat8_fnuz;
-#endif
+            return TensileLite::DataType::BFloat8;
         default:
             assert(!"hipblasltDatatype_to_tensile_type: non-supported type");
-            return rocisa::DataType::None;
+            return TensileLite::DataType::None;
         }
     }
 
@@ -216,9 +193,9 @@ namespace
                                  int                                              useScaleAlphaVec = 0)
     {
         // Tensile DataTypes corresponding to rocsparselt data types
-        static constexpr rocisa::DataType Tensile_Ti = tensile_datatype<Ti>;
-        static constexpr rocisa::DataType Tensile_To = tensile_datatype<To>;
-        static constexpr rocisa::DataType Tensile_Tc = tensile_datatype<Tc>;
+        static constexpr TensileLite::DataType Tensile_Ti = tensile_datatype<Ti>;
+        static constexpr TensileLite::DataType Tensile_To = tensile_datatype<To>;
+        static constexpr TensileLite::DataType Tensile_Tc = tensile_datatype<Tc>;
 
         // Tensor descriptors for a, b
         TensileLite::TensorDescriptor a, b;
@@ -312,7 +289,7 @@ namespace
         TensileLite::TensorDescriptor scaleAlphaVec{"scaleAlphaVec"};
 
         // The ContractionProblemGemm
-        TensileLite::ContractionProblemGemm tensileProblem(a,
+        TensileLite::ContractionProblemGemm tensileProblem{a,
                                                        b,
                                                        c,
                                                        d,
@@ -326,10 +303,9 @@ namespace
                                                        freeIndex,
                                                        batchIndex,
                                                        boundIndex,
-                                                       static_cast<double>(*prob.beta),
-                                                       prob.workspaceSize);
-        tensileProblem.setComputeInputTypeA(Tensile_Ti);
-        tensileProblem.setComputeInputTypeB(Tensile_Ti);
+                                                       *prob.beta,
+                                                       prob.workspaceSize};
+        tensileProblem.setComputeInputType(Tensile_Ti);
         tensileProblem.setAlphaType(Tensile_Tc);
         tensileProblem.setBetaType(Tensile_Tc);
 
@@ -359,8 +335,7 @@ namespace
         // Add problem predicates for CEqualsD
         tensileProblem.setCEqualsD(prob.C == prob.D);
 
-        // Workaround: metadata layout
-        tensileProblem.setSparse(prob.sparseA ? 1 : 2, 0);
+        tensileProblem.setSparse(prob.sparseA ? 1 : 2);
 
         // set Actvation
         tensileProblem.setActivationType(TensileLite::ActivationType::All);
@@ -456,8 +431,6 @@ namespace
         inputs.c = reinterpret_cast<const void*>(prob.C);
         inputs.d = reinterpret_cast<void*>(prob.D);
 
-        inputs.compressed = prob.sparseA ? inputs.a : inputs.b;
-
         inputs.batchA = reinterpret_cast<void const* const*>(prob.batch_A);
         inputs.batchB = reinterpret_cast<void const* const*>(prob.batch_B);
         inputs.batchC = reinterpret_cast<void const* const*>(prob.batch_C);
@@ -465,7 +438,6 @@ namespace
 
         // Set the GSU workspace
         inputs.ws = prob.workspace;
-        inputs.Synchronizer = prob.workspace;
 
         // set bias vector
         inputs.bias = reinterpret_cast<const void*>(prob.bias_vector);
@@ -503,13 +475,69 @@ namespace
         std::string deviceFullString(deviceProperties.gcnArchName);
         std::string deviceString = deviceFullString.substr(0, deviceFullString.find(":"));
 
-        if(deviceString.find("gfx942") != std::string::npos)
+        if(deviceString.find("gfx803") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx803;
+        }
+        else if(deviceString.find("gfx900") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx900;
+        }
+        else if(deviceString.find("gfx906") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx906;
+        }
+        else if(deviceString.find("gfx908") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx908;
+        }
+        else if(deviceString.find("gfx90a") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx90a;
+        }
+        else if(deviceString.find("gfx942") != std::string::npos)
         {
             return TensileLite::LazyLoadingInit::gfx942;
         }
         else if(deviceString.find("gfx950") != std::string::npos)
         {
             return TensileLite::LazyLoadingInit::gfx950;
+        }
+        else if(deviceString.find("gfx1010") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1010;
+        }
+        else if(deviceString.find("gfx1011") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1011;
+        }
+        else if(deviceString.find("gfx1012") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1012;
+        }
+        else if(deviceString.find("gfx1030") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1030;
+        }
+        else if(deviceString.find("gfx1100") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1100;
+        }
+        else if(deviceString.find("gfx1101") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1101;
+        }
+        else if(deviceString.find("gfx1102") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1102;
+        }
+        else if(deviceString.find("gfx1200") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1200;
+        }
+        else if(deviceString.find("gfx1201") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1201;
         }
         return TensileLite::LazyLoadingInit::None;
     }
@@ -628,13 +656,10 @@ namespace
 #endif // ifndef HIPSPARSELT_STATIC_LIB
 
                 // Find the location of the libraries
-                // The first path below is for new build system where `hipblaslt` is added as a subdirectory
-                if(TestPath(path + "/../hipblaslt/Tensile/library"))
-                    path += "/../hipblaslt/Tensile/library";
-                else if(TestPath(path + "/../Tensile/library"))
+                if(TestPath(path + "/../Tensile/library"))
                     path += "/../Tensile/library";
                 else if(TestPath(path + "../hipsparselt/library"))
-                    path += "/../hipsparselt/library";
+                    path += "../hipsparselt/library";
                 else
                     path += "/hipsparselt/library";
 
@@ -757,12 +782,6 @@ namespace
                 {
                     using MSL = TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>;
                     m_library = std::dynamic_pointer_cast<MSL>(lib);
-                    if(!m_library->initLibraryMapping(tensileLibPath))
-                    {
-                        std::cerr << "\nrocblaslt error: Could not initialize Tensile library "
-                                     "mapping"
-                                  << std::endl;
-                    }
                 }
                 return 0;
             }();
@@ -885,7 +904,7 @@ rocsparselt_status runContractionProblem(const RocsparseltContractionProblem<Ti,
 
         auto& adapter = get_library_and_adapter(&library, &deviceProp, prob.handle->device);
 
-        hardware = TensileLite::hip::GetDevice(prob.handle->device);
+        hardware = TensileLite::hip::GetDevice(*deviceProp);
 
         if(!config_max_id || configs == nullptr)
         {
@@ -902,11 +921,11 @@ rocsparselt_status runContractionProblem(const RocsparseltContractionProblem<Ti,
 
             if(!search_iterations)
             {
-                if(configs[*config_id].max_workspace_bytes + configs[*config_id].synchronizer_bytes > prob.workspaceSize
-                   || (configs[*config_id].max_workspace_bytes + configs[*config_id].synchronizer_bytes > 0 && prob.workspace == nullptr))
+                if(configs[*config_id].max_workspace_bytes > prob.workspaceSize
+                   || (configs[*config_id].max_workspace_bytes > 0 && prob.workspace == nullptr))
                 {
                     hipsparselt_cerr << "config " << *config_id << " need extra workspace "
-                                     << configs[*config_id].max_workspace_bytes << " bytes."
+                                     << configs[*config_id].max_workspace_bytes << " bytes - skip."
                                      << std::endl;
                     return rocsparselt_status_internal_error;
                 }
@@ -919,7 +938,7 @@ rocsparselt_status runContractionProblem(const RocsparseltContractionProblem<Ti,
                                      << " does not exists - skip" << std::endl;
                     return rocsparselt_status_not_implemented;
                 }
-                tensile_inputs.ws = (uint8_t*) tensile_inputs.Synchronizer + configs[*config_id].synchronizer_bytes;
+
                 RETURN_IF_HIP_ERROR(
                     adapter.launchKernels(solution->solve(tensile_prob, tensile_inputs, *hardware),
                                           prob.streams[0],
@@ -935,8 +954,8 @@ rocsparselt_status runContractionProblem(const RocsparseltContractionProblem<Ti,
                 RETURN_IF_HIP_ERROR(hipEventCreate(&stopEvent));
                 for(int id = 0; id < config_max_id; id++)
                 {
-                    if(configs[id].max_workspace_bytes + configs[id].synchronizer_bytes > prob.workspaceSize
-                       || (configs[id].max_workspace_bytes + configs[id].synchronizer_bytes> 0 && prob.workspace == nullptr))
+                    if(configs[id].max_workspace_bytes > prob.workspaceSize
+                       || (configs[id].max_workspace_bytes > 0 && prob.workspace == nullptr))
                     {
                         hipsparselt_cerr << "config " << id << " need extra workspace "
                                          << configs[id].max_workspace_bytes << " bytes - skip."
@@ -952,7 +971,7 @@ rocsparselt_status runContractionProblem(const RocsparseltContractionProblem<Ti,
                                          << std::endl;
                         continue;
                     }
-                    tensile_inputs.ws = (uint8_t*) tensile_inputs.Synchronizer + configs[id].synchronizer_bytes;
+
                     //warm up
                     RETURN_IF_HIP_ERROR(adapter.launchKernels(
                         solution->solve(tensile_prob, tensile_inputs, *hardware),
@@ -1027,9 +1046,8 @@ rocsparselt_status getBestSolutions(const RocsparseltContractionProblem<Ti, To, 
         return rocsparselt_status_invalid_pointer;
     }
 
-    hardware          = TensileLite::hip::GetDevice(prob.handle->device);
+    hardware          = TensileLite::hip::GetDevice(*deviceProp);
     auto tensile_prob = ConstructTensileProblem(prob);
-
     // auto handle = prob.handle;
     auto solutions = library->findTopSolutions(tensile_prob, *hardware, requestConfigs);
 
@@ -1079,7 +1097,6 @@ rocsparselt_status getBestSolutions(const RocsparseltContractionProblem<Ti, To, 
         configs[i].max_workspace_bytes = solution->requiredWorkspaceSize(tensile_prob, *hardware);
         configs[i].use_bias            = tensile_prob.useBias();
         configs[i].use_scale_alpha_vec = tensile_prob.useScaleAlphaVec();
-        configs[i].synchronizer_bytes  = std::ceil(solution->requiredSynchronizerSize(tensile_prob, *hardware) ? 16 * 409600 * sizeof(int) : 0);
     }
     return rocsparselt_status_success;
 }
@@ -1122,14 +1139,7 @@ GENERATE_DEFINITIONS(hip_bfloat16, hip_bfloat16, float)
 GENERATE_DEFINITIONS(int8_t, int8_t, float)
 GENERATE_DEFINITIONS(int8_t, __half, float)
 GENERATE_DEFINITIONS(int8_t, hip_bfloat16, float)
-GENERATE_DEFINITIONS(int8_t, int32_t, float)
-#if HIP_FP8_TYPE_OCP
 GENERATE_DEFINITIONS(__hip_fp8_e4m3, float, float)
 GENERATE_DEFINITIONS(__hip_fp8_e5m2, float, float)
-#endif
-#if HIP_FP8_TYPE_FNUZ
-GENERATE_DEFINITIONS(__hip_fp8_e4m3_fnuz, float, float)
-GENERATE_DEFINITIONS(__hip_fp8_e5m2_fnuz, float, float)
-#endif
 
 #undef GENERATE_DEFINITIONS

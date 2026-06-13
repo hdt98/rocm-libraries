@@ -1,16 +1,16 @@
 .. meta::
   :description: rocSPARSE bitwise reproducibility API reference library documentation
-  :keywords: rocSPARSE, ROCm, API, documentation, bitwise reproducibility
+  :keywords: rocSPARSE, ROCm, API, documentation
 
 .. _reproducibility:
 
 Bitwise reproducibility
 =======================
 
-Some routines do not produce deterministic results from run to run. This is typically the case when HIP atomics are used.
-This page catalogues the run-to-run reproducibility of each routine.
+Some routines do not produce deterministic results from run to run. Typically this is the case when HIP atomics are used.
+This page catalogues the run to run reproducibility of each routine.
 
-Sparse level 1 functions
+Sparse Level 1 Functions
 ------------------------
 
 ================================================= === ==
@@ -25,12 +25,15 @@ Function name                                     yes no
 :cpp:func:`rocsparse_Xsctr() <rocsparse_ssctr>`   x
 ================================================= === ==
 
-Sparse level 2 functions
+Sparse Level 2 Functions
 ------------------------
 
 ============================================================================= === ==
 Function name                                                                 yes no
 ============================================================================= === ==
+:cpp:func:`rocsparse_Xbsrmv_ex_analysis() <rocsparse_sbsrmv_ex_analysis>`     x
+:cpp:func:`rocsparse_bsrmv_ex_clear`                                          x
+:cpp:func:`rocsparse_Xbsrmv_ex() <rocsparse_sbsrmv_ex>`                       x
 :cpp:func:`rocsparse_Xbsrmv_analysis() <rocsparse_sbsrmv_analysis>`           x
 :cpp:func:`rocsparse_bsrmv_clear`                                             x
 :cpp:func:`rocsparse_Xbsrmv() <rocsparse_sbsrmv>`                             x
@@ -57,17 +60,20 @@ Function name                                                                 ye
 :cpp:func:`rocsparse_Xgemvi() <rocsparse_sgemvi>`                             x
 ============================================================================= === ==
 
-The reproducibility of :cpp:func:`rocsparse_Xbsrmv() <rocsparse_sbsrmv>`, :cpp:func:`rocsparse_Xbsrxmv() <rocsparse_sbsrxmv>`,
+The reproducibility of :cpp:func:`rocsparse_Xbsrmv_ex() <rocsparse_sbsrmv_ex>`,
+:cpp:func:`rocsparse_Xbsrmv() <rocsparse_sbsrmv>`, :cpp:func:`rocsparse_Xbsrxmv() <rocsparse_sbsrxmv>`,
 :cpp:func:`rocsparse_Xcoomv() <rocsparse_scoomv>`, :cpp:func:`rocsparse_Xcsrmv() <rocsparse_scsrmv>`,
 :cpp:func:`rocsparse_Xellmv() <rocsparse_sellmv>`, :cpp:func:`rocsparse_Xhybmv() <rocsparse_shybmv>`,
-and :cpp:func:`rocsparse_Xgebsrmv() <rocsparse_sgebsrmv>` is more complicated, depending on whether A
-is transposed or not. See the chart below to determine whether these routines are deterministic.
+and :cpp:func:`rocsparse_Xgebsrmv() <rocsparse_sgebsrmv>` is more complicated depending on whether A
+is transposed or not. See the below chart to determine whether these routines are deterministic.
 
 +-----------------------------------------------+-----------------+-----------------+
 |                                               | A non-transpose | A transpose     |
 |    Routine                                    +--------+--------+--------+--------+
 |                                               |  Yes   |   No   |  Yes   |   No   |
 +===============================================+========+========+========+========+
+| rocsparse_Xbsrmv_ex                           |   x    |        |  N/A   |  N/A   |
++-----------------------------------------------+--------+--------+--------+--------+
 | rocsparse_Xbsrmv                              |   x    |        |  N/A   |  N/A   |
 +-----------------------------------------------+--------+--------+--------+--------+
 | rocsparse_Xbsrxmv                             |   x    |        |  N/A   |  N/A   |
@@ -85,7 +91,7 @@ is transposed or not. See the chart below to determine whether these routines ar
 | rocsparse_Xgebsrmv                            |   x    |        |  N/A   |  N/A   |
 +-----------------------------------------------+--------+--------+--------+--------+
 
-Sparse level 3 functions
+Sparse Level 3 Functions
 ------------------------
 
 ========================================================================= === ==
@@ -106,8 +112,8 @@ Function name                                                             yes no
 
 The reproducibility of :cpp:func:`rocsparse_Xbsrmm() <rocsparse_sbsrmm>`,
 :cpp:func:`rocsparse_Xgebsrmm() <rocsparse_sgebsrmm>`, and
-:cpp:func:`rocsparse_Xcsrmm() <rocsparse_scsrmm>` is more complicated, depending on
-whether A is transposed or not. See the chart below to determine whether these routines
+:cpp:func:`rocsparse_Xcsrmm() <rocsparse_scsrmm>` is more complicated depending on
+whether A is transposed or not. See the below chart to determine whether these routines
 are deterministic.
 
 +-----------------------------------------------+-----------------+-----------------+
@@ -122,7 +128,7 @@ are deterministic.
 | rocsparse_Xcsrmm                              |   x    |        |        |   x    |
 +-----------------------------------------------+--------+--------+--------+--------+
 
-Sparse extra functions
+Sparse Extra Functions
 ----------------------
 
 ============================================================================= === ==
@@ -142,7 +148,7 @@ Function name                                                                 ye
 :cpp:func:`rocsparse_Xcsrgemm_numeric() <rocsparse_scsrgemm_numeric>`             x
 ============================================================================= === ==
 
-Preconditioner functions
+Preconditioner Functions
 ------------------------
 
 ===================================================================================================================== === ==
@@ -188,7 +194,7 @@ Function name                                                                   
 ===================================================================================================================== === ==
 
 
-Conversion functions
+Conversion Functions
 --------------------
 
 ========================================================================================================================= === ==
@@ -250,7 +256,7 @@ Function name                                                                   
 :cpp:func:`rocsparse_Xbsrpad_value() <rocsparse_sbsrpad_value>`                                                           x
 ========================================================================================================================= === ==
 
-Reordering functions
+Reordering Functions
 --------------------
 
 ======================================================= === ==
@@ -259,7 +265,7 @@ Function name                                           yes no
 :cpp:func:`rocsparse_Xcsrcolor() <rocsparse_scsrcolor>` x
 ======================================================= === ==
 
-Utility functions
+Utility Functions
 -----------------
 
 =================================================================================================== === ==
@@ -281,7 +287,7 @@ Function name                                                                   
 :cpp:func:`rocsparse_check_matrix_hyb() <rocsparse_check_matrix_hyb>`                               x
 =================================================================================================== === ==
 
-Sparse generic functions
+Sparse Generic Functions
 ------------------------
 
 ==================================================== === ==
@@ -296,16 +302,7 @@ Function name                                        yes no
 :cpp:func:`rocsparse_dense_to_sparse()`              x
 :cpp:func:`rocsparse_spsv()`                             x
 :cpp:func:`rocsparse_spsm()`                             x
-:cpp:func:`rocsparse_sptrsv_buffer_size()`           x
-:cpp:func:`rocsparse_sptrsv()`                           x
-:cpp:func:`rocsparse_sptrsm_buffer_size()`           x
-:cpp:func:`rocsparse_sptrsm()`                           x
-:cpp:func:`rocsparse_spic0_buffer_size()`            x
-:cpp:func:`rocsparse_spic0()`                            x
-:cpp:func:`rocsparse_spilu0_buffer_size()`           x
-:cpp:func:`rocsparse_spilu0()`                           x
 :cpp:func:`rocsparse_spgemm()`                           x
-:cpp:func:`rocsparse_v2_spmv_buffer_size()`          x
 :cpp:func:`rocsparse_spgeam_buffer_size()`           x
 :cpp:func:`rocsparse_spgeam()`                       x
 :cpp:func:`rocsparse_sddmm_buffer_size()`            x
@@ -317,12 +314,12 @@ Function name                                        yes no
 :cpp:func:`rocsparse_extract()`                      x
 ==================================================== === ==
 
-The reproducibility of :cpp:func:`rocsparse_spmv()` and :cpp:func:`rocsparse_v2_spmv()` is more complicated because these generic routines
-support multiple sparse matrix formats and algorithms. See the chart below to determine whether
+The reproducibility of :cpp:func:`rocsparse_spmv()` is more complicated because this generic routine
+supports multiple sparse matrix formats and algorithms. See the below chart to determine whether
 a given algorithm is deterministic.
 
 +-----------------------------------------------------------------------------------+
-|                        Bit-wise reproducibility of SpMV/v2_SpMV                   |
+|                        Bit-wise reproducibility of SpMV                           |
 +-----------------------------------------------+-----------------+-----------------+
 |                                               | A non-transpose | A transpose     |
 |            Algorithm                          +--------+--------+--------+--------+
@@ -352,11 +349,9 @@ a given algorithm is deterministic.
 +-----------------------------------------------+--------+--------+--------+--------+
 | rocsparse_spmv_alg_bsr                        |   x    |        |  N/A   |  N/A   |
 +-----------------------------------------------+--------+--------+--------+--------+
-| rocsparse_spmv_alg_sell                       |   x    |        |  N/A   |  N/A   |
-+-----------------------------------------------+--------+--------+--------+--------+
 
 The reproducibility of :cpp:func:`rocsparse_spmm()` is more complicated because this generic routine
-supports multiple sparse matrix formats and algorithms. See the chart below to determine whether
+supports multiple sparse matrix formats and algorithms. See the below chart to determine whether
 a given algorithm is deterministic.
 
 +-----------------------------------------------------------------------------------+

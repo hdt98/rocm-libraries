@@ -1,5 +1,28 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 
 #include "test.hpp"
 #include "driver.hpp"
@@ -13,13 +36,15 @@
 #include <miopen/temp_file.hpp>
 #include <miopen/filesystem.hpp>
 
+#include <boost/optional.hpp>
+#include <boost/thread.hpp>
+
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <mutex>
-#include <optional>
 #include <random>
-#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -32,13 +57,13 @@ static fs::path& exe_path()
     static fs::path exe_path;
     return exe_path;
 }
-static std::optional<fs::path>& thread_logs_root()
+static boost::optional<fs::path>& thread_logs_root()
 {
     // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock(mutex);
     // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
-    static std::optional<fs::path> path{std::nullopt};
+    static boost::optional<fs::path> path(boost::none);
     return path;
 }
 
@@ -293,7 +318,7 @@ protected:
                                     const std::array<std::pair<std::string, TValue>, count> values,
                                     TDb db)
     {
-        auto record = db.FindRecord(key);
+        boost::optional<DbRecord> record = db.FindRecord(key);
 
         EXPECT(record);
 
@@ -817,7 +842,7 @@ public:
         std::cout << "Launching test processes..." << std::endl;
         {
             auto& file_lock = LockFile::Get(lock_file_path.c_str());
-            std::shared_lock<LockFile> lock(file_lock);
+            boost::shared_lock<LockFile> lock(file_lock);
 
             auto id = 0;
 
@@ -894,7 +919,7 @@ public:
         std::cout << "Launching test processes..." << std::endl;
         {
             auto& file_lock = LockFile::Get(lock_file_path.c_str());
-            std::shared_lock<LockFile> lock(file_lock);
+            boost::shared_lock<LockFile> lock(file_lock);
 
             auto id = 0;
 

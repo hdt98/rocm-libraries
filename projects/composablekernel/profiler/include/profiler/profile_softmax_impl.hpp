@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -53,8 +53,7 @@ bool profile_softmax_impl(int do_verification,
                           std::vector<index_t> in_strides,
                           std::vector<index_t> reduce_dims,
                           double alpha,
-                          double beta,
-                          index_t instance_index = -1)
+                          double beta)
 {
     if(Rank != in_length.size())
     {
@@ -104,12 +103,12 @@ bool profile_softmax_impl(int do_verification,
     // add device softmax instances
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     using DeviceOp    = tensor_operation::device::DeviceSoftmax<InDataType,
-                                                                AccDataType,
-                                                                OutDataType,
-                                                                PassThrough,
-                                                                PassThrough,
-                                                                Rank,
-                                                                NumReduceDim>;
+                                                             AccDataType,
+                                                             OutDataType,
+                                                             PassThrough,
+                                                             PassThrough,
+                                                             Rank,
+                                                             NumReduceDim>;
 
     // get device op instances
     const auto instances = tensor_operation::device::instance::DeviceOperationInstanceFactory<
@@ -125,14 +124,9 @@ bool profile_softmax_impl(int do_verification,
     float best_avg_time   = std::numeric_limits<float>::max();
     float best_gb_per_sec = 0;
     std::vector<bool> instance_pass;
-    for(size_t i = 0; i < instances.size(); i++)
+
+    for(auto& inst_ptr : instances)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& inst_ptr    = instances[i];
         auto argument_ptr = inst_ptr->MakeArgumentPointer(in_tensor_lengths,
                                                           in_tensor_strides,
                                                           reduce_dims,
@@ -147,7 +141,8 @@ bool profile_softmax_impl(int do_verification,
         {
             std::cout << inst_ptr->GetTypeString() << " skipped due to unsupported argument: ";
             LogRange(std::cout << "input lengths = [", in_length, ", ")
-                << "], " << "scaler = [" << alpha << ", " << beta << "]";
+                << "], "
+                << "scaler = [" << alpha << ", " << beta << "]";
             LogRange(std::cout << ", reduce dims = [", reduce_dims, ", ") << "]." << std::endl;
             instance_pass.push_back(true);
             continue;
@@ -207,7 +202,8 @@ bool profile_softmax_impl(int do_verification,
             {
                 std::cout << inst_ptr->GetTypeString() << " failed verification: ";
                 LogRange(std::cout << "input lengths = [", in_length, ", ")
-                    << "], " << "scaler = [" << alpha << ", " << beta << "]." << std::endl;
+                    << "], "
+                    << "scaler = [" << alpha << ", " << beta << "]." << std::endl;
             }
             instance_pass.push_back(pass);
         }
@@ -219,10 +215,10 @@ bool profile_softmax_impl(int do_verification,
         LogRange(std::cout << "length = ", in_tensor_lengths, ",") << ", ";
         LogRange(std::cout << "stride = ", in_tensor_strides, ",") << ", ";
         LogRange(std::cout << "reduce dims ", reduce_dims, ",") << ", ";
-        std::cout << "alpha = " << alpha << ", " << "beta = " << beta << ", " << best_avg_time
-                  << " ms, " << best_gb_per_sec << " GB/s, " << best_instance_name << std::endl;
+        std::cout << "alpha = " << alpha << ", "
+                  << "beta = " << beta << ", " << best_avg_time << " ms, " << best_gb_per_sec
+                  << " GB/s, " << best_instance_name << std::endl;
     }
-
     return std::all_of(
         std::begin(instance_pass), std::end(instance_pass), [](bool p) { return p; });
 }

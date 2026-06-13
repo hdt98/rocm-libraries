@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -32,21 +32,11 @@ endfunction()
 function(add_rocprim_test TEST_NAME TEST_SOURCES)
   get_rocprim_test_target(${TEST_SOURCES} TEST_TARGET)
   add_rocprim_test_internal(${TEST_NAME} "${TEST_SOURCES}" ${TEST_TARGET})
-  # Re-propagate DLLS_COPIED_2 from add_rocprim_test_internal's scope to our
-  # caller (file scope). PARENT_SCOPE only propagates one level, so without
-  # this relay the guard resets on every call and each test target gets
-  # duplicate POST_BUILD copy commands that race on parallel builds.
-  if(DEFINED DLLS_COPIED_2)
-    set(DLLS_COPIED_2 "${DLLS_COPIED_2}" PARENT_SCOPE)
-  endif()
   if(WITH_ROCRAND)
     find_package(rocrand REQUIRED)
-    target_link_libraries(${TEST_TARGET} PRIVATE roc::rocrand)
+    target_link_libraries(${TEST_TARGET} PRIVATE roc::rocrand) 
     target_compile_definitions(${TEST_TARGET} PRIVATE WITH_ROCRAND)
-  endif()
-  if(BUILD_CODE_COVERAGE)
-    target_compile_definitions(${TEST_TARGET} PRIVATE CODE_COVERAGE)
-  endif()
+  endif() 
 endfunction()
 
 function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
@@ -63,15 +53,9 @@ function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
       $<BUILD_INTERFACE:${COMMON_TEST_HEADER_DIRECTORY}>
   )
 
-  if(USE_SYSTEM_LIB)
-    target_link_libraries(${TEST_TARGET} PRIVATE roc::rocprim)
-    # We need this include to allow tests to find the common utilities folder
-    target_include_directories(${TEST_TARGET} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
-  else()
-    target_link_libraries(${TEST_TARGET} PRIVATE rocprim)
-  endif()
   target_link_libraries(${TEST_TARGET}
     PRIVATE
+      rocprim
       GTest::GTest
       GTest::Main
   )
@@ -95,13 +79,6 @@ function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
       $<$<COMPILE_LANGUAGE:HIP>:$<$<HIP_COMPILER_ID:MSVC>:/bigobj>>
   )
 
-  function(add_rocprim_test_disable_dpp TEST_NAME TEST_SOURCES)
-    get_rocprim_test_target(${TEST_SOURCES} TEST_TARGET)
-    set(TEST_TARGET "${TEST_TARGET}_disable_dpp")
-    add_rocprim_test_internal("${TEST_NAME}_disable_dpp" "${TEST_SOURCES}" ${TEST_TARGET})
-    target_compile_definitions(${TEST_TARGET} PRIVATE ROCPRIM_DISABLE_DPP=1)
-  endfunction()
-
   if(WIN32)
     # Usage of 128-bit integral types (__int128_t and __uint128_t, whose alignment is 16 bytes)
     # requires an extended alignment support. Otherwise, a static assert will be triggered in
@@ -115,7 +92,7 @@ function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
   )
   if(AMDGPU_TEST_TARGETS)
     foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
-      add_relative_test("${AMDGPU_TARGET}-${TEST_NAME}" ${TEST_TARGET} ${AMDGPU_TARGET})
+      add_relative_test("${AMDGPU_TARGET}-${TEST_NAME}" ${TEST_TARGET})
       set_tests_properties("${AMDGPU_TARGET}-${TEST_NAME}"
           PROPERTIES
               RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
@@ -123,10 +100,9 @@ function(add_rocprim_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
       )
     endforeach()
   else()
-      add_relative_test(${TEST_NAME} ${TEST_TARGET} ${DEFAULT_GPU_RESOURCE})
+      add_relative_test(${TEST_NAME} ${TEST_TARGET})
       set_tests_properties(${TEST_NAME}
           PROPERTIES
-              RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
               LABELS "hip"
       )
   endif()
@@ -267,6 +243,10 @@ function(add_rocprim_cpp_standard_test STANDARD EXTENSIONS TARGET_SUFFIX TEST_NA
   endif()
 endfunction()
 
+function(add_rocprim_cpp17_test TEST_NAME TEST_SOURCES)
+  add_rocprim_cpp_standard_test(17 OFF "" ${TEST_NAME} ${TEST_SOURCES})
+endfunction()
+
 # ****************************************************************************
 # Tests
 # ****************************************************************************
@@ -284,7 +264,6 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_rocprim_test_parallel("rocprim.block_adjacent_difference" test_block_adjacent_difference.cpp.in)
   add_rocprim_test_parallel("rocprim.block_discontinuity" test_block_discontinuity.cpp.in)
 endif()
-add_rocprim_test("rocprim.bit_cast" test_bit_cast.cpp)
 add_rocprim_test("rocprim.block_exchange" test_block_exchange.cpp)
 add_rocprim_test("rocprim.block_histogram" test_block_histogram.cpp)
 add_rocprim_test("rocprim.block_load_store" test_block_load_store.cpp)
@@ -298,7 +277,6 @@ add_rocprim_test_parallel("rocprim.block_scan" test_block_scan.cpp.in)
 add_rocprim_test("rocprim.block_shuffle" test_block_shuffle.cpp)
 add_rocprim_test("rocprim.block_sort_bitonic" test_block_sort_bitonic.cpp)
 add_rocprim_test("rocprim.config_dispatch" test_config_dispatch.cpp)
-add_rocprim_test("rocprim.config_types" test_config_types.cpp)
 add_rocprim_test("rocprim.constant_iterator" test_constant_iterator.cpp)
 add_rocprim_test("rocprim.counting_iterator" test_counting_iterator.cpp)
 add_rocprim_test("rocprim.device_batch_memcpy" test_device_batch_memcpy.cpp)
@@ -311,14 +289,13 @@ add_rocprim_test("rocprim.device_histogram" test_device_histogram.cpp)
 add_rocprim_test("rocprim.device_merge" test_device_merge.cpp)
 add_rocprim_test("rocprim.device_merge_inplace" test_device_merge_inplace.cpp)
 add_rocprim_test("rocprim.device_merge_sort" test_device_merge_sort.cpp)
-add_rocprim_test("rocprim.nth_element" test_device_nth_element.cpp)
-add_rocprim_test("rocprim.device_partial_sort" test_device_partial_sort.cpp)
+add_rocprim_cpp17_test("rocprim.nth_element" test_device_nth_element.cpp)
+add_rocprim_cpp17_test("rocprim.device_partial_sort" test_device_partial_sort.cpp)
 add_rocprim_test("rocprim.device_partition" test_device_partition.cpp)
 add_rocprim_test_parallel("rocprim.device_radix_sort" test_device_radix_sort.cpp.in)
 add_rocprim_test("rocprim.device_reduce_by_key" test_device_reduce_by_key.cpp)
 add_rocprim_test("rocprim.device_reduce" test_device_reduce.cpp)
 add_rocprim_test("rocprim.device_run_length_encode" test_device_run_length_encode.cpp)
-add_rocprim_test("rocprim.device_scan_by_key" test_device_scan_by_key.cpp)
 add_rocprim_test("rocprim.device_scan" test_device_scan.cpp)
 add_rocprim_test("rocprim.device_search" test_device_search.cpp)
 add_rocprim_test_parallel("rocprim.device_segmented_radix_sort" test_device_segmented_radix_sort.cpp.in)
@@ -332,34 +309,28 @@ add_rocprim_test("rocprim.lookback_reproducibility" test_lookback_reproducibilit
 add_rocprim_test("rocprim.radix_key_codec" test_radix_key_codec.cpp)
 add_rocprim_test("rocprim.predicate_iterator" test_predicate_iterator.cpp)
 add_rocprim_test("rocprim.reverse_iterator" test_reverse_iterator.cpp)
-add_rocprim_test("rocprim.rocprim_tuple" test_rocprim_tuple.cpp)
-add_rocprim_test("rocprim.rocprim_types" test_rocprim_types.cpp)
 add_rocprim_test("rocprim.texture_cache_iterator" test_texture_cache_iterator.cpp)
 add_rocprim_test("rocprim.thread" test_thread.cpp)
 add_rocprim_test("rocprim.thread_algos" test_thread_algos.cpp)
-add_rocprim_test("rocprim.tuple" test_tuple.cpp)
 add_rocprim_test("rocprim.utils_sort_checker" test_utils_sort_checker.cpp)
 add_rocprim_test("rocprim.transform_iterator" test_transform_iterator.cpp)
+# add_rocprim_cpp_standard_test(14 OFF "_cpp14" "rocprim.type_traits_interface" test_type_traits_interface.cpp)
+# add_rocprim_cpp_standard_test(14 ON "_gnupp14" "rocprim.type_traits_interface" test_type_traits_interface.cpp)
 add_rocprim_cpp_standard_test(17 OFF "_cpp17" "rocprim.type_traits_interface" test_type_traits_interface.cpp)
 add_rocprim_cpp_standard_test(17 ON "_gnupp17" "rocprim.type_traits_interface" test_type_traits_interface.cpp)
 add_rocprim_cpp_standard_test(20 OFF "_cpp20" "rocprim.type_traits_interface" test_type_traits_interface.cpp)
 add_rocprim_cpp_standard_test(20 ON "_gnupp20" "rocprim.type_traits_interface" test_type_traits_interface.cpp)
 add_rocprim_test("rocprim.no_half_operators" test_no_half_operators.cpp)
 add_rocprim_test("rocprim.intrinsics" test_intrinsics.cpp)
-# Tests internal function, 128-bit atomic that currently is not yet supported with SPIR-V.
-if(NOT "amdgcnspirv" IN_LIST GPU_TARGETS)
 add_rocprim_test("rocprim.intrinsics_atomic" test_intrinsics_atomic.cpp)
-endif()
 add_rocprim_test("rocprim.invoke_result" test_invoke_result.cpp)
 add_rocprim_test("rocprim.warp_exchange" test_warp_exchange.cpp)
 add_rocprim_test("rocprim.warp_load" test_warp_load.cpp)
 add_rocprim_test("rocprim.warp_reduce" test_warp_reduce.cpp)
 add_rocprim_test("rocprim.warp_scan" test_warp_scan.cpp)
-add_rocprim_test_disable_dpp("rocprim.warp_scan_disable_dpp" test_warp_scan.cpp)
 add_rocprim_test("rocprim.warp_sort" test_warp_sort.cpp)
 add_rocprim_test("rocprim.warp_store" test_warp_store.cpp)
 add_rocprim_test("rocprim.zip_iterator" test_zip_iterator.cpp)
-add_rocprim_test("rocprim.accumulator_t" test_accumulator_t.cpp)
 
 if(NOT WIN32)
   # Linking tests check if all external rocPRIM symbols are in the inline namespace, kernel are not
@@ -430,9 +401,6 @@ if(NOT WIN32)
   #  * there are symbols in the rocprim namespace but not in the inline namespace with the
   #    corresponding rocPRIM version;
   #  * any kernels are visible (usually they have "kernel" in their names).
-
-  # The current compiler ignores `__attribute__((__visibility__("hidden")))` for executables,
-  # but not for libraries, so we remove the `|kernel` from the regex in rocprim.linking_symbols.
   string(REPLACE ";" " " NM_ARGS_STR "${NM_ARGS}")
   add_test(
     NAME "rocprim.linking_lib1_symbols"
@@ -444,7 +412,7 @@ if(NOT WIN32)
   )
   add_test(
     NAME "rocprim.linking_symbols"
-    COMMAND sh -c "${CMAKE_NM} ${NM_ARGS_STR} $<TARGET_FILE:test_linking> | grep -c -P \"(rocprim::(?!ROCPRIM_${rocprim_VERSION_NUMBER}_NS))\""
+    COMMAND sh -c "${CMAKE_NM} ${NM_ARGS_STR} $<TARGET_FILE:test_linking> | grep -c -P \"(rocprim::(?!ROCPRIM_${rocprim_VERSION_NUMBER}_NS))|kernel\""
   )
   set_tests_properties(
     "rocprim.linking_lib1_symbols"

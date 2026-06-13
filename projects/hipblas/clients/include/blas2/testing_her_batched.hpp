@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -62,7 +62,7 @@ void testing_her_batched_bad_arg(const Arguments& arg)
 
         device_vector<U> d_alpha(1), d_zero(1);
 
-        const U  h_alpha{1}, h_zero{0};
+        const U  h_alpha(1), h_zero(0);
         const U* alpha = &h_alpha;
         const U* zero  = &h_zero;
 
@@ -169,7 +169,7 @@ void testing_her_batched(const Arguments& arg)
 
     size_t A_size = lda * N;
 
-    double hipblas_error_host{0}, hipblas_error_device{0};
+    double hipblas_error_host, hipblas_error_device;
 
     U h_alpha = arg.get_alpha<U>();
 
@@ -271,7 +271,7 @@ void testing_her_batched(const Arguments& arg)
 
     if(arg.timing)
     {
-        double gpu_time_used{0};
+        double gpu_time_used;
         CHECK_HIP_ERROR(dA.transfer_from(hA));
         hipStream_t stream;
         CHECK_HIPBLAS_ERROR(hipblasGetStream(handle, &stream));

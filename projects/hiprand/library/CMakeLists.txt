@@ -35,6 +35,24 @@ configure_file(
     @ONLY
 )
 
+if(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY AND NOT WIN32)
+    rocm_wrap_header_dir(
+        "${PROJECT_SOURCE_DIR}/library/include/hiprand"
+        GUARDS SYMLINK WRAPPER
+        WRAPPER_LOCATIONS include hiprand/include
+        OUTPUT_LOCATIONS library/include library/hiprand/include
+        HEADER_LOCATION include/hiprand
+        PATTERNS *.h *.hpp
+    )
+    rocm_wrap_header_file(
+        hiprand_version.h
+        GUARDS SYMLINK WRAPPER
+        WRAPPER_LOCATIONS include hiprand/include
+        OUTPUT_LOCATIONS library/include library/hiprand/include
+        HEADER_LOCATION include/hiprand
+    )
+endif()
+
 # Build
 if (BUILD_WITH_LIB STREQUAL "CUDA")
     set_source_files_properties(${hipRAND_SRCS} PROPERTIES LANGUAGE CUDA)
@@ -42,13 +60,6 @@ if (BUILD_WITH_LIB STREQUAL "CUDA")
 endif()
 add_library(hiprand ${hipRAND_SRCS})
 add_library(hip::hiprand ALIAS hiprand)
-
-if(WIN32)
-    configure_file("${PROJECT_SOURCE_DIR}/library/include/hiprand/hiprand_in.rc.in"
-                   "${PROJECT_BINARY_DIR}/library/include/hiprand/hiprand_in.rc"
-                   @ONLY)
-    target_sources(hiprand PRIVATE "${PROJECT_BINARY_DIR}/library/include/hiprand/hiprand_in.rc")
-endif()
 
 # Add interface include directory so that other CMake applications can maintain previous behaviour.
 # This will be removed with upcoming packaging changes.
@@ -109,6 +120,13 @@ else()
         DEPENDS PACKAGE rocrand
         STATIC_DEPENDS PACKAGE rocrand
         INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/hiprand-fortran-config.cmake"
+    )
+endif()
+
+if(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY AND NOT WIN32)
+    rocm_install(
+        DIRECTORY "${PROJECT_BINARY_DIR}/library/hiprand"
+        DESTINATION "."
     )
 endif()
 

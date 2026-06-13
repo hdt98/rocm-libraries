@@ -23,10 +23,9 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
+#include <thrust/functional.h>
 #include <thrust/detail/type_traits.h>
 #include <thrust/detail/type_traits/pointer_traits.h>
-#include <thrust/functional.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -66,9 +65,10 @@ struct is_operator_greater_function_object_impl;
  *  \see is_operator_plus_function_object
  */
 template <typename T>
-using is_operator_less_function_object = detail::is_operator_less_function_object_impl<T>;
+using is_operator_less_function_object =
+  detail::is_operator_less_function_object_impl<T>;
 
-#if THRUST_CPP_DIALECT >= 2017
+#if THRUST_CPP_DIALECT >= 2014
 /*! \brief <tt>constexpr bool</tt> that is \c true if \c T is a
  *  <a href="https://en.cppreference.com/w/cpp/named_req/BinaryPredicate">BinaryPredicate</a>
  *  equivalent to \c operator<, and \c false otherwise.
@@ -79,7 +79,8 @@ using is_operator_less_function_object = detail::is_operator_less_function_objec
  *  \see is_operator_plus_function_object
  */
 template <typename T>
-constexpr bool is_operator_less_function_object_v = is_operator_less_function_object<T>::value;
+constexpr bool is_operator_less_function_object_v
+  = is_operator_less_function_object<T>::value;
 #endif
 
 /*! \brief <a href="https://en.cppreference.com/w/cpp/named_req/UnaryTypeTrait"><i>UnaryTypeTrait</i></a>
@@ -93,9 +94,10 @@ constexpr bool is_operator_less_function_object_v = is_operator_less_function_ob
  *  \see is_operator_plus_function_object
  */
 template <typename T>
-using is_operator_greater_function_object = detail::is_operator_greater_function_object_impl<T>;
+using is_operator_greater_function_object =
+  detail::is_operator_greater_function_object_impl<T>;
 
-#if THRUST_CPP_DIALECT >= 2017
+#if THRUST_CPP_DIALECT >= 2014
 /*! \brief <tt>constexpr bool</tt> that is \c true if \c T is a
  *  <a href="https://en.cppreference.com/w/cpp/named_req/BinaryPredicate">BinaryPredicate</a>
  *  equivalent to \c operator>, and \c false otherwise.
@@ -106,7 +108,8 @@ using is_operator_greater_function_object = detail::is_operator_greater_function
  *  \see is_operator_plus_function_object
  */
 template <typename T>
-constexpr bool is_operator_greater_function_object_v = is_operator_greater_function_object<T>::value;
+constexpr bool is_operator_greater_function_object_v
+  = is_operator_greater_function_object<T>::value;
 #endif
 
 /*! \brief <a href="https://en.cppreference.com/w/cpp/named_req/UnaryTypeTrait"><i>UnaryTypeTrait</i></a>
@@ -121,11 +124,13 @@ constexpr bool is_operator_greater_function_object_v = is_operator_greater_funct
  */
 template <typename T>
 using is_operator_less_or_greater_function_object =
-  integral_constant<bool,
-                    detail::is_operator_less_function_object_impl<T>::value
-                      || detail::is_operator_greater_function_object_impl<T>::value>;
+  integral_constant<
+    bool
+  ,    detail::is_operator_less_function_object_impl<T>::value
+    || detail::is_operator_greater_function_object_impl<T>::value
+  >;
 
-#if THRUST_CPP_DIALECT >= 2017
+#if THRUST_CPP_DIALECT >= 2014
 /*! \brief <tt>constexpr bool</tt> that is \c true if \c T is a
  *  <a href="https://en.cppreference.com/w/cpp/named_req/BinaryPredicate">BinaryPredicate</a>
  *  equivalent to \c operator< or \c operator>, and \c false otherwise.
@@ -136,7 +141,8 @@ using is_operator_less_or_greater_function_object =
  *  \see is_operator_plus_function_object
  */
 template <typename T>
-constexpr bool is_operator_less_or_greater_function_object_v = is_operator_less_or_greater_function_object<T>::value;
+constexpr bool is_operator_less_or_greater_function_object_v
+  = is_operator_less_or_greater_function_object<T>::value;
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -148,24 +154,18 @@ namespace detail
 {
 
 template <typename T>
-struct is_operator_less_function_object_impl : false_type
-{};
+struct is_operator_less_function_object_impl                   : false_type {};
 template <typename T>
-struct is_operator_less_function_object_impl<thrust::less<T>> : true_type
-{};
+struct is_operator_less_function_object_impl<thrust::less<T> > : true_type {};
 template <typename T>
-struct is_operator_less_function_object_impl<std::less<T>> : true_type
-{};
+struct is_operator_less_function_object_impl<std::less<T>    > : true_type {};
 
 template <typename T>
-struct is_operator_greater_function_object_impl : false_type
-{};
+struct is_operator_greater_function_object_impl                      : false_type {};
 template <typename T>
-struct is_operator_greater_function_object_impl<thrust::greater<T>> : true_type
-{};
+struct is_operator_greater_function_object_impl<thrust::greater<T> > : true_type {};
 template <typename T>
-struct is_operator_greater_function_object_impl<std::greater<T>> : true_type
-{};
+struct is_operator_greater_function_object_impl<std::greater<T>    > : true_type {};
 
 } // namespace detail
 

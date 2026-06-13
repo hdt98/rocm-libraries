@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,15 +20,9 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from rocisa.code import Module
-from rocisa.container import EXEC, VCC, vgpr, sgpr
-from rocisa.instruction import MacroInstruction, SAddCU32, SAddU32, SAndB32, \
-    SAndB64, SLShiftLeftB32, SMovB32, SMovB64, SMulI32, SSubBU32, SSubU32, \
-    VAddCCOU32, VAddCOU32, VAddI32, VAddU32, VAndB32, VBfiB32, \
-    VCmpEQU32, VCmpGtU32, VCmpLtU32, VCmpXNeU32, VCndMaskB32, VLShiftLeftB32, \
-    VMadI32I24, VMovB32, VMulLOU32, VSubI32, VSubU32
-from rocisa.functions import vectorAddMultiplyBpe, vectorMultiply64Bpe
-from .Common import INDEX_CHARS, DataDirection, log2
+from .TensileInstructions import Module, EXEC, vgpr, sgpr, log2, Label
+from .TensileInstructions.Instructions import *
+from .Common import INDEX_CHARS, DataDirection
 
 ##############################################################################
 # Fields associated with computing address
@@ -200,11 +194,7 @@ class AddrCalculation:
             idxChar= INDEX_CHARS[idx]
             module.addComment0("extract %s"%kw.sizeRef(idx))
             assert(tmpVgpr+1 != packedBits) # bad since we still need packedBits below for remainder (can't overwrite here)
-            if kw.states.asmCaps["HasVgprMSB"]:
-                module.add(VMagicDiv(kernel["MagicDivAlg"], tmpVgpr+1, vgpr(packedBits), sgpr("MagicNumberSize%s"%idxChar), \
-                           sgpr("MagicShiftSize%s"%idxChar), sgpr("MagicAbitSize%s"%idxChar)))
-            else:
-                module.add(MacroInstruction("V_MAGIC_DIV", \
+            module.add(MacroInstruction("V_MAGIC_DIV", \
                            args=[tmpVgpr+1, vgpr(packedBits), sgpr("MagicNumberSize%s"%idxChar), \
                            sgpr("MagicShiftSize%s"%idxChar), sgpr("MagicAbitSize%s"%idxChar) if kernel["MagicDivAlg"]==2 else "0"]))
             # tmpVgpr+1 returns the quotient, tmpVgpr+2 is overwritten
@@ -239,8 +229,11 @@ class AddrCalculation:
             module.add(VAddU32(dst=vgpr(addrVgpr), src0=vgpr(addrVgpr), \
                       src1=vgpr(tmpVgpr+2), comment="addrCalc += scaled extracted dim "))
 
-            module.add(vectorAddMultiplyBpe(addrVgpr, rowPtr, addrVgpr, bpe, \
-                        comment="packed: add rowPtr and scaleToBpe"))
+            module.add(VAddLShiftLeftU32(dst=vgpr(addrVgpr), \
+                      src0=vgpr(rowPtr), \
+                      src1=vgpr(addrVgpr), \
+                      shiftHex=hex(log2(bpe)), \
+                      comment="packed: add rowPtr and scaleToBpe"))
 
         return module
 
@@ -272,7 +265,7 @@ class AddrCalculation:
                 comment="scale element by non-unit stride"))
             elementVgpr = addrVgpr
 
-        isSingleKernel = ((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") or kernel["StreamK"] > 0
+        isSingleKernel = (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel") or kernel["StreamK"] > 0
         if ss.optSingleColVgpr:
             # This is first element in the first batch, create a byte address that will
             # be re-used by subsequent elements:
@@ -360,8 +353,11 @@ class AddrCalculation:
                         ss.singleColTDAddrUpdated    = True
                     else:
                         ss.singleColDAddrUpdated    = True
-                    module.add(vectorAddMultiplyBpe(addrVgpr, rowPtr, elementVgpr, bpe, \
-                        comment="optSingleColVgpr scaleToBpe: sharedAddrVgpr <- cinRowPtr + coord0, scaled by BPE. BSHERE:coord0=%d, coord0Vgpr=%d"%(kw.vgprs.coord0, self.coord0Vgpr)))
+                    module.add(VAddLShiftLeftU32(dst=vgpr(addrVgpr), \
+                      src0=vgpr(rowPtr), \
+                      src1=vgpr(elementVgpr), \
+                      shiftHex=hex(log2(bpe)), \
+                      comment="optSingleColVgpr scaleToBpe: sharedAddrVgpr <- cinRowPtr + coord0, scaled by BPE. BSHERE:coord0=%d, coord0Vgpr=%d"%(kw.vgprs.coord0, self.coord0Vgpr)))
         elif ss.optSharedColVgpr:
             # Need an address calculation for the first address in each row:
             if d1==0 and vc1==0:
@@ -428,8 +424,11 @@ class AddrCalculation:
                     module.add(self.emitExtractAndScalePackedDims(kernel, ss, tmpVgpr, tc))
                 else:
                     updatedAddr = True
-                    module.add(vectorAddMultiplyBpe(addrVgpr, rowPtr, elementVgpr, bpe,
-                                comment="optSharedColVgpr scaleToBpe for first row: col addr <- cinRowPtr + coord0, scaled by BPE"))
+                    module.add(VAddLShiftLeftU32(dst=vgpr(addrVgpr), \
+                      src0=vgpr(rowPtr), \
+                      src1=vgpr(elementVgpr), \
+                      shiftHex=hex(log2(bpe)), \
+                      comment="optSharedColVgpr scaleToBpe for first row: col addr <- cinRowPtr + coord0, scaled by BPE"))
         else:
             # Generate final address calculation (to bytes) for each element
             # The unpacking takes 8-10 instructions so could be worth optimizing someday :
@@ -498,15 +497,21 @@ class AddrCalculation:
                 module.add(self.emitExtractAndScalePackedDims(kernel, ss, tmpVgpr, tc))
             else:
                 updatedAddr = True
-                module.add(vectorAddMultiplyBpe(addrVgpr, rowPtr, elementVgpr, bpe, \
-                            comment="scaleToBpe: accumulate d0 lower and *= bpe into Cin addr"))
+                module.add(VAddLShiftLeftU32(dst=vgpr(addrVgpr), \
+                    src0=vgpr(rowPtr), \
+                    src1=vgpr(elementVgpr), \
+                    shiftHex=hex(log2(bpe)), \
+                    comment="scaleToBpe: accumulate d0 lower and *= bpe into Cin addr"))
 
         # if not optSrdIncForRow then we may have moved the row pointer
         # and depending on paths above may not have refreshed addrVgpr already.
         # if so - do it here:
         if self.rowIncDirtyRowPtr and not updatedAddr:
-            module.add(vectorAddMultiplyBpe(addrVgpr, rowPtr, kw.vgprs.coord0, bpe, \
-                        comment="scaleToBpe: Update address with new rowPtr"))
+            module.add(VAddLShiftLeftU32(dst=vgpr(addrVgpr), \
+              src0=vgpr(rowPtr), \
+              src1=vgpr(kw.vgprs.coord0), \
+              shiftHex=hex(log2(bpe)), \
+              comment="scaleToBpe: Update address with new rowPtr"))
 
         return module
 
@@ -584,11 +589,7 @@ class AddrCalculation:
                 else: # just a group index
                     params.append("sgprWorkGroup%u"%i)
             params.append("%s" % (tmpVgpr+2))
-            if kw.states.asmCaps["HasVgprMSB"]:
-                module.add(kw.globalOffset(kernel, None, "C", params))
-            else:
-                module.add(MacroInstruction(name="GLOBAL_OFFSET_C", args=params))
-            module.add(vectorMultiply64Bpe(addrVgpr, addrVgpr, tPB["bpeGR"]))
+            module.add(MacroInstruction(name="GLOBAL_OFFSET_C", args=params))
             module.add(VMovB32(dst=vgpr(tmpVgpr+2), src=vgpr(addrVgpr+0), comment="temp store offset 0"))
             module.add(VMovB32(dst=vgpr(tmpVgpr+3), src=vgpr(addrVgpr+1), comment="temp store offset 1"))
 
@@ -606,7 +607,7 @@ class AddrCalculation:
                               sgpr("StrideC%s"%strideChar), self.rowInc, tmpS01, "ROWINC- Move cinRowPtr to next row"))
                     module.add(self.addScaled(vgpr(kw.vgprs.coutRowPtrD), vgpr(kw.vgprs.coutRowPtrD), \
                               sgpr("StrideD%s"%strideChar), self.rowInc, tmpS01, "Move coutRowPtrD to next row"))
-                    if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1):
+                    if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
                         module.add(self.addScaled(vgpr(kw.vgprs.coutRowPtrE), vgpr(kw.vgprs.coutRowPtrE), \
                                   sgpr("StrideE%s"%strideChar), self.rowInc, tmpS01, "Move coutRowPtrE to next row"))
                     if kw.vgprs.coutRowPtrBias != -1:
@@ -663,7 +664,7 @@ class AddrCalculation:
                              comment="new rowStart address += shift column * StridesD"))
                 module.add(VCndMaskB32(dst=vgpr(kw.vgprs.coutRowPtrD), src0=vgpr(kw.vgprs.coutRowPtrD), src1=vgpr(vTmp1), src2=sgpr(sTmp1,sgprCnt), \
                              comment="set new rowStart if meet conditions" ))
-                if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1):
+                if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
                     module.add(VMadI32I24(dst=vgpr(vTmp1), src0=sgpr(strideE1), src1=vgpr(vTmp2), src2=vgpr(kw.vgprs.coutRowPtrE), \
                              comment="new rowStart address += shift column * StridesE"))
                     module.add(VCndMaskB32(dst=vgpr(kw.vgprs.coutRowPtrE), src0=vgpr(kw.vgprs.coutRowPtrE), src1=vgpr(vTmp1), src2=sgpr(sTmp1,sgprCnt), \
@@ -682,7 +683,7 @@ class AddrCalculation:
                                 comment="new lds write address += shift column * Lds byte Stride"))
                     module.add(VCndMaskB32(dst=vgpr(kw.vgprs.storeRemapLW), src0=vgpr(kw.vgprs.storeRemapLW), src1=vgpr(vTmp1), \
                                   src2=sgpr(sTmp1,sgprCnt), comment="set new rowStart if meet conditions" ))
-                    if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1):
+                    if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
                         printExit("Output E does not support StoreRemapVectorWidth")
                     if kw.vgprs.coutRowPtrBias != -1:
                         printExit("Bias reduction does not support StoreRemapVectorWidth")
@@ -697,7 +698,7 @@ class AddrCalculation:
 
         laneSGPRCount = self.kernelWriter.states.laneSGPRCount
         module = Module("emitLdChange")
-        isSingleKernel = ((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") or kernel["StreamK"] > 0
+        isSingleKernel = (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel") or kernel["StreamK"] > 0
         if kernel["BufferStore"]:
             module.add(self.emitScaleToBpe(kernel, ss, tmpVgpr, tmpSgpr, singleUpdate, tc, dim))
             if edge and (not kernel["StoreRemapVectorWidth"] or (kernel["StoreRemapVectorWidth"] and (beta or kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel"))) and \

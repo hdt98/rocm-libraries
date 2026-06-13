@@ -23,6 +23,13 @@ rocblas_gemm_ex_get_solutions + batched, strided_batched
 .. doxygenfunction:: rocblas_gemm_batched_ex_get_solutions_by_type
 .. doxygenfunction:: rocblas_gemm_strided_batched_ex_get_solutions
 
+rocblas_gemm_ex3 + batched, strided_batched
+=========================================================
+
+.. doxygenfunction:: rocblas_gemm_ex3
+.. doxygenfunction:: rocblas_gemm_batched_ex3
+.. doxygenfunction:: rocblas_gemm_strided_batched_ex3
+
 Graph support for rocBLAS
 =========================================================
 
@@ -71,3 +78,4 @@ HIP Graph known issues in rocBLAS
 =========================================================
 
 On the Windows platform, batched functions (Level-1, Level-2, and Level-3) produce incorrect results.
+

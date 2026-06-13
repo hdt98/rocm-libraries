@@ -18,69 +18,75 @@
 #include <thrust/transform.h>
 #include <thrust/tuple.h>
 
-#include "test_param_fixtures.hpp"
-#include "test_real_assertions.hpp"
-#include "test_utils.hpp"
+#include "test_header.hpp"
 
 TESTS_DEFINE(TupleTransformTests, SignedIntegerTestsParams);
 
 struct MakeTupleFunctor
 {
-  template <typename T1, typename T2>
-  THRUST_HOST_DEVICE thrust::tuple<T1, T2> operator()(T1& lhs, T2& rhs)
-  {
-    return thrust::make_tuple(lhs, rhs);
-  }
+    template <typename T1, typename T2>
+    __host__ __device__ thrust::tuple<T1, T2> operator()(T1& lhs, T2& rhs)
+    {
+        return thrust::make_tuple(lhs, rhs);
+    }
 };
 
 template <int N>
 struct GetFunctor
 {
-  template <typename Tuple>
-  THRUST_HOST_DEVICE typename thrust::tuple_element<N, Tuple>::type operator()(const Tuple& t)
-  {
-    return thrust::get<N>(t);
-  }
+    template <typename Tuple>
+    __host__ __device__
+        typename thrust::access_traits<typename thrust::tuple_element<N, Tuple>::type>::const_type
+        operator()(const Tuple& t)
+    {
+        return thrust::get<N>(t);
+    }
 };
 
 TYPED_TEST(TupleTransformTests, TestTupleTransform)
 {
-  using T = typename TestFixture::input_type;
-  using namespace thrust;
+    using T = typename TestFixture::input_type;
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  for (auto size : get_sizes())
-  {
-    SCOPED_TRACE(testing::Message() << "with size= " << size);
-
-    for (auto seed : get_seeds())
+    for(auto size : get_sizes())
     {
-      SCOPED_TRACE(testing::Message() << "with seed= " << seed);
+        SCOPED_TRACE(testing::Message() << "with size= " << size);
 
-      host_vector<T> h_t1 = get_random_data<T>(size, get_default_limits<T>::min(), get_default_limits<T>::max(), seed);
-      host_vector<T> h_t2 = get_random_data<T>(
-        size, get_default_limits<T>::min(), get_default_limits<T>::max(), seed + seed_value_addition);
+        for(auto seed : get_seeds())
+        {
+            SCOPED_TRACE(testing::Message() << "with seed= " << seed);
 
-      // zip up the data
-      host_vector<tuple<T, T>> h_tuples(size);
-      transform(h_t1.begin(), h_t1.end(), h_t2.begin(), h_tuples.begin(), MakeTupleFunctor());
+            thrust::host_vector<T> h_t1 = get_random_data<T>(
+                size, get_default_limits<T>::min(), get_default_limits<T>::max(), seed);
 
-      // copy to device
-      device_vector<tuple<T, T>> d_tuples = h_tuples;
+            thrust::host_vector<T> h_t2 = get_random_data<T>(
+                size,
+                get_default_limits<T>::min(),
+                get_default_limits<T>::max(),
+                seed + seed_value_addition
+              );
 
-      device_vector<T> d_t1(size), d_t2(size);
+            // zip up the data
+            thrust::host_vector<thrust::tuple<T, T>> h_tuples(size);
+            thrust::transform(
+                h_t1.begin(), h_t1.end(), h_t2.begin(), h_tuples.begin(), MakeTupleFunctor());
 
-      // select 0th
-      transform(d_tuples.begin(), d_tuples.end(), d_t1.begin(), GetFunctor<0>());
+            // copy to device
+            thrust::device_vector<thrust::tuple<T, T>> d_tuples = h_tuples;
 
-      // select 1st
-      transform(d_tuples.begin(), d_tuples.end(), d_t2.begin(), GetFunctor<1>());
+            thrust::device_vector<T> d_t1(size), d_t2(size);
 
-      ASSERT_EQ(h_t1, d_t1);
-      ASSERT_EQ(h_t2, d_t2);
+            // select 0th
+            thrust::transform(d_tuples.begin(), d_tuples.end(), d_t1.begin(), GetFunctor<0>());
 
-      ASSERT_EQ_QUIET(h_tuples, d_tuples);
+            // select 1st
+            thrust::transform(d_tuples.begin(), d_tuples.end(), d_t2.begin(), GetFunctor<1>());
+
+            ASSERT_EQ(h_t1, d_t1);
+            ASSERT_EQ(h_t2, d_t2);
+
+            ASSERT_EQ_QUIET(h_tuples, d_tuples);
+        }
     }
-  }
 }

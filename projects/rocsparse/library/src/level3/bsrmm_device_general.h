@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -65,8 +65,8 @@ namespace rocsparse
         const I block_row_start = (block_row < Mb) ? (bsr_row_ptr[block_row] - idx_base) : 0;
         const I block_row_end   = (block_row < Mb) ? (bsr_row_ptr[block_row + 1] - idx_base) : 0;
 
-        __shared__ B shared_B[BSR_BLOCK_DIM * BLK_SIZE_Y];
-        __shared__ A shared_A[BSR_BLOCK_DIM * BSR_BLOCK_DIM];
+        __shared__ T shared_B[BSR_BLOCK_DIM * BLK_SIZE_Y];
+        __shared__ T shared_A[BSR_BLOCK_DIM * BSR_BLOCK_DIM];
 
         const J global_col = tidy + hipBlockIdx_y * BLK_SIZE_Y;
 
@@ -87,14 +87,14 @@ namespace rocsparse
                         shared_B[BSR_BLOCK_DIM * tidy + tidx]
                             = (global_col < N && (tidx + y) < block_dim)
                                   ? dense_B[block_dim * block_col + (tidx + y) + global_col * ldb]
-                                  : static_cast<B>(0);
+                                  : static_cast<T>(0);
                     }
                     else
                     {
                         shared_B[BSR_BLOCK_DIM * tidy + tidx]
                             = (global_col < N && (tidx + y) < block_dim)
                                   ? dense_B[global_col + ldb * (block_dim * block_col + (tidx + y))]
-                                  : static_cast<B>(0);
+                                  : static_cast<T>(0);
                     }
 
                     if(direction == rocsparse_direction_row)
@@ -103,7 +103,7 @@ namespace rocsparse
                             = ((tidx + x) < block_dim && (tidy + y) < block_dim)
                                   ? bsr_val[block_dim * block_dim * k + block_dim * (tidx + x)
                                             + (tidy + y)]
-                                  : static_cast<A>(0);
+                                  : static_cast<T>(0);
                     }
                     else
                     {
@@ -111,7 +111,7 @@ namespace rocsparse
                             = ((tidx + x) < block_dim && (tidy + y) < block_dim)
                                   ? bsr_val[block_dim * block_dim * k + block_dim * (tidy + y)
                                             + (tidx + x)]
-                                  : static_cast<A>(0);
+                                  : static_cast<T>(0);
                     }
 
                     __syncthreads();

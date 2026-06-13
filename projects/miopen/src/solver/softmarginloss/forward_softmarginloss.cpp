@@ -202,7 +202,7 @@ ConvSolution SoftMarginLossForward::GetSolution(
                     handle_.EnableProfiling(false);
                     start = miopen::make_hip_event();
                     stop  = miopen::make_hip_event();
-                    (void)hipEventRecord(start.get(), handle_.GetStream());
+                    hipEventRecord(start.get(), handle_.GetStream());
                 }
                 /* Phase 1: Calc loss for each element. */
                 {
@@ -227,7 +227,7 @@ ConvSolution SoftMarginLossForward::GetSolution(
                                                       wt.GetOffset(1));
 
                 int kernelCnt = 1;
-                for(; kernelCnt < kernels.size() - 1; kernelCnt++)
+                for(kernelCnt; kernelCnt < kernels.size() - 1; kernelCnt++)
                 {
                     decltype(auto) kernel = handle_.Run(kernels[kernelCnt]);
                     kernel(reduce_in, reduce_out, size);
@@ -235,23 +235,23 @@ ConvSolution SoftMarginLossForward::GetSolution(
                     size = (size + LOCAL_SIZE_REDUCE - 1) / LOCAL_SIZE_REDUCE;
                 }
 
-                // The final ReduceSum kernel signature takes tensor_view_t<1>; passing the
-                // 5D o_tv would corrupt the kernarg buffer (80B written into 16B slot).
-                auto o_tv_1d          = get_inner_expanded_tv<1>(deref(params.oDesc));
                 decltype(auto) kernel = handle_.Run(kernels[kernelCnt]);
-                kernel(reduce_in, params.o, size, o_tv_1d);
+                kernel(reduce_in, params.o, size, o_tv);
 
                 if(profiling)
                 {
-                    (void)hipEventRecord(stop.get(), handle_.GetStream());
-                    (void)hipEventSynchronize(stop.get());
-                    (void)hipEventElapsedTime(&elapsed, start.get(), stop.get());
+                    hipEventRecord(stop.get(), handle_.GetStream());
+                    hipEventSynchronize(stop.get());
+                    hipEventElapsedTime(&elapsed, start.get(), stop.get());
 
+                    // Clean up
+                    hipEventDestroy(start.get());
+                    hipEventDestroy(stop.get());
                     handle_.ResetKernelTime();
                     handle_.AccumKernelTime(elapsed);
 
                     handle_.EnableProfiling(true);
-                }
+                };
             };
         };
     }

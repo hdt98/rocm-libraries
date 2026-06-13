@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -17,10 +17,6 @@
 #include "ck/library/utility/literals.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_gemm.hpp"
 #include "ck/library/utility/check_err.hpp"
-
-using ::ck::DeviceMem;
-using ::ck::HostTensorDescriptor;
-using ::ck::Tensor;
 
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
@@ -131,10 +127,10 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMultipleABD_Xdl
     32,
     8,
     8,
-    16,
-    16,
-    8,
+    32,
+    32,
     4,
+    2,
     S<4, 64, 1>,
     S<1, 0, 2>,
     S<1, 0, 2>,
@@ -152,7 +148,7 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMultipleABD_Xdl
     1,
     1,
     S<1, 32, 1, 8>,
-    4>;
+    8>;
 
 int main(int argc, char* argv[])
 {

@@ -41,6 +41,7 @@
 #include <rocprim/device/device_find_end.hpp>
 #include <rocprim/functional.hpp>
 #include <rocprim/type_traits.hpp>
+#include <rocprim/type_traits_interface.hpp>
 #include <rocprim/types.hpp>
 
 #include <algorithm>

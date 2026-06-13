@@ -206,12 +206,6 @@ NodeFactory::Map1DLength const NodeFactory::map1DLengthDouble = {
     {114688, 224}, //           CC (224cc + 512rc)
 };
 
-NodeFactory::Map1DLength const NodeFactory::map1DLengthTRTRT = {
-    // 3^18 performs better when decomposing with 3^7 kernel even when
-    // 3^8 is available
-    {387420489, 177147},
-};
-
 //
 // Factorisation helpers
 //
@@ -419,8 +413,6 @@ std::unique_ptr<TreeNode> NodeFactory::CreateNodeFromScheme(ComputeScheme s, Tre
         return std::unique_ptr<Real2DEvenNode>(new Real2DEvenNode(parent));
     case CS_REAL_3D_EVEN:
         return std::unique_ptr<Real3DEvenNode>(new Real3DEvenNode(parent));
-    case CS_REAL_3D_PP:
-        return std::unique_ptr<Real3DPPNode>(new Real3DPPNode(parent));
     case CS_BLUESTEIN:
         return std::unique_ptr<BluesteinNode>(new BluesteinNode(parent));
     case CS_L1D_TRTRT:
@@ -443,18 +435,12 @@ std::unique_ptr<TreeNode> NodeFactory::CreateNodeFromScheme(ComputeScheme s, Tre
         return std::unique_ptr<BLOCKCR3DNode>(new BLOCKCR3DNode(parent));
     case CS_3D_RC:
         return std::unique_ptr<RC3DNode>(new RC3DNode(parent));
-    case CS_3D_PP:
-        return std::unique_ptr<PP3DNode>(new PP3DNode(parent));
 
     // Leaf Node that need to check external kernel file
     case CS_KERNEL_STOCKHAM:
         return std::unique_ptr<Stockham1DNode>(new Stockham1DNode(parent, s));
-    case CS_KERNEL_STOCKHAM_PP:
-        return std::unique_ptr<StockhamPP1DNode>(new StockhamPP1DNode(parent, s));
     case CS_KERNEL_STOCKHAM_BLOCK_CC:
         return std::unique_ptr<SBCCNode>(new SBCCNode(parent, s));
-    case CS_KERNEL_STOCKHAM_PP_BLOCK_CC:
-        return std::unique_ptr<SBCCPPNode>(new SBCCPPNode(parent, s));
     case CS_KERNEL_STOCKHAM_BLOCK_RC:
         return std::unique_ptr<SBRCNode>(new SBRCNode(parent, s));
     case CS_KERNEL_STOCKHAM_BLOCK_CR:
@@ -524,7 +510,7 @@ std::unique_ptr<TreeNode> NodeFactory::CreateExplicitNode(NodeMetaData& nodeData
             throw std::runtime_error("solution map error for L1D sub-problem");
     }
 
-    // creating tree without solution map, must call DecideNodeScheme
+    // createing tree without solution map, must call DecideNodeScheme
     if(determined_scheme == CS_NONE)
         determined_scheme = DecideNodeScheme(pool, nodeData, parent);
 
@@ -577,7 +563,7 @@ ComputeScheme NodeFactory::DecideNodeScheme(const function_pool& pool,
     switch(nodeData.dimension)
     {
     case 1:
-        return Decide1DScheme(pool, nodeData, parent);
+        return Decide1DScheme(pool, nodeData);
     case 2:
         return Decide2DScheme(pool, nodeData);
     case 3:
@@ -593,17 +579,8 @@ ComputeScheme NodeFactory::DecideRealScheme(const function_pool& pool, NodeMetaD
 {
     // use size in real units to decide what scheme to use
     const auto& realLength = nodeData.direction == -1 ? nodeData.length : nodeData.outputLength;
-    const auto& realStride = nodeData.direction == -1 ? nodeData.inStride : nodeData.outStride;
-    const auto& realDist   = nodeData.direction == -1 ? nodeData.iDist : nodeData.oDist;
-    const auto  isEven     = [](size_t val) { return val % 2 == 0; };
 
-    // For even-length optimization, we treat real data as
-    // complex-interleaved, so fastest dimension stride must be 1 for
-    // both input and output.  Subsequent strides + dist on the real
-    // side must all be expressible as complex stride + dist; that
-    // is, they must all be even.
-    if(isEven(realLength[0]) && nodeData.inStride[0] == 1 && nodeData.outStride[0] == 1
-       && std::all_of(realStride.begin() + 1, realStride.end(), isEven) && isEven(realDist))
+    if(realLength[0] % 2 == 0 && nodeData.inStride[0] == 1 && nodeData.outStride[0] == 1)
     {
         switch(nodeData.dimension)
         {
@@ -612,10 +589,6 @@ ComputeScheme NodeFactory::DecideRealScheme(const function_pool& pool, NodeMetaD
         case 2:
             return CS_REAL_2D_EVEN;
         case 3:
-            // Try 3D partial-pass first
-            if(use_CS_REAL_3D_PP(pool, nodeData))
-                return CS_REAL_3D_PP;
-
             return CS_REAL_3D_EVEN;
         default:
             throw std::runtime_error("Invalid dimension");
@@ -625,8 +598,7 @@ ComputeScheme NodeFactory::DecideRealScheme(const function_pool& pool, NodeMetaD
     return CS_REAL_TRANSFORM_USING_CMPLX;
 }
 
-ComputeScheme
-    NodeFactory::Decide1DScheme(const function_pool& pool, NodeMetaData& nodeData, TreeNode* parent)
+ComputeScheme NodeFactory::Decide1DScheme(const function_pool& pool, NodeMetaData& nodeData)
 {
     ComputeScheme scheme = CS_NONE;
 
@@ -636,32 +608,7 @@ ComputeScheme
 
     if(pool.has_function(FMKey(nodeData.length[0], nodeData.precision)))
     {
-        // 2-kernel plans for lengths > 4k can still do better at
-        // smaller batch size due to using more CUs.  So prefer
-        // single-kernel only if we launch enough workgroups for all
-        // CUs
-        if(nodeData.length[0] > 4096)
-        {
-            auto kernel = pool.get_kernel(FMKey(nodeData.length[0], nodeData.precision));
-
-            // higher dimensions and batch is the effective batch for
-            // the kernel
-            const auto totalBatch
-                = product(nodeData.length.begin() + 1, nodeData.length.end()) * nodeData.batch;
-
-            // Bluestein would have chosen this kernel for
-            // single-kernel Bluestein, so continue using it for
-            // chirp setup
-            if((parent && parent->scheme == CS_BLUESTEIN)
-               || totalBatch / kernel.transforms_per_block
-                      >= static_cast<size_t>(pool.deviceProp->multiProcessorCount))
-                return CS_KERNEL_STOCKHAM;
-            // otherwise, fall through to multi-kernel plan
-        }
-        else
-        {
-            return CS_KERNEL_STOCKHAM;
-        }
+        return CS_KERNEL_STOCKHAM;
     }
 
     size_t divLength1 = 1;
@@ -711,10 +658,8 @@ ComputeScheme
         }
         else
         {
-            // get largest pow2 1D length
-            auto largest = pool.get_largest_pow2_length(nodeData.precision);
-
-            // need to ignore len 1, or we're going into a infinity decomposition loop
+            auto largest = pool.get_largest_length(nodeData.precision);
+            // need to ignore len 1, or we're going into a infinity decompostion loop
             // basically not gonna happen unless someone builds only a len1 kernel...
             if(largest <= 1)
             {
@@ -776,30 +721,20 @@ ComputeScheme
         if(failed)
         {
             scheme = CS_L1D_TRTRT;
-
-            auto it = map1DLengthTRTRT.find(nodeData.length[0]);
-            if(it != map1DLengthTRTRT.end())
+            divLength1
+                = get_explicitly_supported_factor(pool, nodeData.precision, nodeData.length[0]);
+            if(divLength1 == 0)
             {
-                divLength1 = it->second;
-                failed     = false;
-            }
-            else
-            {
-                divLength1
-                    = get_explicitly_supported_factor(pool, nodeData.precision, nodeData.length[0]);
-                if(divLength1 == 0)
-                {
-                    // We need to recurse.  Note, for CS_L1D_TRTRT,
-                    // divLength0 has to be explicitly supported
-                    auto divLength0 = get_largest_supported_factor(
-                        pool, nodeData.precision, nodeData.length[0]);
+                // We need to recurse.  Note, for CS_L1D_TRTRT,
+                // divLength0 has to be explictly supported
+                auto divLength0
+                    = get_largest_supported_factor(pool, nodeData.precision, nodeData.length[0]);
 
-                    // should ignore factor 1 or we're going into a infinity decomposition loop,
-                    // (an example is to run len-81 when we build only pow2 kernels, we'll be here)
-                    divLength1 = (divLength0 <= 1) ? 0 : nodeData.length[0] / divLength0;
-                }
-                failed = divLength1 == 0;
+                // should ignore factor 1 or we're going into a infinity decompostion loop,
+                // (an example is to run len-81 when we build only pow2 kernels, we'll be here)
+                divLength1 = (divLength0 <= 1) ? 0 : nodeData.length[0] / divLength0;
             }
+            failed = divLength1 == 0;
         }
     }
 
@@ -822,10 +757,7 @@ ComputeScheme NodeFactory::Decide2DScheme(const function_pool& pool, NodeMetaDat
 {
     // First choice is 2D_SINGLE kernel, if the problem will fit into LDS.
     // Next best is CS_2D_RC. Last resort is RTRT.
-    if(use_CS_2D_SINGLE(pool,
-                        nodeData,
-                        rocfft_array_type_complex_interleaved,
-                        rocfft_array_type_complex_interleaved))
+    if(use_CS_2D_SINGLE(pool, nodeData))
         return CS_KERNEL_2D_SINGLE; // the node has all build info
     else if(use_CS_2D_RC(pool, nodeData))
         return CS_2D_RC;
@@ -858,11 +790,8 @@ ComputeScheme NodeFactory::Decide3DScheme(const function_pool& pool, NodeMetaDat
     // multi-dimension cases and small 2d, 3d within one kernel
     bool MultiDimFuseKernelsAvailable = false;
 
-    if(use_CS_3D_PP(pool, nodeData)) // try 2 partial-pass kernels first
-    {
-        return CS_3D_PP;
-    }
-    else if(Apply_SBCR(pool, nodeData)) // try 3 kernels next
+    // try 3 SBCR kernels first
+    if(Apply_SBCR(pool, nodeData))
     {
         return CS_3D_BLOCK_CR;
     }
@@ -905,8 +834,7 @@ ComputeScheme NodeFactory::Decide3DScheme(const function_pool& pool, NodeMetaDat
                {rocfft_precision_double, {84, 108, 112, 168}}};
         if(childScheme == CS_2D_RC
            && length_excepted(exceptions, nodeData.precision, nodeData.length[1])
-           && (nodeData.rootTransformType == rocfft_transform_type_complex_forward
-               || nodeData.rootTransformType == rocfft_transform_type_complex_inverse))
+           && nodeData.rootIsC2C)
         {
             return CS_3D_TRTRTR;
         }
@@ -921,12 +849,10 @@ ComputeScheme NodeFactory::Decide3DScheme(const function_pool& pool, NodeMetaDat
     // TODO: CS_KERNEL_3D_SINGLE?
 }
 
-bool NodeFactory::use_CS_2D_SINGLE(const function_pool& pool,
-                                   const NodeMetaData&  nodeData,
-                                   rocfft_array_type    inArrayType,
-                                   rocfft_array_type    outArrayType)
+bool NodeFactory::use_CS_2D_SINGLE(const function_pool& pool, NodeMetaData& nodeData)
 {
     if(!pool.has_function(
+
            FMKey(nodeData.length[0], nodeData.length[1], nodeData.precision, CS_KERNEL_2D_SINGLE)))
         return false;
 
@@ -937,40 +863,10 @@ bool NodeFactory::use_CS_2D_SINGLE(const function_pool& pool,
     auto kernel = pool.get_kernel(
         FMKey(nodeData.length[0], nodeData.length[1], nodeData.precision, CS_KERNEL_2D_SINGLE));
 
-    auto length0 = nodeData.length[0];
-    auto length1 = nodeData.length[1];
-
-    // For larger LDS, account properly for real-complex usage and
-    // aim for occupancy-2
-    if(ldsSize > 65536)
-    {
-        // Real-forward transform adds an extra element on fastest length
-        // for post-processing
-        if(inArrayType == rocfft_array_type_real
-           && outArrayType == rocfft_array_type_hermitian_interleaved)
-            ++length0;
-        // real-inverse transforms adds an extra element on second-fastest length for pre-processing
-        else if(inArrayType == rocfft_array_type_hermitian_interleaved
-                && outArrayType == rocfft_array_type_real)
-            ++length1;
-
-        auto ldsUsage = length0 * length1 * kernel.transforms_per_block
-                        * complex_type_size(nodeData.precision);
-
-        if(ldsUsage > ldsSize / 2)
-            return false;
-    }
-    // For default (64KiB) LDS, just account for 2D data size and
-    // apply a fudge factor to get good-enough occupancy.  Ideally we
-    // can use the above heuristic everywhere but some tuned
-    // 2D_SINGLE solutions are faster despite being occupancy-1.
-    else
-    {
-        auto ldsUsage = length0 * length1 * kernel.transforms_per_block
-                        * complex_type_size(nodeData.precision);
-        if(1.5 * ldsUsage > ldsSize)
-            return false;
-    }
+    auto ldsUsage = nodeData.length[0] * nodeData.length[1] * kernel.transforms_per_block
+                    * complex_type_size(nodeData.precision);
+    if(1.5 * ldsUsage > ldsSize)
+        return false;
 
     return true;
 }
@@ -1036,7 +932,8 @@ bool NodeFactory::use_CS_3D_RC(const function_pool& pool, NodeMetaData& nodeData
         return false;
 
     // Check the C part.
-    // The first R is built recursively with 2D_FFT, leave the check part to themselves
+    // The first R is built recursively with 2D_FFT, or with a
+    // 1_D FTT + partial pass(es). leave the check part to themselves
     auto kernel = pool.get_kernel(key);
 
     // hack for this special case
@@ -1062,119 +959,4 @@ bool NodeFactory::use_CS_3D_RC(const function_pool& pool, NodeMetaData& nodeData
     return true;
 
     return false;
-}
-
-// Batch size for enabling partial-pass 3D kernels may vary by GPU architecture, precision, and length
-static constexpr std::size_t batchLow           = 5;
-static constexpr std::size_t batchLowException1 = 25;
-static constexpr std::size_t batchLowException2 = 20;
-static constexpr std::size_t batchHigh          = 7500;
-
-// Partial pass is currently restricted to batch sizes in the batchLow to batchHigh range,
-// unit stride, and non-planar array types, to target the cases where it has the most performance
-// benefit and avoid regressions in other cases.
-auto check_pp_restrictions =
-    [](const NodeMetaData& nodeData, const size_t& batchLow, const size_t& batchHigh = 0) -> bool {
-    size_t checkiDist = 0, checkoDist = 0;
-
-    auto inputLength = nodeData.length;
-
-    // real-to-complex iDist check is in real units,
-    // which is outputLength[0] * 2 * product of other lengths
-    if(nodeData.placement == rocfft_placement_inplace
-       && nodeData.inArrayType == rocfft_array_type_real)
-        inputLength[0] = nodeData.outputLength[0] * 2;
-    checkiDist = product(inputLength.begin(), inputLength.end());
-    checkoDist = product(nodeData.outputLength.begin(), nodeData.outputLength.end());
-
-    bool distCondition   = (nodeData.iDist == checkiDist && nodeData.oDist == checkoDist);
-    bool strideCondition = (nodeData.inStride.size() && nodeData.inStride[0] == 1)
-                           && (nodeData.outStride.size() && nodeData.outStride[0] == 1);
-    bool arrayTypeCondition = (nodeData.inArrayType != rocfft_array_type_complex_planar)
-                              && (nodeData.inArrayType != rocfft_array_type_hermitian_planar)
-                              && (nodeData.outArrayType != rocfft_array_type_complex_planar)
-                              && (nodeData.outArrayType != rocfft_array_type_hermitian_planar);
-    bool batchCondition
-        = (nodeData.batch >= batchLow && (batchHigh == 0 || nodeData.batch <= batchHigh));
-
-    return (batchCondition && distCondition && strideCondition && arrayTypeCondition);
-};
-
-// Length exceptions for partial-pass 3D kernels may vary by GPU architecture and precision
-auto check_pp_length = [](const std::vector<std::vector<size_t>>& exceptions,
-                          const std::vector<size_t>&              length) -> bool {
-    const bool length_found
-        = std::find(exceptions.begin(), exceptions.end(), length) != exceptions.end();
-
-    return length_found;
-};
-
-bool NodeFactory::use_CS_3D_PP(const function_pool& pool, NodeMetaData& nodeData)
-{
-    if(!pool.has_function(
-
-           PPFMKey(nodeData.length[0],
-                   nodeData.length[1],
-                   nodeData.length[2],
-                   nodeData.precision,
-                   nodeData.rootTransformType,
-                   CS_3D_PP)))
-        return false;
-
-    size_t bLow = batchLow;
-    if(nodeData.precision == rocfft_precision_single)
-    {
-        bool lenExceptionFound = false;
-
-        // Set a different batch cut-off for gfx1201/gfx950 when
-        // not hitting the excepted lengths in single-precision
-        std::vector<std::vector<size_t>> gfx1201LenException = {{52, 64, 64}, {128, 64, 64}};
-        lenExceptionFound = check_pp_length(gfx1201LenException, nodeData.length);
-        if(get_curr_gcn_arch_name() == "gfx1201" && !lenExceptionFound)
-            bLow = batchLowException1;
-        std::vector<std::vector<size_t>> gfx950LenException = {{52, 64, 64}};
-        lenExceptionFound = check_pp_length(gfx950LenException, nodeData.length);
-        if(get_curr_gcn_arch_name() == "gfx950" && !lenExceptionFound)
-            bLow = batchLowException1;
-    }
-
-    return check_pp_restrictions(nodeData, bLow);
-}
-
-bool NodeFactory::use_CS_REAL_3D_PP(const function_pool& pool, NodeMetaData& nodeData)
-{
-    const auto& realLength = nodeData.direction == -1 ? nodeData.length : nodeData.outputLength;
-
-    const bool is_default_contiguous_layout
-        = nodeData.is_using_default_contiguous_layout_for(io_data_label::INPUT)
-          && nodeData.is_using_default_contiguous_layout_for(io_data_label::OUTPUT);
-
-    // First check if we can use 2D_SINGLE + 1D kernel, prefer that over partial-pass
-    if(Real3DEvenNode::use_real_2D_single_SBCC(nodeData, pool, is_default_contiguous_layout))
-        return false;
-
-    // Now check if we have the kernels for partial-pass
-    if(!pool.has_function(PPFMKey(realLength[0],
-                                  realLength[1],
-                                  realLength[2],
-                                  nodeData.precision,
-                                  nodeData.rootTransformType,
-                                  CS_REAL_3D_PP)))
-        return false;
-
-    // The batch cut-off for real 3D partial-pass is generally higher than complex 3D partial-pass,
-    // and it also varies more across architectures, so we have more fine-grained cut-offs here.
-    size_t bLow = nodeData.precision == rocfft_precision_double ? batchLow : batchLowException1;
-    if(get_curr_gcn_arch_name() == "gfx950" || get_curr_gcn_arch_name() == "gfx90a")
-        bLow = batchLowException2;
-    else if(get_curr_gcn_arch_name() == "gfx942")
-        bLow = batchLow;
-
-    size_t                           bHigh              = 0;
-    std::vector<std::vector<size_t>> gfx950LenException = {{80, 108, 108}};
-    bool lenExceptionFound = check_pp_length(gfx950LenException, nodeData.length);
-    if(lenExceptionFound && get_curr_gcn_arch_name() == "gfx950")
-        bHigh = batchHigh;
-
-    return check_pp_restrictions(nodeData, bLow, bHigh);
 }

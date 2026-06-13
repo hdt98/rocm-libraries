@@ -27,9 +27,6 @@
 #include "rocblas_test.hpp"
 #include "singletons.hpp"
 
-#if __GLIBC__ < 3 && __GLIBC__MINOR__ < 39
-#undef _GLIBCXX_USE_C99_INTTYPES_TR1
-#endif
 #include <cinttypes>
 
 #define MEM_MAX_GUARD_PAD 8192
@@ -116,7 +113,8 @@ public:
         {
             if(!host_mem_safe(m_bytes))
             {
-                return nullptr; // caller decides on throwing exception
+                // exception same as host_alloc helper, could consider new exception
+                throw std::bad_alloc{};
             }
         }
 
@@ -188,11 +186,11 @@ public:
             if(m_pad > 0)
                 d -= m_pad; // restore to start of alloc
 
-            if(use_HMM)
-                free_ptr_use(d); // release count
-
             // Free device memory
             CHECK_HIP_ERROR((hipFree)(d));
+
+            if(use_HMM)
+                free_ptr_use(d); // release count
         }
     }
 };

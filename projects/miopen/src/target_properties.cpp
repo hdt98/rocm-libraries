@@ -25,10 +25,12 @@
  *******************************************************************************/
 #include <miopen/env.hpp>
 #include <miopen/handle.hpp>
+#include <miopen/stringutils.hpp>
 #include <miopen/target_properties.hpp>
-
 #include <map>
 #include <string>
+
+#define WORKAROUND_ISSUE_1204 1 // ROCm may incorrectly report "sramecc-" for gfx900.
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEBUG_ENFORCE_DEVICE)
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH)
@@ -57,12 +59,12 @@ static std::string GetDeviceNameFromMap(const std::string& in)
     if(!dev_str.empty())
         return dev_str;
 
-    std::string name = in.substr(0, in.find(':')); // str.substr(0, npos) returns str.
+    const auto name = in.substr(0, in.find(':')); // str.substr(0, npos) returns str.
 
     auto match = device_name_map.find(name);
     if(match != device_name_map.end())
-        name = match->second;
-    return name;
+        return match->second;
+    return name; // NOLINT (performance-no-automatic-move)
 }
 
 // See https://github.com/llvm/llvm-project/commit/1ed4caff1d5cd49233c1ae7b9f6483a946ed5eea.
@@ -80,10 +82,33 @@ void TargetProperties::Init(const Handle* const handle)
         return handle->GetDeviceNameImpl();
     }();
     name = GetDeviceNameFromMap(rawName);
-
-    xnack.init(rawName, name);
-    sramecc.init(rawName, name);
-
+    // DKMS driver older than 5.9 may report incorrect state of SRAMECC feature.
+    // Therefore we compute default SRAMECC and rely on it for now.
+    sramecc = [&]() -> boost::optional<bool> {
+        if(name == "gfx906" || name == "gfx908")
+            return {true};
+        return {};
+    }();
+    // However we need to store the reported state, even if it is incorrect,
+    // to use together with COMGR.
+    sramecc_reported = [&]() -> boost::optional<bool> {
+#if WORKAROUND_ISSUE_1204
+        if(name == "gfx900")
+            return {};
+#endif
+        if(rawName.find(":sramecc+") != std::string::npos)
+            return true;
+        if(rawName.find(":sramecc-") != std::string::npos)
+            return false;
+        return sramecc; // default
+    }();
+    xnack = [&]() -> boost::optional<bool> {
+        if(rawName.find(":xnack+") != std::string::npos)
+            return true;
+        if(rawName.find(":xnack-") != std::string::npos)
+            return false;
+        return {}; // default
+    }();
     InitDbId();
 }
 
@@ -96,15 +121,15 @@ void TargetProperties::InitDbId()
         // When feature equal to the default (SRAMECC ON), do not
         // append feature suffix. This is for backward compatibility
         // with legacy databases ONLY!
-        if(sramecc.isDisabled())
+        if(!sramecc || !(*sramecc))
             dbId += "_nosramecc";
     }
     else
     {
-        if(sramecc.isEnabled())
+        if(sramecc && *sramecc)
             dbId += "_sramecc";
     }
-    if(xnack.isEnabled())
+    if(xnack && *xnack)
         dbId += "_xnack";
 }
 

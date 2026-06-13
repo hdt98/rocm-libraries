@@ -69,8 +69,6 @@ BEGIN_ROCPRIM_NAMESPACE
 /// In the examples shuffle operation is performed on block of 192 threads, each provides
 /// one \p int value, result is returned using the same variable as for input.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/block/example_block_shuffle.cpp).
-///
 /// \code{.cpp}
 /// __global__ void example_kernel(...)
 /// {
@@ -81,7 +79,7 @@ BEGIN_ROCPRIM_NAMESPACE
 ///
 ///     int value = ...;
 ///     // execute block shuffle
-///     block__shuffle_int().rotate(
+///     block__shuffle_int().inclusive_up(
 ///         value, // input
 ///         value, // output
 ///         storage
@@ -170,8 +168,8 @@ public:
     /// \param [out] output reference to a output value, that receives data from another thread
     /// \param [in] distance The input threadId + distance = output threadId.
     /// \param [in] storage reference to a temporary storage object of type storage_type.
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void offset(const size_t& flat_id, T input, T& output, int distance, storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void
+        offset(const size_t& flat_id, T input, T& output, int distance, storage_type& storage)
     {
         storage.buffer.emplace(flat_id, input);
 
@@ -245,8 +243,8 @@ public:
     /// \param [out] output reference to a output value, that receives data from another thread
     /// \param [in] distance The input threadId + distance = output threadId.
     /// \param [in] storage reference to a temporary storage object of type storage_type.
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void rotate(const size_t& flat_id, T input, T& output, int distance, storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void
+        rotate(const size_t& flat_id, T input, T& output, int distance, storage_type& storage)
     {
         storage.buffer.emplace(flat_id, input);
 
@@ -322,11 +320,10 @@ public:
     /// \param [in] storage reference to a temporary storage object of type storage_type.
     /// The item \p prev[0] is not updated for <em>thread</em><sub>0</sub>.
     template<unsigned int ItemsPerThread>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void up(const size_t& flat_id,
-            T (&input)[ItemsPerThread],
-            T (&prev)[ItemsPerThread],
-            storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void up(const size_t& flat_id,
+                                          T (&input)[ItemsPerThread],
+                                          T (&prev)[ItemsPerThread],
+                                          storage_type& storage)
     {
         storage.buffer.emplace(flat_id, input[ItemsPerThread - 1]);
 
@@ -393,17 +390,16 @@ public:
     /// <em>thread</em><sub><tt>BlockSize-1</tt></sub>, provided to all threads
     /// \param [in] storage reference to a temporary storage object of type storage_type.
     template<int ItemsPerThread>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void up(const size_t& flat_id,
-            T (&input)[ItemsPerThread],
-            T (&prev)[ItemsPerThread],
-            T&            block_suffix,
-            storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void up(const size_t& flat_id,
+                                          T (&input)[ItemsPerThread],
+                                          T (&prev)[ItemsPerThread],
+                                          T&            block_suffix,
+                                          storage_type& storage)
     {
         up(flat_id, input, prev, storage);
 
         // Update block prefix
-        block_suffix = storage.buffer.get_unsafe_array()[BlockSize - 1];
+        block_suffix = storage->buffer.get_unsafe_array()[BlockSize - 1];
     }
 
     /// \brief The thread block rotates a blocked arrange of input items,
@@ -462,11 +458,10 @@ public:
     /// The item \p prev[0] is not updated for <em>thread</em><sub>BlockSize - 1</sub>.
     /// \param [in] storage reference to a temporary storage object of type storage_type.
     template<unsigned int ItemsPerThread>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void down(const size_t& flat_id,
-              T (&input)[ItemsPerThread],
-              T (&next)[ItemsPerThread],
-              storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void down(const size_t& flat_id,
+                                            T (&input)[ItemsPerThread],
+                                            T (&next)[ItemsPerThread],
+                                            storage_type& storage)
     {
         storage.buffer.emplace(flat_id, input[0]);
 
@@ -530,17 +525,16 @@ public:
     /// \param [out] block_prefix  The item \p input[0] from <em>thread</em><sub><tt>0</tt></sub>, provided to all threads
     /// \param [in] storage reference to a temporary storage object of type storage_type.
     template<unsigned int ItemsPerThread>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void down(const size_t& flat_id,
-              T (&input)[ItemsPerThread],
-              T (&next)[ItemsPerThread],
-              T&            block_prefix,
-              storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void down(const size_t& flat_id,
+                                            T (&input)[ItemsPerThread],
+                                            T (&next)[ItemsPerThread],
+                                            T&            block_prefix,
+                                            storage_type& storage)
     {
         this->down(flat_id, input, next, storage);
 
         // Update block prefixstorage_->
-        block_prefix = storage.buffer.get_unsafe_array()[0];
+        block_prefix = storage->next[0];
     }
 };
 

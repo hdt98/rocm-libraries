@@ -33,23 +33,39 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<class Key>
-struct search_config_selector
+// generic struct that instantiates custom configurations
+template<typename Config, typename>
+struct wrapped_search_config
 {
-    // Targets can not be fully empty.
-    using targets
-        = comp_targets<comp_target<gen::unknown, target_arch::unknown, gpu::generic, rep::amdgcn>>;
-    using param_type = search_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr search_config_selector(Target)
-        : params(param_type{
-            2048, kernel_config_params{256, 4}
-    })
-    {}
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr search_config_params params = Config{};
+    };
 };
+
+// specialized for rocprim::default_config, which instantiates the default_search_config
+template<typename Type>
+struct wrapped_search_config<default_config, Type>
+{
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr search_config_params params = {2048, kernel_config<256, 4>()};
+    };
+};
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<typename Config, typename Type>
+template<target_arch Arch>
+constexpr search_config_params
+    wrapped_search_config<Config, Type>::architecture_config<Arch>::params;
+
+template<typename Type>
+template<target_arch Arch>
+constexpr search_config_params
+    wrapped_search_config<default_config, Type>::architecture_config<Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } // namespace detail
 

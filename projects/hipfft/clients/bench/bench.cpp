@@ -31,9 +31,6 @@
 #include "../../shared/client_except.h"
 #include "../../shared/gpubuf.h"
 
-// initialize static class member of hipfft_params
-std::vector<gpubuf> hipfft_params::externally_managed_workareas = std::vector<gpubuf>();
-
 int main(int argc, char* argv[])
 {
     // This helps with mixing output of both wide and narrow characters to the screen
@@ -81,11 +78,6 @@ int main(int argc, char* argv[])
                      "Type of transform:\n0) complex forward\n1) complex inverse\n2) real "
                      "forward\n3) real inverse")
         ->default_val(fft_transform_type_complex_forward);
-    non_token
-        ->add_option("--auto_allocation",
-                     params.auto_allocate,
-                     "hipFFT's auto-allocation behavior: \"on\", \"off\", or \"default\"")
-        ->default_val("default");
     non_token
         ->add_option(
             "--precision", params.precision, "Transform precision: single (default), double, half")
@@ -234,19 +226,23 @@ int main(int argc, char* argv[])
         std::cout << "Token: " << params.token() << std::endl;
     }
 
-    // Check available memory:
-    const auto vram_avail = device_memory_accountant::singleton().get_usable_bytes_all_devices();
+    // Check free and total available memory:
+    size_t free  = 0;
+    size_t total = 0;
 
-    const auto io_vram_footprint = params.io_vram_footprint();
-    if(!vram_fits_problem(io_vram_footprint, vram_avail))
+    if(hipMemGetInfo(&free, &total) != hipSuccess)
+        throw std::runtime_error("hipMemGetInfo failed");
+
+    const auto raw_vram_footprint
+        = params.fft_params_vram_footprint() + twiddle_table_vram_footprint(params);
+    if(!vram_fits_problem(raw_vram_footprint, free))
     {
-        std::cout << "SKIPPED: Problem size (" << byte_sizes_to_str(io_vram_footprint)
-                  << ") exceeds usable memory on some device (" << byte_sizes_to_str(vram_avail)
-                  << ")\n";
+        std::cout << "SKIPPED: Problem size (" << raw_vram_footprint
+                  << ") raw data too large for device.\n";
         return EXIT_SUCCESS;
     }
 
-    std::vector<size_t> vram_footprint;
+    size_t vram_footprint = 0;
 
     try
     {
@@ -254,14 +250,13 @@ int main(int argc, char* argv[])
     }
     catch(ROCFFT_SKIP& e)
     {
-        std::cout << "SKIPPED: " << e.what() << "\n";
+        std::cout << "SKIPPED: " << e.msg << "\n";
         return EXIT_SUCCESS;
     }
-    if(!vram_fits_problem(vram_footprint, vram_avail))
+    if(!vram_fits_problem(vram_footprint, free))
     {
-        std::cout << "SKIPPED: Problem size (" << byte_sizes_to_str(io_vram_footprint)
-                  << ") exceeds usable memory on some device (" << byte_sizes_to_str(vram_avail)
-                  << ")\n";
+        std::cout << "SKIPPED: Problem size (" << vram_footprint
+                  << ") raw data too large for device.\n";
         return EXIT_SUCCESS;
     }
 
@@ -290,6 +285,7 @@ int main(int argc, char* argv[])
     auto is_host_gen = (params.igen == fft_input_generator_host
                         || params.igen == fft_input_random_generator_host);
 
+#ifdef USE_HIPRAND
     if(!is_host_gen)
     {
         // Input data:
@@ -312,7 +308,7 @@ int main(int argc, char* argv[])
             params.print_ibuffer(ibuffer_cpu);
         }
     }
-
+#endif
     if(is_host_gen)
     {
         // Input data:

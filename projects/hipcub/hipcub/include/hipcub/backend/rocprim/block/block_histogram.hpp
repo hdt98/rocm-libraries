@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2017-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2017-2024, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,7 +36,7 @@
 
 #include <type_traits>
 
-#include <rocprim/block/block_histogram.hpp> // IWYU pragma: export
+#include <rocprim/block/block_histogram.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
@@ -133,7 +133,7 @@ public:
                    CounterT histogram[BINS])
     {
         base_type::init_histogram(histogram);
-        __syncthreads();
+        CTA_SYNC();
         base_type::composite(items, histogram, temp_storage_);
     }
 

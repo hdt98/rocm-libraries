@@ -1,20 +1,29 @@
 .. meta::
-  :description: Building and installing rocFFT
+  :description: building and installing rocFFT
   :keywords: rocFFT, ROCm, API, documentation, install, build from source
 
 .. _building-installing-rocfft:
 
-************************************
-Build and install rocFFT from source
-************************************
+********************************************************************
+Building and installing rocFFT
+********************************************************************
 
-To build rocFFT as part of the ROCm Core SDK, see `TheRock build
-instructions
-<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
-TheRock is the recommended way to build ROCm components from source.
 
-Alternatively, you can build rocFFT standalone using the following
-instructions.
+This topic explains how to install rocFFT from the prebuilt packages or build it from the source code.
+
+Installing prebuilt packages
+=============================
+
+For information on downloading and installing ROCm, see the
+:doc:`ROCm installation guide <rocm-install-on-linux:install/quick-start>`.
+
+To install rocFFT, use the package manager for your Linux distribution.
+
+For example, on the Ubuntu distribution, run the following command:
+
+.. code-block:: shell
+
+   sudo apt update && sudo apt install rocfft
 
 Building rocFFT from source
 =============================
@@ -23,8 +32,7 @@ You can use the GitHub releases tab to download the source code. This might prov
 than the prebuilt packages.
 
 rocFFT uses the AMD clang++ compiler and CMake. You can specify several options to customize your build.
-Use the following commands to build a shared library for the supported AMD GPUs.
-Run these commands from the ``rocm-libraries/projects/rocfft`` directory:
+Use the following commands to build a shared library for the supported AMD GPUs:
 
 .. code-block:: shell
 
@@ -70,7 +78,7 @@ rocFFT uses version 1.11 of GoogleTest.
 
 You can build the clients separately from the main library.
 For example, to build all the clients with an existing rocFFT library, invoke CMake from
-within the ``rocm-libraries/projects/rocfft/rocFFT-src/clients`` folder using these commands:
+within the ``rocFFT-src/clients`` folder using these commands:
 
 .. code-block:: shell
 
@@ -82,8 +90,9 @@ To install the client dependencies on Ubuntu, run the following command:
 
 .. code-block:: shell
 
-   sudo apt install libgtest-dev libfftw3-dev
+   sudo apt install libgtest-dev libfftw3-dev libboost-dev
 
 .. note::
 
-   On Red Hat-related distributions, these packages are named ``gtest-devel`` and ``fftw-devel``.
+   ``libboost-dev`` is the Boost development package. On Red Hat-related distributions,
+   these packages are named ``gtest-devel``, ``fftw-devel`` and ``boost-devel``.

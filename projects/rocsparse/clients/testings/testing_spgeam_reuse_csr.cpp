@@ -69,20 +69,23 @@ void testing_spgeam_reuse_csr_bad_arg(const Arguments& arg)
     rocsparse_spmat_descr mat_B = local_B;
     rocsparse_spmat_descr mat_C = local_C;
 
+    const T* alpha = (const T*)0x4;
+    const T* beta  = (const T*)0x4;
+
     size_t buffer_size = 0;
     void*  temp_buffer = nullptr;
 
-    int32_t       nargs_to_exclude_buffer_size   = 3;
-    const int32_t args_to_exclude_buffer_size[3] = {4, 6, 7};
+    int       nargs_to_exclude_buffer_size   = 2;
+    const int args_to_exclude_buffer_size[2] = {4, 6};
 
-    int32_t       nargs_to_exclude_analysis   = 4;
-    const int32_t args_to_exclude_analysis[4] = {4, 6, 7, 8};
+    int       nargs_to_exclude_analysis   = 5;
+    const int args_to_exclude_analysis[5] = {2, 4, 6, 8, 9};
 
-    int32_t       nargs_to_exclude   = 3;
-    const int32_t args_to_exclude[3] = {6, 7, 8};
+    int       nargs_to_exclude   = 4;
+    const int args_to_exclude[4] = {2, 4, 8, 9};
 
-    rocsparse_spgeam_stage stage = rocsparse_spgeam_stage_symbolic_analysis;
-    rocsparse_error*       p_error{};
+    rocsparse_spgeam_stage stage = rocsparse_spgeam_stage_analysis;
+
     // Analysis
     select_bad_arg_analysis(rocsparse_spgeam_buffer_size,
                             nargs_to_exclude_buffer_size,
@@ -93,25 +96,24 @@ void testing_spgeam_reuse_csr_bad_arg(const Arguments& arg)
                             mat_B,
                             mat_C,
                             stage,
-                            &buffer_size,
-                            p_error);
-
+                            &buffer_size);
     select_bad_arg_analysis(rocsparse_spgeam,
                             nargs_to_exclude_analysis,
                             args_to_exclude_analysis,
                             handle,
                             descr,
+                            alpha,
                             mat_A,
+                            beta,
                             mat_B,
                             mat_C,
                             stage,
                             buffer_size,
-                            temp_buffer,
-                            p_error);
+                            temp_buffer);
 
-    stage = rocsparse_spgeam_stage_symbolic_compute;
+    stage = rocsparse_spgeam_stage_symbolic;
 
-    // Symbolic_Compute
+    // Symbolic
     select_bad_arg_analysis(rocsparse_spgeam_buffer_size,
                             nargs_to_exclude_buffer_size,
                             args_to_exclude_buffer_size,
@@ -121,25 +123,24 @@ void testing_spgeam_reuse_csr_bad_arg(const Arguments& arg)
                             mat_B,
                             mat_C,
                             stage,
-                            &buffer_size,
-                            p_error);
-
+                            &buffer_size);
     select_bad_arg_analysis(rocsparse_spgeam,
                             nargs_to_exclude,
                             args_to_exclude,
                             handle,
                             descr,
+                            alpha,
                             mat_A,
+                            beta,
                             mat_B,
                             mat_C,
                             stage,
                             buffer_size,
-                            temp_buffer,
-                            p_error);
+                            temp_buffer);
 
-    // Numeric analysis
-    stage = rocsparse_spgeam_stage_numeric_analysis;
+    stage = rocsparse_spgeam_stage_numeric;
 
+    // Numeric
     select_bad_arg_analysis(rocsparse_spgeam_buffer_size,
                             nargs_to_exclude_buffer_size,
                             args_to_exclude_buffer_size,
@@ -149,48 +150,20 @@ void testing_spgeam_reuse_csr_bad_arg(const Arguments& arg)
                             mat_B,
                             mat_C,
                             stage,
-                            &buffer_size,
-                            p_error);
-
-    select_bad_arg_analysis(rocsparse_spgeam,
-                            nargs_to_exclude_analysis,
-                            args_to_exclude_analysis,
-                            handle,
-                            descr,
-                            mat_A,
-                            mat_B,
-                            mat_C,
-                            stage,
-                            buffer_size,
-                            temp_buffer,
-                            p_error);
-
-    // Numeric compute
-    stage = rocsparse_spgeam_stage_numeric_compute;
-    select_bad_arg_analysis(rocsparse_spgeam_buffer_size,
-                            nargs_to_exclude_buffer_size,
-                            args_to_exclude_buffer_size,
-                            handle,
-                            descr,
-                            mat_A,
-                            mat_B,
-                            mat_C,
-                            stage,
-                            &buffer_size,
-                            p_error);
-
+                            &buffer_size);
     select_bad_arg_analysis(rocsparse_spgeam,
                             nargs_to_exclude,
                             args_to_exclude,
                             handle,
                             descr,
+                            alpha,
                             mat_A,
+                            beta,
                             mat_B,
                             mat_C,
                             stage,
                             buffer_size,
-                            temp_buffer,
-                            p_error);
+                            temp_buffer);
 }
 
 template <typename I, typename J, typename T>
@@ -208,15 +181,16 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
     T h_alpha = arg.get_alpha<T>();
     T h_beta  = arg.get_beta<T>();
 
-    T* h_alpha_ptr = &h_alpha;
-    T* h_beta_ptr  = &h_beta;
+    // -99 means nullptr
+    T* h_alpha_ptr = (h_alpha == (T)-99) ? nullptr : &h_alpha;
+    T* h_beta_ptr  = (h_beta == (T)-99) ? nullptr : &h_beta;
 
     device_vector<T> d_alpha(1);
     device_vector<T> d_beta(1);
     CHECK_HIP_ERROR(hipMemcpy(d_alpha, &h_alpha, sizeof(T), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(d_beta, &h_beta, sizeof(T), hipMemcpyHostToDevice));
-    T* d_alpha_ptr = d_alpha;
-    T* d_beta_ptr  = d_beta;
+    T* d_alpha_ptr = (h_alpha == (T)-99) ? nullptr : d_alpha;
+    T* d_beta_ptr  = (h_beta == (T)-99) ? nullptr : d_beta;
 
     // Index and data type
     rocsparse_datatype ttype = get_datatype<T>();
@@ -257,16 +231,14 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
     rocsparse_spgeam_descr descr;
     CHECK_ROCSPARSE_ERROR(rocsparse_create_spgeam_descr(&descr));
 
+    CHECK_ROCSPARSE_ERROR(
+        rocsparse_spgeam_set_input(handle, descr, rocsparse_spgeam_input_alg, &alg, sizeof(alg)));
     CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_alg, &alg, sizeof(alg), nullptr));
+        handle, descr, rocsparse_spgeam_input_operation_A, &trans_A, sizeof(trans_A)));
     CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_operation_A, &trans_A, sizeof(trans_A), nullptr));
+        handle, descr, rocsparse_spgeam_input_operation_B, &trans_B, sizeof(trans_B)));
     CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_operation_B, &trans_B, sizeof(trans_B), nullptr));
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_datatype, &ttype, sizeof(ttype), nullptr));
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_compute_datatype, &ttype, sizeof(ttype), nullptr));
+        handle, descr, rocsparse_spgeam_input_compute_datatype, &ttype, sizeof(ttype)));
 
     // Calculate NNZ phase
     size_t buffer_size_in_bytes;
@@ -276,22 +248,33 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
                                                        mat_A,
                                                        mat_B,
                                                        nullptr,
-                                                       rocsparse_spgeam_stage_symbolic_analysis,
-                                                       &buffer_size_in_bytes,
-                                                       nullptr));
+                                                       rocsparse_spgeam_stage_analysis,
+                                                       &buffer_size_in_bytes));
 
     CHECK_HIP_ERROR(rocsparse_hipMalloc(&buffer, buffer_size_in_bytes));
 
     CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
     CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
                                            descr,
+                                           h_alpha_ptr,
                                            mat_A,
+                                           h_beta_ptr,
                                            mat_B,
                                            nullptr,
-                                           rocsparse_spgeam_stage_symbolic_analysis,
+                                           rocsparse_spgeam_stage_analysis,
                                            buffer_size_in_bytes,
-                                           buffer,
-                                           nullptr));
+                                           buffer));
+    CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_device));
+    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
+                                           descr,
+                                           d_alpha_ptr,
+                                           mat_A,
+                                           d_beta_ptr,
+                                           mat_B,
+                                           nullptr,
+                                           rocsparse_spgeam_stage_analysis,
+                                           buffer_size_in_bytes,
+                                           buffer));
     CHECK_HIP_ERROR(rocsparse_hipFree(buffer));
 
     // Ensure analysis stage is complete before grabbing C non-zero count
@@ -299,7 +282,7 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
 
     int64_t nnz_C;
     CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_get_output(
-        handle, descr, rocsparse_spgeam_output_nnz, &nnz_C, sizeof(int64_t), nullptr));
+        handle, descr, rocsparse_spgeam_output_nnz, &nnz_C, sizeof(int64_t)));
 
     // Allocate and set up C
     device_csr_matrix<T, I, J> dC;
@@ -312,52 +295,36 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
                                                        mat_A,
                                                        mat_B,
                                                        mat_C,
-                                                       rocsparse_spgeam_stage_symbolic_compute,
-                                                       &buffer_size_in_bytes,
-                                                       nullptr));
+                                                       rocsparse_spgeam_stage_symbolic,
+                                                       &buffer_size_in_bytes));
     CHECK_HIP_ERROR(rocsparse_hipMalloc(&buffer, buffer_size_in_bytes));
-
+    CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
     CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
                                            descr,
+                                           h_alpha_ptr,
                                            mat_A,
+                                           h_beta_ptr,
                                            mat_B,
                                            mat_C,
-                                           rocsparse_spgeam_stage_symbolic_compute,
+                                           rocsparse_spgeam_stage_symbolic,
                                            buffer_size_in_bytes,
-                                           buffer,
-                                           nullptr));
+                                           buffer));
+    CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_device));
+    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
+                                           descr,
+                                           d_alpha_ptr,
+                                           mat_A,
+                                           d_beta_ptr,
+                                           mat_B,
+                                           mat_C,
+                                           rocsparse_spgeam_stage_symbolic,
+                                           buffer_size_in_bytes,
+                                           buffer));
     CHECK_HIP_ERROR(rocsparse_hipFree(buffer));
 
     // Numeric compute phase
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_buffer_size(handle,
-                                                       descr,
-                                                       mat_A,
-                                                       mat_B,
-                                                       mat_C,
-                                                       rocsparse_spgeam_stage_numeric_analysis,
-                                                       &buffer_size_in_bytes,
-                                                       nullptr));
-
-    CHECK_HIP_ERROR(rocsparse_hipMalloc(&buffer, buffer_size_in_bytes));
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
-                                           descr,
-                                           mat_A,
-                                           mat_B,
-                                           mat_C,
-                                           rocsparse_spgeam_stage_numeric_analysis,
-                                           buffer_size_in_bytes,
-                                           buffer,
-                                           nullptr));
-    CHECK_HIP_ERROR(rocsparse_hipFree(buffer));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_buffer_size(handle,
-                                                       descr,
-                                                       mat_A,
-                                                       mat_B,
-                                                       mat_C,
-                                                       rocsparse_spgeam_stage_numeric_compute,
-                                                       &buffer_size_in_bytes,
-                                                       nullptr));
+    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_buffer_size(
+        handle, descr, mat_A, mat_B, mat_C, rocsparse_spgeam_stage_numeric, &buffer_size_in_bytes));
     CHECK_HIP_ERROR(rocsparse_hipMalloc(&buffer, buffer_size_in_bytes));
 
     if(arg.unit_check)
@@ -401,31 +368,18 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
 
         // Compute C on host multiple times.
         CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
-        CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(handle,
-                                                         descr,
-                                                         rocsparse_spgeam_input_scalar_alpha,
-                                                         h_alpha_ptr,
-                                                         sizeof(h_alpha_ptr),
-                                                         nullptr));
-
-        CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(handle,
-                                                         descr,
-                                                         rocsparse_spgeam_input_scalar_beta,
-                                                         h_beta_ptr,
-                                                         sizeof(h_beta_ptr),
-                                                         nullptr));
-
-        for(int32_t i = 0; i < 2; i++)
+        for(int i = 0; i < 2; i++)
         {
             CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
                                                    descr,
+                                                   h_alpha_ptr,
                                                    mat_A,
+                                                   h_beta_ptr,
                                                    mat_B,
                                                    mat_C,
-                                                   rocsparse_spgeam_stage_numeric_compute,
+                                                   rocsparse_spgeam_stage_numeric,
                                                    buffer_size_in_bytes,
-                                                   buffer,
-                                                   nullptr));
+                                                   buffer));
         }
 
         hC.near_check(dC);
@@ -437,31 +391,18 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
 
         // Compute C on device multiple times.
         CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_device));
-        CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(handle,
-                                                         descr,
-                                                         rocsparse_spgeam_input_scalar_alpha,
-                                                         d_alpha_ptr,
-                                                         sizeof(d_alpha_ptr),
-                                                         nullptr));
-
-        CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(handle,
-                                                         descr,
-                                                         rocsparse_spgeam_input_scalar_beta,
-                                                         d_beta_ptr,
-                                                         sizeof(d_beta_ptr),
-                                                         nullptr));
-
-        for(int32_t i = 0; i < 2; i++)
+        for(int i = 0; i < 2; i++)
         {
             CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
                                                    descr,
+                                                   d_alpha_ptr,
                                                    mat_A,
+                                                   d_beta_ptr,
                                                    mat_B,
                                                    mat_C,
-                                                   rocsparse_spgeam_stage_numeric_compute,
+                                                   rocsparse_spgeam_stage_numeric,
                                                    buffer_size_in_bytes,
-                                                   buffer,
-                                                   nullptr));
+                                                   buffer));
         }
 
         if(ROCSPARSE_REPRODUCIBILITY)
@@ -474,52 +415,41 @@ void testing_spgeam_reuse_csr(const Arguments& arg)
 
     if(arg.timing)
     {
-        int32_t number_cold_calls = 2;
-        int32_t number_hot_calls  = arg.iters;
+        int number_cold_calls = 2;
+        int number_hot_calls  = arg.iters;
 
         CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
-        CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(handle,
-                                                         descr,
-                                                         rocsparse_spgeam_input_scalar_alpha,
-                                                         h_alpha_ptr,
-                                                         sizeof(h_alpha_ptr),
-                                                         nullptr));
-
-        CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(handle,
-                                                         descr,
-                                                         rocsparse_spgeam_input_scalar_beta,
-                                                         h_beta_ptr,
-                                                         sizeof(d_beta_ptr),
-                                                         nullptr));
 
         // Warm up
-        for(int32_t iter = 0; iter < number_cold_calls; ++iter)
+        for(int iter = 0; iter < number_cold_calls; ++iter)
         {
             CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
                                                    descr,
+                                                   h_alpha_ptr,
                                                    mat_A,
+                                                   h_beta_ptr,
                                                    mat_B,
                                                    mat_C,
-                                                   rocsparse_spgeam_stage_numeric_compute,
+                                                   rocsparse_spgeam_stage_numeric,
                                                    buffer_size_in_bytes,
-                                                   buffer,
-                                                   nullptr));
+                                                   buffer));
         }
 
         double gpu_solve_time_used = get_time_us();
 
         // Performance run
-        for(int32_t iter = 0; iter < number_hot_calls; ++iter)
+        for(int iter = 0; iter < number_hot_calls; ++iter)
         {
             CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(handle,
                                                    descr,
+                                                   h_alpha_ptr,
                                                    mat_A,
+                                                   h_beta_ptr,
                                                    mat_B,
                                                    mat_C,
-                                                   rocsparse_spgeam_stage_numeric_compute,
+                                                   rocsparse_spgeam_stage_numeric,
                                                    buffer_size_in_bytes,
-                                                   buffer,
-                                                   nullptr));
+                                                   buffer));
         }
 
         gpu_solve_time_used = (get_time_us() - gpu_solve_time_used) / number_hot_calls;
@@ -579,194 +509,4 @@ INSTANTIATE(int64_t, int64_t, float);
 INSTANTIATE(int64_t, int64_t, double);
 INSTANTIATE(int64_t, int64_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int64_t, rocsparse_double_complex);
-
-//
-// This test messes up stages and checks that invalid status is returned.
-//
-static void testing_spgeam_reuse_csr_extra_wrong_stages(const Arguments& arg)
-{
-    const int32_t              m       = 2;
-    const int32_t              n       = 2;
-    const int32_t              nnz_A   = 2;
-    const int32_t              nnz_B   = 2;
-    const int32_t              nnz_C   = 2;
-    const float                h_alpha = 1.0f;
-    const float                h_beta  = 1.0f;
-    const rocsparse_index_base base_A  = rocsparse_index_base_zero;
-    const rocsparse_index_base base_B  = rocsparse_index_base_zero;
-    const rocsparse_index_base base_C  = rocsparse_index_base_zero;
-    const rocsparse_operation  trans_A = rocsparse_operation_none;
-    const rocsparse_operation  trans_B = rocsparse_operation_none;
-    const rocsparse_spgeam_alg alg     = rocsparse_spgeam_alg_default;
-    const rocsparse_datatype   ttype   = rocsparse_datatype_f32_r;
-    // Create rocsparse handle
-    rocsparse_local_handle handle;
-    // Declare host matrices.
-    host_csr_matrix<float> hA(m, n, nnz_A, base_A);
-    host_csr_matrix<float> hB(m, n, nnz_B, base_B);
-    host_csr_matrix<float> hC(m, n, nnz_C, base_C);
-    hA.ptr[0] = 0;
-    hA.ptr[1] = 1;
-    hA.ptr[2] = 2;
-    hA.ind[0] = 0;
-    hA.ind[1] = 1;
-    hA.val[0] = 1;
-    hA.val[1] = 1;
-
-    hB.ptr[0] = 0;
-    hB.ptr[1] = 1;
-    hB.ptr[2] = 2;
-    hB.ind[0] = 0;
-    hB.ind[1] = 1;
-    hB.val[0] = 1;
-    hB.val[1] = 1;
-
-    hC.ptr[0] = 0;
-    hC.ptr[1] = 1;
-    hC.ptr[2] = 2;
-    hC.ind[0] = 0;
-    hC.ind[1] = 1;
-    hC.val[0] = 2;
-    hC.val[1] = 2;
-
-    device_csr_matrix<float> dA(hA), dB(hB), dC(hC);
-    rocsparse_local_spmat    A(dA), B(dB), C(dC);
-
-    rocsparse_spgeam_descr descr;
-    CHECK_ROCSPARSE_ERROR(rocsparse_create_spgeam_descr(&descr));
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_alg, &alg, sizeof(alg), nullptr));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_operation_A, &trans_A, sizeof(trans_A), nullptr));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_operation_B, &trans_B, sizeof(trans_B), nullptr));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_datatype, &ttype, sizeof(ttype), nullptr));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_compute_datatype, &ttype, sizeof(ttype), nullptr));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_alpha, &h_alpha, sizeof(&h_alpha), nullptr));
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_beta, &h_beta, sizeof(&h_beta), nullptr));
-
-    // Calculate NNZ phase
-    const size_t              buffer_size_in_bytes = 64;
-    device_dense_vector<char> buffer(buffer_size_in_bytes);
-
-#define PARAMS(stage) handle, descr, A, B, C, stage, buffer_size_in_bytes, buffer, nullptr
-
-    {
-        ROCSPARSE_DEBUG_VERBOSE_OFF;
-        //
-        // Expect an invalid status when calling symbolic_compute before symbolic analysis
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_compute)),
-                                rocsparse_status_invalid_value);
-        ROCSPARSE_DEBUG_VERBOSE_ON;
-    }
-
-    //
-    // Call symbolic analysis
-    //
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_analysis)));
-
-    {
-        ROCSPARSE_DEBUG_VERBOSE_OFF;
-        //
-        // Expect an invalid status when calling symbolic analysis twice
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_analysis)),
-                                rocsparse_status_invalid_value);
-
-        ROCSPARSE_DEBUG_VERBOSE_ON;
-    }
-
-    //
-    // Call symbolic_compute
-    //
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_compute)));
-
-    {
-        ROCSPARSE_DEBUG_VERBOSE_OFF;
-        //
-        // Expect an invalid status when calling symbolic_compute twice
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_compute)),
-                                rocsparse_status_invalid_value);
-
-        //
-        // Expect an invalid status when calling compute after symbolic_compute
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_compute)),
-                                rocsparse_status_invalid_value);
-
-        ROCSPARSE_DEBUG_VERBOSE_ON;
-    }
-
-    {
-        ROCSPARSE_DEBUG_VERBOSE_OFF;
-        //
-        // Expect an invalid status when calling numeric_compute before numeric_analysis
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_compute)),
-                                rocsparse_status_invalid_value);
-        ROCSPARSE_DEBUG_VERBOSE_ON;
-    }
-
-    //
-    // Call numeric analysis
-    //
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_numeric_analysis)));
-
-    {
-        ROCSPARSE_DEBUG_VERBOSE_OFF;
-        //
-        // Expect an invalid status when calling numeric analysis twice
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_numeric_analysis)),
-                                rocsparse_status_invalid_value);
-
-        ROCSPARSE_DEBUG_VERBOSE_ON;
-    }
-
-    //
-    // Call numeric_compute
-    //
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_numeric_compute)));
-
-    //
-    // Call numeric_compute twice
-    //
-    CHECK_ROCSPARSE_ERROR(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_numeric_compute)));
-
-    {
-        ROCSPARSE_DEBUG_VERBOSE_OFF;
-        //
-        // Expect an invalid status when calling symbolic_compute after numeric_compute
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_symbolic_compute)),
-                                rocsparse_status_invalid_value);
-
-        //
-        // Expect an invalid status when calling compute after numeric_compute
-        //
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spgeam(PARAMS(rocsparse_spgeam_stage_compute)),
-                                rocsparse_status_invalid_value);
-
-        ROCSPARSE_DEBUG_VERBOSE_ON;
-    }
-
-    CHECK_ROCSPARSE_ERROR(rocsparse_destroy_spgeam_descr(descr));
-#undef PARAMS
-}
-
-void testing_spgeam_reuse_csr_extra(const Arguments& arg)
-{
-    testing_spgeam_reuse_csr_extra_wrong_stages(arg);
-}
+void testing_spgeam_reuse_csr_extra(const Arguments& arg) {}

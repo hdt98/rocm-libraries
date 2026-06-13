@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -104,7 +104,7 @@ void testing_rot_batched(const Arguments& arg)
     int64_t abs_incx = incx >= 0 ? incx : -incx;
     int64_t abs_incy = incy >= 0 ? incy : -incy;
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     device_batch_vector<T> dx(N, incx, batch_count);
     device_batch_vector<T> dy(N, incy, batch_count);
@@ -161,8 +161,8 @@ void testing_rot_batched(const Arguments& arg)
                         incx,
                         dy.ptr_on_device(),
                         incy,
-                        hc.internal_type(),
-                        hs.internal_type(),
+                        hc,
+                        hs,
                         batch_count));
 
             host_batch_vector<T> rx(N, incx, batch_count);

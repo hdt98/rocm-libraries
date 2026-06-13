@@ -2,59 +2,7 @@
 
 Full documentation for hipSPARSELt is available at [rocm.docs.amd.com/projects/hipSPARSELt](https://rocm.docs.amd.com/projects/hipSPARSELt/en/latest/index.html).
 
-## hipSPARSELt 0.2.9 since ROCm 7.13
-
-### Added
-
-* Support for the following data type combinations for the LLVM target gfx942:
-  * FP8_FNUZ(E4M3_FNUZ) inputs, F32 output, and F32 Matrix Core accumulation.
-  * BF8_FNUZ(E5M2_FNUZ) inputs, F32 output, and F32 Matrix Core accumulation.
-
-## hipSPARSELt 0.2.8 for ROCm 7.13
-
-### Added
-
-* CTest and test categories support (`--smoke`, `--pre_checkin`, and `--nightly`).
-
-### Optimized
-
-* Provided more kernels for the FP16, BF16 and Int8 datatypes.
-* Improved the performance of the `HIPSPARSELT_PRUNE_SPMMA_TILE` function.
-
-### Resolved issues
-
-* Fixed incorrect behavior when retrieving the PCI chip ID.
-* Fixed LDS out-of-bounds read in `prune_tile_kernel`.
-* Fixed out-of-bounds access for compress function test cases.
-* Fixed missing null terminator in the return value of `hipsparseLtGetArchName()`
-* Fixed incorrect CPU result when `bias_type` is BF16 for spmm test cases.
-* Fixed double-free issue in example code: `example_prune_strip`.
-* Fixed symbol interposition in the hipSPARSELt library.
-
-## hipSPARSELt 0.2.7 for ROCm 7.12
-
-### Added
-
-* Support for the following data type combinations for the LLVM target gfx942/gfx950:
-  * `INT8` inputs, `INT32` output, and `INT32` Matrix Core accumulation.
-
-## hipSPARSELt 0.2.6 for ROCm 7.2.0
-
-### Optimized
-
-* Provided more kernels for the `FP16` and `FP8(E4M3)` data types.
-
-## hipSPARSELt 0.2.5 for ROCm 7.1.0
-
-### Changed
-
-* Changed the behavior of the Relu activation.
-
-### Optimized
-
-* Provided more kernels for the `FP16` and `BF16` data types.
-
-## hipSPARSELt 0.2.4 for ROCm 7.0.0
+## (Unreleased) hipSPARSELt 0.2.4 for ROCm 6.5.0
 
 ### Added
 
@@ -65,17 +13,16 @@ Full documentation for hipSPARSELt is available at [rocm.docs.amd.com/projects/h
 * Support for ROC-TX if `HIPSPARSELT_ENABLE_MARKER=1` is set.
 * Support for the cuSPARSELt v0.6.3 backend.
 
+### Changed
+
+* Support for the LLVM target gfx940 and gfx941 has been removed.
+
 ### Optimized
 
 * Improved the library loading time.
 * Provided more kernels for FP16 datatype.
 
-### Removed
-
-* Support for LLVM targets gfx940 and gfx941 has been removed.
-* `hipsparseLtDatatype_t` has been removed.
-
-## hipSPARSELt 0.2.3 for ROCm 6.4.0
+## (Unreleased) hipSPARSELt 0.2.3 for ROCm 6.4.0
 
 ### Added
 

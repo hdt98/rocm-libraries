@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,17 +21,17 @@
 #ifndef ROCPRIM_DETAIL_VARIOUS_HPP_
 #define ROCPRIM_DETAIL_VARIOUS_HPP_
 
+#include <chrono>
+#include <iostream>
+#include <type_traits>
+
 #include "../common.hpp"
 #include "../config.hpp"
+#include "../functional.hpp"
 #include "../type_traits.hpp"
 #include "../types.hpp"
 
 #include <hip/hip_runtime.h>
-
-#include <chrono>
-#include <iostream>
-#include <type_traits>
-#include <variant>
 
 // Check for c++ standard library features, in a backwards compatible manner
 #ifndef __has_include
@@ -190,11 +190,10 @@ struct match_fundamental_type
         >::type;
 };
 
-// A storage-backing wrapper that allows types with non-trivial constructors to be aliased in unions.
-// Due to the reinterpret cast, it may in some cases be technically UB, but the generated code is usually
-// more performant than proper code.
+// A storage-backing wrapper that allows types with non-trivial constructors to be aliased in unions
 template<typename T>
-struct raw_storage
+struct [[deprecated("To store non default-constructible types in local memory, use "
+                    "rocprim::uninitialized_array instead")]] raw_storage
 {
     // Biggest memory-access word that T is a whole multiple of and is not larger than the alignment of T
     using device_word = typename detail::match_fundamental_type<T>::type;
@@ -303,7 +302,17 @@ using bool_constant = std::integral_constant<bool, Value>;
 inline hipError_t memcpy_and_sync(
     void* dst, const void* src, size_t size_bytes, hipMemcpyKind kind, hipStream_t stream)
 {
+    // hipMemcpyWithStream is only supported on rocm 3.1 and above
+#if(HIP_VERSION_MAJOR == 3 && HIP_VERSION_MINOR >= 1) || HIP_VERSION_MAJOR > 3
     return hipMemcpyWithStream(dst, src, size_bytes, kind, stream);
+#else
+    const hipError_t result = hipMemcpyAsync(dst src, size_bytes, kind, stream);
+    if(hipSuccess != result)
+    {
+        return result;
+    }
+    return hipStreamSynchronize(stream);
+#endif
 }
 
 #if __cpp_lib_as_const >= 201510L
@@ -328,6 +337,25 @@ template<typename T>
 constexpr std::add_const_t<T>* as_const_ptr(T* ptr)
 {
     return ptr;
+}
+
+template<class Tuple, class Function, size_t... Indices>
+ROCPRIM_HOST_DEVICE inline void
+    for_each_in_tuple_impl(Tuple&& t, Function&& f, ::rocprim::index_sequence<Indices...>)
+{
+    int swallow[]
+        = {(std::forward<Function>(f)(::rocprim::get<Indices>(std::forward<Tuple>(t))), 0)...};
+    (void)swallow;
+}
+
+template<class Tuple, class Function>
+ROCPRIM_HOST_DEVICE inline auto for_each_in_tuple(Tuple&& t, Function&& f)
+    -> void_t<tuple_size<std::remove_reference_t<Tuple>>>
+{
+    static constexpr size_t size = tuple_size<std::remove_reference_t<Tuple>>::value;
+    for_each_in_tuple_impl(std::forward<Tuple>(t),
+                           std::forward<Function>(f),
+                           ::rocprim::make_index_sequence<size>());
 }
 
 /// \brief Reinterprets the pointer as another type and increments it to match the alignment of
@@ -377,10 +405,22 @@ ROCPRIM_HOST_DEVICE ROCPRIM_INLINE DstPtr cast_align_down(Src* pointer)
 }
 
 template<typename Destination, typename Source>
-ROCPRIM_INLINE ROCPRIM_HOST_DEVICE
-auto bit_cast(const Source& source)
+ROCPRIM_HOST_DEVICE auto bit_cast(const Source& source)
+    -> std::enable_if_t<sizeof(Destination) == sizeof(Source)
+                            && std::is_trivially_copyable<Destination>::value
+                            && std::is_trivially_copyable<Source>::value,
+                        Destination>
 {
-    return ::rocprim::traits::radix_key_codec::bit_cast<Destination, Source>(source);
+#if defined(__has_builtin) && __has_builtin(__builtin_bit_cast)
+    return __builtin_bit_cast(Destination, source);
+#else
+    static_assert(
+        std::is_trivially_constructable<Destination>::value,
+        "Fallback implementation of bit_cast requires Destination to be trivially constructible");
+    Destination dest;
+    memcpy(&dest, &source, sizeof(Destination));
+    return dest;
+#endif
 }
 
 template<typename... Ts>
@@ -414,7 +454,7 @@ hipError_t
     hipDevice_t stream_device;
     ROCPRIM_RETURN_ON_ERROR(hipStreamGetDevice(stream, &stream_device));
 
-    // After setting device, we can't just exit on non-success.
+    // after setting device, we can't just exit on non-success
     hipError_t result = hipSetDevice(stream_device);
 
     int occupancy;
@@ -439,7 +479,7 @@ hipError_t
         result = hipDeviceGetAttribute(&num_multi_processors,
                                        hipDeviceAttribute_t::hipDeviceAttributeMultiprocessorCount,
                                        stream_device);
-        // Sanity check.
+        // sanity check
         if(num_multi_processors == 0)
         {
             result = hipErrorUnknown;
@@ -451,7 +491,7 @@ hipError_t
         grid_dim = occupancy * num_multi_processors;
     }
 
-    // Always attempt to restore to default device.
+    // always attempt to restore to default device
     hipError_t set_result = hipSetDevice(default_device);
     ROCPRIM_RETURN_ON_ERROR(result);
 
@@ -496,200 +536,6 @@ inline float update_time_point(std::chrono::high_resolution_clock::time_point& t
     t_time = t_stop;
 
     return delta_time;
-}
-
-template<typename T, T... Vs>
-struct constexpr_value_variant
-{
-    using variant = std::variant<std::integral_constant<T, Vs>...>;
-
-    static variant create(T value)
-    {
-        variant var{};
-        // Unfold over variadic enum values. For each value
-        // create and run a small lambda that sets our variant.
-        (
-            [&]
-            {
-                if(value == Vs)
-                {
-                    var = std::integral_constant<T, Vs>{};
-                }
-            }(),
-            ...);
-        return var;
-    }
-};
-
-template<typename... T>
-struct constexpr_type_variant
-{
-    using variant = std::variant<T...>;
-
-    static variant create(int index, T... values)
-    {
-        variant var{};
-        update_variant(index, var, std::make_tuple(values...), std::index_sequence_for<T...>{});
-        return var;
-    }
-
-    static variant create(int index)
-    {
-        return create(index, (T{}, ...));
-    }
-
-    template<typename F>
-    static variant create_with(int index, F f)
-    {
-        auto var = create(index, (T{}, ...));
-        std::visit(f, var);
-    };
-
-    static variant create(bool select, T... values)
-    {
-        return create(select ? 1 /* true */ : 0 /* false */, values...);
-    }
-
-private:
-    template<std::size_t... I>
-    static void update_variant(std::size_t      index,
-                               variant&         var,
-                               std::tuple<T...> t,
-                               std::index_sequence<I...> /* */)
-    {
-        ((index == I ? var = std::get<I>(t), 0 : 0), ...);
-    }
-};
-
-template<class T>
-struct type_wrapper
-{
-private:
-    T data;
-
-public:
-    ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE
-    static auto create(T& item)
-    {
-        type_wrapper ret;
-        ret.data = item;
-        return ret;
-    }
-
-    ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE
-    T unpack()
-    {
-        return data;
-    }
-};
-
-// For each element 'i' in index sequence, do 'f(init + i * inc)'.
-template<typename F, auto init, auto inc, std::size_t... Is>
-constexpr void constexpr_for_impl(F&& f, std::index_sequence<Is...> /* sequence */)
-{
-    // Implement constexpr for via std::index_sequence because it compiles faster
-    // than recursive types.
-    (f(std::integral_constant<decltype(init), init + Is * inc>{}), ...);
-}
-
-/// Implements statically unrolled loop:
-/// `for (auto i = init; i < cond; i += inc) f(i);`
-template<auto init, auto cond, auto inc, class F>
-ROCPRIM_HOST_DEVICE ROCPRIM_INLINE
-constexpr void constexpr_for_lt(F&& f)
-{
-    if constexpr(init < cond)
-    {
-        static_assert(inc > 0);
-        constexpr auto N = (cond - init + inc - 1) / inc;
-        constexpr_for_impl<F, init, inc>(std::forward<F>(f), std::make_index_sequence<N>{});
-    }
-}
-
-/// Implements statically unrolled loop:
-/// `for (auto i = init; i <= cond; i += inc) f(i);`
-template<auto init, auto cond, auto inc, class F>
-ROCPRIM_HOST_DEVICE ROCPRIM_INLINE
-constexpr void constexpr_for_lte(F&& f)
-{
-    if constexpr(init <= cond)
-    {
-        static_assert(inc > 0);
-        constexpr auto N = (cond - init + inc) / inc;
-        constexpr_for_impl<F, init, inc>(std::forward<F>(f), std::make_index_sequence<N>{});
-    }
-}
-
-/// Implements statically unrolled loop:
-/// `for (auto i = init; i > cond; i += inc) f(i);`
-template<auto init, auto cond, auto inc, class F>
-ROCPRIM_HOST_DEVICE ROCPRIM_INLINE
-constexpr void constexpr_for_gt(F&& f)
-{
-    if constexpr(init > cond)
-    {
-        static_assert(inc < 0);
-        constexpr auto N = (cond - init + inc + 1) / inc;
-        constexpr_for_impl<F, init, inc>(std::forward<F>(f), std::make_index_sequence<N>{});
-    }
-}
-
-/// Implements statically unrolled loop:
-/// `for (auto i = init; i >= cond; i += inc) f(i);`
-template<auto init, auto cond, auto inc, class F>
-ROCPRIM_HOST_DEVICE ROCPRIM_INLINE
-constexpr void constexpr_for_gte(F&& f)
-{
-    if constexpr(init >= cond)
-    {
-        static_assert(inc < 0);
-        constexpr auto N = (cond - init + inc) / inc;
-        constexpr_for_impl<F, init, inc>(std::forward<F>(f), std::make_index_sequence<N>{});
-    }
-}
-
-template<class T, unsigned int ItemsPerThread, class WordType = int>
-struct __align__(sizeof(WordType)) thread_items_pack
-{
-private:
-    WordType data[ceiling_div(sizeof(T) * ItemsPerThread, sizeof(WordType))];
-
-public:
-    ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE
-    static auto create(T(&thread_items)[ItemsPerThread])
-    {
-        thread_items_pack ret;
-        __builtin_memcpy(&ret, &thread_items, sizeof(T) * ItemsPerThread);
-        return ret; // Move constructor is called here
-    }
-
-    ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE
-    T* unpack_to_decayed()
-    {
-        return reinterpret_cast<T*>(&data);
-    }
-
-    ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE
-    T operator[](int index)
-    {
-        T ret;
-        __builtin_memcpy(reinterpret_cast<void*>(&ret),
-                         reinterpret_cast<char*>(data) + (index * sizeof(T)),
-                         sizeof(T));
-        return ret;
-    }
-};
-
-ROCPRIM_INLINE
-hipError_t is_graph_capture(hipStream_t stream, bool& is_capturing)
-{
-    hipStreamCaptureStatus status;
-    unsigned long long     id;
-    ROCPRIM_RETURN_ON_ERROR(hipStreamGetCaptureInfo(stream, &status, &id));
-
-    is_capturing = status != hipStreamCaptureStatus::hipStreamCaptureStatusNone;
-
-    return hipSuccess;
 }
 
 } // end namespace detail

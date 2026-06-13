@@ -1,4 +1,4 @@
-* @stanleytsang-amd @umfranzw @RobsonRLemos
+* @stanleytsang-amd @umfranzw @RobsonRLemos @lawruble13
 # Documentation files
 docs/* @ROCm/rocm-documentation
 *.md @ROCm/rocm-documentation

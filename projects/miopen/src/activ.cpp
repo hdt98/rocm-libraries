@@ -67,8 +67,7 @@ std::ostream& operator<<(std::ostream& stream, const ActivationDescriptor& x)
                     miopenActivationPOWER,
                     miopenActivationCLIPPEDRELU,
                     miopenActivationLEAKYRELU,
-                    miopenActivationELU,
-                    miopenActivationCLAMP)
+                    miopenActivationELU)
         << ", ";
     LogRange(stream, x.parms, ", ") << ", ";
     return stream;

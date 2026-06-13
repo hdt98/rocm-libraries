@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,65 +22,7 @@
  * ************************************************************************ */
 
 #include "rocsparse_sparse_to_sparse.hpp"
-#include "rocsparse_utility.hpp"
-
-// LCOV_EXCL_START
-template <>
-const char* rocsparse::enum_utils::to_string(rocsparse_sparse_to_sparse_alg value)
-{
-#define CASE(C) \
-    case C:     \
-        return #C
-    switch(value)
-    {
-        CASE(rocsparse_sparse_to_sparse_alg_default);
-#undef CASE
-    }
-    THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-}
-
-template <>
-const char* rocsparse::enum_utils::to_string(rocsparse_sparse_to_sparse_stage value)
-{
-#define CASE(C) \
-    case C:     \
-        return #C
-    switch(value)
-    {
-        CASE(rocsparse_sparse_to_sparse_stage_analysis);
-        CASE(rocsparse_sparse_to_sparse_stage_compute);
-#undef CASE
-    }
-    THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-}
-// LCOV_EXCL_STOP
-
-template <>
-bool rocsparse::enum_utils::is_invalid(rocsparse_sparse_to_sparse_stage value)
-{
-    switch(value)
-    {
-    case rocsparse_sparse_to_sparse_stage_analysis:
-    case rocsparse_sparse_to_sparse_stage_compute:
-    {
-        return false;
-    }
-    }
-    return true;
-}
-
-template <>
-bool rocsparse::enum_utils::is_invalid(rocsparse_sparse_to_sparse_alg value)
-{
-    switch(value)
-    {
-    case rocsparse_sparse_to_sparse_alg_default:
-    {
-        return false;
-    }
-    }
-    return true;
-}
+#include "utility.h"
 
 extern "C" rocsparse_status
     rocsparse_create_sparse_to_sparse_descr(rocsparse_sparse_to_sparse_descr* descr,
@@ -173,14 +115,6 @@ try
                                                         &ind_type,
                                                         &base,
                                                         &val_type));
-
-            // Due to the changes in the hipFree introduced in HIP 7.0
-            // https://rocm.docs.amd.com/projects/HIP/en/latest/hip-7-changes.html#update-hipfree
-            // we need to introduce a device synchronize here as the below hipFree calls are now asynchronous.
-            // hipFree() previously had an implicit wait for synchronization purpose which is applicable for all memory allocations.
-            // This wait has been disabled in the HIP 7.0 runtime for allocations made with hipMallocAsync and hipMallocFromPoolAsync.
-            RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
-
             RETURN_IF_HIP_ERROR(rocsparse_hipFree(row));
             RETURN_IF_HIP_ERROR(rocsparse_hipFree(col));
             RETURN_IF_HIP_ERROR(rocsparse_hipFree(val));
@@ -251,9 +185,6 @@ namespace rocsparse
         ROCSPARSE_CHECKARG_POINTER(3, target);
         ROCSPARSE_CHECKARG_ENUM(4, stage);
         ROCSPARSE_CHECKARG_ARRAY(6, buffer_size_in_bytes, buffer);
-
-        ROCSPARSE_CHECKARG(2, source, (source->batch_count != 1), rocsparse_status_not_implemented);
-        ROCSPARSE_CHECKARG(3, target, (target->batch_count != 1), rocsparse_status_not_implemented);
 
         const rocsparse_status status = rocsparse::sparse_to_sparse_quickreturn(
             handle, descr, source, target, stage, buffer_size_in_bytes, buffer);

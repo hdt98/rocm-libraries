@@ -175,7 +175,7 @@ void testing_spmm_bell_bad_arg(void)
 }
 
 template <typename I, typename T>
-void testing_spmm_bell()
+hipsparseStatus_t testing_spmm_bell()
 {
 
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)
@@ -277,7 +277,8 @@ void testing_spmm_bell()
                               make_DataType<T>(45.0),
                               make_DataType<T>(58.0)};
 
-    std::vector<T> hC_2(hC_1);
+    std::vector<T> hC_2(m * n);
+    hC_2 = hC_1;
 
     // allocate memory on device
     auto drow_ptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(I) * (m + 1)), device_free};
@@ -380,5 +381,7 @@ void testing_spmm_bell()
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnMat(C2));
 
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 #endif // TESTING_SPMM_BELL_HPP

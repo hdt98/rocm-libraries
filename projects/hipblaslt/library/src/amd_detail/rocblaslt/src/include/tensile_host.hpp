@@ -3,7 +3,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -91,7 +91,6 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                               const rocblaslt_matmul_algo& algo,
                               const Tuning*                tuning,
                               void*                        workspace,
-                              size_t                       workspaceSizeInBytes,
                               bool                         useUserArgs,
                               hipStream_t                  stream,
                               std::shared_ptr<void>        gemmData);
@@ -217,76 +216,41 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
 /******************************************************
  * Map a hipblaslt data type to a corresponding Tensile type *
  ******************************************************/
-inline rocisa::DataType hipDataType_to_tensile_type(hipDataType type)
+inline TensileLite::DataType hipDataType_to_tensile_type(hipDataType type)
 {
     switch(type)
     {
     case HIP_R_16F:
-        return rocisa::DataType::Half;
+        return TensileLite::DataType::Half;
     case HIP_R_32F:
-        return rocisa::DataType::Float;
+        return TensileLite::DataType::Float;
     case HIP_R_64F:
-        return rocisa::DataType::Double;
+        return TensileLite::DataType::Double;
     case HIP_R_16BF:
-        return rocisa::DataType::BFloat16;
+        return TensileLite::DataType::BFloat16;
     case HIP_R_8F_E4M3_FNUZ:
-        return rocisa::DataType::Float8_fnuz;
+        return TensileLite::DataType::Float8_fnuz;
     case HIP_R_8F_E5M2_FNUZ:
-        return rocisa::DataType::BFloat8_fnuz;
+        return TensileLite::DataType::BFloat8_fnuz;
+#ifdef ROCM_USE_FLOAT8
     case HIP_R_8F_E4M3:
-        return rocisa::DataType::Float8;
+        return TensileLite::DataType::Float8;
     case HIP_R_8F_E5M2:
-        return rocisa::DataType::BFloat8;
+        return TensileLite::DataType::BFloat8;
+#endif
     case HIP_R_8I:
-        return rocisa::DataType::Int8;
+        return TensileLite::DataType::Int8;
     case HIP_R_32I:
-        return rocisa::DataType::Int32;
-    case HIP_C_32F:
-        return rocisa::DataType::ComplexFloat;
-    case HIP_C_64F:
-        return rocisa::DataType::ComplexDouble;    
-    // MX 6/4 data types
-    case HIP_R_6F_E2M3:
-        return rocisa::DataType::Float6;
-    case HIP_R_6F_E3M2:
-        return rocisa::DataType::BFloat6;
-    case HIP_R_4F_E2M1:
-        return rocisa::DataType::Float4;
+        return TensileLite::DataType::Int32;
     default:
         assert(!"hipDataType_to_tensile_type: non-supported type");
-        return rocisa::DataType::None;
+        return TensileLite::DataType::None;
     }
 }
 
-inline rocisa::DataType rocComputeType_to_tensile_type(rocblaslt_compute_type type)
+namespace
 {
-    switch(type)
-    {
-    case rocblaslt_compute_f32_fast_xf32:
-        return rocisa::DataType::XFloat32;
-    case rocblaslt_compute_f32_fast_f16:
-        return rocisa::DataType::Half;
-    case rocblaslt_compute_f32_fast_bf16:
-        return rocisa::DataType::BFloat16;
-    case rocblaslt_compute_f16:
-    case rocblaslt_compute_f32:
-    case rocblaslt_compute_f32_fast_f8_fnuz:
-    case rocblaslt_compute_f32_fast_bf8_fnuz:
-    case rocblaslt_compute_f32_fast_f8bf8_fnuz:
-    case rocblaslt_compute_f32_fast_bf8f8_fnuz:
-    case rocblaslt_compute_f32_fast_f8:
-    case rocblaslt_compute_f32_fast_bf8:
-    case rocblaslt_compute_f32_fast_f8bf8:
-    case rocblaslt_compute_f32_fast_bf8f8:
-        return rocisa::DataType::Float;
-    case rocblaslt_compute_f64:
-        return rocisa::DataType::Double;
-    case rocblaslt_compute_i32:
-        return rocisa::DataType::Int32;
-    default:
-        assert(!"rocDataType_to_tensile_type: non-supported type");
-        return rocisa::DataType::None;
-    }
+    TensileLite::DataType roc2TensileType(rocblaslt_compute_type, bool);
 }
 
 namespace TensileLite
@@ -298,5 +262,3 @@ TensileLite::ProblemOverride
     RocblasltContractionProblem2ProblemOverride(const RocblasltContractionProblem&);
 
 TensileLite::ProblemOverride TensileDataGemm2ProblemOverride(std::shared_ptr<void>);
-
-TensileLite::ContractionProblemGemm* ExtractProblemGemm(std::shared_ptr<void>);

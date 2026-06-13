@@ -31,7 +31,6 @@
 #include "iterator/predicate_iterator.hpp"
 #include "iterator/texture_cache_iterator.hpp"
 #include "iterator/transform_iterator.hpp"
-#include "iterator/transform_output_iterator.hpp"
 #include "iterator/zip_iterator.hpp"
 
 #endif // ROCPRIM_ITERATOR_HPP_

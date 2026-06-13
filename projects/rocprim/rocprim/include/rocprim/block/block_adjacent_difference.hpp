@@ -1,7 +1,7 @@
 /******************************************************************************
 * Copyright (c) 2011, Duane Merrill.  All rights reserved.
 * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
-* Modifications Copyright (c) 2022-2026, Advanced Micro Devices, Inc.  All rights reserved.
+* Modifications Copyright (c) 2022-2025, Advanced Micro Devices, Inc.  All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
@@ -30,8 +30,8 @@
 #ifndef ROCPRIM_BLOCK_BLOCK_ADJACENT_DIFFERENCE_HPP_
 #define ROCPRIM_BLOCK_BLOCK_ADJACENT_DIFFERENCE_HPP_
 
-#include "detail/block_adjacent_difference_crosslane.hpp"
-#include "detail/block_adjacent_difference_shared_mem.hpp"
+
+#include "detail/block_adjacent_difference_impl.hpp"
 
 #include "../config.hpp"
 #include "../detail/various.hpp"
@@ -42,43 +42,6 @@
 /// @{
 
 BEGIN_ROCPRIM_NAMESPACE
-
-/// \brief Available algorithms for block_adjacent_difference.
-enum class block_adjacent_difference_algorithm
-{
-    /// \brief An algorithm using warp intrinsics.
-    adjacent_difference_crosslane,
-    /// \brief An algorithm using only shared memory.
-    adjacent_difference_shared_mem,
-    /// \brief Default block_adjacent_difference algorithm.
-    default_algorithm = adjacent_difference_shared_mem,
-};
-
-namespace detail
-{
-
-// Selector for block_adjacent_difference algorithm which gives block adjacent difference
-// implementation, type based on passed block_adjacent_difference_algorithm enum
-template<block_adjacent_difference_algorithm Algorithm>
-struct select_block_adjacent_difference_impl;
-
-template<>
-struct select_block_adjacent_difference_impl<
-    block_adjacent_difference_algorithm::adjacent_difference_crosslane>
-{
-    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
-    using type = block_adjacent_difference_crosslane<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
-};
-
-template<>
-struct select_block_adjacent_difference_impl<
-    block_adjacent_difference_algorithm::adjacent_difference_shared_mem>
-{
-    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
-    using type = block_adjacent_difference_shared_mem<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
-};
-
-} // end namespace detail
 
 /// \brief The \p block_adjacent_difference class is a block level parallel primitive which provides
 /// methods for applying binary functions for pairs of consecutive items partition across a thread
@@ -100,8 +63,6 @@ struct select_block_adjacent_difference_impl<
 /// In the examples discontinuity operation is performed on block of 128 threads, using type
 /// \p int.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/block/example_block_adjacent_difference.cpp).
-///
 /// \code{.cpp}
 /// __global__ void example_kernel(...)
 /// {
@@ -121,20 +82,18 @@ struct select_block_adjacent_difference_impl<
 /// }
 /// \endcode
 /// \endparblock
-template<class T,
-         unsigned int                        BlockSizeX,
-         unsigned int                        BlockSizeY = 1,
-         unsigned int                        BlockSizeZ = 1,
-         block_adjacent_difference_algorithm Algorithm
-         = block_adjacent_difference_algorithm::default_algorithm>
+template<
+    class T,
+    unsigned int BlockSizeX,
+    unsigned int BlockSizeY = 1,
+    unsigned int BlockSizeZ = 1
+>
 class block_adjacent_difference
 #ifndef DOXYGEN_SHOULD_SKIP_THIS // hide implementation detail from documentation
-    : private detail::select_block_adjacent_difference_impl<
-          Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ>
+    : private detail::block_adjacent_difference_impl<T, BlockSizeX, BlockSizeY, BlockSizeZ>
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 {
-    using base_type = typename detail::select_block_adjacent_difference_impl<
-        Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
+    using base_type = detail::block_adjacent_difference_impl<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
 
     static constexpr unsigned BlockSize = base_type::BlockSize;
     // Struct used for creating a raw_storage object for this primitive's temporary storage.
@@ -161,6 +120,758 @@ public:
     #else
     using storage_type = storage_type_;
     #endif
+
+    /// \brief Tags \p head_flags that indicate discontinuities between items partitioned
+    /// across the thread block, where the first item has no reference and is always
+    /// flagged.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_left() or block_discontinuity::flag_heads() instead.
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] head_flags array that contains the head flags.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     ...
+    ///     int head_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_heads(head_flags, input, flag_op_type(), storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_left or block_discontinuity.flag_heads instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_heads(Flag (&head_flags)[ItemsPerThread],
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op,
+                    storage_type& storage)
+    {
+        static constexpr auto as_flags         = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_predecessor = false;
+        base_type::template apply_left<as_flags, reversed, with_predecessor>(
+            input, head_flags, flag_op, input[0] /* predecessor */, storage.get().left);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_left() or block_discontinuity::flag_heads() instead.
+    /// This overload does not take a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_left or block_discontinuity.flag_heads instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_heads(Flag (&head_flags)[ItemsPerThread],
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_heads(head_flags, input, flag_op, storage);
+    }
+
+    /// \brief Tags \p head_flags that indicate discontinuities between items partitioned
+    /// across the thread block, where the first item of the first thread is compared against
+    /// a \p tile_predecessor_item.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_left() or block_discontinuity::flag_heads() instead.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] head_flags array that contains the head flags.
+    /// \param [in] tile_predecessor_item first tile item from thread to be compared
+    /// against.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     int tile_item = 0;
+    ///     if (threadIdx.x == 0)
+    ///     {
+    ///         tile_item = ...
+    ///     }
+    ///     ...
+    ///     int head_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_heads(head_flags, tile_item, input, flag_op_type(),
+    ///                                storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_left or block_discontinuity.flag_heads instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_heads(Flag (&head_flags)[ItemsPerThread],
+                    T tile_predecessor_item,
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op,
+                    storage_type& storage)
+    {
+        static constexpr auto as_flags         = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_predecessor = true;
+        base_type::template apply_left<as_flags, reversed, with_predecessor>(
+            input, head_flags, flag_op, tile_predecessor_item, storage.get().left);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_left() or block_discontinuity::flag_heads() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_left or block_discontinuity.flag_heads instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_heads(Flag (&head_flags)[ItemsPerThread],
+                    T tile_predecessor_item,
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_heads(head_flags, tile_predecessor_item, input, flag_op, storage);
+    }
+
+    /// \brief Tags \p tail_flags that indicate discontinuities between items partitioned
+    /// across the thread block, where the last item has no reference and is always
+    /// flagged.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_right() or block_discontinuity::flag_tails() instead.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] tail_flags array that contains the tail flags.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     ...
+    ///     int tail_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_tails(tail_flags, input, flag_op_type(), storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_right or block_discontinuity.flag_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_tails(Flag (&tail_flags)[ItemsPerThread],
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op,
+                    storage_type& storage)
+    {
+        static constexpr auto as_flags       = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_successor = false;
+        base_type::template apply_right<as_flags, reversed, with_successor>(
+            input, tail_flags, flag_op, input[0] /* successor */, storage.get().right);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_right() or block_discontinuity::flag_tails() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_right or block_discontinuity.flag_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_tails(Flag (&tail_flags)[ItemsPerThread],
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_tails(tail_flags, input, flag_op, storage);
+    }
+
+    /// \brief Tags \p tail_flags that indicate discontinuities between items partitioned
+    /// across the thread block, where the last item of the last thread is compared against
+    /// a \p tile_successor_item.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_right() or block_discontinuity::flag_tails() instead.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] tail_flags array that contains the tail flags.
+    /// \param [in] tile_successor_item last tile item from thread to be compared
+    /// against.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     int tile_item = 0;
+    ///     if (threadIdx.x == 0)
+    ///     {
+    ///         tile_item = ...
+    ///     }
+    ///     ...
+    ///     int tail_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_tails(tail_flags, tile_item, input, flag_op_type(),
+    ///                                storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_right or block_discontinuity.flag_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_tails(Flag (&tail_flags)[ItemsPerThread],
+                    T tile_successor_item,
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op,
+                    storage_type& storage)
+    {
+        static constexpr auto as_flags       = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_successor = true;
+        base_type::template apply_right<as_flags, reversed, with_successor>(
+            input, tail_flags, flag_op, tile_successor_item, storage.get().right);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use subtract_right() or block_discontinuity::flag_tails() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use subtract_right or block_discontinuity.flag_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_tails(Flag (&tail_flags)[ItemsPerThread],
+                    T tile_successor_item,
+                    const T (&input)[ItemsPerThread],
+                    FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_tails(tail_flags, tile_successor_item, input, flag_op, storage);
+    }
+
+    /// \brief Tags both \p head_flags and\p tail_flags that indicate discontinuities
+    /// between items partitioned across the thread block.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] head_flags array that contains the head flags.
+    /// \param [out] tail_flags array that contains the tail flags.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     ...
+    ///     int head_flags[8];
+    ///     int tail_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_heads_and_tails(head_flags, tail_flags, input,
+    ///                                          flag_op_type(), storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              Flag (&tail_flags)[ItemsPerThread],
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op,
+                              storage_type& storage)
+    {
+        static constexpr auto as_flags         = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_predecessor = false;
+        static constexpr auto with_successor   = false;
+
+        // Copy items in case head_flags is aliased with input
+        T items[ItemsPerThread];
+
+        ROCPRIM_UNROLL
+        for(unsigned int i = 0; i < ItemsPerThread; ++i) {
+            items[i] = input[i];
+        }
+
+        base_type::template apply_left<as_flags, reversed, with_predecessor>(
+            items, head_flags, flag_op, items[0] /*predecessor*/, storage.get().left);
+
+        base_type::template apply_right<as_flags, reversed, with_successor>(
+            items, tail_flags, flag_op, items[0] /*successor*/, storage.get().right);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              Flag (&tail_flags)[ItemsPerThread],
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_heads_and_tails(head_flags, tail_flags, input, flag_op, storage);
+    }
+
+    /// \brief Tags both \p head_flags and\p tail_flags that indicate discontinuities
+    /// between items partitioned across the thread block, where the last item of the
+    /// last thread is compared against a \p tile_successor_item.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] head_flags array that contains the head flags.
+    /// \param [out] tail_flags array that contains the tail flags.
+    /// \param [in] tile_successor_item last tile item from thread to be compared
+    /// against.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     int tile_item = 0;
+    ///     if (threadIdx.x == 0)
+    ///     {
+    ///         tile_item = ...
+    ///     }
+    ///     ...
+    ///     int head_flags[8];
+    ///     int tail_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_heads_and_tails(head_flags, tail_flags, tile_item,
+    ///                                          input, flag_op_type(),
+    ///                                          storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              Flag (&tail_flags)[ItemsPerThread],
+                              T tile_successor_item,
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op,
+                              storage_type& storage)
+    {
+        static constexpr auto as_flags         = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_predecessor = false;
+        static constexpr auto with_successor   = true;
+
+        // Copy items in case head_flags is aliased with input
+        T items[ItemsPerThread];
+
+        ROCPRIM_UNROLL
+        for(unsigned int i = 0; i < ItemsPerThread; ++i) {
+            items[i] = input[i];
+        }
+
+        base_type::template apply_left<as_flags, reversed, with_predecessor>(
+            items, head_flags, flag_op, items[0] /*predecessor*/, storage.get().left);
+
+        base_type::template apply_right<as_flags, reversed, with_successor>(
+            items, tail_flags, flag_op, tile_successor_item, storage.get().right);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              Flag (&tail_flags)[ItemsPerThread],
+                              T tile_successor_item,
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_heads_and_tails(head_flags, tail_flags, tile_successor_item, input, flag_op, storage);
+    }
+
+    /// \brief Tags both \p head_flags and\p tail_flags that indicate discontinuities
+    /// between items partitioned across the thread block, where the first item of the
+    /// first thread is compared against a \p tile_predecessor_item.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] head_flags array that contains the head flags.
+    /// \param [in] tile_predecessor_item first tile item from thread to be compared
+    /// against.
+    /// \param [out] tail_flags array that contains the tail flags.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     int tile_item = 0;
+    ///     if (threadIdx.x == 0)
+    ///     {
+    ///         tile_item = ...
+    ///     }
+    ///     ...
+    ///     int head_flags[8];
+    ///     int tail_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_heads_and_tails(head_flags, tile_item, tail_flags,
+    ///                                          input, flag_op_type(),
+    ///                                          storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              T tile_predecessor_item,
+                              Flag (&tail_flags)[ItemsPerThread],
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op,
+                              storage_type& storage)
+    {
+        static constexpr auto as_flags         = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_predecessor = true;
+        static constexpr auto with_successor   = false;
+
+        // Copy items in case head_flags is aliased with input
+        T items[ItemsPerThread];
+
+        ROCPRIM_UNROLL
+        for(unsigned int i = 0; i < ItemsPerThread; ++i) {
+            items[i] = input[i];
+        }
+
+        base_type::template apply_left<as_flags, reversed, with_predecessor>(
+            items, head_flags, flag_op, tile_predecessor_item, storage.get().left);
+
+        base_type::template apply_right<as_flags, reversed, with_successor>(
+            items, tail_flags, flag_op, items[0] /*successor*/, storage.get().right);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              T tile_predecessor_item,
+                              Flag (&tail_flags)[ItemsPerThread],
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_heads_and_tails(head_flags, tile_predecessor_item, tail_flags, input, flag_op, storage);
+    }
+
+    /// \brief Tags both \p head_flags and\p tail_flags that indicate discontinuities
+    /// between items partitioned across the thread block, where the first and last items of
+    /// the first and last thread is compared against a \p tile_predecessor_item and
+    /// a \p tile_successor_item.
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// \tparam ItemsPerThread [inferred] the number of items to be processed by
+    /// each thread.
+    /// \tparam Flag [inferred] the flag type.
+    /// \tparam FlagOp [inferred] type of binary function used for flagging.
+    ///
+    /// \param [out] head_flags array that contains the head flags.
+    /// \param [in] tile_predecessor_item first tile item from thread to be compared
+    /// against.
+    /// \param [out] tail_flags array that contains the tail flags.
+    /// \param [in] tile_successor_item last tile item from thread to be compared
+    /// against.
+    /// \param [in] input array that data is loaded from.
+    /// \param [in] flag_op binary operation function object that will be used for flagging.
+    /// The signature of the function should be equivalent to the following:
+    /// <tt>bool f(const T &a, const T &b);</tt> or <tt>bool (const T& a, const T& b, unsigned int b_index);</tt>.
+    /// The signature does not need to have <tt>const &</tt>, but function object
+    /// must not modify the objects passed to it.
+    /// \param [in] storage reference to a temporary storage object of type storage_type.
+    ///
+    /// \par Storage reuse
+    /// Synchronization barrier should be placed before \p storage is reused
+    /// or repurposed: \p __syncthreads() or \p rocprim::syncthreads().
+    ///
+    /// \par Example.
+    /// \code{.cpp}
+    /// __global__ void example_kernel(...)
+    /// {
+    ///     // specialize discontinuity for int and a block of 128 threads
+    ///     using block_adjacent_difference_int = rocprim::block_adjacent_difference<int, 128>;
+    ///     // allocate storage in shared memory
+    ///     __shared__ block_adjacent_difference_int::storage_type storage;
+    ///
+    ///     // segment of consecutive items to be used
+    ///     int input[8];
+    ///     int tile_predecessor_item = 0;
+    ///     int tile_successor_item = 0;
+    ///     if (threadIdx.x == 0)
+    ///     {
+    ///         tile_predecessor_item = ...
+    ///         tile_successor_item = ...
+    ///     }
+    ///     ...
+    ///     int head_flags[8];
+    ///     int tail_flags[8];
+    ///     block_adjacent_difference_int b_discontinuity;
+    ///     using flag_op_type = typename rocprim::greater<int>;
+    ///     b_discontinuity.flag_heads_and_tails(head_flags, tile_predecessor_item,
+    ///                                          tail_flags, tile_successor_item,
+    ///                                          input, flag_op_type(),
+    ///                                          storage);
+    ///     ...
+    /// }
+    /// \endcode
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              T tile_predecessor_item,
+                              Flag (&tail_flags)[ItemsPerThread],
+                              T tile_successor_item,
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op,
+                              storage_type& storage)
+    {
+        static constexpr auto as_flags         = true;
+        static constexpr auto reversed         = true;
+        static constexpr auto with_predecessor = true;
+        static constexpr auto with_successor   = true;
+
+        // Copy items in case head_flags is aliased with input
+        T items[ItemsPerThread];
+
+        ROCPRIM_UNROLL
+        for(unsigned int i = 0; i < ItemsPerThread; ++i) {
+            items[i] = input[i];
+        }
+
+        base_type::template apply_left<as_flags, reversed, with_predecessor>(
+            items, head_flags, flag_op, tile_predecessor_item, storage.get().left);
+
+        base_type::template apply_right<as_flags, reversed, with_successor>(
+            items, tail_flags, flag_op, tile_successor_item, storage.get().right);
+    }
+
+    /// \overload
+    /// \deprecated The flags API of block_adjacent_difference is deprecated,
+    /// use block_discontinuity::flag_heads_and_tails() instead.
+    ///
+    /// This overload does not accept a reference to temporary storage, instead it is declared as
+    /// part of the function itself. Note that this does NOT decrease the shared memory requirements
+    /// of a kernel using this function.
+    template<unsigned int ItemsPerThread, class Flag, class FlagOp>
+    [[deprecated("The flags API of block_adjacent_difference is deprecated."
+                 "Use block_discontinuity.flag_heads_and_tails instead.")]]
+    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    void flag_heads_and_tails(Flag (&head_flags)[ItemsPerThread],
+                              T tile_predecessor_item,
+                              Flag (&tail_flags)[ItemsPerThread],
+                              T tile_successor_item,
+                              const T (&input)[ItemsPerThread],
+                              FlagOp flag_op)
+    {
+        ROCPRIM_SHARED_MEMORY storage_type storage;
+        flag_heads_and_tails(
+            head_flags, tile_predecessor_item, tail_flags, tile_successor_item,
+            input, flag_op, storage
+        );
+    }
 
     /// \brief Apply a function to each consecutive pair of elements partitioned across threads in
     /// the block and write the output to the position of the left item.

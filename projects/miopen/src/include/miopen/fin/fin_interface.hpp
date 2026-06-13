@@ -33,7 +33,6 @@
 
 #include <miopen/conv_algo_name.hpp>
 #include <miopen/conv_solution.hpp>
-#include <miopen/export_internals.h>
 #include <miopen/miopen.h>
 #include <miopen/mlo_internal.hpp>
 
@@ -59,21 +58,21 @@ namespace fin_interface {
 // ================== Interface for Fin ==================
 
 // Base classes for solvers.
-class Solver
+class MIOPEN_INTERNALS_EXPORT Solver
 {
 public:
     // GetId(), IsDynamic() and IsTunable() throw miopenStatusNotInitialized if the solver is not
     // valid.
 
     // Returns false if the solver could not be found by its name.
-    MIOPEN_INTERNALS_EXPORT bool IsValid() const;
+    bool IsValid() const;
 
-    MIOPEN_INTERNALS_EXPORT uint64_t GetId() const;
+    uint64_t GetId() const;
     // Returns the name even if the solver is not valid (returns the requested name).
-    MIOPEN_INTERNALS_EXPORT const std::string& GetName() const;
+    const std::string& GetName() const;
 
-    MIOPEN_INTERNALS_EXPORT bool IsTunable() const;
-    MIOPEN_INTERNALS_EXPORT bool IsDynamic() const;
+    bool IsTunable() const;
+    bool IsDynamic() const;
 
 protected:
     Solver(const miopen::solver::SolverBase* solver_base, uint64_t solver_id);
@@ -121,18 +120,16 @@ protected:
     friend Solver GetSolver(const std::string&);
 };
 
-extern template class MIOPEN_INTERNALS_EXPORT
-    SolverMixin<miopen::ExecutionContext, miopen::conv::ProblemDescription>;
-extern template class MIOPEN_INTERNALS_EXPORT
-    SolverMixin<miopen::ExecutionContext, miopen::batchnorm::ProblemDescription>;
+extern template class SolverMixin<miopen::ExecutionContext, miopen::conv::ProblemDescription>;
+extern template class SolverMixin<miopen::ExecutionContext, miopen::batchnorm::ProblemDescription>;
 
 // Convolution solver
-class ConvSolver final
+class MIOPEN_INTERNALS_EXPORT ConvSolver final
     : public SolverMixin<miopen::ExecutionContext, miopen::conv::ProblemDescription>
 {
 public:
     ConvSolver(const miopen::solver::SolverBase* solver_base, uint64_t solver_id) = delete;
-    MIOPEN_INTERNALS_EXPORT std::string GetAlgo(miopen::conv::Direction dir) const;
+    std::string GetAlgo(miopen::conv::Direction dir) const;
 
 protected:
     ConvSolver(const miopen::solver::SolverBase* solver_base,
@@ -149,7 +146,7 @@ protected:
 };
 
 // Batch normalization solver
-class BatchNormSolver final
+class MIOPEN_INTERNALS_EXPORT BatchNormSolver final
     : public SolverMixin<miopen::ExecutionContext, miopen::batchnorm::ProblemDescription>
 {
 protected:

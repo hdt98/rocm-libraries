@@ -22,9 +22,9 @@
  * ************************************************************************ */
 
 #include "rocsparse_gbsr2csr.hpp"
-#include "rocsparse_control.hpp"
-#include "rocsparse_handle.hpp"
-#include "rocsparse_utility.hpp"
+#include "control.h"
+#include "handle.h"
+#include "utility.h"
 
 #include "rocsparse_bsr2csr.hpp"
 
@@ -184,10 +184,18 @@ rocsparse_status rocsparse::gbsr2csr(rocsparse_handle          handle,
     switch(csr_val_datatype)
     {
     case rocsparse_datatype_i8_r:
+    {
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
+    }
     case rocsparse_datatype_u8_r:
+    {
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
+    }
     case rocsparse_datatype_u32_r:
+    {
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
+    }
     case rocsparse_datatype_f16_r:
-    case rocsparse_datatype_bf16_r:
     {
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
     }

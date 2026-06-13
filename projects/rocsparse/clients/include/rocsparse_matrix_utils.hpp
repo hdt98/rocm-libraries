@@ -58,16 +58,15 @@ struct rocsparse_matrix_utils
     //
     // @brief Initialize a host dense matrix with random values.
     // @param[in] that Fill \p that matrix.
-    // @param[in] use_exact If \p use_exact is true, the matrix will be initialized with exact values.
     //
     template <typename T>
-    static void init(host_dense_matrix<T>& that, bool use_exact = false)
+    static void init(host_dense_matrix<T>& that)
     {
         switch(that.order)
         {
         case rocsparse_order_column:
         {
-            rocsparse_init<T>(that, that.m, that.n, that.ld, use_exact);
+            rocsparse_init<T>(that, that.m, that.n, that.ld);
             break;
         }
 
@@ -77,7 +76,7 @@ struct rocsparse_matrix_utils
             // Little trick but the resulting matrix is the transpose of the matrix obtained from rocsparse_order_column.
             // If this poses a problem, we need to refactor rocsparse_init.
             //
-            rocsparse_init<T>(that, that.n, that.m, that.ld, use_exact);
+            rocsparse_init<T>(that, that.n, that.m, that.ld);
             break;
         }
         }
@@ -969,31 +968,6 @@ struct rocsparse_matrix_utils
         host_gebsrunsort(const I* bsr_row_ptr, J* bsr_col_ind, J Mb, rocsparse_index_base base)
     {
         host_csrunsort<T, I, J>(bsr_row_ptr, bsr_col_ind, Mb, base);
-    }
-
-    // Given a flat block array \p blk of size bd*bd stored in \p direction order,
-    // symmetrize the off-diagonal entries as A[i][j] <- A[i][j] + conj(A[j][i])
-    // and set the diagonal to 2*bd to ensure diagonal dominance.
-    template <typename T>
-    static void make_block_hpd(T* blk, rocsparse_int bd, rocsparse_direction direction)
-    {
-        for(rocsparse_int i = 0; i < bd; i++)
-        {
-            for(rocsparse_int j = i + 1; j < bd; j++)
-            {
-                const size_t ij  = (direction == rocsparse_direction_row)
-                                       ? static_cast<size_t>(bd) * i + j
-                                       : static_cast<size_t>(bd) * j + i;
-                const size_t ji  = (direction == rocsparse_direction_row)
-                                       ? static_cast<size_t>(bd) * j + i
-                                       : static_cast<size_t>(bd) * i + j;
-                const T      sym = blk[ij] + rocsparse_conj(blk[ji]);
-                blk[ij]          = sym;
-                blk[ji]          = rocsparse_conj(sym);
-            }
-            blk[static_cast<size_t>(bd) * i + i]
-                = static_cast<T>(static_cast<floating_data_t<T>>(2 * bd));
-        }
     }
 
     template <typename T, typename I, typename J>

@@ -23,7 +23,7 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#ifndef MIOPEN_HIP_RUNTIME_COMPILE
+#ifndef MIOPEN_DONT_USE_HIP_RUNTIME_HEADERS
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 #include <hip/hip_bfloat16.h>
@@ -71,7 +71,7 @@ inline __device__ __host__ ushort convert_fp32_to_bf16(float src_val)
     return target_val.ushortvec[1];
 }
 
-template <typename src_data_t, typename dst_data_t, int use_tf32 = 0>
+template <typename src_data_t, typename dst_data_t>
 inline __device__ __host__ dst_data_t cast_to(const src_data_t& val)
 {
     return static_cast<dst_data_t>(val);
@@ -100,25 +100,6 @@ template <>
 inline __device__ __host__ int8_t cast_to(const int32_t& val)
 {
     return static_cast<int8_t>(val & 0xff);
-}
-
-template <>
-inline __device__ __host__ float cast_to<float, float, 1>(const float& val)
-{
-    union
-    {
-        float fp32;
-        uint32_t int32;
-    } u = {val};
-
-    u.int32 = u.int32 & 0xffffe000;
-    return u.fp32;
-}
-
-template <>
-inline __device__ __host__ double cast_to<float, double, 1>(const float& val)
-{
-    return static_cast<double>(cast_to<float, float, 1>(val));
 }
 
 inline __device__ __host__ bool IsZero(double val) { return val == 0.0; }
@@ -160,11 +141,7 @@ inline __device__ void applyalphaBetaUpdate(dst_data_t* __restrict__ p_array,
 
 /// alpha and beta are double to ensure high precision.
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_fwd_nchw(const src_data_t* __restrict__ p_in,
                                            const src_data_t* __restrict__ p_wei,
                                            const double alpha,
@@ -260,8 +237,8 @@ inline __device__ void naive_conv_fwd_nchw(const src_data_t* __restrict__ p_in,
                             size_t f_idx = static_cast<size_t>(ic) * fy * fx +
                                            static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                         else
                         {
@@ -273,8 +250,8 @@ inline __device__ void naive_conv_fwd_nchw(const src_data_t* __restrict__ p_in,
                                            static_cast<size_t>(iy) * wei_strides[1] +
                                            static_cast<size_t>(ix) * wei_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                     }
                 }
@@ -294,11 +271,7 @@ inline __device__ void naive_conv_fwd_nchw(const src_data_t* __restrict__ p_in,
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
                                            const src_data_t* __restrict__ p_wei,
                                            const double alpha,
@@ -399,8 +372,8 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
                             size_t f_idx = static_cast<size_t>(ik) * c_per_group * fy * fx +
                                            static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                         else
                         {
@@ -412,8 +385,8 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
                                            static_cast<size_t>(iy) * wei_strides[1] +
                                            static_cast<size_t>(ix) * wei_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                     }
                 }
@@ -434,11 +407,7 @@ inline __device__ void naive_conv_bwd_nchw(dst_data_t* __restrict__ p_in,
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
                                            dst_data_t* __restrict__ p_wei,
                                            const double alpha,
@@ -534,8 +503,8 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
                             size_t o_idx = static_cast<size_t>(in) * k * ho * wo +
                                            static_cast<size_t>(iho) * wo + static_cast<size_t>(iwo);
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                         }
                         else
                         {
@@ -548,8 +517,8 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
                                            static_cast<size_t>(iho) * out_strides[1] +
                                            static_cast<size_t>(iwo) * out_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                         }
                     }
                 }
@@ -573,12 +542,7 @@ inline __device__ void naive_conv_wrw_nchw(const src_data_t* __restrict__ p_in,
 }
 
 // design block_size 256
-
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_fwd_ncdhw(const src_data_t* __restrict__ p_in,
                                             const src_data_t* __restrict__ p_wei,
                                             const double alpha,
@@ -692,8 +656,8 @@ inline __device__ void naive_conv_fwd_ncdhw(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iy) * fx +
                                                static_cast<size_t>(ix);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                             else
                             {
@@ -707,8 +671,8 @@ inline __device__ void naive_conv_fwd_ncdhw(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iy) * wei_strides[1] +
                                                static_cast<size_t>(ix) * wei_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                         }
                     }
@@ -732,11 +696,7 @@ inline __device__ void naive_conv_fwd_ncdhw(const src_data_t* __restrict__ p_in,
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
                                             const src_data_t* __restrict__ p_wei,
                                             const double alpha,
@@ -859,8 +819,8 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
                                     static_cast<size_t>(iz) * fy * fx +
                                     static_cast<size_t>(iy) * fx + static_cast<size_t>(ix);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                             else
                             {
@@ -874,8 +834,8 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iy) * wei_strides[1] +
                                                static_cast<size_t>(ix) * wei_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                         }
                     }
@@ -899,11 +859,7 @@ inline __device__ void naive_conv_bwd_ncdhw(dst_data_t* __restrict__ p_in,
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                             dst_data_t* __restrict__ p_wei,
                                             const double alpha,
@@ -1015,8 +971,8 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iho) * wo +
                                                static_cast<size_t>(iwo);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                             }
                             else
                             {
@@ -1031,8 +987,8 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iho) * out_strides[1] +
                                                static_cast<size_t>(iwo) * out_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                             }
                         }
                     }
@@ -1060,12 +1016,7 @@ inline __device__ void naive_conv_wrw_ncdhw(const src_data_t* __restrict__ p_in,
 
 /***************************** nhwc *****************************/
 // design block_size 256
-
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_fwd_nhwc(const src_data_t* __restrict__ p_in,
                                            const src_data_t* __restrict__ p_wei,
                                            const double alpha,
@@ -1094,43 +1045,41 @@ inline __device__ void naive_conv_fwd_nhwc(const src_data_t* __restrict__ p_in,
     /*
      *  need to compute total output pixel: `group * n * ho * wo * k_per_group`.
      *  to distribute this workload, let one workgroup compute `wo *
-     *  group * k_per_group` pixels,
-     *  hence need `n * ho` workgroups (grid_size).
+     * k_per_group` pixel,
+     *  hence need `group * n * ho` workgroups (grid_size).
      */
-
     int k             = k_per_group * group;
     int c             = c_per_group * group;
-    int thread_length = wo * k;
+    int thread_length = wo * k_per_group;
     int bid           = blockIdx.x;
     int iho           = bid % ho;
     int in            = (bid / ho) % n;
+    int ig            = bid / (n * ho);
 
     if constexpr(ASSUME_PACKED)
     {
-        p_in += static_cast<size_t>(in) * hi * wi * c;
+        p_in += static_cast<size_t>(in) * hi * wi * c + static_cast<size_t>(ig) * c_per_group;
 
-        p_out += static_cast<size_t>(in) * ho * wo * k + static_cast<size_t>(iho) * wo * k;
+        p_wei += static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group;
+
+        p_out += static_cast<size_t>(in) * ho * wo * k + static_cast<size_t>(iho) * wo * k +
+                 static_cast<size_t>(ig) * k_per_group;
     }
     else
     {
-        p_in += static_cast<size_t>(in) * in_strides[4];
+        p_in += static_cast<size_t>(in) * in_strides[4] + static_cast<size_t>(ig) * in_strides[1];
 
-        p_out +=
-            static_cast<size_t>(in) * out_strides[4] + static_cast<size_t>(iho) * out_strides[3];
+        p_wei += static_cast<size_t>(ig) * wei_strides[4];
+
+        p_out += static_cast<size_t>(in) * out_strides[4] +
+                 static_cast<size_t>(iho) * out_strides[3] +
+                 static_cast<size_t>(ig) * out_strides[1];
     }
 
     for(int tid = threadIdx.x; tid < thread_length; tid += blockDim.x)
     {
-        // We want to compute
-        //      iwo = tid / k
-        //      ik  = tid % k
-        // , but
-        //      tid = tid / k * k + tid % k = iwo * k + ik
-        // so we can avoid the % operation.
-        int iwo       = tid / k;
-        int global_ik = tid - iwo * k;
-        int ig        = global_ik / k_per_group;
-        int ik        = global_ik - ig * k_per_group;
+        int iwo = tid / k_per_group;
+        int ik  = tid % k_per_group;
 
         acc_data_t value = 0;
 
@@ -1142,45 +1091,41 @@ inline __device__ void naive_conv_fwd_nhwc(const src_data_t* __restrict__ p_in,
                 valid_h &= 0;
             for(int ix = 0; ix < fx; ix++)
             {
-                int valid_w = 1;
-                int cur_w   = sx * iwo - px + dx * ix;
-                if(cur_w < 0 || cur_w >= wi)
-                    valid_w &= 0;
                 for(int ic = 0; ic < c_per_group; ic++)
                 {
+                    int valid_w = 1;
+                    int cur_w   = sx * iwo - px + dx * ix;
+                    if(cur_w < 0 || cur_w >= wi)
+                        valid_w &= 0;
+
                     if(valid_w & valid_h)
                     {
                         if constexpr(ASSUME_PACKED)
                         {
                             size_t i_idx = static_cast<size_t>(cur_h) * wi * c +
-                                           static_cast<size_t>(cur_w) * c +
-                                           static_cast<size_t>(ig) * c_per_group +
+                                           static_cast<size_t>(cur_w) * c + static_cast<size_t>(ic);
+
+                            size_t f_idx = static_cast<size_t>(ik) * fy * fx * c_per_group +
+                                           static_cast<size_t>(iy) * fx * c_per_group +
+                                           static_cast<size_t>(ix) * c_per_group +
                                            static_cast<size_t>(ic);
 
-                            size_t f_idx =
-                                static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group +
-                                static_cast<size_t>(ik) * fy * fx * c_per_group +
-                                static_cast<size_t>(iy) * fx * c_per_group +
-                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
-
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                         else
                         {
                             size_t i_idx = static_cast<size_t>(cur_h) * in_strides[3] +
                                            static_cast<size_t>(cur_w) * in_strides[2] +
-                                           static_cast<size_t>(ig) * in_strides[1] +
                                            static_cast<size_t>(ic) * in_strides[0];
 
-                            size_t f_idx = static_cast<size_t>(ig) * wei_strides[4] +
-                                           static_cast<size_t>(ik) * wei_strides[3] +
+                            size_t f_idx = static_cast<size_t>(ik) * wei_strides[3] +
                                            static_cast<size_t>(iy) * wei_strides[2] +
                                            static_cast<size_t>(ix) * wei_strides[1] +
                                            static_cast<size_t>(ic) * wei_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                     }
                 }
@@ -1189,25 +1134,19 @@ inline __device__ void naive_conv_fwd_nhwc(const src_data_t* __restrict__ p_in,
 
         if constexpr(ASSUME_PACKED)
         {
-            size_t o_idx = static_cast<size_t>(iwo) * k + static_cast<size_t>(ig) * k_per_group +
-                           static_cast<size_t>(ik);
+            size_t o_idx = static_cast<size_t>(iwo) * k + static_cast<size_t>(ik);
             applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_out, value, alpha, beta, o_idx);
         }
         else
         {
             size_t o_idx = static_cast<size_t>(iwo) * out_strides[2] +
-                           static_cast<size_t>(ig) * out_strides[1] +
                            static_cast<size_t>(ik) * out_strides[0];
             applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_out, value, alpha, beta, o_idx);
         }
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
                                            const src_data_t* __restrict__ p_wei,
                                            const double alpha,
@@ -1236,41 +1175,41 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
     /*
      *  need to compute total input pixel: `group * n * hi * wi * c_per_group`.
      *  to distribute this workload, let one workgroup compute `wi *
-     *  group * c_per_group` pixel,
-     *  hence need `n * hi` workgroups (grid_size).
+     * c_per_group` pixel,
+     *  hence need `group * n * hi` workgroups (grid_size).
      */
     int k             = k_per_group * group;
     int c             = c_per_group * group;
-    int thread_length = wi * c;
+    int thread_length = wi * c_per_group;
     int bid           = blockIdx.x;
     int ihi           = bid % hi;
     int in            = (bid / hi) % n;
+    int ig            = bid / (n * hi);
 
     if constexpr(ASSUME_PACKED)
     {
-        p_in += static_cast<size_t>(in) * hi * wi * c + static_cast<size_t>(ihi) * wi * c;
+        p_in += static_cast<size_t>(in) * hi * wi * c + static_cast<size_t>(ihi) * wi * c +
+                static_cast<size_t>(ig) * c_per_group;
 
-        p_out += static_cast<size_t>(in) * ho * wo * k;
+        p_wei += static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group;
+
+        p_out += static_cast<size_t>(in) * ho * wo * k + static_cast<size_t>(ig) * k_per_group;
     }
     else
     {
-        p_in += static_cast<size_t>(in) * in_strides[4] + static_cast<size_t>(ihi) * in_strides[3];
+        p_in += static_cast<size_t>(in) * in_strides[4] + static_cast<size_t>(ihi) * in_strides[3] +
+                static_cast<size_t>(ig) * in_strides[1];
 
-        p_out += static_cast<size_t>(in) * out_strides[4];
+        p_wei += static_cast<size_t>(ig) * wei_strides[4];
+
+        p_out +=
+            static_cast<size_t>(in) * out_strides[4] + static_cast<size_t>(ig) * out_strides[1];
     }
 
     for(int tid = threadIdx.x; tid < thread_length; tid += blockDim.x)
     {
-        // We want to compute
-        //      iwi = tid / c
-        //      ic  = tid % c
-        // , but
-        //      tid = tid / c * c + tid % c = iwi * c + ic
-        // so we can avoid the % operation.
-        int iwi       = tid / c;
-        int global_ic = tid - iwi * c;
-        int ig        = global_ic / c_per_group;
-        int ic        = global_ic - ig * c_per_group;
+        int iwi = tid / c_per_group;
+        int ic  = tid % c_per_group;
 
         acc_data_t value = 0;
 
@@ -1294,39 +1233,36 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
                     valid_w &= 0;
                 for(int ik = 0; ik < k_per_group; ik++)
                 {
+
                     if(valid_h & valid_w)
                     {
                         if constexpr(ASSUME_PACKED)
                         {
                             size_t o_idx = static_cast<size_t>(cur_ho) * wo * k +
                                            static_cast<size_t>(cur_wo) * k +
-                                           static_cast<size_t>(ig) * k_per_group +
                                            static_cast<size_t>(ik);
 
-                            size_t f_idx =
-                                static_cast<size_t>(ig) * k_per_group * fy * fx * c_per_group +
-                                static_cast<size_t>(ik) * fy * fx * c_per_group +
-                                static_cast<size_t>(iy) * fx * c_per_group +
-                                static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
+                            size_t f_idx = static_cast<size_t>(ik) * fy * fx * c_per_group +
+                                           static_cast<size_t>(iy) * fx * c_per_group +
+                                           static_cast<size_t>(ix) * c_per_group +
+                                           static_cast<size_t>(ic);
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                         else
                         {
                             size_t o_idx = static_cast<size_t>(cur_ho) * out_strides[3] +
                                            static_cast<size_t>(cur_wo) * out_strides[2] +
-                                           static_cast<size_t>(ig) * out_strides[1] +
                                            static_cast<size_t>(ik) * out_strides[0];
 
-                            size_t f_idx = static_cast<size_t>(ig) * wei_strides[4] +
-                                           static_cast<size_t>(ik) * wei_strides[3] +
+                            size_t f_idx = static_cast<size_t>(ik) * wei_strides[3] +
                                            static_cast<size_t>(iy) * wei_strides[2] +
                                            static_cast<size_t>(ix) * wei_strides[1] +
                                            static_cast<size_t>(ic) * wei_strides[0];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                         }
                     }
                 }
@@ -1335,25 +1271,19 @@ inline __device__ void naive_conv_bwd_nhwc(dst_data_t* __restrict__ p_in,
 
         if constexpr(ASSUME_PACKED)
         {
-            size_t i_idx = static_cast<size_t>(iwi) * c + static_cast<size_t>(ig) * c_per_group +
-                           static_cast<size_t>(ic);
+            size_t i_idx = static_cast<size_t>(iwi) * c + static_cast<size_t>(ic);
             applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_in, value, alpha, beta, i_idx);
         }
         else
         {
-            size_t i_idx = static_cast<size_t>(iwi) * in_strides[2] +
-                           static_cast<size_t>(ig) * in_strides[1] +
-                           static_cast<size_t>(ic) * in_strides[0];
+            size_t i_idx =
+                static_cast<size_t>(iwi) * in_strides[2] + static_cast<size_t>(ic) * in_strides[0];
             applyalphaBetaUpdate<dst_data_t, acc_data_t>(p_in, value, alpha, beta, i_idx);
         }
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
                                            dst_data_t* __restrict__ p_wei,
                                            const double alpha,
@@ -1449,8 +1379,8 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
                                            static_cast<size_t>(iho) * wo * k +
                                            static_cast<size_t>(iwo) * k;
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                         }
                         else
                         {
@@ -1463,8 +1393,8 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
                                            static_cast<size_t>(iho) * out_strides[3] +
                                            static_cast<size_t>(iwo) * out_strides[2];
 
-                            value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                     cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                            value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                     cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                         }
                     }
                 }
@@ -1488,12 +1418,7 @@ inline __device__ void naive_conv_wrw_nhwc(const src_data_t* __restrict__ p_in,
 }
 
 // design block_size 256
-
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
                                             const src_data_t* __restrict__ p_wei,
                                             const double alpha,
@@ -1606,8 +1531,8 @@ inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
                                     static_cast<size_t>(iy) * fx * c_per_group +
                                     static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                             else
                             {
@@ -1622,8 +1547,8 @@ inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(ix) * wei_strides[1] +
                                                static_cast<size_t>(ic) * wei_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                         }
                     }
@@ -1647,11 +1572,7 @@ inline __device__ void naive_conv_fwd_ndhwc(const src_data_t* __restrict__ p_in,
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
                                             const src_data_t* __restrict__ p_wei,
                                             const double alpha,
@@ -1772,8 +1693,8 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
                                     static_cast<size_t>(iy) * fx * c_per_group +
                                     static_cast<size_t>(ix) * c_per_group + static_cast<size_t>(ic);
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                             else
                             {
@@ -1788,8 +1709,8 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
                                                static_cast<size_t>(ix) * wei_strides[1] +
                                                static_cast<size_t>(ic) * wei_strides[0];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_wei[f_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_out[o_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_wei[f_idx]);
                             }
                         }
                     }
@@ -1813,11 +1734,7 @@ inline __device__ void naive_conv_bwd_ndhwc(dst_data_t* __restrict__ p_in,
     }
 }
 
-template <bool ASSUME_PACKED,
-          typename src_data_t,
-          typename acc_data_t,
-          typename dst_data_t,
-          int use_tf32 = 0>
+template <bool ASSUME_PACKED, typename src_data_t, typename acc_data_t, typename dst_data_t>
 inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                             dst_data_t* __restrict__ p_wei,
                                             const double alpha,
@@ -1929,8 +1846,8 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iho) * wo * k +
                                                static_cast<size_t>(iwo) * k;
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                             }
                             else
                             {
@@ -1946,8 +1863,8 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
                                                static_cast<size_t>(iho) * out_strides[3] +
                                                static_cast<size_t>(iwo) * out_strides[2];
 
-                                value += cast_to<src_data_t, acc_data_t, use_tf32>(p_in[i_idx]) *
-                                         cast_to<src_data_t, acc_data_t, use_tf32>(p_out[o_idx]);
+                                value += cast_to<src_data_t, acc_data_t>(p_in[i_idx]) *
+                                         cast_to<src_data_t, acc_data_t>(p_out[o_idx]);
                             }
                         }
                     }
@@ -1973,323 +1890,297 @@ inline __device__ void naive_conv_wrw_ndhwc(const src_data_t* __restrict__ p_in,
     }
 }
 
-#define DEFINE_2D_NAIVE_CONV_KERNEL(                                                                                     \
-    direction, tensor_layout, src_data_t, acc_data_t, dst_data_t, use_tf32)                                              \
-    extern "C" __global__ void                                                                                           \
-        naive_conv_ab_packed_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t##_##use_tf32(    \
-            src_data_t* __restrict__ p_in,                                                                               \
-            src_data_t* __restrict__ p_wei,                                                                              \
-            double alpha,                                                                                                \
-            double beta,                                                                                                 \
-            dst_data_t* __restrict__ p_out,                                                                              \
-            Strides5D in_strides,                                                                                        \
-            Strides5D wei_strides,                                                                                       \
-            Strides5D out_strides,                                                                                       \
-            int hi,                                                                                                      \
-            int wi,                                                                                                      \
-            int n,                                                                                                       \
-            int k_per_group,                                                                                             \
-            int c_per_group,                                                                                             \
-            int ho,                                                                                                      \
-            int wo,                                                                                                      \
-            int sy,                                                                                                      \
-            int sx,                                                                                                      \
-            int dy,                                                                                                      \
-            int dx,                                                                                                      \
-            int py,                                                                                                      \
-            int px,                                                                                                      \
-            int fy,                                                                                                      \
-            int fx,                                                                                                      \
-            int group)                                                                                                   \
-    {                                                                                                                    \
-        naive_conv_##direction##_##tensor_layout<true,                                                                   \
-                                                 src_data_t,                                                             \
-                                                 acc_data_t,                                                             \
-                                                 dst_data_t,                                                             \
-                                                 use_tf32>(p_in,                                                         \
-                                                           p_wei,                                                        \
-                                                           alpha,                                                        \
-                                                           beta,                                                         \
-                                                           p_out,                                                        \
-                                                           in_strides,                                                   \
-                                                           wei_strides,                                                  \
-                                                           out_strides,                                                  \
-                                                           hi,                                                           \
-                                                           wi,                                                           \
-                                                           n,                                                            \
-                                                           k_per_group,                                                  \
-                                                           c_per_group,                                                  \
-                                                           ho,                                                           \
-                                                           wo,                                                           \
-                                                           sy,                                                           \
-                                                           sx,                                                           \
-                                                           dy,                                                           \
-                                                           dx,                                                           \
-                                                           py,                                                           \
-                                                           px,                                                           \
-                                                           fy,                                                           \
-                                                           fx,                                                           \
-                                                           group);                                                       \
-    }                                                                                                                    \
-    extern "C" __global__ void                                                                                           \
-        naive_conv_ab_nonpacked_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t##_##use_tf32( \
-            src_data_t* __restrict__ p_in,                                                                               \
-            src_data_t* __restrict__ p_wei,                                                                              \
-            double alpha,                                                                                                \
-            double beta,                                                                                                 \
-            dst_data_t* __restrict__ p_out,                                                                              \
-            Strides5D in_strides,                                                                                        \
-            Strides5D wei_strides,                                                                                       \
-            Strides5D out_strides,                                                                                       \
-            int hi,                                                                                                      \
-            int wi,                                                                                                      \
-            int n,                                                                                                       \
-            int k_per_group,                                                                                             \
-            int c_per_group,                                                                                             \
-            int ho,                                                                                                      \
-            int wo,                                                                                                      \
-            int sy,                                                                                                      \
-            int sx,                                                                                                      \
-            int dy,                                                                                                      \
-            int dx,                                                                                                      \
-            int py,                                                                                                      \
-            int px,                                                                                                      \
-            int fy,                                                                                                      \
-            int fx,                                                                                                      \
-            int group)                                                                                                   \
-    {                                                                                                                    \
-        naive_conv_##direction##_##tensor_layout<false,                                                                  \
-                                                 src_data_t,                                                             \
-                                                 acc_data_t,                                                             \
-                                                 dst_data_t,                                                             \
-                                                 use_tf32>(p_in,                                                         \
-                                                           p_wei,                                                        \
-                                                           alpha,                                                        \
-                                                           beta,                                                         \
-                                                           p_out,                                                        \
-                                                           in_strides,                                                   \
-                                                           wei_strides,                                                  \
-                                                           out_strides,                                                  \
-                                                           hi,                                                           \
-                                                           wi,                                                           \
-                                                           n,                                                            \
-                                                           k_per_group,                                                  \
-                                                           c_per_group,                                                  \
-                                                           ho,                                                           \
-                                                           wo,                                                           \
-                                                           sy,                                                           \
-                                                           sx,                                                           \
-                                                           dy,                                                           \
-                                                           dx,                                                           \
-                                                           py,                                                           \
-                                                           px,                                                           \
-                                                           fy,                                                           \
-                                                           fx,                                                           \
-                                                           group);                                                       \
+#define DEFINE_2D_NAIVE_CONV_KERNEL(direction, tensor_layout, src_data_t, acc_data_t, dst_data_t)           \
+    extern "C" __global__ void                                                                              \
+        naive_conv_ab_packed_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t(    \
+            src_data_t* __restrict__ p_in,                                                                  \
+            src_data_t* __restrict__ p_wei,                                                                 \
+            double alpha,                                                                                   \
+            double beta,                                                                                    \
+            dst_data_t* __restrict__ p_out,                                                                 \
+            Strides5D in_strides,                                                                           \
+            Strides5D wei_strides,                                                                          \
+            Strides5D out_strides,                                                                          \
+            int hi,                                                                                         \
+            int wi,                                                                                         \
+            int n,                                                                                          \
+            int k_per_group,                                                                                \
+            int c_per_group,                                                                                \
+            int ho,                                                                                         \
+            int wo,                                                                                         \
+            int sy,                                                                                         \
+            int sx,                                                                                         \
+            int dy,                                                                                         \
+            int dx,                                                                                         \
+            int py,                                                                                         \
+            int px,                                                                                         \
+            int fy,                                                                                         \
+            int fx,                                                                                         \
+            int group)                                                                                      \
+    {                                                                                                       \
+        naive_conv_##direction##_##tensor_layout<true, src_data_t, acc_data_t, dst_data_t>(                 \
+            p_in,                                                                                           \
+            p_wei,                                                                                          \
+            alpha,                                                                                          \
+            beta,                                                                                           \
+            p_out,                                                                                          \
+            in_strides,                                                                                     \
+            wei_strides,                                                                                    \
+            out_strides,                                                                                    \
+            hi,                                                                                             \
+            wi,                                                                                             \
+            n,                                                                                              \
+            k_per_group,                                                                                    \
+            c_per_group,                                                                                    \
+            ho,                                                                                             \
+            wo,                                                                                             \
+            sy,                                                                                             \
+            sx,                                                                                             \
+            dy,                                                                                             \
+            dx,                                                                                             \
+            py,                                                                                             \
+            px,                                                                                             \
+            fy,                                                                                             \
+            fx,                                                                                             \
+            group);                                                                                         \
+    }                                                                                                       \
+    extern "C" __global__ void                                                                              \
+        naive_conv_ab_nonpacked_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t( \
+            src_data_t* __restrict__ p_in,                                                                  \
+            src_data_t* __restrict__ p_wei,                                                                 \
+            double alpha,                                                                                   \
+            double beta,                                                                                    \
+            dst_data_t* __restrict__ p_out,                                                                 \
+            Strides5D in_strides,                                                                           \
+            Strides5D wei_strides,                                                                          \
+            Strides5D out_strides,                                                                          \
+            int hi,                                                                                         \
+            int wi,                                                                                         \
+            int n,                                                                                          \
+            int k_per_group,                                                                                \
+            int c_per_group,                                                                                \
+            int ho,                                                                                         \
+            int wo,                                                                                         \
+            int sy,                                                                                         \
+            int sx,                                                                                         \
+            int dy,                                                                                         \
+            int dx,                                                                                         \
+            int py,                                                                                         \
+            int px,                                                                                         \
+            int fy,                                                                                         \
+            int fx,                                                                                         \
+            int group)                                                                                      \
+    {                                                                                                       \
+        naive_conv_##direction##_##tensor_layout<false, src_data_t, acc_data_t, dst_data_t>(                \
+            p_in,                                                                                           \
+            p_wei,                                                                                          \
+            alpha,                                                                                          \
+            beta,                                                                                           \
+            p_out,                                                                                          \
+            in_strides,                                                                                     \
+            wei_strides,                                                                                    \
+            out_strides,                                                                                    \
+            hi,                                                                                             \
+            wi,                                                                                             \
+            n,                                                                                              \
+            k_per_group,                                                                                    \
+            c_per_group,                                                                                    \
+            ho,                                                                                             \
+            wo,                                                                                             \
+            sy,                                                                                             \
+            sx,                                                                                             \
+            dy,                                                                                             \
+            dx,                                                                                             \
+            py,                                                                                             \
+            px,                                                                                             \
+            fy,                                                                                             \
+            fx,                                                                                             \
+            group);                                                                                         \
     }
 
-#define DEFINE_3D_NAIVE_CONV_KERNEL(                                                                                     \
-    direction, tensor_layout, src_data_t, acc_data_t, dst_data_t, use_tf32)                                              \
-    extern "C" __global__ void                                                                                           \
-        naive_conv_ab_packed_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t##_##use_tf32(    \
-            src_data_t* __restrict__ p_in,                                                                               \
-            src_data_t* __restrict__ p_wei,                                                                              \
-            double alpha,                                                                                                \
-            double beta,                                                                                                 \
-            dst_data_t* __restrict__ p_out,                                                                              \
-            Strides6D in_strides,                                                                                        \
-            Strides6D wei_strides,                                                                                       \
-            Strides6D out_strides,                                                                                       \
-            int di,                                                                                                      \
-            int hi,                                                                                                      \
-            int wi,                                                                                                      \
-            int n,                                                                                                       \
-            int k_per_group,                                                                                             \
-            int c_per_group,                                                                                             \
-            int do_,                                                                                                     \
-            int ho,                                                                                                      \
-            int wo,                                                                                                      \
-            int sz,                                                                                                      \
-            int sy,                                                                                                      \
-            int sx,                                                                                                      \
-            int dz,                                                                                                      \
-            int dy,                                                                                                      \
-            int dx,                                                                                                      \
-            int pz,                                                                                                      \
-            int py,                                                                                                      \
-            int px,                                                                                                      \
-            int fz,                                                                                                      \
-            int fy,                                                                                                      \
-            int fx,                                                                                                      \
-            int group)                                                                                                   \
-    {                                                                                                                    \
-        naive_conv_##direction##_##tensor_layout<true,                                                                   \
-                                                 src_data_t,                                                             \
-                                                 acc_data_t,                                                             \
-                                                 dst_data_t,                                                             \
-                                                 use_tf32>(p_in,                                                         \
-                                                           p_wei,                                                        \
-                                                           alpha,                                                        \
-                                                           beta,                                                         \
-                                                           p_out,                                                        \
-                                                           in_strides,                                                   \
-                                                           wei_strides,                                                  \
-                                                           out_strides,                                                  \
-                                                           di,                                                           \
-                                                           hi,                                                           \
-                                                           wi,                                                           \
-                                                           n,                                                            \
-                                                           k_per_group,                                                  \
-                                                           c_per_group,                                                  \
-                                                           do_,                                                          \
-                                                           ho,                                                           \
-                                                           wo,                                                           \
-                                                           sz,                                                           \
-                                                           sy,                                                           \
-                                                           sx,                                                           \
-                                                           dz,                                                           \
-                                                           dy,                                                           \
-                                                           dx,                                                           \
-                                                           pz,                                                           \
-                                                           py,                                                           \
-                                                           px,                                                           \
-                                                           fz,                                                           \
-                                                           fy,                                                           \
-                                                           fx,                                                           \
-                                                           group);                                                       \
-    }                                                                                                                    \
-    extern "C" __global__ void                                                                                           \
-        naive_conv_ab_nonpacked_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t##_##use_tf32( \
-            src_data_t* __restrict__ p_in,                                                                               \
-            src_data_t* __restrict__ p_wei,                                                                              \
-            double alpha,                                                                                                \
-            double beta,                                                                                                 \
-            dst_data_t* __restrict__ p_out,                                                                              \
-            Strides6D in_strides,                                                                                        \
-            Strides6D wei_strides,                                                                                       \
-            Strides6D out_strides,                                                                                       \
-            int di,                                                                                                      \
-            int hi,                                                                                                      \
-            int wi,                                                                                                      \
-            int n,                                                                                                       \
-            int k_per_group,                                                                                             \
-            int c_per_group,                                                                                             \
-            int do_,                                                                                                     \
-            int ho,                                                                                                      \
-            int wo,                                                                                                      \
-            int sz,                                                                                                      \
-            int sy,                                                                                                      \
-            int sx,                                                                                                      \
-            int dz,                                                                                                      \
-            int dy,                                                                                                      \
-            int dx,                                                                                                      \
-            int pz,                                                                                                      \
-            int py,                                                                                                      \
-            int px,                                                                                                      \
-            int fz,                                                                                                      \
-            int fy,                                                                                                      \
-            int fx,                                                                                                      \
-            int group)                                                                                                   \
-    {                                                                                                                    \
-        naive_conv_##direction##_##tensor_layout<false,                                                                  \
-                                                 src_data_t,                                                             \
-                                                 acc_data_t,                                                             \
-                                                 dst_data_t,                                                             \
-                                                 use_tf32>(p_in,                                                         \
-                                                           p_wei,                                                        \
-                                                           alpha,                                                        \
-                                                           beta,                                                         \
-                                                           p_out,                                                        \
-                                                           in_strides,                                                   \
-                                                           wei_strides,                                                  \
-                                                           out_strides,                                                  \
-                                                           di,                                                           \
-                                                           hi,                                                           \
-                                                           wi,                                                           \
-                                                           n,                                                            \
-                                                           k_per_group,                                                  \
-                                                           c_per_group,                                                  \
-                                                           do_,                                                          \
-                                                           ho,                                                           \
-                                                           wo,                                                           \
-                                                           sz,                                                           \
-                                                           sy,                                                           \
-                                                           sx,                                                           \
-                                                           dz,                                                           \
-                                                           dy,                                                           \
-                                                           dx,                                                           \
-                                                           pz,                                                           \
-                                                           py,                                                           \
-                                                           px,                                                           \
-                                                           fz,                                                           \
-                                                           fy,                                                           \
-                                                           fx,                                                           \
-                                                           group);                                                       \
+#define DEFINE_3D_NAIVE_CONV_KERNEL(direction, tensor_layout, src_data_t, acc_data_t, dst_data_t)           \
+    extern "C" __global__ void                                                                              \
+        naive_conv_ab_packed_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t(    \
+            src_data_t* __restrict__ p_in,                                                                  \
+            src_data_t* __restrict__ p_wei,                                                                 \
+            double alpha,                                                                                   \
+            double beta,                                                                                    \
+            dst_data_t* __restrict__ p_out,                                                                 \
+            Strides6D in_strides,                                                                           \
+            Strides6D wei_strides,                                                                          \
+            Strides6D out_strides,                                                                          \
+            int di,                                                                                         \
+            int hi,                                                                                         \
+            int wi,                                                                                         \
+            int n,                                                                                          \
+            int k_per_group,                                                                                \
+            int c_per_group,                                                                                \
+            int do_,                                                                                        \
+            int ho,                                                                                         \
+            int wo,                                                                                         \
+            int sz,                                                                                         \
+            int sy,                                                                                         \
+            int sx,                                                                                         \
+            int dz,                                                                                         \
+            int dy,                                                                                         \
+            int dx,                                                                                         \
+            int pz,                                                                                         \
+            int py,                                                                                         \
+            int px,                                                                                         \
+            int fz,                                                                                         \
+            int fy,                                                                                         \
+            int fx,                                                                                         \
+            int group)                                                                                      \
+    {                                                                                                       \
+        naive_conv_##direction##_##tensor_layout<true, src_data_t, acc_data_t, dst_data_t>(                 \
+            p_in,                                                                                           \
+            p_wei,                                                                                          \
+            alpha,                                                                                          \
+            beta,                                                                                           \
+            p_out,                                                                                          \
+            in_strides,                                                                                     \
+            wei_strides,                                                                                    \
+            out_strides,                                                                                    \
+            di,                                                                                             \
+            hi,                                                                                             \
+            wi,                                                                                             \
+            n,                                                                                              \
+            k_per_group,                                                                                    \
+            c_per_group,                                                                                    \
+            do_,                                                                                            \
+            ho,                                                                                             \
+            wo,                                                                                             \
+            sz,                                                                                             \
+            sy,                                                                                             \
+            sx,                                                                                             \
+            dz,                                                                                             \
+            dy,                                                                                             \
+            dx,                                                                                             \
+            pz,                                                                                             \
+            py,                                                                                             \
+            px,                                                                                             \
+            fz,                                                                                             \
+            fy,                                                                                             \
+            fx,                                                                                             \
+            group);                                                                                         \
+    }                                                                                                       \
+    extern "C" __global__ void                                                                              \
+        naive_conv_ab_nonpacked_##direction##_##tensor_layout##_##src_data_t##_##acc_data_t##_##dst_data_t( \
+            src_data_t* __restrict__ p_in,                                                                  \
+            src_data_t* __restrict__ p_wei,                                                                 \
+            double alpha,                                                                                   \
+            double beta,                                                                                    \
+            dst_data_t* __restrict__ p_out,                                                                 \
+            Strides6D in_strides,                                                                           \
+            Strides6D wei_strides,                                                                          \
+            Strides6D out_strides,                                                                          \
+            int di,                                                                                         \
+            int hi,                                                                                         \
+            int wi,                                                                                         \
+            int n,                                                                                          \
+            int k_per_group,                                                                                \
+            int c_per_group,                                                                                \
+            int do_,                                                                                        \
+            int ho,                                                                                         \
+            int wo,                                                                                         \
+            int sz,                                                                                         \
+            int sy,                                                                                         \
+            int sx,                                                                                         \
+            int dz,                                                                                         \
+            int dy,                                                                                         \
+            int dx,                                                                                         \
+            int pz,                                                                                         \
+            int py,                                                                                         \
+            int px,                                                                                         \
+            int fz,                                                                                         \
+            int fy,                                                                                         \
+            int fx,                                                                                         \
+            int group)                                                                                      \
+    {                                                                                                       \
+        naive_conv_##direction##_##tensor_layout<false, src_data_t, acc_data_t, dst_data_t>(                \
+            p_in,                                                                                           \
+            p_wei,                                                                                          \
+            alpha,                                                                                          \
+            beta,                                                                                           \
+            p_out,                                                                                          \
+            in_strides,                                                                                     \
+            wei_strides,                                                                                    \
+            out_strides,                                                                                    \
+            di,                                                                                             \
+            hi,                                                                                             \
+            wi,                                                                                             \
+            n,                                                                                              \
+            k_per_group,                                                                                    \
+            c_per_group,                                                                                    \
+            do_,                                                                                            \
+            ho,                                                                                             \
+            wo,                                                                                             \
+            sz,                                                                                             \
+            sy,                                                                                             \
+            sx,                                                                                             \
+            dz,                                                                                             \
+            dy,                                                                                             \
+            dx,                                                                                             \
+            pz,                                                                                             \
+            py,                                                                                             \
+            px,                                                                                             \
+            fz,                                                                                             \
+            fy,                                                                                             \
+            fx,                                                                                             \
+            group);                                                                                         \
     }
 
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, double, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, double, float, 1)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, half, double, half, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, ushort, double, ushort, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, int8_t, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, int32_t, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, float, double, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, float, double, float, 1)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, half, double, half, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, ushort, double, ushort, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, int8_t, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, int32_t, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, float, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, float, double, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, half, double, half)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, ushort, double, ushort)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, int8_t)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, int32_t)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nchw, int8_t, int32_t, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, float, double, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, half, double, half)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, ushort, double, ushort)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, int8_t)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, int32_t)
+DEFINE_2D_NAIVE_CONV_KERNEL(fwd, nhwc, int8_t, int32_t, float)
 
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, double, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, double, float, 1)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, half, double, half, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, ushort, double, ushort, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, float, double, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, float, double, float, 1)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, half, double, half, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, ushort, double, ushort, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, float, double, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, half, double, half)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nchw, ushort, double, ushort)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, float, double, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, half, double, half)
+DEFINE_2D_NAIVE_CONV_KERNEL(bwd, nhwc, ushort, double, ushort)
 
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, float, double, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, float, double, float, 1)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, half, double, half, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, ushort, double, ushort, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, float, double, float, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, float, double, float, 1)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, half, double, half, 0)
-DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, ushort, double, ushort, 0)
+DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, float, double, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, half, double, half)
+DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nchw, ushort, double, ushort)
+DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, float, double, float)
+DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, half, double, half)
+DEFINE_2D_NAIVE_CONV_KERNEL(wrw, nhwc, ushort, double, ushort)
 
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, float, double, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, float, double, float, 1)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, half, double, half, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, ushort, double, ushort, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, int8_t, int32_t, int32_t, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, int8_t, int32_t, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, float, double, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, float, double, float, 1)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, half, double, half, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, ushort, double, ushort, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, int32_t, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, float, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, float, double, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, half, double, half)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, ushort, double, ushort)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, int8_t, int32_t, int32_t)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ncdhw, int8_t, int32_t, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, float, double, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, half, double, half)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, ushort, double, ushort)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, int32_t)
+DEFINE_3D_NAIVE_CONV_KERNEL(fwd, ndhwc, int8_t, int32_t, float)
 
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, float, double, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, float, double, float, 1)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, half, double, half, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, ushort, double, ushort, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, double, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, double, float, 1)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, half, double, half, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, ushort, double, ushort, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, float, double, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, half, double, half)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ncdhw, ushort, double, ushort)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, float, double, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, half, double, half)
+DEFINE_3D_NAIVE_CONV_KERNEL(bwd, ndhwc, ushort, double, ushort)
 
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, float, double, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, float, double, float, 1)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, half, double, half, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, ushort, double, ushort, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, float, double, float, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, float, double, float, 1)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, half, double, half, 0)
-DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, ushort, double, ushort, 0)
+DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, float, double, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, half, double, half)
+DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ncdhw, ushort, double, ushort)
+DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, float, double, float)
+DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, half, double, half)
+DEFINE_3D_NAIVE_CONV_KERNEL(wrw, ndhwc, ushort, double, ushort)
 
 /// \todo discuss whether we should split the kernels into separate files, or
 /// figure out a mechanism to compile each kernel separately to reduce hipRTC

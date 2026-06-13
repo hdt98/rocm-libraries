@@ -22,57 +22,43 @@
 
 #pragma once
 #include "../../../../shared/arithmetic.h"
-#include "../kernels/device_enum.h"
 #include "rocfft/rocfft.h"
-#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
 
 struct StockhamGeneratorSpecs
 {
-    StockhamGeneratorSpecs(const std::vector<unsigned int>&   factors,
-                           const std::vector<unsigned int>&   factors2d,
-                           unsigned int                       precision,
-                           const std::string&                 gcn_arch_name,
-                           unsigned int                       workgroup_size,
-                           const std::string&                 scheme,
-                           const std::optional<unsigned int>& transform_type = std::nullopt)
+    StockhamGeneratorSpecs(const std::vector<unsigned int>& factors,
+                           const std::vector<unsigned int>& factors2d,
+                           const std::vector<unsigned int>& precisions,
+                           unsigned int                     workgroup_size,
+                           const std::string&               scheme)
         : factors(factors)
         , factors2d(factors2d)
-        , precision(precision)
-        , gcn_arch_name(gcn_arch_name)
+        , precisions(precisions)
         , length(product(factors.begin(), factors.end()))
         , length2d(product(factors2d.begin(), factors2d.end()))
         , workgroup_size(workgroup_size)
         , scheme(scheme)
-        , transform_type(transform_type)
     {
     }
 
     std::vector<unsigned int> factors;
     std::vector<unsigned int> factors2d;
-    std::vector<unsigned int> factors_pp;
-    unsigned int              precision; // mapped from rocfft_precision
-    std::string               gcn_arch_name;
+    std::vector<unsigned int> precisions; // mapped from rocfft_precision
     unsigned int              length;
-    unsigned int              length_pp;
     unsigned int              length2d = 0;
 
     unsigned int workgroup_size;
-    unsigned int threads_per_transform    = 0;
-    unsigned int threads_per_transform_pp = 0;
-    bool         half_lds                 = false;
-    bool         direct_to_from_reg       = false;
+    unsigned int threads_per_transform = 0;
+    bool         half_lds              = false;
+    bool         direct_to_from_reg    = false;
     // dimension of the kernel - 0 if the generated kernel accepts a
     // 'dim' argument at runtime; otherwise the dimension is
     // statically defined for the kernel
     unsigned int static_dim = 0;
     std::string  scheme;
-
-    std::optional<unsigned int> transform_type; // mapped from rocfft_transform_type
-
-    EmbeddedType ebtype = EmbeddedType::NONE;
 
     // this value indicating if the wgs, tpt are excatly what we want
     // (i.e. were already derived somewhere)
@@ -93,37 +79,3 @@ void stockham_variants(const std::vector<std::string>& kernel_name,
                        const StockhamGeneratorSpecs&   specs,
                        const StockhamGeneratorSpecs&   specs2d,
                        std::ostream&                   output);
-
-struct StockhamPartialPassParams
-{
-    StockhamPartialPassParams() = default;
-
-    StockhamPartialPassParams(const std::vector<unsigned int>& parent_length,
-                              const unsigned int               pp_threads_per_transform,
-                              const unsigned int               current_dim,
-                              const unsigned int               off_dim,
-                              const std::vector<unsigned int>& pp_factors_curr,
-                              const std::vector<unsigned int>& pp_factors_other)
-        : parent_length(parent_length)
-        , pp_threads_per_transform(pp_threads_per_transform)
-        , current_dim(current_dim)
-        , off_dim(off_dim)
-        , pp_factors_curr(pp_factors_curr)
-        , pp_factors_other(pp_factors_other)
-    {
-    }
-
-    std::vector<unsigned int> parent_length;
-    unsigned int              pp_threads_per_transform;
-    unsigned int              current_dim = 0;
-    unsigned int              off_dim     = 0;
-    std::vector<unsigned int> pp_factors_curr;
-    std::vector<unsigned int> pp_factors_other;
-};
-
-void stockham_partial_pass_variants(const std::string&               kernel_name,
-                                    const StockhamGeneratorSpecs&    specs1,
-                                    const StockhamGeneratorSpecs&    specs2,
-                                    const StockhamPartialPassParams& params_1,
-                                    const StockhamPartialPassParams& params_2,
-                                    std::ostream&                    output);

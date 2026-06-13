@@ -18,35 +18,31 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
-#include <thrust/detail/allocator/allocator_traits.h>
 #include <thrust/detail/execute_with_allocator_fwd.h>
-#include <thrust/detail/integer_math.h>
+#include <thrust/pair.h>
 #include <thrust/detail/raw_pointer_cast.h>
 #include <thrust/detail/type_traits/pointer_traits.h>
-#include <thrust/pair.h>
-
-#if !_THRUST_HAS_DEVICE_SYSTEM_STD
-#  include <type_traits>
-#endif
+#include <thrust/detail/allocator/allocator_traits.h>
+#include <thrust/detail/integer_math.h>
 
 THRUST_NAMESPACE_BEGIN
 
 namespace detail
 {
 
-template <typename T, typename Allocator, template <typename> class BaseSystem>
-THRUST_HOST thrust::pair<T*, std::ptrdiff_t>
-get_temporary_buffer(thrust::detail::execute_with_allocator<Allocator, BaseSystem>& system, std::ptrdiff_t n)
+template <
+    typename T
+  , typename Allocator
+  , template <typename> class BaseSystem
+>
+THRUST_HOST
+thrust::pair<T*, std::ptrdiff_t>
+get_temporary_buffer(
+    thrust::detail::execute_with_allocator<Allocator, BaseSystem>& system
+  , std::ptrdiff_t n
+    )
 {
-  using naked_allocator = _THRUST_STD::remove_reference_t<Allocator>;
+  using naked_allocator = typename thrust::detail::remove_reference<Allocator>::type;
   using alloc_traits    = typename thrust::detail::allocator_traits<naked_allocator>;
   using void_pointer    = typename alloc_traits::void_pointer;
   using size_type       = typename alloc_traits::size_type;
@@ -59,14 +55,23 @@ get_temporary_buffer(thrust::detail::execute_with_allocator<Allocator, BaseSyste
   void_pointer ptr = alloc_traits::allocate(system.get_allocator(), num_elements);
 
   // Return the pointer and the number of elements of type T allocated.
-  return thrust::make_pair(thrust::reinterpret_pointer_cast<T*>(ptr), n);
+  return thrust::make_pair(thrust::reinterpret_pointer_cast<T*>(ptr),n);
 }
 
-template <typename Pointer, typename Allocator, template <typename> class BaseSystem>
-THRUST_HOST void return_temporary_buffer(
-  thrust::detail::execute_with_allocator<Allocator, BaseSystem>& system, Pointer p, std::ptrdiff_t n)
+template <
+    typename Pointer
+  , typename Allocator
+  , template <typename> class BaseSystem
+>
+THRUST_HOST
+void
+return_temporary_buffer(
+    thrust::detail::execute_with_allocator<Allocator, BaseSystem>& system
+  , Pointer p
+  , std::ptrdiff_t n
+    )
 {
-  using naked_allocator = _THRUST_STD::remove_reference_t<Allocator>;
+  using naked_allocator = typename thrust::detail::remove_reference<Allocator>::type;
   using alloc_traits    = typename thrust::detail::allocator_traits<naked_allocator>;
   using pointer         = typename alloc_traits::pointer;
   using size_type       = typename alloc_traits::size_type;
@@ -79,13 +84,20 @@ THRUST_HOST void return_temporary_buffer(
   alloc_traits::deallocate(system.get_allocator(), to_ptr, num_elements);
 }
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
-template <typename T, template <typename> class BaseSystem, typename Allocator, typename... Dependencies>
-THRUST_DEPRECATED THRUST_HOST thrust::pair<T*, std::ptrdiff_t> get_temporary_buffer(
-  thrust::detail::execute_with_allocator_and_dependencies<Allocator, BaseSystem, Dependencies...>& system,
-  std::ptrdiff_t n)
+template <
+    typename T,
+    template <typename> class BaseSystem,
+    typename Allocator,
+    typename ...Dependencies
+>
+THRUST_HOST
+thrust::pair<T*, std::ptrdiff_t>
+get_temporary_buffer(
+    thrust::detail::execute_with_allocator_and_dependencies<Allocator, BaseSystem, Dependencies...>& system,
+    std::ptrdiff_t n
+    )
 {
-  using naked_allocator = _THRUST_STD::remove_reference_t<Allocator>;
+  using naked_allocator = typename thrust::detail::remove_reference<Allocator>::type;
   using alloc_traits    = typename thrust::detail::allocator_traits<naked_allocator>;
   using void_pointer    = typename alloc_traits::void_pointer;
   using size_type       = typename alloc_traits::size_type;
@@ -98,16 +110,24 @@ THRUST_DEPRECATED THRUST_HOST thrust::pair<T*, std::ptrdiff_t> get_temporary_buf
   void_pointer ptr = alloc_traits::allocate(system.get_allocator(), num_elements);
 
   // Return the pointer and the number of elements of type T allocated.
-  return thrust::make_pair(thrust::reinterpret_pointer_cast<T*>(ptr), n);
+  return thrust::make_pair(thrust::reinterpret_pointer_cast<T*>(ptr),n);
 }
 
-template <typename Pointer, template <typename> class BaseSystem, typename Allocator, typename... Dependencies>
-THRUST_HOST void return_temporary_buffer(
-  thrust::detail::execute_with_allocator_and_dependencies<Allocator, BaseSystem, Dependencies...>& system,
-  Pointer p,
-  std::ptrdiff_t n)
+template <
+    typename Pointer,
+    template <typename> class BaseSystem,
+    typename Allocator,
+    typename ...Dependencies
+>
+THRUST_HOST
+void
+return_temporary_buffer(
+    thrust::detail::execute_with_allocator_and_dependencies<Allocator, BaseSystem, Dependencies...>& system,
+    Pointer p,
+    std::ptrdiff_t n
+    )
 {
-  using naked_allocator = _THRUST_STD::remove_reference_t<Allocator>;
+  using naked_allocator = typename thrust::detail::remove_reference<Allocator>::type;
   using alloc_traits    = typename thrust::detail::allocator_traits<naked_allocator>;
   using pointer         = typename alloc_traits::pointer;
   using size_type       = typename alloc_traits::size_type;
@@ -119,7 +139,7 @@ THRUST_HOST void return_temporary_buffer(
   pointer to_ptr = thrust::reinterpret_pointer_cast<pointer>(p);
   alloc_traits::deallocate(system.get_allocator(), to_ptr, num_elements);
 }
-THRUST_SUPPRESS_DEPRECATED_POP
+
 
 } // namespace detail
 

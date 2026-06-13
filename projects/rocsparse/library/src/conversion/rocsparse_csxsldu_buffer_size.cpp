@@ -22,7 +22,7 @@
  *
  * ************************************************************************ */
 #include "rocsparse_csxsldu.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 template <typename T, typename I, typename J>
 rocsparse_status rocsparse::csxsldu_buffer_size_template(rocsparse_handle     handle_,

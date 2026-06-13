@@ -3,68 +3,19 @@
 Documentation for hipRAND is available at
 [https://rocm.docs.amd.com/projects/hipRAND/en/latest/](https://rocm.docs.amd.com/projects/hipRAND/en/latest/).
 
-## Since last release ROCm 7.13
+## hipRAND 2.12.0 for ROCm 6.5
 
-### Added
-
-* gfx1250 support
-
-## Since last release ROCm 7.12
-
-### Added
-
-* hiprand.dll now contains embedded file version metadata.
-
-## hipRAND 3.2.0 for ROCm 7.12
-
-### Added
-
-* gfx1150,gfx1152 and gfx1153 support
-* Added a new cmake option, `ROCRAND_FETCH_METHOD`, which allows you to specify how you would like to fetch rocRAND.
-  * It may be set to one of the following:
-    * `PACKAGE` - (default) searches for a preinstalled packaged version of the dependency. If it is not found, the build will fall back using option `DOWNLOAD`, below.
-    * `DOWNLOAD` - downloads the dependency from the rocm-libraries repository. If git >= 2.25 is present, this option uses a sparse checkout that avoids downloading more than it needs to. If not, the whole monorepo is downloaded (this may take some time).
-    * `MONOREPO` - this options is intended to be used if you are building hipCUB from within a copy of the rocm-libraries repository that you have cloned (and therefore already contains rocRAND). When selected, the build will try find the dependency in the local repository tree. If it cannot be found, the build will attempt to use git to perform a sparse-checkout of rocRAND. If that also fails, it will fall back to using the `DOWNLOAD` option described above.
-    
-  * The existing `DEPENDENCIES_FORCE_DOWNLOAD` CMake option has been renamed `EXTERNAL_DEPS_FORCE_DOWNLOAD` and no longer affects rocRAND.
-
-## hipRAND 3.1.0 for ROCm 7.1
-
-### Resolved issues
-
-* Updated error handling for several hipRAND unit tests to accomodate the new hipGetLastError behaviour that was introduced in ROCm 7.0.
-As of ROCm 7.0, the internal error state is cleared on each call to `hipGetLastError` rather than on every HIP API call.
-
-## hipRAND 3.0.0 for ROCm 7.0
-
-### Added
+### Added 
 
 * gfx950 support
 
 ### Changed
 
-* Deprecated hipRAND's Fortran API in favor of hipfort.
+* Changed the C++ version from 14 to 17. 
 
-### Removed
+### Upcoming changes
 
-* Removed C++14 support, only C++17 is supported.
-
-## hipRAND 2.12.0 for ROCm 6.4.0
-
-### Changed
-
-* When building hipRAND on Windows, use `HIP_PATH` (instead of the former `HIP_DIR`) to specify the path to the HIP SDK installation.
-  * When building with the `rmake.py` script, if `HIP_PATH` is not set, it will default to `C:\hip`.
-
-### Resolved issues
-
-* Fixed an issue that was causing hipRAND build failures on Windows when the HIP SDK was installed to a location with a path that contains spaces.
-
-## hipRAND-2.11.1 for ROCm 6.2.4
-
-### Added
-
-* GFX1151 Support
+* C++14 will be deprecated in the next major release.
 
 ## hipRAND 2.11.0 for ROCm 6.2.0
 

@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -36,7 +36,7 @@ function(add_hipcub_benchmark BENCHMARK_SOURCE)
       hipcub
   )
   if((HIP_COMPILER STREQUAL "nvcc"))
-    set_property(TARGET ${BENCHMARK_TARGET} PROPERTY CUDA_STANDARD 17)
+    set_property(TARGET ${BENCHMARK_TARGET} PROPERTY CUDA_STANDARD 14)
     set_source_files_properties(${BENCHMARK_SOURCE} PROPERTIES LANGUAGE CUDA)
     target_compile_options(${BENCHMARK_TARGET}
       PRIVATE
@@ -88,7 +88,6 @@ add_hipcub_benchmark(benchmark_device_batch_memcpy.cpp)
 add_hipcub_benchmark(benchmark_device_for.cpp)
 add_hipcub_benchmark(benchmark_device_histogram.cpp)
 add_hipcub_benchmark(benchmark_device_memory.cpp)
-add_hipcub_benchmark(benchmark_device_merge.cpp)
 add_hipcub_benchmark(benchmark_device_merge_sort.cpp)
 add_hipcub_benchmark(benchmark_device_partition.cpp)
 add_hipcub_benchmark(benchmark_device_radix_sort.cpp)

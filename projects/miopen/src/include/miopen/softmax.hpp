@@ -37,7 +37,7 @@ namespace miopen {
 struct Handle;
 struct TensorDescriptor;
 
-struct SoftmaxDescriptor : miopenSoftmaxDescriptor
+struct MIOPEN_INTERNALS_EXPORT SoftmaxDescriptor : miopenSoftmaxDescriptor
 {
     SoftmaxDescriptor() {}
 
@@ -57,7 +57,8 @@ struct SoftmaxDescriptor : miopenSoftmaxDescriptor
         mode      = mode_;
     }
 
-    friend std::ostream& operator<<(std::ostream& stream, const SoftmaxDescriptor& x);
+    MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream& stream,
+                                                            const SoftmaxDescriptor& x);
 
     friend void to_json(nlohmann::json& json, const SoftmaxDescriptor& descriptor);
     friend void from_json(const nlohmann::json& json, SoftmaxDescriptor& descriptor);

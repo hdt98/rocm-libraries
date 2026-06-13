@@ -1,1 +1,8 @@
-../../rocprim/.githooks/install
+#!/bin/sh
+
+cd "$(git rev-parse --git-dir)"
+cd hooks
+
+echo "Installing hooks..." 
+ln -s ../../.githooks/pre-commit pre-commit
+echo "Done!"

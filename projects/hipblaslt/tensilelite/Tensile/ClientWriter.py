@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,6 @@
 #
 ################################################################################
 
-import inspect
 import os
 import subprocess
 import shlex
@@ -31,22 +30,20 @@ import shutil
 from pathlib import Path
 from enum import Enum
 from glob import glob
+from typing import List
 
 from Tensile.SolutionStructs.Problem import ProblemType, ProblemSizesMock, ProblemSizesMockDummy
 from Tensile.SolutionStructs import ActivationArgs, BiasTypeArgs, FactorDimArgs
 from Tensile.Toolchain.Component import Assembler
 
-import rocisa
-
 from . import ROOT_PATH
+from . import ClientExecutable
 from . import LibraryIO
 from Tensile.Common import ensurePath, print1, printExit, printWarning, ClientExecutionLock,\
-                           LIBRARY_LOGIC_DIR, LIBRARY_CLIENT_DIR
+                           LIBRARY_LOGIC_DIR, LIBRARY_CLIENT_DIR, DepthUConfig
 from Tensile.Common.Architectures import isaToGfx
 from Tensile.Common.GlobalParameters import globalParameters
-from Tensile.Common.TimingInstrumentation import timing_context
-from .TensileCreateLibrary import copyStaticFiles, libraryDir
-from .ParallelExecution import detectAvailableGpus, runClientParallel
+from .TensileCreateLibrary import copyStaticFiles
 from .Contractions import FreeIndex, BatchIndex
 from .Contractions import ProblemType as ContractionsProblemType
 
@@ -77,7 +74,6 @@ class DataInitName(Enum):
   TrigIndCos = 24
   TrigIndAbsSin = 25
   TrigIndAbsCos = 26
-  UniformLowPrecision = 27
 
 class ClientLogLevel(Enum):
   Error = 0
@@ -89,7 +85,7 @@ class ClientLogLevel(Enum):
 ################################################################################
 # Main
 ################################################################################
-def main(config, assembler: Assembler, cCompiler: str, isaInfoMap, outputPath: Path, deviceId: int, gfxName: str):
+def main(config, assembler: Assembler, cCompiler: str, isaInfoMap, outputPath: Path, deviceId: int, gfxName: str, useShortNames: bool=False):
 
   libraryLogicPath = ensurePath(outputPath / LIBRARY_LOGIC_DIR)
   clientLibraryPath = ensurePath(outputPath / LIBRARY_CLIENT_DIR)
@@ -107,41 +103,25 @@ def main(config, assembler: Assembler, cCompiler: str, isaInfoMap, outputPath: P
   functions = []
   functionNames = []
 
-  # Get rocIsa path, remove this when subprocess is removed
-  module_path = os.path.dirname(inspect.getfile(rocisa))
-  env = os.environ.copy()
-  if 'PYTHONPATH' in env:
-    if not module_path in env['PYTHONPATH']:
-        env["PYTHONPATH"] = module_path + ":" + env["PYTHONPATH"]
-  else:
-    env["PYTHONPATH"] = module_path
-
-  targetGfx = isaToGfx(list(isaInfoMap.keys())[0])
-  createLibraryScript = getBuildClientLibraryScript(clientLibraryPath, libraryLogicPath, str(assembler.path), targetGfx)
-  subprocess.run(shlex.split(createLibraryScript), env=env, cwd=clientLibraryPath)
-  archs = [isaToGfx(isa) for isa in isaInfoMap.keys()]
-  # Kernels fan out into one per-base subdir per arch; union the globs across them.
-  coList = []
-  yamlList = []
-  for arch in archs:
-    archDir = libraryDir(clientLibraryPath, arch)
-    coList.extend(glob(os.path.join(archDir, "*.co")))
-    yamlList.extend(glob(os.path.join(archDir, "*.yaml")))
+  createLibraryScript = getBuildClientLibraryScript(clientLibraryPath, libraryLogicPath, str(assembler.path), isaToGfx(list(isaInfoMap.keys())[0]), useShortNames)
+  subprocess.run(shlex.split(createLibraryScript), cwd=clientLibraryPath)
+  coList = glob(os.path.join(clientLibraryPath, "library/*.co"))
+  yamlList = glob(os.path.join(clientLibraryPath, "library/*.yaml"))
 
   clientParametersPaths = []
   splitGSU = False
-  printSolutionRejectionReason = True
+  printSolutionRejectionReason = False
   printIndexAssignmentInfo = False
   for logicFileName in logicFiles:
-    logic = LibraryIO.parseLibraryLogicFile(logicFileName,
-                                            assembler,
-                                            splitGSU,
-                                            printSolutionRejectionReason,
-                                            printIndexAssignmentInfo,
-                                            isaInfoMap,
-                                            globalParameters["LazyLibraryLoading"])
-    scheduleName, problemType, exactLogic, newLibrary = \
-        logic.schedule, logic.problemType, logic.exactLogic, logic.library
+    (scheduleName, _, problemType, _, exactLogic, newLibrary) \
+        = LibraryIO.parseLibraryLogicFile(logicFileName, 
+                                          assembler, 
+                                          splitGSU,
+                                          printSolutionRejectionReason,
+                                          printIndexAssignmentInfo, 
+                                          DepthUConfig(),
+                                          isaInfoMap,
+                                          globalParameters["LazyLibraryLoading"])
     functions.append((scheduleName, problemType))
     functionNames.append("tensile_%s" % (problemType))
     problemSizes = ProblemSizesMock(exactLogic) if exactLogic else ProblemSizesMockDummy()
@@ -214,13 +194,9 @@ def main(config, assembler: Assembler, cCompiler: str, isaInfoMap, outputPath: P
 ################################################################################
 def runNewClient(scriptPath, clientParametersPath, cxxCompiler: str, cCompiler: str, clientBuildDir=None):
 
-  clientExe = getClientExecutablePath()
+  clientExe = ClientExecutable.getClientExecutable(cxxCompiler, cCompiler, clientBuildDir)
   iniFile = "--config-file={}".format(clientParametersPath)
   args = [clientExe, iniFile]
-
-  # Add MX scale format if set
-  if globalParameters["MXScaleFormat"]:
-    args.extend(["--mx-scale-format", str(globalParameters["MXScaleFormat"])])
 
   try:
     subprocess.run(args, check=True)
@@ -229,43 +205,20 @@ def runNewClient(scriptPath, clientParametersPath, cxxCompiler: str, cCompiler: 
 
 
 def runClient(libraryLogicPath, forBenchmark, enableTileSelection, cxxCompiler: str, cCompiler: str, outputPath, configPaths=None):
+
   buildPath = ensurePath(outputPath / "build")
-  timingEnabled = globalParameters.get("TimingInstrumentation", False)
-  parallelGpus = globalParameters.get("ParallelGpuExecution", 1)
 
-  # Compute default configPaths if not provided (same logic as writeRunScript)
-  if configPaths is None:
-    configPaths = []
-    configPaths.append(os.path.join(buildPath, "../source/ClientParameters.ini"))
-    if enableTileSelection:
-      configPaths.append(os.path.join(buildPath, "../source/ClientParameters_Granularity.ini"))
-
-  # Determine number of GPUs to use
-  if parallelGpus == 0:
-    numGpus = detectAvailableGpus()
-    print1(f"# Auto-detected {numGpus} GPUs for parallel execution")
-  else:
-    numGpus = parallelGpus
-
-  with timing_context("python_client_execution"):
-    # Use parallel execution only for benchmarking with multiple GPUs
-    if numGpus > 1 and forBenchmark:
-      return runClientParallel(buildPath, configPaths, numGpus, timingEnabled, getClientExecutablePath)
-
-    # Original single-GPU path
-    runScriptName = writeRunScript(buildPath, forBenchmark, enableTileSelection, cxxCompiler, cCompiler, buildPath, configPaths)
-
-    with ClientExecutionLock(globalParameters["ClientExecutionLockPath"]):
-      process = subprocess.Popen(runScriptName, cwd=buildPath)
-      process.communicate()
+  runScriptName = writeRunScript(buildPath, forBenchmark, enableTileSelection, cxxCompiler, cCompiler, buildPath, configPaths)
+  with ClientExecutionLock(globalParameters["ClientExecutionLockPath"]):
+    process = subprocess.Popen(runScriptName, cwd=buildPath)
+    process.communicate()
 
   if process.returncode:
     printWarning("ClientWriter Benchmark Process exited with code %u" % process.returncode)
 
   return process.returncode
 
-
-def getBuildClientLibraryScript(buildPath, libraryLogicPath, cxxCompiler, targetGfx):
+def getBuildClientLibraryScript(buildPath, libraryLogicPath, cxxCompiler, targetGfx, useShortNames: bool=False):
   import io
   runScriptFile = io.StringIO()
 
@@ -274,14 +227,14 @@ def getBuildClientLibraryScript(buildPath, libraryLogicPath, cxxCompiler, target
   if not globalParameters["LazyLibraryLoading"]:
     callCreateLibraryCmd += " --no-lazy-library-loading"
 
+  if useShortNames:
+    callCreateLibraryCmd += " --short-file-names"
+
   if globalParameters.get("AsmDebug", False):
     callCreateLibraryCmd += " --asm-debug"
 
   if globalParameters["KeepBuildTmp"]:
     callCreateLibraryCmd += " --keep-build-tmp"
-
-  if globalParameters["DisableAsmComments"]:
-    callCreateLibraryCmd += " --disable-asm-comments"
 
   callCreateLibraryCmd += " --architecture=" + targetGfx
   callCreateLibraryCmd += " --code-object-version=" + globalParameters["CodeObjectVersion"]
@@ -335,11 +288,9 @@ def writeRunScript(path, forBenchmark, enableTileSelection, cxxCompiler: str, cC
 
     runScriptFile.write("ERR1=0\n")
 
-    clientExe = getClientExecutablePath()
-    timingFlag = " --timing-instrumentation" if globalParameters["TimingInstrumentation"] else ""
-    mxScaleFormatFlag = " --mx-scale-format {}".format(globalParameters["MXScaleFormat"]) if globalParameters["MXScaleFormat"] else ""
+    clientExe = ClientExecutable.getClientExecutable(cxxCompiler, cCompiler, buildDir)
     for configFile in configPaths:
-      runScriptFile.write("{} --config-file {}{}{}\n".format(clientExe, configFile, timingFlag, mxScaleFormatFlag))
+      runScriptFile.write("{} --config-file {}\n".format(clientExe, configFile))
     runScriptFile.write("ERR2=$?\n\n")
 
     runScriptFile.write("""
@@ -361,10 +312,8 @@ fi
         runScriptFile.write("%s -d 0 --resetclocks\n" % globalParameters["ROCmSMIPath"])
         runScriptFile.write("%s -d 0 --setfan 50\n" % globalParameters["ROCmSMIPath"])
   else:
-    mxScaleFormatFlag = " --mx-scale-format {}".format(globalParameters["MXScaleFormat"]) if globalParameters["MXScaleFormat"] else ""
     for configFile in configPaths:
-      runScriptFile.write("{} --config-file {} --best-solution{}\n".format(getClientExecutablePath(), configFile, mxScaleFormatFlag))
-
+      runScriptFile.write("{} --config-file {} --best-solution 1\n".format(ClientExecutable.getClientExecutable(cxxCompiler, cCompiler, buildDir), configFile))
   if os.name != "nt":
     runScriptFile.write("exit $ERR\n")
   runScriptFile.close()
@@ -521,8 +470,6 @@ def dataInitParams(problemType):
     initScaleC  = globalParameters['DataInitTypeScaleC']
     initScaleD  = globalParameters['DataInitTypeScaleD']
     initScaleAlphaVec  = globalParameters['DataInitTypeScaleAlphaVec']
-    initMXScaleA = globalParameters["DataInitTypeMXSA"]
-    initMXScaleB = globalParameters["DataInitTypeMXSB"]
 
     if not problemType.useBeta:
         initBeta = 0
@@ -542,9 +489,7 @@ def dataInitParams(problemType):
             ('init-scaleB',        DataInitName(initScaleB).name),
             ('init-scaleC',        DataInitName(initScaleC).name),
             ('init-scaleD',        DataInitName(initScaleD).name),
-            ('init-scaleAlphaVec', DataInitName(initScaleAlphaVec).name),
-            ('init-mx-a',      DataInitName(initMXScaleA).name),
-            ('init-mx-b',      DataInitName(initMXScaleB).name)]
+            ('init-scaleAlphaVec', DataInitName(initScaleAlphaVec).name)]
 
 def boundsCheckName(mode):
     if mode == 0: return 'Disable'
@@ -562,18 +507,17 @@ def pruneModeName(mode):
     if mode == 5: return 'Prune0X0X'
     if mode == 6: return 'Prune00XX'
 
-def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs, activationArgs, icacheFlushArgs, problemType, sourceDir, codeObjectFiles, resultsFileName, parametersFilePath, deviceId: int, gfxName: str, libraryFile, probSolMap={}):
+def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs, activationArgs, icacheFlushArgs, problemType, sourceDir, codeObjectFiles, resultsFileName, parametersFilePath, deviceId: int, gfxName: str, libraryFile=None):
 
     assert os.path.exists(sourceDir), f"sourceDir={sourceDir} does not exist"
-    # libraryFile must point at the per-base TensileLibrary{,.yaml,.dat}; the
-    # previous flat default `<sourceDir>/library/TensileLibrary.{dat,yaml}`
-    # silently masked the per-base layout when callers forgot to compute it.
-    assert libraryFile, "libraryFile is required; pass the per-base TensileLibrary path"
 
     with open(parametersFilePath, "w") as f:
         def param(key, value):
             f.write("{}={}\n".format(key, value))
 
+        if libraryFile is None:
+          libraryFilename = "TensileLibrary.yaml" if globalParameters["LibraryFormat"] == "yaml" else "TensileLibrary.dat"
+          libraryFile = os.path.join(sourceDir, "library", libraryFilename)
         param("library-file", libraryFile)
 
         for coFile in codeObjectFiles:
@@ -583,20 +527,19 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param('results-file', resultsFileName)
         param('performance-metric', globalParameters["PerformanceMetric"])
         param('problem-identifier', problemType.operationIdentifier)
-        param('compute-input-type-A', problemType.computeInputTypeA.toName())
-        param('compute-input-type-B', problemType.computeInputTypeB.toName())
-        param('a-type',     problemType.aType.toName())
-        param('b-type',     problemType.bType.toName())
-        param('c-type',     problemType.cType.toName())
-        param('d-type',     problemType.dType.toName())
+        param('compute-input-type', problemType.computeInputType.toEnum())
+        param('a-type',     problemType.aType.toEnum())
+        param('b-type',     problemType.bType.toEnum())
+        param('c-type',     problemType.cType.toEnum())
+        param('d-type',     problemType.dType.toEnum())
         if problemType.useE:
-            param('e-type',     problemType.eType.toName())
+            param('e-type',     problemType.eType.toEnum())
         if problemType.outputAmaxD:
-            param('amaxD-type',     problemType.amaxDType.toName())
-        param('alpha-type', problemType.alphaType.toName())
-        param('beta-type',  problemType.betaType.toName())
-        param('f32-xdl-math-op', problemType.f32XdlMathOp.toName())
-        param('activation-compute-type', problemType.activationComputeDataType.toName())
+            param('amaxD-type',     problemType.amaxDType.toEnum())
+        param('alpha-type', problemType.alphaType.toEnum())
+        param('beta-type',  problemType.betaType.toEnum())
+        param('f32-xdl-math-op', problemType.f32XdlMathOp.toEnum())
+        param('activation-compute-type', problemType.activationComputeDataType.toEnum())
         param('use-gradient', problemType.useGradient)
         param('use-bias',   problemType.useBias)
         param('bias-source',   problemType.biasSrcWhiteList[0])
@@ -607,16 +550,9 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param('use-scaleAlphaVec',   problemType.useScaleAlphaVec)
         param('swizzle-tensor-a', problemType.swizzleTensorA)
         param('swizzle-tensor-b', problemType.swizzleTensorB)
-        if problemType.mxBlockA:
-            param('mx-a-block', problemType.mxBlockA)
-            param('mx-a-type', problemType.mxTypeA.toName())
-        if problemType.mxBlockB:
-            param('mx-b-block', problemType.mxBlockB)
-            param('mx-b-type', problemType.mxTypeB.toName())
-
         if biasTypeArgs:
           for btype in biasTypeArgs.biasTypes:
-            param('bias-type-args',  btype.toName())
+            param('bias-type-args',  btype.toEnum())
         if factorDimArgs:
           for fdim in factorDimArgs.factorDims:
             param('factor-dim-args', fdim)
@@ -627,19 +563,13 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
             param('icache-flush-args', opt)
 
         param('sparse',   problemType.sparse)
-        param('metadata-layout', problemType.metadataLayout)
         param('high-precision-accumulate', problemType.highPrecisionAccumulate)
         param('strided-batched', problemType.stridedBatched)
         param('grouped-gemm', problemType.groupedGemm)
 
-        probIdx = 0
         for problem in problemSizes.problems:
             for key,value in problemSizeParams(problemType, problem, factorDimArgs.factorDims):
                 param(key,value)
-            if probIdx in probSolMap:
-                solutionIdx = probSolMap[probIdx]
-                param('prob-sol-map', str(f'{probIdx},{solutionIdx}'),)
-            probIdx += 1
 
         if activationArgs:
           for setting in activationArgs.settingList:
@@ -711,7 +641,6 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param("max-workspace-size",       globalParameters["MaxWorkspaceSize"])
         param("PrintWinnersOnly",         globalParameters["PrintWinnersOnly"])
         param("granularity-threshold",    globalParameters["GranularityThreshold"])
-        param("prediction-threshold",     globalParameters["PredictionThreshold"])
         param("pristine-on-gpu",          globalParameters["PristineOnGPU"])
 
         param("library-update-file",      globalParameters["LibraryUpdateFile"])
@@ -720,9 +649,7 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param("use-user-args",            globalParameters["UseUserArgs"])
         param("rotating-buffer-size",     globalParameters["RotatingBufferSize"])
         param("rotating-buffer-mode",     globalParameters["RotatingMode"])
-        if globalParameters["RocProfCounter"]:
-            for counter in globalParameters["RocProfCounter"]:
-                param("rocprof-counter", counter)
+
 
 def writeClientConfig(
       forBenchmark,
@@ -740,14 +667,10 @@ def writeClientConfig(
       deviceId: int,
       gfxName: str,
       configBase = "ClientParameters",
-      *,
-      libraryFile,
-      probSolMap = {},
-      sourceDir = None
+      libraryFile = None
     ):
 
-    if sourceDir is None:
-        sourceDir = os.path.join(stepBaseDir, "source")
+    sourceDir = os.path.join(stepBaseDir, "source")
 
     if tileAwareSelection:
       filename = os.path.join(sourceDir, "%s_Granularity.ini"%configBase)
@@ -764,26 +687,14 @@ def writeClientConfig(
       resultsFileName = os.path.join(stepBaseDir, "../Data", stepName+".csv")
 
     newSolution = next(iter(newLibrary.solutions.values()))
-    writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs, activationArgs, icacheFlushArgs, newSolution.problemType, sourceDir, codeObjectFiles, resultsFileName, filename, deviceId, gfxName, libraryFile, probSolMap)
+    writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs, activationArgs, icacheFlushArgs, newSolution.problemType, sourceDir, codeObjectFiles, resultsFileName, filename, deviceId, gfxName, libraryFile)
 
     return filename
 
-def CreateBenchmarkClientParametersForSizes(libraryRootPath, problemSizes, dataFilePath, configFile, deviceId, gfxName, problemTypeDict=None, archs=None):
+def CreateBenchmarkClientParametersForSizes(libraryRootPath, problemSizes, dataFilePath, configFile, deviceId, gfxName, problemTypeDict=None):
 
-    # Benchmarking operates on a single arch at a time. Resolve the per-base
-    # dir from the arch the caller already holds (archs, else gfxName) via the
-    # same prescription used to write it; an unknown arch is a hard error, not
-    # a filesystem guess.
-    if archs:
-        libraryPath = libraryDir(libraryRootPath, archs[0])
-    elif gfxName:
-        libraryPath = libraryDir(libraryRootPath, gfxName)
-    else:
-        raise RuntimeError(
-            "CreateBenchmarkClientParametersForSizes: arch is required; "
-            "pass archs=[...] or a non-empty gfxName"
-        )
-    libraryFiles = [os.path.join(str(libraryPath), f) for f in os.listdir(libraryPath)]
+    libraryPath = os.path.join(libraryRootPath, "library")
+    libraryFiles = [os.path.join(libraryPath, f) for f in os.listdir(libraryPath)]
     codeObjectFiles = [f for f in libraryFiles if f.endswith("co")]
 
     if problemTypeDict:
@@ -797,18 +708,4 @@ def CreateBenchmarkClientParametersForSizes(libraryRootPath, problemSizes, dataF
       problemTypeDict = metaData["ProblemType"]
       problemType = ContractionsProblemType.FromOriginalState(problemTypeDict)
 
-    libraryExt = ".yaml" if globalParameters["LibraryFormat"] == "yaml" else ".dat"
-    libraryFile = str(libraryPath / ("TensileLibrary" + libraryExt))
-    writeClientConfigIni(True, problemSizes, "", "", "", "", problemType, libraryRootPath, codeObjectFiles, dataFilePath, configFile, deviceId, gfxName, libraryFile=libraryFile)
-
-def getClientExecutablePath():
-  clientExe = globalParameters.get("PrebuiltClient")
-
-  if not os.path.isfile(clientExe):
-    raise FileNotFoundError(
-        f"Tensile client executable not found at '{clientExe}'.\n"
-        "Please ensure the client is built or provide a valid path using the --prebuilt-client flag.\n"
-        "To build, run: `invoke build-client` (you may need to `pip3 install invoke` first).\n"
-        "For custom cmake build instructions, please refer to the README in next-cmake."
-    )
-  return clientExe
+    writeClientConfigIni(True, problemSizes, "", "", "", "", problemType, libraryRootPath, codeObjectFiles, dataFilePath, configFile, deviceId, gfxName)

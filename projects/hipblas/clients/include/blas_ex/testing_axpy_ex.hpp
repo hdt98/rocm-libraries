@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,6 @@ inline void testname_axpy_ex(const Arguments& arg, std::string& name)
 template <typename Ta, typename Tx = Ta, typename Ty = Tx, typename Tex = Ty>
 void testing_axpy_ex_bad_arg(const Arguments& arg)
 {
-    using Ts                = hipblas_internal_type<Ta>;
     auto hipblasAxpyExFn    = arg.api == FORTRAN ? hipblasAxpyExFortran : hipblasAxpyEx;
     auto hipblasAxpyExFn_64 = arg.api == FORTRAN_64 ? hipblasAxpyEx_64Fortran : hipblasAxpyEx_64;
 
@@ -49,10 +48,10 @@ void testing_axpy_ex_bad_arg(const Arguments& arg)
         hipblasLocalHandle handle(arg);
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, pointer_mode));
 
-        hipDataType alphaType     = arg.a_type;
-        hipDataType xType         = arg.b_type;
-        hipDataType yType         = arg.c_type;
-        hipDataType executionType = arg.compute_type;
+        hipblasDatatype_t alphaType     = arg.a_type;
+        hipblasDatatype_t xType         = arg.b_type;
+        hipblasDatatype_t yType         = arg.c_type;
+        hipblasDatatype_t executionType = arg.compute_type;
 
         int64_t N    = 100;
         int64_t incx = 1;
@@ -62,9 +61,9 @@ void testing_axpy_ex_bad_arg(const Arguments& arg)
         device_vector<Tx> dx(N, incx);
         device_vector<Ty> dy(N, incy);
 
-        const Ts  h_alpha{1.0f}, h_zero{0.0f};
-        const Ts* alpha = &h_alpha;
-        const Ts* zero  = &h_zero;
+        const Ta  h_alpha(1), h_zero(0);
+        const Ta* alpha = &h_alpha;
+        const Ta* zero  = &h_zero;
 
         if(pointer_mode == HIPBLAS_POINTER_MODE_DEVICE)
         {
@@ -167,7 +166,6 @@ void testing_axpy_ex_bad_arg(const Arguments& arg)
 template <typename Ta, typename Tx = Ta, typename Ty = Tx, typename Tex = Ty>
 void testing_axpy_ex(const Arguments& arg)
 {
-    using Ts                = hipblas_internal_type<Ta>;
     auto hipblasAxpyExFn    = arg.api == FORTRAN ? hipblasAxpyExFortran : hipblasAxpyEx;
     auto hipblasAxpyExFn_64 = arg.api == FORTRAN_64 ? hipblasAxpyEx_64Fortran : hipblasAxpyEx_64;
 
@@ -177,10 +175,10 @@ void testing_axpy_ex(const Arguments& arg)
 
     hipblasLocalHandle handle(arg);
 
-    hipDataType alphaType     = arg.a_type;
-    hipDataType xType         = arg.b_type;
-    hipDataType yType         = arg.c_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t alphaType     = arg.a_type;
+    hipblasDatatype_t xType         = arg.b_type;
+    hipblasDatatype_t yType         = arg.c_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     // argument sanity check, quick return if input parameters are invalid before allocating invalid
     // memory
@@ -220,7 +218,7 @@ void testing_axpy_ex(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dy.memcheck());
     CHECK_DEVICE_ALLOCATION(d_alpha.memcheck());
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_vector(hx, arg, hipblas_client_alpha_sets_nan, true);
@@ -238,17 +236,7 @@ void testing_axpy_ex(const Arguments& arg)
     =================================================================== */
     CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
     DAPI_CHECK(hipblasAxpyExFn,
-               (handle,
-                N,
-                reinterpret_cast<Ts*>(&h_alpha),
-                alphaType,
-                dx,
-                xType,
-                incx,
-                dy,
-                yType,
-                incy,
-                executionType));
+               (handle, N, &h_alpha, alphaType, dx, xType, incx, dy, yType, incy, executionType));
 
     // copy output from device to CPU
     CHECK_HIP_ERROR(hy_host.transfer_from(dy));

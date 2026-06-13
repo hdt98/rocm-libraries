@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2017-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2017-2020, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,13 +32,11 @@
 
 #include "../../../config.hpp"
 
-#include <cub/grid/grid_barrier.cuh> // IWYU pragma: export
+#include <cub/grid/grid_barrier.cuh>
 
 BEGIN_HIPCUB_NAMESPACE
-_CCCL_SUPPRESS_DEPRECATED_PUSH
-// This API will be deprecated, suggest to use hip cooperative groups apis.
-class HIPCUB_DEPRECATED_BECAUSE("Use the APIs from cooperative groups instead") GridBarrierLifetime
-    : public ::cub::GridBarrierLifetime
+
+class GridBarrierLifetime : public ::cub::GridBarrierLifetime
 {
 public:
     hipError_t HostReset()
@@ -48,6 +46,9 @@ public:
         );
     }
 
+
+
+
     hipError_t Setup(int sweep_grid_size)
     {
         return hipCUDAErrorTohipError(
@@ -55,7 +56,7 @@ public:
         );
     }
 };
-_CCCL_SUPPRESS_DEPRECATED_POP
+
 END_HIPCUB_NAMESPACE
 
 #endif // HIPCUB_CUB_GRID_GRID_BARRIER_HPP_

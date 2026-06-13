@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <bool STRIDED, typename I, typename Td, typename Id>
 void getrs_checkBadArgs(const rocblas_handle handle,
@@ -302,7 +301,7 @@ void getrs_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -319,12 +318,12 @@ void getrs_getPerfData(const rocblas_handle handle,
         getrs_initData<false, true, T>(handle, trans, n, nrhs, dA, lda, stA, dIpiv, stP, dB, ldb,
                                        stB, bc, hA, hIpiv, hIpiv_cpu, hB);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_getrs(STRIDED, handle, trans, n, nrhs, dA.data(), lda, stA, dIpiv.data(), stP,
                         dB.data(), ldb, stB, bc);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I>
@@ -379,7 +378,7 @@ void testing_getrs(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         if(BATCHED)
@@ -392,9 +391,13 @@ void testing_getrs(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     if(BATCHED)
@@ -433,12 +436,13 @@ void testing_getrs(Arguments& argus)
                                        stB, bc, hA, hIpiv, hIpiv_cpu, hB, hBRes, &max_error);
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
             getrs_getPerfData<STRIDED, T>(handle, trans, n, nrhs, dA, lda, stA, dIpiv, stP, dB, ldb,
                                           stB, bc, hA, hIpiv, hIpiv_cpu, hB, &gpu_time_used,
                                           &cpu_time_used, hot_calls, argus.profile,
                                           argus.profile_kernels, argus.perf);
     }
+
     else
     {
         // memory allocations
@@ -475,7 +479,7 @@ void testing_getrs(Arguments& argus)
                                        stB, bc, hA, hIpiv, hIpiv_cpu, hB, hBRes, &max_error);
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
             getrs_getPerfData<STRIDED, T>(handle, trans, n, nrhs, dA, lda, stA, dIpiv, stP, dB, ldb,
                                           stB, bc, hA, hIpiv, hIpiv_cpu, hB, &gpu_time_used,
                                           &cpu_time_used, hot_calls, argus.profile,
@@ -483,7 +487,7 @@ void testing_getrs(Arguments& argus)
     }
 
     // validate results for rocsolver-test
-    // using n * machine_precision as tolerance
+    // using m * machine_precision as tolerance
     if(argus.unit_check)
         ROCSOLVER_TEST_CHECK(T, max_error, n);
 

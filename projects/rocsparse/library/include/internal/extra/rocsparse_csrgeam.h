@@ -35,7 +35,7 @@ extern "C" {
 /*! \ingroup extra_module
 *  \details
 *  \p rocsparse_csrgeam_nnz computes the total CSR non-zero elements and the CSR row
-*  offsets that point to the start of every row of the sparse CSR matrix of the
+*  offsets, that point to the start of every row of the sparse CSR matrix, of the
 *  resulting matrix C. It is assumed that \p csr_row_ptr_C has been allocated with
 *  size \p m+1.
 *
@@ -49,11 +49,11 @@ extern "C" {
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
-*  m               number of rows of the sparse CSR matrix \f$A\f$, \f$B\f$, and \f$C\f$.
+*  m               number of rows of the sparse CSR matrix \f$A\f$, \f$B\f$ and \f$C\f$.
 *  @param[in]
-*  n               number of columns of the sparse CSR matrix \f$A\f$, \f$B\f$, and \f$C\f$.
+*  n               number of columns of the sparse CSR matrix \f$A\f$, \f$B\f$ and \f$C\f$.
 *  @param[in]
 *  descr_A         descriptor of the sparse CSR matrix \f$A\f$. Currently, only
 *                  \ref rocsparse_matrix_type_general is supported.
@@ -88,10 +88,10 @@ extern "C" {
 *
 *  \retval rocsparse_status_success the operation completed successfully.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval rocsparse_status_invalid_size \p m, \p n, \p nnz_A, or \p nnz_B is invalid.
+*  \retval rocsparse_status_invalid_size \p m, \p n, \p nnz_A or \p nnz_B is invalid.
 *  \retval rocsparse_status_invalid_pointer \p descr_A, \p csr_row_ptr_A,
 *          \p csr_col_ind_A, \p descr_B, \p csr_row_ptr_B, \p csr_col_ind_B,
-*          \p descr_C, \p csr_row_ptr_C, or \p nnz_C is invalid.
+*          \p descr_C, \p csr_row_ptr_C or \p nnz_C is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 */
@@ -112,7 +112,7 @@ rocsparse_status rocsparse_csrgeam_nnz(rocsparse_handle          handle,
                                        rocsparse_int*            nnz_C);
 
 /*! \ingroup extra_module
-*  \brief Sparse matrix sparse matrix addition using the CSR storage format.
+*  \brief Sparse matrix sparse matrix addition using CSR storage format
 *
 *  \details
 *  \p rocsparse_csrgeam multiplies the scalar \f$\alpha\f$ with the sparse
@@ -125,7 +125,7 @@ rocsparse_status rocsparse_csrgeam_nnz(rocsparse_handle          handle,
 *  \f]
 *
 *  It is assumed that \p csr_row_ptr_C has already been filled and that \p csr_val_C and
-*  \p csr_col_ind_C are allocated by the user. \p csr_row_ptr_C and the allocation size of
+*  \p csr_col_ind_C are allocated by the user. \p csr_row_ptr_C and allocation size of
 *  \p csr_col_ind_C and \p csr_val_C is defined by the number of non-zero elements of
 *  the sparse CSR matrix C. Both can be obtained by \ref rocsparse_csrgeam_nnz().
 *
@@ -140,11 +140,11 @@ rocsparse_status rocsparse_csrgeam_nnz(rocsparse_handle          handle,
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
-*  m               number of rows of the sparse CSR matrix \f$A\f$, \f$B\f$, and \f$C\f$.
+*  m               number of rows of the sparse CSR matrix \f$A\f$, \f$B\f$ and \f$C\f$.
 *  @param[in]
-*  n               number of columns of the sparse CSR matrix \f$A\f$, \f$B\f$, and \f$C\f$.
+*  n               number of columns of the sparse CSR matrix \f$A\f$, \f$B\f$ and \f$C\f$.
 *  @param[in]
 *  alpha           scalar \f$\alpha\f$.
 *  @param[in]
@@ -189,17 +189,76 @@ rocsparse_status rocsparse_csrgeam_nnz(rocsparse_handle          handle,
 *
 *  \retval rocsparse_status_success the operation completed successfully.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval rocsparse_status_invalid_size \p m, \p n, \p nnz_A, or \p nnz_B is invalid.
+*  \retval rocsparse_status_invalid_size \p m, \p n, \p nnz_A or \p nnz_B is invalid.
 *  \retval rocsparse_status_invalid_pointer \p alpha, \p descr_A, \p csr_val_A,
 *          \p csr_row_ptr_A, \p csr_col_ind_A, \p beta, \p descr_B, \p csr_val_B,
 *          \p csr_row_ptr_B, \p csr_col_ind_B, \p descr_C, \p csr_val_C,
-*          \p csr_row_ptr_C, or \p csr_col_ind_C is invalid.
+*          \p csr_row_ptr_C or \p csr_col_ind_C is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 *
 *  \par Example
 *  This example adds two CSR matrices.
-*  \snippet example_rocsparse_csrgeam.cpp doc example
+*  \code{.c}
+*  // Initialize scalar multipliers
+*  float alpha = 1.0f;
+*  float beta  = 1.0f;
+*
+*  // Create matrix descriptors
+*  rocsparse_mat_descr descr_A;
+*  rocsparse_mat_descr descr_B;
+*  rocsparse_mat_descr descr_C;
+*
+*  rocsparse_create_mat_descr(&descr_A);
+*  rocsparse_create_mat_descr(&descr_B);
+*  rocsparse_create_mat_descr(&descr_C);
+*
+*  // Set pointer mode
+*  rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host);
+*
+*  // Obtain number of total non-zero entries in C and row pointers of C
+*  rocsparse_int nnz_C;
+*  hipMalloc((void**)&csr_row_ptr_C, sizeof(rocsparse_int) * (m + 1));
+*
+*  rocsparse_csrgeam_nnz(handle,
+*                        m,
+*                        n,
+*                        descr_A,
+*                        nnz_A,
+*                        csr_row_ptr_A,
+*                        csr_col_ind_A,
+*                        descr_B,
+*                        nnz_B,
+*                        csr_row_ptr_B,
+*                        csr_col_ind_B,
+*                        descr_C,
+*                        csr_row_ptr_C,
+*                        &nnz_C);
+*
+*  // Compute column indices and values of C
+*  hipMalloc((void**)&csr_col_ind_C, sizeof(rocsparse_int) * nnz_C);
+*  hipMalloc((void**)&csr_val_C, sizeof(float) * nnz_C);
+*
+*  rocsparse_scsrgeam(handle,
+*                     m,
+*                     n,
+*                     &alpha,
+*                     descr_A,
+*                     nnz_A,
+*                     csr_val_A,
+*                     csr_row_ptr_A,
+*                     csr_col_ind_A,
+*                     &beta,
+*                     descr_B,
+*                     nnz_B,
+*                     csr_val_B,
+*                     csr_row_ptr_B,
+*                     csr_col_ind_B,
+*                     descr_C,
+*                     csr_val_C,
+*                     csr_row_ptr_C,
+*                     csr_col_ind_C);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

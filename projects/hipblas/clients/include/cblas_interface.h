@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -81,13 +81,13 @@ inline void ref_asum(int64_t n, const double* x, int64_t incx, double* result)
 }
 
 template <>
-inline void ref_asum(int64_t n, const std::complex<float>* x, int64_t incx, float* result)
+inline void ref_asum(int64_t n, const hipblasComplex* x, int64_t incx, float* result)
 {
     *result = cblas_scasum(n, x, incx);
 }
 
 template <>
-inline void ref_asum(int64_t n, const std::complex<double>* x, int64_t incx, double* result)
+inline void ref_asum(int64_t n, const hipblasDoubleComplex* x, int64_t incx, double* result)
 {
     *result = cblas_dzasum(n, x, incx);
 }
@@ -619,32 +619,6 @@ void ref_syrk(hipblasFillMode_t  uplo,
               T*                 C,
               int64_t            ldc);
 
-// syrk_ex
-template <typename T, typename U = T, typename Tc = U>
-void ref_syrk_ex(hipblasFillMode_t  uplo,
-                 hipblasOperation_t transA,
-                 int64_t            n,
-                 int64_t            k,
-                 Tc                 alpha,
-                 const T*           A,
-                 int64_t            lda,
-                 Tc                 beta,
-                 U*                 C,
-                 int64_t            ldc);
-
-// herk_ex
-template <typename T, typename U, typename Tc>
-void ref_herk_ex(hipblasFillMode_t  uplo,
-                 hipblasOperation_t transA,
-                 int64_t            n,
-                 int64_t            k,
-                 Tc                 alpha,
-                 const T*           A,
-                 int64_t            lda,
-                 Tc                 beta,
-                 U*                 C,
-                 int64_t            ldc);
-
 // syr2k
 template <typename T>
 void ref_syr2k(hipblasFillMode_t  uplo,
@@ -747,17 +721,17 @@ inline void ref_trsm<double>(hipblasSideMode_t  side,
 }
 
 template <>
-inline void ref_trsm<std::complex<float>>(hipblasSideMode_t          side,
-                                          hipblasFillMode_t          uplo,
-                                          hipblasOperation_t         transA,
-                                          hipblasDiagType_t          diag,
-                                          int64_t                    m,
-                                          int64_t                    n,
-                                          std::complex<float>        alpha,
-                                          const std::complex<float>* A,
-                                          int64_t                    lda,
-                                          std::complex<float>*       B,
-                                          int64_t                    ldb)
+inline void ref_trsm<hipblasComplex>(hipblasSideMode_t     side,
+                                     hipblasFillMode_t     uplo,
+                                     hipblasOperation_t    transA,
+                                     hipblasDiagType_t     diag,
+                                     int64_t               m,
+                                     int64_t               n,
+                                     hipblasComplex        alpha,
+                                     const hipblasComplex* A,
+                                     int64_t               lda,
+                                     hipblasComplex*       B,
+                                     int64_t               ldb)
 {
     cblas_ctrsm(CblasColMajor,
                 (CBLAS_SIDE)side,
@@ -774,16 +748,16 @@ inline void ref_trsm<std::complex<float>>(hipblasSideMode_t          side,
 }
 
 template <>
-inline void ref_trsm<std::complex<double>>(hipblasSideMode_t           side,
+inline void ref_trsm<hipblasDoubleComplex>(hipblasSideMode_t           side,
                                            hipblasFillMode_t           uplo,
                                            hipblasOperation_t          transA,
                                            hipblasDiagType_t           diag,
                                            int64_t                     m,
                                            int64_t                     n,
-                                           std::complex<double>        alpha,
-                                           const std::complex<double>* A,
+                                           hipblasDoubleComplex        alpha,
+                                           const hipblasDoubleComplex* A,
                                            int64_t                     lda,
-                                           std::complex<double>*       B,
+                                           hipblasDoubleComplex*       B,
                                            int64_t                     ldb)
 {
     cblas_ztrsm(CblasColMajor,

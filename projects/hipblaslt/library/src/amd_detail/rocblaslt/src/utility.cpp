@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,18 +25,7 @@
  *******************************************************************************/
 #include "utility.hpp"
 #include <sys/types.h>
-#include <time.h>
-
-#ifdef _WIN32
-#include <process.h>
-#else
 #include <unistd.h>
-#endif
-
-#include <iostream>
-#include <memory>
-#include <string>
-
 std::ostream* get_logger_os()
 {
     LoggerSingleton& s = LoggerSingleton::getInstance();
@@ -86,17 +75,19 @@ const char* hipDataType_to_string(hipDataType type)
         return "R_8F_E4M3_FNUZ";
     case HIP_R_8F_E5M2_FNUZ:
         return "R_8F_E5M2_FNUZ";
+#ifdef ROCM_USE_FLOAT8
     case HIP_R_8F_E4M3:
         return "R_8F_E4M3";
     case HIP_R_8F_E5M2:
         return "R_8F_E5M2";
+#endif
     case HIP_R_8I:
         return "R_8I";
-    case static_cast<hipDataType>(HIP_R_6F_E2M3):
+    case static_cast<hipDataType>(HIP_R_6F_E2M3_EXT):
         return "R_6F_E2M3";
-    case static_cast<hipDataType>(HIP_R_6F_E3M2):
+    case static_cast<hipDataType>(HIP_R_6F_E3M2_EXT):
         return "R_6F_E3M2";
-    case static_cast<hipDataType>(HIP_R_4F_E2M1):
+    case static_cast<hipDataType>(HIP_R_4F_E2M1_EXT):
         return "R_4F_E2M1";
     default:
         return "Invalid";
@@ -119,10 +110,6 @@ const char* hipDataType_to_bench_string(hipDataType type)
         return "f32_r";
     case HIP_R_64F:
         return "f64_r";
-    case HIP_C_32F:
-        return "f32_c";
-    case HIP_C_64F:
-        return "f64_c";    
     case HIP_R_16F:
         return "f16_r";
     case HIP_R_16BF:
@@ -135,15 +122,17 @@ const char* hipDataType_to_bench_string(hipDataType type)
         return "f8_r";
     case HIP_R_8F_E5M2_FNUZ:
         return "bf8_r";
+#ifdef ROCM_USE_FLOAT8
     case HIP_R_8F_E4M3:
         return "f8_r";
     case HIP_R_8F_E5M2:
         return "bf8_r";
-    case static_cast<hipDataType>(HIP_R_6F_E2M3):
+#endif
+    case static_cast<hipDataType>(HIP_R_6F_E2M3_EXT):
         return "f6_r";
-    case static_cast<hipDataType>(HIP_R_6F_E3M2):
+    case static_cast<hipDataType>(HIP_R_6F_E3M2_EXT):
         return "bf6_r";
-    case static_cast<hipDataType>(HIP_R_4F_E2M1):
+    case static_cast<hipDataType>(HIP_R_4F_E2M1_EXT):
         return "f4_r";
     default:
         return "invalid";
@@ -156,42 +145,18 @@ const char* rocblaslt_compute_type_to_string(rocblaslt_compute_type type)
     {
     case rocblaslt_compute_f16:
         return "COMPUTE_16F";
-    case rocblaslt_compute_f16_pedantic:
-        return "COMPUTE_16F_PEDANTIC";
     case rocblaslt_compute_f32:
         return "COMPUTE_32F";
-    case rocblaslt_compute_f32_pedantic:
-        return "COMPUTE_32F_PEDANTIC";
     case rocblaslt_compute_f32_fast_xf32:
         return "COMPUTE_32XF";
     case rocblaslt_compute_f64:
         return "COMPUTE_64F";
-    case rocblaslt_compute_f64_pedantic:
-        return "COMPUTE_64F_PEDANTIC";
     case rocblaslt_compute_i32:
         return "COMPUTE_32I";
-    case rocblaslt_compute_i32_pedantic:
-        return "COMPUTE_32I_PEDANTIC";
     case rocblaslt_compute_f32_fast_f16:
         return "COMPUTE_32F_16F";
     case rocblaslt_compute_f32_fast_bf16:
         return "COMPUTE_32F_16BF";
-    case rocblaslt_compute_f32_fast_f8_fnuz:
-        return "COMPUTE_32F_8F_FNUZ";
-    case rocblaslt_compute_f32_fast_bf8_fnuz:
-        return "COMPUTE_32F_8BF_FNUZ";
-    case rocblaslt_compute_f32_fast_f8bf8_fnuz:
-        return "COMPUTE_32F_8F8BF_FNUZ";
-    case rocblaslt_compute_f32_fast_bf8f8_fnuz:
-        return "COMPUTE_32F_8BF8F_FNUZ";
-    case rocblaslt_compute_f32_fast_f8:
-        return "COMPUTE_32F_8F";
-    case rocblaslt_compute_f32_fast_bf8:
-        return "COMPUTE_32F_8BF";
-    case rocblaslt_compute_f32_fast_f8bf8:
-        return "COMPUTE_32F_8F8BF";
-    case rocblaslt_compute_f32_fast_bf8f8:
-        return "COMPUTE_32F_8BF8F";
     default:
         return "Invalid";
     }
@@ -215,8 +180,6 @@ const char* rocblaslt_matrix_layout_attributes_to_string(rocblaslt_matrix_layout
         return "ROCBLASLT_MATRIX_LAYOUT_COLS";
     case ROCBLASLT_MATRIX_LAYOUT_LD:
         return "ROCBLASLT_MATRIX_LAYOUT_LD";
-    case ROCBLASLT_MATRIX_LAYOUT_BATCH_MODE:
-        return "ROCBLASLT_MATRIX_LAYOUT_BATCH_MODE";        
     case ROCBLASLT_MATRIX_LAYOUT_MAX:
         return "ROCBLASLT_MATRIX_LAYOUT_MAX";
     default:
@@ -246,8 +209,6 @@ const char* rocblaslt_matmul_desc_attributes_to_string(rocblaslt_matmul_desc_att
         return "MATMUL_DESC_C_SCALE_POINTER";
     case ROCBLASLT_MATMUL_DESC_D_SCALE_POINTER:
         return "MATMUL_DESC_D_SCALE_POINTER";
-    case ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_SCALE_POINTER:
-        return "MATMUL_DESC_EPILOGUE_AUX_SCALE_POINTER";
     case ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_POINTER:
         return "MATMUL_DESC_EPILOGUE_AUX_POINTER";
     case ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD:
@@ -258,28 +219,14 @@ const char* rocblaslt_matmul_desc_attributes_to_string(rocblaslt_matmul_desc_att
         return "MATMUL_DESC_POINTER_MODE";
     case ROCBLASLT_MATMUL_DESC_AMAX_D_POINTER:
         return "MATMUL_DESC_AMAX_D_POINTER";
-    case ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE:
-        return "MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE";
-    case ROCBLASLT_MATMUL_DESC_A_SCALE_MODE:
-        return "MATMUL_DESC_A_SCALE_MODE";
-    case ROCBLASLT_MATMUL_DESC_B_SCALE_MODE:
-        return "MATMUL_DESC_B_SCALE_MODE";
-    case ROCBLASLT_MATMUL_DESC_SM_COUNT_TARGET:
-        return "MATMUL_DESC_SM_COUNT_TARGET";
+    case ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER_VEC_EXT:
+        return "MATMUL_DESC_A_SCALE_POINTER_VEC";
+    case ROCBLASLT_MATMUL_DESC_B_SCALE_POINTER_VEC_EXT:
+        return "MATMUL_DESC_B_SCALE_POINTER_VEC";
     case ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT:
         return "MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT";
     case ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT:
         return "MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT";
-    case ROCBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT:
-        return "MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT";
-    case ROCBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT:
-        return "MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT";
-    case ROCBLASLT_MATMUL_DESC_DYN_PERSISTENT_TILE_EXT:
-        return "MATMUL_DESC_DYN_PERSISTENT_TILE_EXT";
-    case ROCBLASLT_MATMUL_DESC_MAX:
-        return "MATMUL_DESC_MAX";
-    case ROCBLASLT_MATMUL_DESC_BIAS_BATCH_STRIDE:
-        return "MATMUL_DESC_BIAS_BATCH_STRIDE";
     default:
         return "Invalid";
     }
@@ -295,35 +242,6 @@ const char* hipblasOperation_to_string(hipblasOperation_t op)
         return "OP_T";
     case HIPBLAS_OP_C:
         return "OP_C";
-    default:
-        return "Invalid";
-    }
-}
-
-const char* rocblaslt_scaling_format_to_string(RocblasltContractionProblem::ScalingFormat type)
-{
-    switch(type)
-    {
-    case RocblasltContractionProblem::ScalingFormat::None:
-        return "None";
-    case RocblasltContractionProblem::ScalingFormat::Scalar:
-        return "Scalar";
-    case RocblasltContractionProblem::ScalingFormat::Vector:
-        return "Vector";
-    case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
-        return "Block_32_UE8M0";
-    case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT:
-        return "Block_32_UE8M0_32_8_EXT";
-    case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
-        return "Block_16_UE8M0";
-    case RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3:
-        return "Block_32_UE4M3";
-    case RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3:
-        return "Block_16_UE4M3";
-    case RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3:
-        return "Block_32_UE5M3";
-    case RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3:
-        return "Block_16_UE5M3";
     default:
         return "Invalid";
     }
@@ -368,16 +286,10 @@ const char* rocblaslt_epilogue_to_string(rocblaslt_epilogue epilogue)
         return "EPILOGUE_BIAS";
     case ROCBLASLT_EPILOGUE_RELU_BIAS:
         return "EPILOGUE_RELU_BIAS";
-    case ROCBLASLT_EPILOGUE_RELU_AUX:
-        return "ROCBLASLT_EPILOGUE_RELU_AUX";
-    case ROCBLASLT_EPILOGUE_RELU_AUX_BIAS:
-        return "ROCBLASLT_EPILOGUE_RELU_AUX_BIAS";
     case ROCBLASLT_EPILOGUE_GELU:
         return "EPILOGUE_GELU";
     case ROCBLASLT_EPILOGUE_DGELU:
         return "EPILOGUE_DGELU";
-    case ROCBLASLT_EPILOGUE_DRELU:
-        return "EPILOGUE_DRELU";    
     case ROCBLASLT_EPILOGUE_GELU_BIAS:
         return "EPILOGUE_GELU_BIAS";
     case ROCBLASLT_EPILOGUE_GELU_AUX:
@@ -387,25 +299,13 @@ const char* rocblaslt_epilogue_to_string(rocblaslt_epilogue epilogue)
     case ROCBLASLT_EPILOGUE_DGELU_BGRAD:
         return "EPILOGUE_DGELU_BGRAD";
     case ROCBLASLT_EPILOGUE_BGRADA:
-        return "EPILOGUE_BGRADA";
+        return "EPILOGUE_DGELU_BGRADA";
     case ROCBLASLT_EPILOGUE_BGRADB:
-        return "EPILOGUE_BGRADB";
-    case ROCBLASLT_EPILOGUE_DRELU_BGRAD:
-        return "EPILOGUE_DRELU_BGRAD";
-    case ROCBLASLT_EPILOGUE_SIGMOID:
-        return "EPILOGUE_SIGMOID";        
+        return "EPILOGUE_DGELU_BGRADB";
     case ROCBLASLT_EPILOGUE_SWISH_EXT:
         return "EPILOGUE_SWISH_EXT";
     case ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT:
         return "EPILOGUE_SWISH_BIAS_EXT";
-    case ROCBLASLT_EPILOGUE_CLAMP_EXT:
-        return "EPILOGUE_CLAMP_EXT";
-    case ROCBLASLT_EPILOGUE_CLAMP_BIAS_EXT:
-        return "EPILOGUE_CLAMP_BIAS_EXT";
-    case ROCBLASLT_EPILOGUE_CLAMP_AUX_EXT:
-        return "ROCBLASLT_EPILOGUE_CLAMP_AUX_EXT";
-    case ROCBLASLT_EPILOGUE_CLAMP_AUX_BIAS_EXT:
-        return "ROCBLASLT_EPILOGUE_CLAMP_AUX_BIAS_EXT";
     default:
         return "Invalid epilogue";
     }
@@ -415,7 +315,7 @@ std::string rocblaslt_matrix_layout_to_string(rocblaslt_matrix_layout mat)
 {
     std::string             format = mat->batch_count <= 1
                                          ? "[type=%s rows=%d cols=%d ld=%d]\0"
-                                         : "[type=%s rows=%d cols=%d ld=%d batch_count=%d batch_stride=%d batch_mode=%d]\0";
+                                         : "[type=%s rows=%d cols=%d ld=%d batch_count=%d batch_stride=%d]\0";
     std::unique_ptr<char[]> buf(new char[255]);
     if(mat->batch_count <= 1)
         std::sprintf(
@@ -428,48 +328,20 @@ std::string rocblaslt_matrix_layout_to_string(rocblaslt_matrix_layout mat)
                      mat->n,
                      mat->ld,
                      mat->batch_count,
-                     mat->batch_stride,
-                     mat->batch_mode);
+                     mat->batch_stride);
     return std::string(buf.get());
 }
 std::string rocblaslt_matmul_desc_to_string(rocblaslt_matmul_desc matmul_desc)
 {
-    std::stringstream ss;
-    ss << "[computeType=%s scaleType=%s transA=%s transB=%s epilogue=%s biasPointer=0x%x";
-    if(is_e_enabled(matmul_desc->epilogue))
-    {
-        ss << " epilogueAuxPointer=0x%x epilogueAuxLd=" << matmul_desc->lde;
-        if(matmul_desc->aux_type != HIPBLASLT_DATATYPE_INVALID)
-            ss << " epilogueAuxDataType=" << hipDataType_to_string(matmul_desc->aux_type);
-    }
-    if(matmul_desc->bias_type != HIPBLASLT_DATATYPE_INVALID)
-        ss << " biasType=%s";
-    ss << "]";
-    std::string format = ss.str();
+    std::string format = matmul_desc->bias_type == HIPBLASLT_DATATYPE_INVALID
+                             ? "[computeType=%s scaleType=%s transA=%s transB=%s "
+                               "epilogue=%s biasPointer=0x%x]\0"
+                             : "[computeType=%s scaleType=%s transA=%s transB=%s "
+                               "epilogue=%s biasPointer=0x%x biasType=%s]\0";
 
     std::unique_ptr<char[]> buf(new char[255]);
 
     if(matmul_desc->bias_type == HIPBLASLT_DATATYPE_INVALID)
-        if(is_e_enabled(matmul_desc->epilogue))
-            std::sprintf(buf.get(),
-                         format.c_str(),
-                         rocblaslt_compute_type_to_string(matmul_desc->compute_type),
-                         hipDataType_to_string(matmul_desc->scale_type),
-                         hipblasOperation_to_string(matmul_desc->op_A),
-                         hipblasOperation_to_string(matmul_desc->op_B),
-                         rocblaslt_epilogue_to_string(matmul_desc->epilogue),
-                         matmul_desc->bias,
-                         matmul_desc->e);
-        else
-            std::sprintf(buf.get(),
-                         format.c_str(),
-                         rocblaslt_compute_type_to_string(matmul_desc->compute_type),
-                         hipDataType_to_string(matmul_desc->scale_type),
-                         hipblasOperation_to_string(matmul_desc->op_A),
-                         hipblasOperation_to_string(matmul_desc->op_B),
-                         rocblaslt_epilogue_to_string(matmul_desc->epilogue),
-                         matmul_desc->bias);
-    else if(is_e_enabled(matmul_desc->epilogue))
         std::sprintf(buf.get(),
                      format.c_str(),
                      rocblaslt_compute_type_to_string(matmul_desc->compute_type),
@@ -477,9 +349,7 @@ std::string rocblaslt_matmul_desc_to_string(rocblaslt_matmul_desc matmul_desc)
                      hipblasOperation_to_string(matmul_desc->op_A),
                      hipblasOperation_to_string(matmul_desc->op_B),
                      rocblaslt_epilogue_to_string(matmul_desc->epilogue),
-                     matmul_desc->bias,
-                     matmul_desc->e,
-                     hipDataType_to_string(matmul_desc->bias_type));
+                     matmul_desc->bias);
     else
         std::sprintf(buf.get(),
                      format.c_str(),
@@ -498,14 +368,3 @@ bool    UserClientArguments::m_flush              = false;
 int32_t UserClientArguments::m_rotatingBufferSize = 0;
 int32_t UserClientArguments::m_coldIterations     = 0;
 int32_t UserClientArguments::m_hotIterations      = 0;
-
-// Define and initialize static members of struct hipblasltClientPerformanceArgs
-double hipblasltClientPerformanceArgs::totalGranularity = 0.0;
-double hipblasltClientPerformanceArgs::tilesPerCu       = 0.0;
-double hipblasltClientPerformanceArgs::tile0Granularity = 0.0; // loss due to tile0
-double hipblasltClientPerformanceArgs::tile1Granularity = 0.0;
-double hipblasltClientPerformanceArgs::cuGranularity    = 0.0;
-double hipblasltClientPerformanceArgs::waveGranularity  = 0.0;
-int    hipblasltClientPerformanceArgs::CUs              = 0;
-size_t hipblasltClientPerformanceArgs::memWriteBytesD   = 0.0; //! Estimated memory writes D
-size_t hipblasltClientPerformanceArgs::memReadBytes     = 0.0;

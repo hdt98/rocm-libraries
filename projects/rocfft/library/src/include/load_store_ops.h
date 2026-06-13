@@ -21,7 +21,6 @@
 #ifndef ROCFFT_LOAD_STORE_OPS_H
 #define ROCFFT_LOAD_STORE_OPS_H
 
-#include <optional>
 #include <string>
 
 class RTCKernelArgs;
@@ -91,11 +90,8 @@ struct StoreOps
 };
 
 // helpers to apply both load + store ops together
-std::string load_store_name_suffix(const std::optional<LoadOps>&  loadOps,
-                                   const std::optional<StoreOps>& storeOps);
+std::string load_store_name_suffix(const LoadOps& loadOps, const StoreOps& storeOps);
 void        append_load_store_args(RTCKernelArgs& kargs, TreeNode& node);
-void        make_load_store_ops(Function&                      f,
-                                const std::optional<LoadOps>&  loadOps,
-                                const std::optional<StoreOps>& storeOps);
+void        make_load_store_ops(Function& f, const LoadOps& loadOps, const StoreOps& storeOps);
 
 #endif

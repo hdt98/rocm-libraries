@@ -14,10 +14,10 @@
  *  limitations under the License.
  */
 
+
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/iterator/iterator_traits.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -28,9 +28,10 @@ namespace detail
 namespace generic
 {
 
-template <typename InputIterator>
-inline THRUST_HOST_DEVICE typename thrust::iterator_traits<InputIterator>::difference_type
-distance(InputIterator first, InputIterator last);
+template<typename InputIterator>
+inline THRUST_HOST_DEVICE
+  typename thrust::iterator_traits<InputIterator>::difference_type
+    distance(InputIterator first, InputIterator last);
 
 } // end namespace generic
 } // end namespace detail
@@ -38,3 +39,4 @@ distance(InputIterator first, InputIterator last);
 THRUST_NAMESPACE_END
 
 #include <thrust/system/detail/generic/distance.inl>
+

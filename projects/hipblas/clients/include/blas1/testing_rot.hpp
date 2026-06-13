@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -98,7 +98,7 @@ void testing_rot(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     int64_t abs_incx = incx >= 0 ? incx : -incx;
     int64_t abs_incy = incy >= 0 ? incy : -incy;
@@ -145,8 +145,7 @@ void testing_rot(const Arguments& arg)
             // copy data from CPU to device
             CHECK_HIP_ERROR(dx.transfer_from(hx));
             CHECK_HIP_ERROR(dy.transfer_from(hy));
-            DAPI_CHECK(hipblasRotFn,
-                       (handle, N, dx, incx, dy, incy, hc.internal_type(), hs.internal_type()));
+            DAPI_CHECK(hipblasRotFn, (handle, N, dx, incx, dy, incy, hc, hs));
 
             host_vector<T> rx(N, incx);
             host_vector<T> ry(N, incy);

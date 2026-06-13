@@ -1,122 +1,59 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
-#include "ck_tile/core/arch/arch.hpp"
+#ifndef TEST_GEMM_PIPELINE_UT_CASES_INC
+#define TEST_GEMM_PIPELINE_UT_CASES_INC
 
 TYPED_TEST(TEST_SUITE_NAME, SmallM)
 {
     std::vector<int> Ms{1, 2, 3, 4, 5, 6};
     constexpr int N = 1024;
-    std::vector<int> Ks;
-    for(auto K_count : {2, 3, 4, 10, 11})
-    {
-        Ks.push_back(K_count * TestFixture::K_Tile);
-    }
+    constexpr int K = 320;
 
     for(int M : Ms)
     {
-        for(int K : Ks)
+        if constexpr(std::is_same_v<typename TestFixture::ALayout,
+                                    ck_tile::tensor_layout::gemm::ColumnMajor>)
         {
-            if constexpr(std::is_same_v<typename TestFixture::ADataType, ck_tile::fp16_t> &&
-                         std::is_same_v<typename TestFixture::BDataType, ck_tile::pk_int4_t>)
-            {
-                if(K == 2 * TestFixture::K_Tile)
-                {
-                    // This particular combination of parameters fails.
-                    continue;
-                }
-            }
-            if constexpr(std::is_same_v<typename TestFixture::ALayout,
-                                        ck_tile::tensor_layout::gemm::ColumnMajor>)
-            {
-#define XSTRINGIFY(s) STRINGIFY(s)
-#define STRINGIFY(s) #s
-                constexpr std::string_view suite_name = XSTRINGIFY(TEST_SUITE_NAME);
-#undef STRINGIFY
-#undef XSTRINGIFY
-                if constexpr(suite_name == "TestCkTileGemmPipelineCompTDMWmma")
-                {
-                    // TestCkTileGemmPipelineCompTDMWmma can handle non-dword-aligned cases
-                    this->Run(M, N, K);
-                }
-                else
-                {
-                    EXPECT_THROW((this->Run(M, N, K)), std::runtime_error);
-                }
-            }
-            else
-            {
-                this->Run(M, N, K);
-            }
+            EXPECT_THROW((this->Run(M, N, K)), std::runtime_error);
+        }
+        else
+        {
+            this->Run(M, N, K);
         }
     }
-}
-
-TYPED_TEST(TEST_SUITE_NAME, SingleTile)
-{
-    this->Run(TestFixture::M_Tile, TestFixture::N_Tile, TestFixture::K_Tile);
 }
 
 TYPED_TEST(TEST_SUITE_NAME, MidLargeM)
 {
     std::vector<int> Ms{127, 255, 312, 799, 1573};
-    constexpr int N = 1024;
-
-    std::vector<int> Ks;
-    for(auto K_count : {2, 3, 4, 10, 11})
-    {
-        Ks.push_back(K_count * TestFixture::K_Tile);
-    }
+    constexpr int N           = 1024;
+    constexpr int K           = 320;
     constexpr int VecLoadSize = (std::is_same_v<typename TestFixture::ADataType, ck_tile::fp8_t> ||
-                                 std::is_same_v<typename TestFixture::ADataType, ck_tile::bf8_t> ||
-                                 std::is_same_v<typename TestFixture::ADataType, ck_tile::int8_t>)
+                                 std::is_same_v<typename TestFixture::ADataType, ck_tile::bf8_t>)
                                     ? 16
                                     : 8;
 
     for(int M : Ms)
     {
-        for(int K : Ks)
+        if constexpr(std::is_same_v<typename TestFixture::ALayout,
+                                    ck_tile::tensor_layout::gemm::ColumnMajor>)
         {
-            if constexpr(std::is_same_v<typename TestFixture::ADataType, ck_tile::fp16_t> &&
-                         std::is_same_v<typename TestFixture::BDataType, ck_tile::pk_int4_t>)
-            {
-                if(K == 2 * TestFixture::K_Tile)
-                {
-                    // This particular combination of parameters fails.
-                    continue;
-                }
-            }
-            if constexpr(std::is_same_v<typename TestFixture::ALayout,
-                                        ck_tile::tensor_layout::gemm::ColumnMajor>)
-            {
-                if(M % VecLoadSize == 0)
-                {
-                    this->Run(M, N, K);
-                }
-                else
-                {
-#define XSTRINGIFY(s) STRINGIFY(s)
-#define STRINGIFY(s) #s
-                    constexpr std::string_view suite_name = XSTRINGIFY(TEST_SUITE_NAME);
-#undef STRINGIFY
-#undef XSTRINGIFY
-                    if constexpr(suite_name == "TestCkTileGemmPipelineCompTDMWmma")
-                    {
-                        // TestCkTileGemmPipelineCompTDMWmma can handle non-dword-aligned cases
-                        this->Run(M, N, K);
-                    }
-                    else
-                    {
-                        EXPECT_THROW((this->Run(M, N, K)), std::runtime_error);
-                    }
-                }
-            }
-            else
+            // TODO: Can we anyhow deduce used vector load size?
+            if(M % VecLoadSize == 0)
             {
                 this->Run(M, N, K);
             }
+            else
+            {
+                EXPECT_THROW((this->Run(M, N, K)), std::runtime_error);
+            }
+        }
+        else
+        {
+            this->Run(M, N, K);
         }
     }
 }
@@ -127,24 +64,8 @@ TYPED_TEST(TEST_SUITE_NAME, PaddK)
     constexpr int N = 1024;
     constexpr int K = 432;
 
-    if constexpr(TestFixture::PipelineType == GemmPipelineType::CompAsyncEightWaves)
-        return;
-
     for(int M : Ms)
-    {
-        if constexpr(std::is_same_v<typename TestFixture::BDataType, ck_tile::pk_int4_t>)
-        {
-#if defined(ARCH_GFX12) || defined(ARCH_GFX11)
-            this->Run(M, N, K);
-#else
-            EXPECT_THROW(this->Run(M, N, K), std::runtime_error);
-#endif
-        }
-        else
-        {
-            this->Run(M, N, K);
-        }
-    }
+        this->Run(M, N, K);
 }
 
 TYPED_TEST(TEST_SUITE_NAME, Regular)
@@ -176,32 +97,7 @@ TYPED_TEST(TEST_SUITE_NAME, NotSupportedArgument)
     constexpr bool PadN = false;
     constexpr bool PadK = false;
 
-#define XSTRINGIFY(s) STRINGIFY(s)
-#define STRINGIFY(s) #s
-
-    constexpr std::string_view suite_name = XSTRINGIFY(TEST_SUITE_NAME);
-    if constexpr(suite_name == "TestCkTileGemmPipelineCompTDMWmma")
-    {
-        using ADataType = TestFixture::ADataType;
-        using BDataType = TestFixture::BDataType;
-
-        constexpr int APackedSize = ck_tile::numeric_traits<ADataType>::PackedSize;
-        constexpr int BPackedSize = ck_tile::numeric_traits<BDataType>::PackedSize;
-        if constexpr((APackedSize == 1) && (BPackedSize == 1))
-        {
-            this->template Run<PadM, PadN, PadK>(M, N, K);
-        }
-        else
-        {
-            GTEST_SKIP()
-                << "TestCkTileGemmPipelineCompTDMWmma only supports A and B packed size of 1";
-        }
-    }
-    else
-    {
-        EXPECT_THROW((this->template Run<PadM, PadN, PadK>(M, N, K)), std::runtime_error);
-    }
-
-#undef STRINGIFY
-#undef XSTRINGIFY
+    EXPECT_THROW((this->template Run<PadM, PadN, PadK>(M, N, K)), std::runtime_error);
 }
+
+#endif

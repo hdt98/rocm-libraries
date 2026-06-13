@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -46,9 +46,7 @@ template <typename InDataType,
           ck::ReduceTensorOp ReduceOpId,
           bool PropagateNan,
           bool OutputIndex>
-bool profile_pool3d_fwd_impl(PoolFwdInputParams& in_params,
-                             PoolFwdKernelParams& kernel_params,
-                             index_t instance_index = -1)
+bool profile_pool3d_fwd_impl(PoolFwdInputParams& in_params, PoolFwdKernelParams& kernel_params)
 {
     constexpr index_t InOutRank  = 5;
     constexpr index_t WindowRank = 3;
@@ -93,8 +91,7 @@ bool profile_pool3d_fwd_impl(PoolFwdInputParams& in_params,
             using namespace ck::literals;
 
             return HostTensorDescriptor({N_, C_, D, H, W},
-                                        {D * C_ * H * W, 1_uz, C_ * H * W, W * C_, C_},
-                                        ck::tensor_layout::convolution::NDHWC{});
+                                        {D * C_ * H * W, 1_uz, C_ * H * W, W * C_, C_});
         };
 
     Tensor<InDataType> in_n_c_di_hi_wi(f_host_tensor_descriptor(N, C, Di, Hi, Wi));
@@ -180,14 +177,8 @@ bool profile_pool3d_fwd_impl(PoolFwdInputParams& in_params,
 
     int num_kernel = 0;
 
-    for(size_t j = 0; j < instance_ptrs.size(); j++)
+    for(auto& inst_ptr : instance_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(j)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& inst_ptr    = instance_ptrs[j];
         auto argument_ptr = inst_ptr->MakeArgumentPointer(
             static_cast<InDataType*>(in_device_buf.GetDeviceBuffer()),
             static_cast<OutDataType*>(out_device_buf.GetDeviceBuffer()),
@@ -331,7 +322,7 @@ bool profile_pool3d_fwd_impl(PoolFwdInputParams& in_params,
                   << best_instance_name << std::endl;
     }
 
-    if(num_kernel == 0 && instance_index == -1)
+    if(num_kernel == 0)
     {
         std::cout << "Error: No kernel is applicable" << std::endl;
         return false;

@@ -28,7 +28,6 @@
 
 extern const char* rocfft_complex_h;
 extern const char* common_h;
-extern const char* device_enum_h;
 extern const char* memory_gfx_h;
 extern const char* callback_h;
 extern const char* butterfly_constant_h;
@@ -48,11 +47,9 @@ extern const char* radix_13_h;
 extern const char* radix_16_h;
 extern const char* radix_17_h;
 
-extern const char* sys_mem_h;
 extern const char* device_properties_h;
 extern const char* rocfft_hip_h;
 extern const char* gpubuf_h;
-extern const char* hip_object_wrapper_h;
 extern const char* rtc_kernel_h;
 extern const char* rtc_kernel_cpp;
 extern const char* rtc_test_harness_helper_cpp;

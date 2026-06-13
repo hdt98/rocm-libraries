@@ -161,15 +161,7 @@ public:
     void OnTestProgramEnd(const UnitTest& unit_test) override
     {
         if(skipped_tests)
-        {
             rocblas_cout << "[ SKIPPED  ] " << skipped_tests << " tests." << std::endl;
-
-            // repeat in case of too many skipped
-            rocblas_cout << "[ PASSED   ] " << unit_test.successful_test_count() << " tests."
-                         << std::endl;
-            rocblas_cout << "[ FAILED   ] " << unit_test.failed_test_count() << " tests."
-                         << std::endl;
-        }
         eventListener->OnTestProgramEnd(unit_test);
     }
 };
@@ -267,7 +259,6 @@ static std::string rocblas_capture_args(int argc, char** argv, std::string& filt
             rocblas_cout << "info: " << warning << filter_str << "\n" << std::endl;
         }
     }
-
     return cmdLine.str();
 }
 
@@ -313,7 +304,6 @@ int main(int argc, char** argv)
     }
 
     print_rocblas_version_string();
-    print_asan_kernel_warning("rocblas-test");
 
     // Set test device
     rocblas_set_test_device();

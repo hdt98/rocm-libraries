@@ -78,6 +78,7 @@ struct custom_non_default_type
 };
 
 // Custom type used in tests
+// Loops are prevented from being unrolled due to a compiler bug in ROCm 5.2 for device code
 template<class T, size_t N>
 struct custom_test_array_type
 {
@@ -89,14 +90,17 @@ struct custom_test_array_type
     ROCPRIM_HOST_DEVICE inline
         custom_test_array_type()
     {
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             values[i] = T(i + 1);
         }
     }
 
-    ROCPRIM_HOST_DEVICE inline custom_test_array_type(T v)
+    ROCPRIM_HOST_DEVICE inline
+        custom_test_array_type(T v)
     {
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             values[i] = v;
@@ -107,18 +111,20 @@ struct custom_test_array_type
     ROCPRIM_HOST_DEVICE inline
         custom_test_array_type(const custom_test_array_type<U, N>& other)
     {
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             values[i] = other.values[i];
         }
     }
 
-    ROCPRIM_HOST_DEVICE inline ~custom_test_array_type() {}
+    ROCPRIM_HOST_DEVICE inline
+        ~custom_test_array_type() {}
 
-    ROCPRIM_HOST_DEVICE
-    inline custom_test_array_type&
-        operator=(const custom_test_array_type& other)
+    ROCPRIM_HOST_DEVICE inline
+        custom_test_array_type& operator=(const custom_test_array_type& other)
     {
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             values[i] = other.values[i];
@@ -126,11 +132,11 @@ struct custom_test_array_type
         return *this;
     }
 
-    ROCPRIM_HOST_DEVICE
-    inline custom_test_array_type
-        operator+(const custom_test_array_type& other) const
+    ROCPRIM_HOST_DEVICE inline
+        custom_test_array_type operator+(const custom_test_array_type& other) const
     {
         custom_test_array_type result;
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             result.values[i] = values[i] + other.values[i];
@@ -142,6 +148,7 @@ struct custom_test_array_type
         custom_test_array_type operator-(const custom_test_array_type& other) const
     {
         custom_test_array_type result;
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             result.values[i] = values[i] - other.values[i];
@@ -152,6 +159,7 @@ struct custom_test_array_type
     ROCPRIM_HOST_DEVICE inline
         bool operator<(const custom_test_array_type& other) const
     {
+#pragma unroll 1
         for(unsigned int i = 0; i < N; i++)
         {
             if(values[i] < other.values[i])
@@ -166,10 +174,10 @@ struct custom_test_array_type
         return false;
     }
 
-    ROCPRIM_HOST_DEVICE
-    inline bool
-        operator>(const custom_test_array_type& other) const
+    ROCPRIM_HOST_DEVICE inline
+        bool operator>(const custom_test_array_type& other) const
     {
+#pragma unroll 1
         for(unsigned int i = 0; i < N; i++)
         {
             if(values[i] > other.values[i])
@@ -184,10 +192,10 @@ struct custom_test_array_type
         return false;
     }
 
-    ROCPRIM_HOST_DEVICE
-    inline bool
-        operator==(const custom_test_array_type& other) const
+    ROCPRIM_HOST_DEVICE inline
+        bool operator==(const custom_test_array_type& other) const
     {
+#pragma unroll 1
         for(size_t i = 0; i < N; i++)
         {
             if(values[i] != other.values[i])
@@ -198,9 +206,8 @@ struct custom_test_array_type
         return true;
     }
 
-    ROCPRIM_HOST_DEVICE
-    inline bool
-        operator!=(const custom_test_array_type& other) const
+    ROCPRIM_HOST_DEVICE inline
+        bool operator!=(const custom_test_array_type& other) const
     {
         return !(*this == other);
     }

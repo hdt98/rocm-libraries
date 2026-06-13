@@ -36,22 +36,14 @@ Tests:
   function: identity
   precision: *single_precision
   M: 1
-  N: [33, 242]
+  N: [33, 242, 623, 1000]
 
 - name: identity
   category: pre_checkin
   function: identity
   precision: *single_precision
   M: 1
-  N: [8, 1543]
-
-- name: identity_graph_test
-  category: pre_checkin
-  function: identity
-  precision: *single_precision
-  M: 1
-  N: [33, 242]
-  graph_test: true
+  N: [0, 1543, 7111, 10000]
 
 - name: identity
   category: nightly
@@ -59,3 +51,11 @@ Tests:
   precision: *single_precision
   M: 1
   N: [23512, 184412, 711983, 3452387, 9482640]
+
+- name: identity_graph_test
+  category: pre_checkin
+  function: identity
+  precision: *single_precision
+  M: 1
+  N: [33, 242, 623, 1000]
+  graph_test: true

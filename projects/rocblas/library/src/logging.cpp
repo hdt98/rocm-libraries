@@ -22,10 +22,8 @@
 
 #include <limits>
 
-#ifndef DISABLE_ROCTX
 #if !defined(ROCBLAS_STATIC_LIB) && !defined(WIN32)
 #include <roctracer/roctx.h>
-#endif
 #endif
 
 #include "logging.hpp"
@@ -33,6 +31,32 @@
 /*************************************************
  * Bench log scalar values pointed to by pointer *
  *************************************************/
+inline std::string rocblas_internal_log_bench_scalar_value(const char*         name,
+                                                           const rocblas_half* value)
+{
+    rocblas_internal_ostream ss;
+    ss << "--" << name << " " << (value ? float(*value) : std::numeric_limits<float>::quiet_NaN());
+    return ss.str();
+}
+
+template <typename T, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
+std::string rocblas_internal_log_bench_scalar_value(const char* name, const T* value)
+{
+    rocblas_internal_ostream ss;
+    ss << "--" << name << " " << (value ? *value : std::numeric_limits<T>::quiet_NaN());
+    return ss.str();
+}
+
+template <typename T, std::enable_if_t<+rocblas_is_complex<T>, int> = 0>
+std::string rocblas_internal_log_bench_scalar_value(const char* name, const T* value)
+{
+    rocblas_internal_ostream ss;
+    ss << "--" << name << " "
+       << (value ? std::real(*value) : std::numeric_limits<typename T::value_type>::quiet_NaN());
+    if(value && std::imag(*value))
+        ss << " --" << name << "i " << std::imag(*value);
+    return ss.str();
+}
 
 template <typename T>
 std::string
@@ -41,9 +65,8 @@ std::string
     T host;
     if(value && handle->pointer_mode == rocblas_pointer_mode_device)
     {
-        THROW_IF_HIP_ERROR(hipMemcpyAsync(
-            &host, value, sizeof(host), hipMemcpyDeviceToHost, handle->get_stream()));
-        THROW_IF_HIP_ERROR(hipStreamSynchronize(handle->get_stream()));
+        hipMemcpyAsync(&host, value, sizeof(host), hipMemcpyDeviceToHost, handle->get_stream());
+        hipStreamSynchronize(handle->get_stream());
         value = &host;
     }
     return rocblas_internal_log_bench_scalar_value(name, value);
@@ -78,32 +101,29 @@ inline float rocblas_internal_log_trace_scalar_value(const rocblas_half* value)
     return value ? float(*value) : std::numeric_limits<float>::quiet_NaN();
 }
 
-template <typename T>
-T rocblas_internal_log_trace_scalar_value(const T* value)
+template <typename T, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
+inline T rocblas_internal_log_trace_scalar_value(const T* value)
 {
-    if constexpr(!rocblas_is_complex<T>)
-    {
-        return value ? *value : std::numeric_limits<T>::quiet_NaN();
-    }
-    else
-    {
-        return value ? *value
-                     : T{std::numeric_limits<typename T::value_type>::quiet_NaN(),
-                         std::numeric_limits<typename T::value_type>::quiet_NaN()};
-    }
+    return value ? *value : std::numeric_limits<T>::quiet_NaN();
+}
+
+template <typename T, std::enable_if_t<+rocblas_is_complex<T>, int> = 0>
+inline T rocblas_internal_log_trace_scalar_value(const T* value)
+{
+    return value ? *value
+                 : T{std::numeric_limits<typename T::value_type>::quiet_NaN(),
+                     std::numeric_limits<typename T::value_type>::quiet_NaN()};
 }
 
 template <typename T>
 std::string rocblas_internal_log_trace_scalar_value(rocblas_handle handle, const T* value)
 {
     rocblas_internal_ostream os;
-
-    T host;
+    T                        host;
     if(value && handle->pointer_mode == rocblas_pointer_mode_device)
     {
-        THROW_IF_HIP_ERROR(hipMemcpyAsync(
-            &host, value, sizeof(host), hipMemcpyDeviceToHost, handle->get_stream()));
-        THROW_IF_HIP_ERROR(hipStreamSynchronize(handle->get_stream()));
+        hipMemcpyAsync(&host, value, sizeof(host), hipMemcpyDeviceToHost, handle->get_stream());
+        hipStreamSynchronize(handle->get_stream());
         value = &host;
     }
     os << rocblas_internal_log_trace_scalar_value(value);
@@ -128,7 +148,6 @@ const char* c_rocblas_internal = "rocblas_internal";
 
 void rocblas_internal_logger::log_endline(rocblas_internal_ostream& os)
 {
-#ifndef DISABLE_ROCTX
 #if !defined(ROCBLAS_STATIC_LIB) && !defined(WIN32)
     if(!m_active)
     {
@@ -137,16 +156,13 @@ void rocblas_internal_logger::log_endline(rocblas_internal_ostream& os)
         m_active = true;
     }
 #endif
-#endif
     os << std::endl;
 }
 
 void rocblas_internal_logger::log_cleanup()
 {
-#ifndef DISABLE_ROCTX
 #if !defined(ROCBLAS_STATIC_LIB) && !defined(WIN32)
     roctxRangePop();
-#endif
 #endif
 }
 
@@ -190,6 +206,40 @@ rocblas_status rocblas_internal_log_trace_alpha_beta_ex(rocblas_datatype        
             reinterpret_cast<const rocblas_double_complex*>(alpha));
         betass << rocblas_internal_log_trace_scalar_value(
             reinterpret_cast<const rocblas_double_complex*>(beta));
+        break;
+    default:
+        return rocblas_status_not_implemented;
+    }
+    return rocblas_status_success;
+}
+
+rocblas_status rocblas_internal_log_trace_alpha_beta_ex(rocblas_computetype       compute_type,
+                                                        const void*               alpha,
+                                                        const void*               beta,
+                                                        rocblas_internal_ostream& alphass,
+                                                        rocblas_internal_ostream& betass)
+{
+    switch(compute_type)
+    {
+    case rocblas_compute_type_f32:
+        alphass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(alpha));
+        betass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_f8_f8_f32:
+        alphass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(alpha));
+        betass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_f8_bf8_f32:
+        alphass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(alpha));
+        betass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_bf8_f8_f32:
+        alphass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(alpha));
+        betass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_bf8_bf8_f32:
+        alphass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(alpha));
+        betass << rocblas_internal_log_trace_scalar_value(reinterpret_cast<const float*>(beta));
         break;
     default:
         return rocblas_status_not_implemented;
@@ -247,6 +297,50 @@ rocblas_status rocblas_internal_log_bench_alpha_beta_ex(rocblas_datatype compute
     return rocblas_status_success;
 }
 
+rocblas_status rocblas_internal_log_bench_alpha_beta_ex(rocblas_computetype compute_type,
+                                                        const void*         alpha,
+                                                        const void*         beta,
+                                                        std::string&        alphas,
+                                                        std::string&        betas)
+{
+    switch(compute_type)
+    {
+    case rocblas_compute_type_f32:
+        alphas = rocblas_internal_log_bench_scalar_value("alpha",
+                                                         reinterpret_cast<const float*>(alpha));
+        betas
+            = rocblas_internal_log_bench_scalar_value("beta", reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_f8_f8_f32:
+        alphas = rocblas_internal_log_bench_scalar_value("alpha",
+                                                         reinterpret_cast<const float*>(alpha));
+        betas
+            = rocblas_internal_log_bench_scalar_value("beta", reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_f8_bf8_f32:
+        alphas = rocblas_internal_log_bench_scalar_value("alpha",
+                                                         reinterpret_cast<const float*>(alpha));
+        betas
+            = rocblas_internal_log_bench_scalar_value("beta", reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_bf8_f8_f32:
+        alphas = rocblas_internal_log_bench_scalar_value("alpha",
+                                                         reinterpret_cast<const float*>(alpha));
+        betas
+            = rocblas_internal_log_bench_scalar_value("beta", reinterpret_cast<const float*>(beta));
+        break;
+    case rocblas_compute_type_bf8_bf8_f32:
+        alphas = rocblas_internal_log_bench_scalar_value("alpha",
+                                                         reinterpret_cast<const float*>(alpha));
+        betas
+            = rocblas_internal_log_bench_scalar_value("beta", reinterpret_cast<const float*>(beta));
+        break;
+    default:
+        return rocblas_status_not_implemented;
+    }
+    return rocblas_status_success;
+}
+
 /*********************************************************************
  * Bench log precision for mixed precision scal_ex and nrm2_ex calls *
  *********************************************************************/
@@ -289,6 +383,26 @@ double rocblas_internal_value_category(const T* beta, rocblas_datatype compute_t
     }
 }
 
+template <typename T>
+double rocblas_internal_value_category(const T* beta, rocblas_computetype compute_type)
+{
+    switch(compute_type)
+    {
+    case rocblas_compute_type_f32:
+        return rocblas_internal_value_category(*reinterpret_cast<const float*>(beta));
+    case rocblas_compute_type_f8_f8_f32:
+        return rocblas_internal_value_category(*reinterpret_cast<const float*>(beta));
+    case rocblas_compute_type_f8_bf8_f32:
+        return rocblas_internal_value_category(*reinterpret_cast<const float*>(beta));
+    case rocblas_compute_type_bf8_f8_f32:
+        return rocblas_internal_value_category(*reinterpret_cast<const float*>(beta));
+    case rocblas_compute_type_bf8_bf8_f32:
+        return rocblas_internal_value_category(*reinterpret_cast<const float*>(beta));
+    default:
+        throw rocblas_status_internal_error;
+    }
+}
+
 // instantiate support
 template double rocblas_internal_value_category(const void* beta, rocblas_datatype compute_type);
 template double rocblas_internal_value_category(const rocblas_half* beta,
@@ -300,3 +414,17 @@ template double rocblas_internal_value_category(const rocblas_float_complex* bet
                                                 rocblas_datatype             compute_type);
 template double rocblas_internal_value_category(const rocblas_double_complex* beta,
                                                 rocblas_datatype              compute_type);
+
+template double rocblas_internal_value_category(const void* beta, rocblas_computetype compute_type);
+template double rocblas_internal_value_category(const rocblas_half* beta,
+                                                rocblas_computetype compute_type);
+template double rocblas_internal_value_category(const int32_t*      beta,
+                                                rocblas_computetype compute_type);
+template double rocblas_internal_value_category(const float*        beta,
+                                                rocblas_computetype compute_type);
+template double rocblas_internal_value_category(const double*       beta,
+                                                rocblas_computetype compute_type);
+template double rocblas_internal_value_category(const rocblas_float_complex* beta,
+                                                rocblas_computetype          compute_type);
+template double rocblas_internal_value_category(const rocblas_double_complex* beta,
+                                                rocblas_computetype           compute_type);

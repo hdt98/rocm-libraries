@@ -31,6 +31,11 @@ target_include_directories(rocsolver-common INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+set(source_files
+  common_host_helpers.cpp
+)
+prepend_path("${CMAKE_CURRENT_SOURCE_DIR}/src/" source_files source_paths)
+target_sources(rocsolver-common INTERFACE ${source_paths})
 target_compile_definitions(rocsolver-common INTERFACE __HIP_HCC_COMPAT_MODE__=1)
 
 if(WIN32)
@@ -71,14 +76,10 @@ endif()
 
 if(BUILD_CODE_COVERAGE)
   target_compile_options(rocsolver-common INTERFACE
-    -g
-    -O0
-    -fprofile-instr-generate
-    -fcoverage-mapping
+    -fprofile-arcs
+    -ftest-coverage
   )
-  target_link_options(rocsolver-common INTERFACE
-    -fprofile-instr-generate
-  )
+  target_link_options(rocsolver-common INTERFACE --coverage)
 endif()
 
 if(BUILD_COMPRESSED_DBG)

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011-2021, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2021-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2021, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,14 +34,13 @@
 #include "../util_ptx.hpp"
 #include "../util_type.hpp"
 
-#include <rocprim/functional.hpp> // IWYU pragma: export
+#include <rocprim/functional.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
-// Should be deprecated once hip::std::swap is available in this scope.
-template<typename T>
-HIPCUB_DEVICE
-HIPCUB_FORCEINLINE void Swap(T& lhs, T& rhs)
+
+template <typename T>
+HIPCUB_DEVICE __forceinline__ void Swap(T &lhs, T &rhs)
 {
   T temp = lhs;
   lhs    = rhs;

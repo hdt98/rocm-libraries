@@ -25,12 +25,14 @@
 
 #include "../../common/utils_custom_type.hpp"
 
+#include "test_utils_custom_float_traits_type.hpp"
 #include "test_utils_custom_float_type.hpp"
 #include "test_utils_custom_test_types.hpp"
 
 #include <rocprim/config.hpp>
 #include <rocprim/functional.hpp>
 #include <rocprim/type_traits.hpp>
+#include <rocprim/type_traits_interface.hpp>
 #include <rocprim/types.hpp>
 #include <rocprim/types/tuple.hpp>
 
@@ -97,7 +99,8 @@ template<unsigned int StartBit,
                               // radix sorting custom types. A part of this workaround
                               // is to specialize rocprim::is_floating_point<custom_float_type>
                               // that we must counter here.
-                              && !std::is_same<Key, custom_float_type>::value,
+                              && !std::is_same<Key, custom_float_type>::value
+                              && !std::is_same<Key, custom_float_traits_type>::value,
                           int>
          = 0>
 ROCPRIM_HOST_DEVICE
@@ -136,7 +139,8 @@ template<unsigned int StartBit,
                               // radix sorting custom types. A part of this workaround
                               // is to specialize common::is_custom_type<custom_float_type>
                               // that we must counter here.
-                              && !std::is_same<Key, custom_float_type>::value,
+                              && !std::is_same<Key, custom_float_type>::value
+                              && !std::is_same<Key, custom_float_traits_type>::value,
                           int>
          = 0>
 ROCPRIM_HOST_DEVICE
@@ -173,6 +177,17 @@ auto to_bits(const Key key) -> typename rocprim::get_unsigned_bits_type<Key>::un
 {
     return to_bits<StartBit, EndBit>(key.x);
 }
+
+template<unsigned int StartBit,
+         unsigned int EndBit,
+         class Key,
+         std::enable_if_t<std::is_same<Key, custom_float_traits_type>::value, int> = 0>
+ROCPRIM_HOST_DEVICE
+auto to_bits(const Key key) -> typename rocprim::get_unsigned_bits_type<Key>::unsigned_type
+{
+    return to_bits<StartBit, EndBit>(key.x);
+}
+
 } // namespace detail
 
 template<class T>

@@ -38,14 +38,14 @@ extern "C" {
 *  over all rows, the \p ell_width, for a given CSR matrix.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  m           number of rows of the sparse CSR matrix.
 *  @param[in]
@@ -79,7 +79,7 @@ rocsparse_status rocsparse_csr2ell_width(rocsparse_handle          handle,
                                          rocsparse_int*            ell_width);
 
 /*! \ingroup conv_module
-*  \brief Convert a sparse CSR matrix into a sparse ELL matrix.
+*  \brief Convert a sparse CSR matrix into a sparse ELL matrix
 *
 *  \details
 *  \p rocsparse_csr2ell converts a CSR matrix into an ELL matrix. It is assumed,
@@ -89,14 +89,14 @@ rocsparse_status rocsparse_csr2ell_width(rocsparse_handle          handle,
 *  non-zero elements per row is obtained by rocsparse_csr2ell_width().
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  m           number of rows of the sparse CSR matrix.
 *  @param[in]
@@ -124,14 +124,61 @@ rocsparse_status rocsparse_csr2ell_width(rocsparse_handle          handle,
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
 *  \retval     rocsparse_status_invalid_size \p m or \p ell_width is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p csr_descr, \p csr_val,
-*              \p csr_row_ptr, \p csr_col_ind, \p ell_descr, \p ell_val, or
+*              \p csr_row_ptr, \p csr_col_ind, \p ell_descr, \p ell_val or
 *              \p ell_col_ind pointer is invalid.
 *  \retval     rocsparse_status_not_implemented
 *              \ref rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 *
 *  \par Example
 *  This example converts a CSR matrix into an ELL matrix.
-*  \snippet example_rocsparse_csr2ell.cpp doc example
+*  \code{.c}
+*      //     1 2 0 3 0
+*      // A = 0 4 5 0 0
+*      //     6 0 0 7 8
+*
+*      rocsparse_int m   = 3;
+*      rocsparse_int n   = 5;
+*      rocsparse_int nnz = 8;
+*
+*      csr_row_ptr[m+1] = {0, 3, 5, 8};             // device memory
+*      csr_col_ind[nnz] = {0, 1, 3, 1, 2, 0, 3, 4}; // device memory
+*      csr_val[nnz]     = {1, 2, 3, 4, 5, 6, 7, 8}; // device memory
+*
+*      // Create ELL matrix descriptor
+*      rocsparse_mat_descr ell_descr;
+*      rocsparse_create_mat_descr(&ell_descr);
+*
+*      // Obtain the ELL width
+*      rocsparse_int ell_width;
+*      rocsparse_csr2ell_width(handle,
+*                              m,
+*                              csr_descr,
+*                              csr_row_ptr,
+*                              ell_descr,
+*                              &ell_width);
+*
+*      // Compute ELL non-zero entries
+*      rocsparse_int ell_nnz = m * ell_width;
+*
+*      // Allocate ELL column and value arrays
+*      rocsparse_int* ell_col_ind;
+*      hipMalloc((void**)&ell_col_ind, sizeof(rocsparse_int) * ell_nnz);
+*
+*      float* ell_val;
+*      hipMalloc((void**)&ell_val, sizeof(float) * ell_nnz);
+*
+*      // Format conversion
+*      rocsparse_scsr2ell(handle,
+*                         m,
+*                         csr_descr,
+*                         csr_val,
+*                         csr_row_ptr,
+*                         csr_col_ind,
+*                         ell_descr,
+*                         ell_width,
+*                         ell_val,
+*                         ell_col_ind);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

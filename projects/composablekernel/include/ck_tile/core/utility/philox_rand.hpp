@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -55,8 +55,7 @@ class philox
 
     CK_TILE_HOST_DEVICE void get_random_8x8(uint8_t* out,
                                             const unsigned long long subsequence,
-                                            const index_t idx0,
-                                            const index_t idx1) const
+                                            const index_t start_idx) const
     {
         uint4 tmp_ph;
         tmp_ph = get_philox_4x32(subsequence);
@@ -67,12 +66,13 @@ class philox
         tmp[2]            = tmp_ph.z;
         tmp[3]            = tmp_ph.w;
         uint32_t* out_tmp = reinterpret_cast<uint32_t*>(&out[0]);
-        out_tmp[0]        = tmp[idx0];
-        out_tmp[1]        = tmp[idx1];
+        out_tmp[0]        = tmp[start_idx];
+        out_tmp[1]        = tmp[start_idx + 2];
     }
 
-    CK_TILE_HOST_DEVICE void
-    get_random_4x8(uint8_t* out, const unsigned long long subsequence, const index_t idx) const
+    CK_TILE_HOST_DEVICE void get_random_4x8(uint8_t* out,
+                                            const unsigned long long subsequence,
+                                            const index_t start_idx) const
     {
         uint4 tmp_ph;
         tmp_ph = get_philox_4x32(subsequence);
@@ -83,7 +83,7 @@ class philox
         tmp[2]            = tmp_ph.z;
         tmp[3]            = tmp_ph.w;
         uint32_t* out_tmp = reinterpret_cast<uint32_t*>(&out[0]);
-        out_tmp[0]        = tmp[idx];
+        out_tmp[0]        = tmp[start_idx];
     }
 
     private:

@@ -21,7 +21,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/system/detail/sequential/execution_policy.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -32,13 +31,27 @@ namespace detail
 namespace sequential
 {
 
-template <typename DerivedPolicy, typename InputIterator, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator
-copy(sequential::execution_policy<DerivedPolicy>& exec, InputIterator first, InputIterator last, OutputIterator result);
 
-template <typename DerivedPolicy, typename InputIterator, typename Size, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator
-copy_n(sequential::execution_policy<DerivedPolicy>& exec, InputIterator first, Size n, OutputIterator result);
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator copy(sequential::execution_policy<DerivedPolicy> &exec,
+                      InputIterator first,
+                      InputIterator last,
+                      OutputIterator result);
+
+
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename Size,
+         typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator copy_n(sequential::execution_policy<DerivedPolicy> &exec,
+                        InputIterator first,
+                        Size n,
+                        OutputIterator result);
+
 
 } // end namespace sequential
 } // end namespace detail
@@ -46,3 +59,4 @@ copy_n(sequential::execution_policy<DerivedPolicy>& exec, InputIterator first, S
 THRUST_NAMESPACE_END
 
 #include <thrust/system/detail/sequential/copy.inl>
+

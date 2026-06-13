@@ -23,13 +23,15 @@
 
 #include <thrust/detail/config.h>
 
-#include <thrust/mr/host_memory_resource.h>
 #include <thrust/mr/memory_resource.h>
-#include <thrust/system/detail/bad_alloc.h>
 #include <thrust/system/hip/detail/guarded_hip_runtime_api.h>
-#include <thrust/system/hip/detail/util.h>
-#include <thrust/system/hip/error.h>
 #include <thrust/system/hip/pointer.h>
+
+#include <thrust/system/detail/bad_alloc.h>
+#include <thrust/system/hip/error.h>
+#include <thrust/system/hip/detail/util.h>
+
+#include <thrust/mr/host_memory_resource.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -41,62 +43,63 @@ namespace hip
 namespace detail
 {
 
-using allocation_fn   = hipError_t (*)(void**, std::size_t);
-using deallocation_fn = hipError_t (*)(void*);
+    using allocation_fn   = hipError_t (*)(void **, std::size_t);
+    using deallocation_fn = hipError_t (*)(void *);
 
-template <allocation_fn Alloc, deallocation_fn Dealloc, typename Pointer>
-class hip_memory_resource final : public mr::memory_resource<Pointer>
-{
-public:
-  Pointer do_allocate(std::size_t bytes, std::size_t alignment = THRUST_MR_DEFAULT_ALIGNMENT) override
-  {
-    (void) alignment;
-
-    void* ret;
-    hipError_t status = Alloc(&ret, bytes);
-
-    if (status != hipSuccess)
+    template<allocation_fn Alloc, deallocation_fn Dealloc, typename Pointer>
+    class hip_memory_resource final : public mr::memory_resource<Pointer>
     {
-      // Clear the HIP global error state.
-      hipError_t clear_error_status = hipGetLastError();
-      THRUST_UNUSED_VAR(clear_error_status);
-      throw thrust::system::detail::bad_alloc(thrust::hip_category().message(status).c_str());
+    public:
+        Pointer do_allocate(std::size_t bytes, std::size_t alignment = THRUST_MR_DEFAULT_ALIGNMENT) override
+        {
+            (void)alignment;
+
+            void * ret;
+            hipError_t status = Alloc(&ret, bytes);
+
+            if (status != hipSuccess)
+            {
+                // Clear the HIP global error state.
+                hipError_t clear_error_status = hipGetLastError();
+                THRUST_UNUSED_VAR(clear_error_status);
+                throw thrust::system::detail::bad_alloc(thrust::hip_category().message(status).c_str());
+            }
+
+            return Pointer(ret);
+        }
+
+        void do_deallocate(Pointer p, std::size_t bytes, std::size_t alignment) override
+        {
+            (void)bytes;
+            (void)alignment;
+
+            hipError_t status = Dealloc(thrust::detail::pointer_traits<Pointer>::get(p));
+
+            if (status != hipSuccess)
+            {
+                thrust::hip_rocprim::throw_on_error(status, "HIP free failed");
+            }
+        }
+    };
+
+    inline hipError_t hipMallocManaged(void ** ptr, std::size_t bytes)
+    {
+        return ::hipMallocManaged(ptr, bytes, hipMemAttachGlobal);
     }
 
-    return Pointer(ret);
-  }
-
-  void do_deallocate(Pointer p, std::size_t bytes, std::size_t alignment) override
-  {
-    (void) bytes;
-    (void) alignment;
-
-    hipError_t status = Dealloc(thrust::detail::pointer_traits<Pointer>::get(p));
-
-    if (status != hipSuccess)
+    inline hipError_t hipHostMalloc(void ** ptr, std::size_t bytes)
     {
-      thrust::hip_rocprim::throw_on_error(status, "HIP free failed");
+        return ::hipHostMalloc(ptr, bytes, hipHostMallocMapped);
     }
-  }
-};
 
-inline hipError_t hipMallocManaged(void** ptr, std::size_t bytes)
-{
-  return ::hipMallocManaged(ptr, bytes, hipMemAttachGlobal);
-}
+    using device_memory_resource  = detail::hip_memory_resource<hipMalloc, hipFree,
+                                    thrust::hip_rocprim::pointer<void> >;
+    using managed_memory_resource = detail::hip_memory_resource<detail::hipMallocManaged, hipFree,
+                                    thrust::hip::universal_pointer<void> >;
+    using pinned_memory_resource  = detail::hip_memory_resource<hipHostMalloc, hipHostFree,
+                                    thrust::hip::universal_pointer<void> >;
 
-inline hipError_t hipHostMalloc(void** ptr, std::size_t bytes)
-{
-  return ::hipHostMalloc(ptr, bytes, hipHostMallocMapped);
-}
-
-using device_memory_resource = detail::hip_memory_resource<hipMalloc, hipFree, thrust::hip_rocprim::pointer<void>>;
-using managed_memory_resource =
-  detail::hip_memory_resource<detail::hipMallocManaged, hipFree, thrust::hip::universal_pointer<void>>;
-using pinned_memory_resource =
-  detail::hip_memory_resource<hipHostMalloc, hipHostFree, thrust::hip::universal_pointer<void>>;
-
-} // namespace detail
+} // end detail
 //! \endcond
 
 /*! The memory resource for the HIP system. Uses <tt>hipMalloc</tt> and wraps
@@ -114,13 +117,13 @@ using universal_memory_resource = detail::managed_memory_resource;
  */
 using universal_host_pinned_memory_resource = detail::pinned_memory_resource;
 
-} // namespace hip
-} // namespace system
+} // end hip
+} // end system
 
 namespace hip
 {
 using thrust::system::hip::memory_resource;
-using thrust::system::hip::universal_host_pinned_memory_resource;
 using thrust::system::hip::universal_memory_resource;
-} // namespace hip
+using thrust::system::hip::universal_host_pinned_memory_resource;
+}
 THRUST_NAMESPACE_END

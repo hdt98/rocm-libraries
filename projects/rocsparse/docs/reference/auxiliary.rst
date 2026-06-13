@@ -1,6 +1,6 @@
 .. meta::
-  :description: rocSPARSE auxiliary functions API documentation
-  :keywords: rocSPARSE, ROCm, API, documentation, auxiliary functions
+  :description: rocSPARSE documentation and API reference library
+  :keywords: rocSPARSE, ROCm, API, documentation
 
 .. _rocsparse_auxiliary_functions_:
 
@@ -8,10 +8,11 @@
 Sparse auxiliary functions
 ********************************************************************
 
-This module contains all sparse auxiliary functions.
+This module holds all sparse auxiliary functions.
 
 The functions that are contained in the auxiliary module describe all available helper functions that are required for subsequent library calls.
-These functions do not support execution in a ``hipGraph`` context.
+
+The functions in this module do not support execution in a hipGraph context.
 
 .. _rocsparse_create_handle_:
 
@@ -58,16 +59,6 @@ rocsparse_get_git_rev()
 -----------------------
 
 .. doxygenfunction:: rocsparse_get_git_rev
-
-rocsparse_destroy_error()
--------------------------
-
-.. doxygenfunction:: rocsparse_destroy_error
-
-rocsparse_error_get_message()
------------------------------
-
-.. doxygenfunction:: rocsparse_error_get_message
 
 rocsparse_create_mat_descr()
 ----------------------------
@@ -248,11 +239,6 @@ rocsparse_create_bell_descr
 
 .. doxygenfunction:: rocsparse_create_bell_descr
 
-rocsparse_create_sell_descr
----------------------------
-
-.. doxygenfunction:: rocsparse_create_sell_descr
-
 rocsparse_create_const_coo_descr
 --------------------------------
 
@@ -268,20 +254,10 @@ rocsparse_create_const_csc_descr
 
 .. doxygenfunction:: rocsparse_create_const_csc_descr
 
-rocsparse_create_const_bsr_descr
---------------------------------
-
-.. doxygenfunction:: rocsparse_create_const_bsr_descr
-
 rocsparse_create_const_bell_descr
 ---------------------------------
 
 .. doxygenfunction:: rocsparse_create_const_bell_descr
-
-rocsparse_create_const_sell_descr
----------------------------------
-
-.. doxygenfunction:: rocsparse_create_const_sell_descr
 
 rocsparse_destroy_spmat_descr
 -----------------------------
@@ -333,115 +309,6 @@ rocsparse_spgeam_get_output
 
 .. doxygenfunction:: rocsparse_spgeam_get_output
 
-rocsparse_create_spmv_descr
----------------------------
-
-.. doxygenfunction:: rocsparse_create_spmv_descr
-
-rocsparse_destroy_spmv_descr
-----------------------------
-
-.. doxygenfunction:: rocsparse_destroy_spmv_descr
-
-rocsparse_spmv_set_input
-------------------------
-
-.. doxygenfunction:: rocsparse_spmv_set_input
-
-
-rocsparse_create_sptrsv_descr
------------------------------
-
-.. doxygenfunction:: rocsparse_create_sptrsv_descr
-
-rocsparse_destroy_sptrsv_descr
-------------------------------
-
-.. doxygenfunction:: rocsparse_destroy_sptrsv_descr
-
-rocsparse_sptrsv_set_input
---------------------------
-
-.. doxygenfunction:: rocsparse_sptrsv_set_input
-
-rocsparse_sptrsv_get_output
----------------------------
-
-.. doxygenfunction:: rocsparse_sptrsv_get_output
-
-rocsparse_create_sptrsm_descr
------------------------------
-
-.. doxygenfunction:: rocsparse_create_sptrsm_descr
-
-rocsparse_destroy_sptrsm_descr
-------------------------------
-
-.. doxygenfunction:: rocsparse_destroy_sptrsm_descr
-
-rocsparse_sptrsm_set_input
---------------------------
-
-.. doxygenfunction:: rocsparse_sptrsm_set_input
-
-rocsparse_sptrsm_get_output
----------------------------
-
-.. doxygenfunction:: rocsparse_sptrsm_get_output
-
-
-rocsparse_spic0_descr_create
-----------------------------
-
-.. doxygenfunction:: rocsparse_spic0_descr_create
-
-rocsparse_spic0_descr_destroy
------------------------------
-
-.. doxygenfunction:: rocsparse_spic0_descr_destroy
-
-rocsparse_spic0_set_input
--------------------------
-
-.. doxygenfunction:: rocsparse_spic0_set_input
-
-rocsparse_spic0_get_output
---------------------------
-
-.. doxygenfunction:: rocsparse_spic0_get_output
-
-
-rocsparse_spilu0_descr_create
------------------------------
-
-.. doxygenfunction:: rocsparse_spilu0_descr_create
-
-rocsparse_spilu0_descr_destroy
-------------------------------
-
-.. doxygenfunction:: rocsparse_spilu0_descr_destroy
-
-rocsparse_spilu0_set_input
---------------------------
-
-.. doxygenfunction:: rocsparse_spilu0_set_input
-
-rocsparse_spilu0_get_output
----------------------------
-
-.. doxygenfunction:: rocsparse_spilu0_get_output
-
-
-rocsparse_sptrsv_descr_create
------------------------------
-
-.. doxygenfunction:: rocsparse_sptrsv_descr_create
-
-rocsparse_sptrsv_descr_destroy
-------------------------------
-
-.. doxygenfunction:: rocsparse_sptrsv_descr_destroy
-
 rocsparse_coo_get
 -----------------
 
@@ -466,11 +333,6 @@ rocsparse_bell_get
 ------------------
 
 .. doxygenfunction:: rocsparse_bell_get
-
-rocsparse_sell_get
-------------------
-
-.. doxygenfunction:: rocsparse_sell_get
 
 rocsparse_coo_set_pointers
 --------------------------
@@ -636,91 +498,3 @@ rocsparse_dnmat_set_strided_batch
 ---------------------------------
 
 .. doxygenfunction:: rocsparse_dnmat_set_strided_batch
-
-
-
-rocsparse_create_const_spvec_descr
-----------------------------------
-.. doxygenfunction:: rocsparse_create_const_spvec_descr
-
-rocsparse_const_spvec_get
--------------------------
-.. doxygenfunction:: rocsparse_const_spvec_get
-
-rocsparse_const_spvec_get_values
---------------------------------
-.. doxygenfunction:: rocsparse_const_spvec_get_values
-
-rocsparse_const_coo_get
------------------------
-.. doxygenfunction:: rocsparse_const_coo_get
-
-rocsparse_const_coo_aos_get
----------------------------
-.. doxygenfunction:: rocsparse_const_coo_aos_get
-
-rocsparse_const_csr_get
------------------------
-.. doxygenfunction:: rocsparse_const_csr_get
-
-rocsparse_csc_get
------------------
-.. doxygenfunction:: rocsparse_csc_get
-
-rocsparse_const_csc_get
------------------------
-.. doxygenfunction:: rocsparse_const_csc_get
-
-rocsparse_const_ell_get
------------------------
-.. doxygenfunction:: rocsparse_const_ell_get
-
-rocsparse_const_bell_get
-------------------------
-.. doxygenfunction:: rocsparse_const_bell_get
-
-rocsparse_const_sell_get
-------------------------
-.. doxygenfunction:: rocsparse_const_sell_get
-
-rocsparse_bsr_get
------------------
-.. doxygenfunction:: rocsparse_bsr_get
-
-rocsparse_const_bsr_get
------------------------
-.. doxygenfunction:: rocsparse_const_bsr_get
-
-rocsparse_const_spmat_get_values
---------------------------------
-.. doxygenfunction:: rocsparse_const_spmat_get_values
-
-rocsparse_spmat_set_nnz
------------------------
-.. doxygenfunction:: rocsparse_spmat_set_nnz
-
-rocsparse_const_dnvec_get
--------------------------
-.. doxygenfunction:: rocsparse_const_dnvec_get
-
-rocsparse_const_dnvec_get_values
---------------------------------
-.. doxygenfunction:: rocsparse_const_dnvec_get_values
-
-rocsparse_const_dnmat_get
--------------------------
-.. doxygenfunction:: rocsparse_const_dnmat_get
-
-rocsparse_const_dnmat_get_values
---------------------------------
-.. doxygenfunction:: rocsparse_const_dnmat_get_values
-
-rocsparse_dnvec_get_strided_batch
----------------------------------
-.. doxygenfunction:: rocsparse_dnvec_get_strided_batch
-
-rocsparse_dnvec_set_strided_batch
----------------------------------
-.. doxygenfunction:: rocsparse_dnvec_set_strided_batch
-
-

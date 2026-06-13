@@ -52,7 +52,7 @@ parameter_spaces = {
             ],
         },
         "params": {
-            "RadixBits": [6, 7, 8],
+            "LongBits": [6, 7, 8],
             "BlockSize": [256],
             "ItemsPerThread": [7, 8, 13, 16, 17],
             "WarpSmallLWS": [8, 16, 32, 64],
@@ -84,7 +84,7 @@ parameter_spaces = {
             ],
         },
         "params": {
-            "RadixBits": [6, 7, 8],
+            "LongBits": [6, 7, 8],
             "BlockSize": [256],
             "ItemsPerThread": [7, 8, 13, 16, 17],
             "WarpSmallLWS": [8, 16, 32, 64],
@@ -278,12 +278,15 @@ def tune_alg(alg_name: str, arch: str, max_samples: int, num_workers: int, size:
                 bench = subprocess.call(
                     [
                         os.path.join(build_dir, 'benchmark', build_target),
+                        '--name_format',
+                        'json',
                         '--seed',
                         'random',  # Random is better... I think? Otherwise we might overfit.
                         '--size',
                         f'{size}',
                         '--trials',
                         f'{trials}',
+                        '--benchmark_out_format=json',
                         f'--benchmark_out={result_filename}',
                     ],
                     cwd=result_dir,

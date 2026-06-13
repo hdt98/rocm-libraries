@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,62 +23,15 @@
  * ************************************************************************ */
 
 #pragma once
-#include "rocsparse_handle.hpp"
+#include "handle.h"
 
 namespace rocsparse
 {
     template <typename I, typename T>
-    rocsparse_status gthr_strided_batched_template(rocsparse_handle     handle,
-                                                   int64_t              batch_count,
-                                                   int64_t              nnz,
-                                                   const void*          y,
-                                                   int64_t              y_stride,
-                                                   void*                x_val,
-                                                   int64_t              x_val_stride,
-                                                   const void*          x_ind,
-                                                   rocsparse_index_base idx_base);
-    template <typename I, typename T>
     rocsparse_status gthr_template(rocsparse_handle     handle,
-                                   int64_t              nnz,
-                                   const void*          y,
-                                   void*                x_val,
-                                   const void*          x_ind,
-                                   rocsparse_index_base idx_base)
-    {
-        return gthr_strided_batched_template<I, T>(handle, 1, nnz, y, 0, x_val, 0, x_ind, idx_base);
-    }
-
-    rocsparse_status gthr_indices(rocsparse_handle     handle,
-                                  int64_t              nnz,
-                                  rocsparse_indextype  y_indextype,
-                                  const void*          y,
-                                  rocsparse_indextype  x_val_indextype,
-                                  void*                x_val,
-                                  rocsparse_indextype  x_ind_indextype,
-                                  const void*          x_ind,
-                                  rocsparse_index_base idx_base);
-
-    rocsparse_status gthr(rocsparse_handle     handle,
-                          int64_t              nnz,
-                          rocsparse_datatype   y_datatype,
-                          const void*          y,
-                          rocsparse_datatype   x_datatype,
-                          void*                x_val,
-                          rocsparse_indextype  x_indextype,
-                          const void*          x_ind,
-                          rocsparse_index_base idx_base);
-
-    rocsparse_status gthr_strided_batched(rocsparse_handle    handle,
-                                          int64_t             batch_count,
-                                          int64_t             nnz,
-                                          rocsparse_datatype  y_datatype,
-                                          const void*         y,
-                                          int64_t             y_stride,
-                                          rocsparse_datatype  x_datatype,
-                                          void*               x_val,
-                                          int64_t             x_val_stride,
-                                          rocsparse_indextype x_indextype,
-                                          const void*         x_ind,
-
-                                          rocsparse_index_base idx_base);
+                                   I                    nnz,
+                                   const T*             y,
+                                   T*                   x_val,
+                                   const I*             x_ind,
+                                   rocsparse_index_base idx_base);
 }

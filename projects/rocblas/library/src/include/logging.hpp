@@ -144,34 +144,6 @@ std::string rocblas_internal_log_trace_scalar_value(rocblas_handle handle, const
  *************************************************/
 
 template <typename T>
-inline std::string rocblas_internal_log_bench_scalar_value(const char* name, const T* value)
-{
-    rocblas_internal_ostream ss;
-    if constexpr(!rocblas_is_complex<T>)
-    {
-        ss << "--" << name << " " << (value ? *value : std::numeric_limits<T>::quiet_NaN());
-    }
-    else
-    {
-        ss << "--" << name << " "
-           << (value ? std::real(*value)
-                     : std::numeric_limits<typename T::value_type>::quiet_NaN());
-        if(value && std::imag(*value))
-            ss << " --" << name << "i " << std::imag(*value);
-    }
-    return ss.str();
-}
-
-template <>
-inline std::string rocblas_internal_log_bench_scalar_value<rocblas_half>(const char*         name,
-                                                                         const rocblas_half* value)
-{
-    rocblas_internal_ostream ss;
-    ss << "--" << name << " " << (value ? float(*value) : std::numeric_limits<float>::quiet_NaN());
-    return ss.str();
-}
-
-template <typename T>
 std::string rocblas_internal_log_bench_scalar_value(rocblas_handle handle,
                                                     const char*    name,
                                                     const T*       value);
@@ -195,14 +167,29 @@ rocblas_status rocblas_internal_log_trace_alpha_beta_ex(rocblas_datatype        
                                                         rocblas_internal_ostream& alphass,
                                                         rocblas_internal_ostream& betass);
 
+rocblas_status rocblas_internal_log_trace_alpha_beta_ex(rocblas_computetype       compute_type,
+                                                        const void*               alpha,
+                                                        const void*               beta,
+                                                        rocblas_internal_ostream& alphass,
+                                                        rocblas_internal_ostream& betass);
+
 rocblas_status rocblas_internal_log_bench_alpha_beta_ex(rocblas_datatype compute_type,
                                                         const void*      alpha,
                                                         const void*      beta,
                                                         std::string&     alphas,
                                                         std::string&     betas);
 
+rocblas_status rocblas_internal_log_bench_alpha_beta_ex(rocblas_computetype compute_type,
+                                                        const void*         alpha,
+                                                        const void*         beta,
+                                                        std::string&        alphas,
+                                                        std::string&        betas);
+
 template <typename T>
 double rocblas_internal_value_category(const T* beta, rocblas_datatype compute_type);
+
+template <typename T>
+double rocblas_internal_value_category(const T* beta, rocblas_computetype compute_type);
 
 extern const char* c_rocblas_internal;
 
@@ -246,7 +233,7 @@ public:
     void log_bench(rocblas_handle handle, Ts&&... xs)
     {
         const char* atomics_str
-            = handle->atomics_mode == rocblas_atomics_allowed ? "--atomics_allowed" : "";
+            = handle->atomics_mode == rocblas_atomics_not_allowed ? "--atomics_not_allowed" : "";
         log_arguments(*handle->log_bench_os, " ", std::forward<Ts>(xs)..., atomics_str);
     }
 

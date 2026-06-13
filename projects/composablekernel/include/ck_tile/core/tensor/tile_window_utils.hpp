@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "ck_tile/core/arch/arch.hpp"
 #include "ck_tile/core/arch/utility.hpp"
@@ -17,13 +17,6 @@
 
 #pragma once
 namespace ck_tile {
-
-template <typename TileWindow_>
-CK_TILE_DEVICE void move_tile_window(TileWindow_& window,
-                                     const typename TileWindow_::BottomTensorIndex& step)
-{
-    window.move(step);
-}
 
 // input a lds store tile, extract some information from it
 // used to set m0 value for gfx9 serious
@@ -57,13 +50,5 @@ CK_TILE_DEVICE auto get_async_store_smem_info(LdsTileWindow_&& lds_tile)
 
     return make_tuple(m0_init_value, size_per_issue);
 }
-
-// used in LocalPrefetch in TDM pipeline
-enum struct WindowSlideMode
-{
-    Stay,
-    Move,
-    Reset
-};
 
 } // namespace ck_tile

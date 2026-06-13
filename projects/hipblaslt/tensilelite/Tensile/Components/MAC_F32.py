@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,12 +22,8 @@
 #
 ################################################################################
 
-from rocisa.code import Module
-from rocisa.container import vgpr
-from rocisa.enum import DataTypeEnum
-from rocisa.instruction import VMacF32, SSetPrior
-from ..Common.DataType import DataType
-from ..Component import MAC
+from ..TensileInstructions import DataType, Module, vgpr, VMacF32, SSetPrior
+from ..Component import Component, MAC
 
 class MAC_F32_Plain(MAC):
     """
@@ -37,8 +33,7 @@ class MAC_F32_Plain(MAC):
     def asmCaps(caps):
         return caps["v_mac_f32"] or caps["v_fma_f32"]
 
-    kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Float),
-                              "MacDataTypeB": DataType(DataTypeEnum.Float),}}
+    kernel = {"ProblemType": {"DataType": DataType(DataType.single)}}
 
     def __call__(self, writer, tPA, tPB, m, innerUnroll):
         kernel = writer.states.kernel

@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file host_vector.h
  *  \brief A dynamically-sizable array of elements which resides in memory
  *         accessible to hosts.
@@ -22,20 +23,12 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
 #include <thrust/detail/memory_wrapper.h>
 #include <thrust/detail/vector_base.h>
 
 #include <initializer_list>
-#include <utility>
 #include <vector>
+#include <utility>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -56,225 +49,212 @@ THRUST_NAMESPACE_BEGIN
  *  \see device_vector
  *  \see universal_vector
  */
-template <typename T, typename Alloc = std::allocator<T>>
-class host_vector : public detail::vector_base<T, Alloc>
+template<typename T, typename Alloc = std::allocator<T> >
+  class host_vector
+    : public detail::vector_base<T,Alloc>
 {
-private:
-  using Parent = detail::vector_base<T, Alloc>;
+  private:
+    using Parent = detail::vector_base<T,Alloc>;
 
-public:
-  /*! \cond
-   */
-  using size_type  = typename Parent::size_type;
-  using value_type = typename Parent::value_type;
-  /*! \endcond
-   */
+  public:
+    /*! \cond
+     */
+    using size_type  = typename Parent::size_type;
+    using value_type = typename Parent::value_type;
+    /*! \endcond
+     */
 
-  /*! This constructor creates an empty \p host_vector.
-   */
-  THRUST_HOST host_vector()
-      : Parent()
-  {}
+    /*! This constructor creates an empty \p host_vector.
+     */
+    THRUST_HOST
+    host_vector(void)
+      :Parent() {}
 
-  /*! This constructor creates an empty \p host_vector.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  THRUST_HOST host_vector(const Alloc& alloc)
-      : Parent(alloc)
-  {}
+    /*! This constructor creates an empty \p host_vector.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+    THRUST_HOST
+    host_vector(const Alloc &alloc)
+      :Parent(alloc) {}
 
-  /*! The destructor erases the elements.
-   */
-  //  Define an empty destructor to explicitly specify
-  //  its execution space qualifier, as a workaround for nvcc warning
-  THRUST_HOST ~host_vector() {}
+    /*! The destructor erases the elements.
+     */
+    //  Define an empty destructor to explicitly specify
+    //  its execution space qualifier, as a workaround for nvcc warning
+    THRUST_HOST
+    ~host_vector(void) {}
 
-  /*! This constructor creates a \p host_vector with the given
-   *  size.
-   *  \param n The number of elements to initially create.
-   */
-  THRUST_HOST explicit host_vector(size_type n)
-      : Parent(n)
-  {}
+    /*! This constructor creates a \p host_vector with the given
+     *  size.
+     *  \param n The number of elements to initially create.
+     */
+    THRUST_HOST
+    explicit host_vector(size_type n)
+      :Parent(n) {}
 
-  /*! This constructor creates a \p host_vector with the given
-   *  size.
-   *  \param n The number of elements to initially create.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  THRUST_HOST explicit host_vector(size_type n, const Alloc& alloc)
-      : Parent(n, alloc)
-  {}
+    /*! This constructor creates a \p host_vector with the given
+     *  size.
+     *  \param n The number of elements to initially create.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+    THRUST_HOST
+    explicit host_vector(size_type n, const Alloc &alloc)
+      :Parent(n,alloc) {}
 
-  /*! This constructor creates a \p host_vector with copies
-   *  of an exemplar element.
-   *  \param n The number of elements to initially create.
-   *  \param value An element to copy.
-   */
-  THRUST_HOST explicit host_vector(size_type n, const value_type& value)
-      : Parent(n, value)
-  {}
+    /*! This constructor creates a \p host_vector with copies
+     *  of an exemplar element.
+     *  \param n The number of elements to initially create.
+     *  \param value An element to copy.
+     */
+    THRUST_HOST
+    explicit host_vector(size_type n, const value_type &value)
+      :Parent(n,value) {}
 
-  /*! This constructor creates a \p host_vector with copies
-   *  of an exemplar element.
-   *  \param n The number of elements to initially create.
-   *  \param value An element to copy.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  THRUST_HOST explicit host_vector(size_type n, const value_type& value, const Alloc& alloc)
-      : Parent(n, value, alloc)
-  {}
+    /*! This constructor creates a \p host_vector with copies
+     *  of an exemplar element.
+     *  \param n The number of elements to initially create.
+     *  \param value An element to copy.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+    THRUST_HOST
+    explicit host_vector(size_type n, const value_type &value, const Alloc &alloc)
+      :Parent(n,value,alloc) {}
 
-  /*! Copy constructor copies from an exemplar \p host_vector.
-   *  \param v The \p host_vector to copy.
-   */
-  THRUST_HOST host_vector(const host_vector& v)
-      : Parent(v)
-  {}
+    /*! Copy constructor copies from an exemplar \p host_vector.
+     *  \param v The \p host_vector to copy.
+     */
+    THRUST_HOST
+    host_vector(const host_vector &v)
+      :Parent(v) {}
 
-  /*! Copy constructor copies from an exemplar \p host_vector.
-   *  \param v The \p host_vector to copy.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  THRUST_HOST host_vector(const host_vector& v, const Alloc& alloc)
-      : Parent(v, alloc)
-  {}
+    /*! Copy constructor copies from an exemplar \p host_vector.
+     *  \param v The \p host_vector to copy.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+    THRUST_HOST
+    host_vector(const host_vector &v, const Alloc &alloc)
+      :Parent(v,alloc) {}
 
-  /*! Move constructor moves from another host_vector.
-   *  \param v The host_vector to move.
-   */
-  THRUST_HOST host_vector(host_vector&& v)
-      : Parent(std::move(v))
-  {}
+    /*! Move constructor moves from another host_vector.
+     *  \param v The host_vector to move.
+     */
+     THRUST_HOST
+    host_vector(host_vector &&v)
+      :Parent(std::move(v)) {}
 
-  /*! Move constructor moves from another host_vector.
-   *  \param v The host_vector to move.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  THRUST_HOST host_vector(host_vector&& v, const Alloc& alloc)
-      : Parent(std::move(v), alloc)
-  {}
+    /*! Move constructor moves from another host_vector.
+     *  \param v The host_vector to move.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+     THRUST_HOST
+    host_vector(host_vector &&v, const Alloc &alloc)
+      :Parent(std::move(v),alloc) {}
 
   /*! Assign operator copies from an exemplar \p host_vector.
    *  \param v The \p host_vector to copy.
    */
-  THRUST_HOST host_vector& operator=(const host_vector& v)
-  {
-    Parent::operator=(v);
-    return *this;
-  }
+  THRUST_HOST
+  host_vector &operator=(const host_vector &v)
+  { Parent::operator=(v); return *this; }
 
-  /*! Move assign operator moves from another host_vector.
-   *  \param v The host_vector to move.
-   */
-  THRUST_HOST host_vector& operator=(host_vector&& v)
-  {
-    Parent::operator=(std::move(v));
-    return *this;
-  }
+    /*! Move assign operator moves from another host_vector.
+     *  \param v The host_vector to move.
+     */
+     THRUST_HOST
+     host_vector &operator=(host_vector &&v)
+     { Parent::operator=(std::move(v)); return *this; }
 
-  /*! Copy constructor copies from an exemplar \p host_vector with different type.
-   *  \param v The \p host_vector to copy.
-   */
-  template <typename OtherT, typename OtherAlloc>
-  THRUST_HOST host_vector(const host_vector<OtherT, OtherAlloc>& v)
-      : Parent(v)
-  {}
+    /*! Copy constructor copies from an exemplar \p host_vector with different type.
+     *  \param v The \p host_vector to copy.
+     */
+    template<typename OtherT, typename OtherAlloc>
+    THRUST_HOST
+    host_vector(const host_vector<OtherT,OtherAlloc> &v)
+      :Parent(v) {}
 
-  /*! Assign operator copies from an exemplar \p host_vector with different type.
-   *  \param v The \p host_vector to copy.
-   */
-  template <typename OtherT, typename OtherAlloc>
-  THRUST_HOST host_vector& operator=(const host_vector<OtherT, OtherAlloc>& v)
-  {
-    Parent::operator=(v);
-    return *this;
-  }
+    /*! Assign operator copies from an exemplar \p host_vector with different type.
+     *  \param v The \p host_vector to copy.
+     */
+    template<typename OtherT, typename OtherAlloc>
+    THRUST_HOST
+    host_vector &operator=(const host_vector<OtherT,OtherAlloc> &v)
+    { Parent::operator=(v); return *this; }
 
-  /*! Copy constructor copies from an exemplar <tt>std::vector</tt>.
-   *  \param v The <tt>std::vector</tt> to copy.
-   */
-  template <typename OtherT, typename OtherAlloc>
-  THRUST_HOST host_vector(const std::vector<OtherT, OtherAlloc>& v)
-      : Parent(v)
-  {}
+    /*! Copy constructor copies from an exemplar <tt>std::vector</tt>.
+     *  \param v The <tt>std::vector</tt> to copy.
+     */
+    template<typename OtherT, typename OtherAlloc>
+    THRUST_HOST
+    host_vector(const std::vector<OtherT,OtherAlloc> &v)
+      :Parent(v) {}
 
-  /*! Assign operator copies from an exemplar <tt>std::vector</tt>.
-   *  \param v The <tt>std::vector</tt> to copy.
-   */
-  template <typename OtherT, typename OtherAlloc>
-  THRUST_HOST host_vector& operator=(const std::vector<OtherT, OtherAlloc>& v)
-  {
-    Parent::operator=(v);
-    return *this;
-  }
+    /*! Assign operator copies from an exemplar <tt>std::vector</tt>.
+     *  \param v The <tt>std::vector</tt> to copy.
+     */
+    template<typename OtherT, typename OtherAlloc>
+    THRUST_HOST
+    host_vector &operator=(const std::vector<OtherT,OtherAlloc> &v)
+    { Parent::operator=(v); return *this;}
 
-  /*! Copy construct from a \p vector_base whose element type is convertible
-   *  to \c T.
-   *
-   *  \param v The \p vector_base to copy.
-   */
-  template <typename OtherT, typename OtherAlloc>
-  THRUST_HOST host_vector(const detail::vector_base<OtherT, OtherAlloc>& v)
-      : Parent(v)
-  {}
+    /*! Copy construct from a \p vector_base whose element type is convertible
+     *  to \c T.
+     *
+     *  \param v The \p vector_base to copy.
+     */
+    template<typename OtherT, typename OtherAlloc>
+    THRUST_HOST
+    host_vector(const detail::vector_base<OtherT,OtherAlloc> &v)
+      :Parent(v) {}
 
-  /*! Assign a \p vector_base whose element type is convertible to \c T.
-   *
-   *  \param v The \p vector_base to copy.
-   */
-  template <typename OtherT, typename OtherAlloc>
-  THRUST_HOST host_vector& operator=(const detail::vector_base<OtherT, OtherAlloc>& v)
-  {
-    Parent::operator=(v);
-    return *this;
-  }
+    /*! Assign a \p vector_base whose element type is convertible to \c T.
+     *
+     *  \param v The \p vector_base to copy.
+     */
+    template<typename OtherT, typename OtherAlloc>
+    THRUST_HOST
+    host_vector &operator=(const detail::vector_base<OtherT,OtherAlloc> &v)
+    { Parent::operator=(v); return *this; }
+    
+    /*! This constructor builds a \p host_vector from an intializer_list.
+     *  \param il The intializer_list.
+     */
+    host_vector(std::initializer_list<T> il)
+      :Parent(il) {}
+      
+    /*! This constructor builds a \p host_vector from an intializer_list.
+     *  \param il The intializer_list.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+    host_vector(std::initializer_list<T> il, const Alloc &alloc)
+      :Parent(il, alloc) {}
+      
+    /*! Assign an \p intializer_list with a matching element type
+     *  \param il The intializer_list.
+     */
+    host_vector &operator=(std::initializer_list<T> il)
+    { Parent::operator=(il); return *this; }
 
-  /*! This constructor builds a \p host_vector from an intializer_list.
-   *  \param il The intializer_list.
-   */
-  host_vector(std::initializer_list<T> il)
-      : Parent(il)
-  {}
+    /*! This constructor builds a \p host_vector from a range.
+     *  \param first The beginning of the range.
+     *  \param last The end of the range.
+     */
+    template<typename InputIterator>
+    THRUST_HOST
+    host_vector(InputIterator first, InputIterator last)
+      :Parent(first, last) {}
 
-  /*! This constructor builds a \p host_vector from an intializer_list.
-   *  \param il The intializer_list.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  host_vector(std::initializer_list<T> il, const Alloc& alloc)
-      : Parent(il, alloc)
-  {}
-
-  /*! Assign an \p intializer_list with a matching element type
-   *  \param il The intializer_list.
-   */
-  host_vector& operator=(std::initializer_list<T> il)
-  {
-    Parent::operator=(il);
-    return *this;
-  }
-
-  /*! This constructor builds a \p host_vector from a range.
-   *  \param first The beginning of the range.
-   *  \param last The end of the range.
-   */
-  template <typename InputIterator>
-  THRUST_HOST host_vector(InputIterator first, InputIterator last)
-      : Parent(first, last)
-  {}
-
-  /*! This constructor builds a \p host_vector from a range.
-   *  \param first The beginning of the range.
-   *  \param last The end of the range.
-   *  \param alloc The allocator to use by this host_vector.
-   */
-  template <typename InputIterator>
-  THRUST_HOST host_vector(InputIterator first, InputIterator last, const Alloc& alloc)
-      : Parent(first, last, alloc)
-  {}
+    /*! This constructor builds a \p host_vector from a range.
+     *  \param first The beginning of the range.
+     *  \param last The end of the range.
+     *  \param alloc The allocator to use by this host_vector.
+     */
+    template<typename InputIterator>
+    THRUST_HOST
+    host_vector(InputIterator first, InputIterator last, const Alloc &alloc)
+      :Parent(first, last, alloc) {}
 
 // declare these members for the purpose of Doxygenating them
-// they actually exist in a base class
+// they actually exist in a derived-from class
 #if 0
     /*! \brief Resizes this vector to the specified number of elements.
      *  \param new_size Number of elements this vector should contain.
@@ -290,12 +270,12 @@ public:
 
     /*! Returns the number of elements in this vector.
      */
-    size_type size() const;
+    size_type size(void) const;
 
     /*! Returns the size() of the largest possible vector.
      *  \return The largest possible return value of size().
      */
-    size_type max_size() const;
+    size_type max_size(void) const;
 
     /*! \brief If n is less than or equal to capacity(), this call has no effect.
      *         Otherwise, this method is a request for allocation of additional memory. If
@@ -308,12 +288,12 @@ public:
     /*! Returns the number of elements which have been reserved in this
      *  vector.
      */
-    size_type capacity() const;
+    size_type capacity(void) const;
 
     /*! This method shrinks the capacity of this vector to exactly
      *  fit its elements.
      */
-    void shrink_to_fit();
+    void shrink_to_fit(void);
 
     /*! \brief Subscript access to the data contained in this vector_dev.
      *  \param n The index of the element for which data should be accessed.
@@ -339,119 +319,119 @@ public:
      *  this vector.
      *  \return mStart
      */
-    iterator begin();
+    iterator begin(void);
 
     /*! This method returns a const_iterator pointing to the beginning
      *  of this vector.
      *  \return mStart
      */
-    const_iterator begin() const;
+    const_iterator begin(void) const;
 
     /*! This method returns a const_iterator pointing to the beginning
      *  of this vector.
      *  \return mStart
      */
-    const_iterator cbegin() const;
+    const_iterator cbegin(void) const;
 
     /*! This method returns a reverse_iterator pointing to the beginning of
      *  this vector's reversed sequence.
      *  \return A reverse_iterator pointing to the beginning of this
      *          vector's reversed sequence.
      */
-    reverse_iterator rbegin();
+    reverse_iterator rbegin(void);
 
     /*! This method returns a const_reverse_iterator pointing to the beginning of
      *  this vector's reversed sequence.
      *  \return A const_reverse_iterator pointing to the beginning of this
      *          vector's reversed sequence.
      */
-    const_reverse_iterator rbegin() const;
+    const_reverse_iterator rbegin(void) const;
 
     /*! This method returns a const_reverse_iterator pointing to the beginning of
      *  this vector's reversed sequence.
      *  \return A const_reverse_iterator pointing to the beginning of this
      *          vector's reversed sequence.
      */
-    const_reverse_iterator crbegin() const;
+    const_reverse_iterator crbegin(void) const;
 
     /*! This method returns an iterator pointing to one element past the
      *  last of this vector.
      *  \return begin() + size().
      */
-    iterator end();
+    iterator end(void);
 
     /*! This method returns a const_iterator pointing to one element past the
      *  last of this vector.
      *  \return begin() + size().
      */
-    const_iterator end() const;
+    const_iterator end(void) const;
 
     /*! This method returns a const_iterator pointing to one element past the
      *  last of this vector.
      *  \return begin() + size().
      */
-    const_iterator cend() const;
+    const_iterator cend(void) const;
 
     /*! This method returns a reverse_iterator pointing to one element past the
      *  last of this vector's reversed sequence.
      *  \return rbegin() + size().
      */
-    reverse_iterator rend();
+    reverse_iterator rend(void);
 
     /*! This method returns a const_reverse_iterator pointing to one element past the
      *  last of this vector's reversed sequence.
      *  \return rbegin() + size().
      */
-    const_reverse_iterator rend() const;
+    const_reverse_iterator rend(void) const;
 
     /*! This method returns a const_reverse_iterator pointing to one element past the
      *  last of this vector's reversed sequence.
      *  \return rbegin() + size().
      */
-    const_reverse_iterator crend() const;
+    const_reverse_iterator crend(void) const;
 
     /*! This method returns a const_reference referring to the first element of this
      *  vector.
      *  \return The first element of this vector.
      */
-    const_reference front() const;
+    const_reference front(void) const;
 
     /*! This method returns a reference pointing to the first element of this
      *  vector.
      *  \return The first element of this vector.
      */
-    reference front();
+    reference front(void);
 
     /*! This method returns a const reference pointing to the last element of
      *  this vector.
      *  \return The last element of this vector.
      */
-    const_reference back() const;
+    const_reference back(void) const;
 
     /*! This method returns a reference referring to the last element of
      *  this vector_dev.
      *  \return The last element of this vector.
      */
-    reference back();
+    reference back(void);
 
     /*! This method returns a pointer to this vector's first element.
      *  \return A pointer to the first element of this vector.
      */
-    pointer data();
+    pointer data(void);
 
     /*! This method returns a const_pointer to this vector's first element.
      *  \return a const_pointer to the first element of this vector.
      */
-    const_pointer data() const;
+    const_pointer data(void) const;
 
     /*! This method resizes this vector to 0.
      */
-    void clear();
+    void clear(void);
 
     /*! This method returns true iff size() == 0.
      *  \return true if size() == 0; false, otherwise.
      */
-    bool empty() const;
+    bool empty(void) const;
 
     /*! This method appends the given element to the end of this vector.
      *  \param x The element to append.
@@ -461,7 +441,7 @@ public:
     /*! This method erases the last element of this vector, invalidating
      *  all iterators and references to it.
      */
-    void pop_back();
+    void pop_back(void);
 
     /*! This method swaps the contents of this host_vector with another vector.
      *  \param v The vector with which to swap.
@@ -528,20 +508,21 @@ public:
     void assign(InputIterator first, InputIterator last);
 
     /*! This method returns a copy of this vector's allocator.
-     *  \return A copy of the allocator used by this vector.
+     *  \return A copy of the alloctor used by this vector.
      */
-    allocator_type get_allocator() const;
+    allocator_type get_allocator(void) const;
 #endif // end doxygen-only members
-
-  /*! Exchanges the values of two vectors.
-   *  \p x The first \p host_vector of interest.
-   *  \p y The second \p host_vector of interest.
-   */
-  friend void swap(host_vector& a, host_vector& b) noexcept(noexcept(a.swap(b)))
-  {
-    a.swap(b);
-  }
 };
+
+/*! Exchanges the values of two vectors.
+ *  \p x The first \p host_vector of interest.
+ *  \p y The second \p host_vector of interest.
+ */
+template<typename T, typename Alloc>
+  void swap(host_vector<T,Alloc> &a, host_vector<T,Alloc> &b)
+{
+  a.swap(b);
+}
 
 /*! \}
  */

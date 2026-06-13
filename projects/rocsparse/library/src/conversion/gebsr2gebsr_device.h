@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -44,10 +44,6 @@ namespace rocsparse
                                      rocsparse_int row_block_dim_C,
                                      rocsparse_int col_block_dim_C)
     {
-        static_assert(WF_SEGMENT_SIZE > 0 && (WF_SEGMENT_SIZE & (WF_SEGMENT_SIZE - 1)) == 0,
-                      "WF_SEGMENT_SIZE must be a power of two.");
-        static_assert(BLOCK_SIZE % WF_SEGMENT_SIZE == 0,
-                      "BLOCK_SIZE must be a multiple of WF_SEGMENT_SIZE.");
         constexpr rocsparse_int SEGMENTS_PER_BLOCK = (BLOCK_SIZE / WF_SEGMENT_SIZE);
 
         rocsparse_int block_id = hipBlockIdx_x;
@@ -104,8 +100,7 @@ namespace rocsparse
             rocsparse::wfreduce_min<WF_SEGMENT_SIZE>(&min_block_col_index);
 
             // broadcast min_block_col_index from last thread in segment to all threads in segment
-            min_block_col_index
-                = rocsparse::shfl(min_block_col_index, WF_SEGMENT_SIZE - 1, WF_SEGMENT_SIZE);
+            min_block_col_index = __shfl(min_block_col_index, WF_SEGMENT_SIZE - 1, WF_SEGMENT_SIZE);
 
             // update block_col for all threads in segment
             block_col = min_block_col_index + 1;
@@ -146,10 +141,6 @@ namespace rocsparse
                                  rocsparse_int row_block_dim_C,
                                  rocsparse_int col_block_dim_C)
     {
-        static_assert(WF_SEGMENT_SIZE > 0 && (WF_SEGMENT_SIZE & (WF_SEGMENT_SIZE - 1)) == 0,
-                      "WF_SEGMENT_SIZE must be a power of two.");
-        static_assert(BLOCK_SIZE % WF_SEGMENT_SIZE == 0,
-                      "BLOCK_SIZE must be a multiple of WF_SEGMENT_SIZE.");
         constexpr rocsparse_int SEGMENTS_PER_BLOCK = (BLOCK_SIZE / WF_SEGMENT_SIZE);
 
         rocsparse_int block_id = hipBlockIdx_x;
@@ -220,10 +211,10 @@ namespace rocsparse
             }
 
             // broadcast CSR minimum column index from last thread in segment to all threads in segment
-            min_block_col = rocsparse::shfl(min_block_col, WF_SEGMENT_SIZE - 1, WF_SEGMENT_SIZE);
+            min_block_col = __shfl(min_block_col, WF_SEGMENT_SIZE - 1, WF_SEGMENT_SIZE);
 
             // broadcast nnzb_per_row from last thread in segment to all threads in segment
-            nnzb_per_row = rocsparse::shfl(nnzb_per_row, WF_SEGMENT_SIZE - 1, WF_SEGMENT_SIZE);
+            nnzb_per_row = __shfl(nnzb_per_row, WF_SEGMENT_SIZE - 1, WF_SEGMENT_SIZE);
 
             rocsparse_int k
                 = row_block_dim_C * col_block_dim_C * (bsr_row_start + nnzb_per_row - 1);

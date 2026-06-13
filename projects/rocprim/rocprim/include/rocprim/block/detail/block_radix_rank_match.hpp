@@ -26,6 +26,8 @@
 #include "../../functional.hpp"
 #include "../../types.hpp"
 
+#include "../../thread/radix_key_codec.hpp"
+
 #include "../block_scan.hpp"
 #include "../config.hpp"
 #include "rocprim/intrinsics/arch.hpp"
@@ -35,12 +37,11 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<unsigned int            BlockSizeX,
-         unsigned int            RadixBits,
-         unsigned int            BlockSizeY     = 1,
-         unsigned int            BlockSizeZ     = 1,
-         block_padding_hint      PaddingHint    = block_padding_hint::avoid_conflicts,
-         arch::wavefront::target TargetWaveSize = arch::wavefront::get_target()>
+template<unsigned int       BlockSizeX,
+         unsigned int       RadixBits,
+         unsigned int       BlockSizeY  = 1,
+         unsigned int       BlockSizeZ  = 1,
+         block_padding_hint PaddingHint = block_padding_hint::avoid_conflicts>
 class block_radix_rank_match
 {
     using digit_counter_type = unsigned int;
@@ -49,8 +50,7 @@ class block_radix_rank_match
                                                   BlockSizeX,
                                                   ::rocprim::block_scan_algorithm::using_warp_scan,
                                                   BlockSizeY,
-                                                  BlockSizeZ,
-                                                  TargetWaveSize>;
+                                                  BlockSizeZ>;
 
     static constexpr unsigned int block_size   = BlockSizeX * BlockSizeY * BlockSizeZ;
     static constexpr unsigned int radix_digits = 1 << RadixBits;
@@ -58,8 +58,8 @@ class block_radix_rank_match
     struct unpadded_config
     {
         // min size is used because we allocate based on the number of warps
-        static constexpr unsigned int warps = ::rocprim::detail::ceiling_div(
-            block_size, arch::wavefront::size_from_target<TargetWaveSize>());
+        static constexpr unsigned int warps
+            = ::rocprim::detail::ceiling_div(block_size, arch::wavefront::min_size());
     };
 
     struct padded_config
@@ -204,8 +204,7 @@ private:
                                        const unsigned int begin_bit,
                                        const unsigned int pass_bits)
     {
-        using key_codec
-            = decltype(::rocprim::traits::get<Key>().template radix_key_codec<Descending>());
+        using key_codec    = ::rocprim::radix_key_codec<Key, Descending>;
         using bit_key_type = typename key_codec::bit_key_type;
 
         bit_key_type bit_keys[ItemsPerThread];

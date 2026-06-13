@@ -42,7 +42,7 @@ void alloc_ptr_use(void* ptr, size_t size);
 //!
 //! @brief Release counted external memory
 //!
-void free_ptr_use(void* ptr, bool call_free = false);
+void free_ptr_use(void* ptr);
 
 //!
 //! @brief Counted memory limit not exceeded

@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,14 +20,9 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from rocisa.code import Module, Label, RegSet
-from rocisa.container import DSModifiers, ContinuousRegister
-from rocisa.instruction import DSLoadB128, DSLoadB32, DSLoadB64, DSStoreB128, \
-    DSStoreB32, DSStoreB64, SAndB32, SCBranchSCC0, SCmpEQU32, SMovB32, SNop, SWaitCnt, \
-    VAddF32, VAddI32, VAddU32, VAndB32, VLShiftLeftAddU32, VMovB32, VMulLOU32, VAddF64
-from rocisa.functions import vectorStaticDivide
-from copy import deepcopy
-from ..Common import log2, ceilDivide
+from ..TensileInstructions import Module, Label, RegisterPoolResource, SCmpEQU32, \
+    SMovB32, log2, ceilDivide, SCBranchSCC0, Instruction, \
+    SAndB32, RegSet, vectorStaticDivide
 from ..Component import Component
 from ..KernelWriterModules import *
 from ..AsmStoreState import StoreState, VectorDataTypes
@@ -54,15 +49,14 @@ class LSUOn(LSU):
         self.LSUelemCoord0 = []
         self.LSUelemCoord1 = []
         self.LSUelements   = []
-        self.LSUfullVws    = []
-        # NOTE: notLocalFullTileElements returns vector widths in descending order, for example: [8, 4, 2, 1]
-        # first-longest vector width and corresponding element are used through LSU component
-        (vwsdummy, elesdummy, self.LSUfullVws, self.LSUelements) = writer.notLocalFullTileElements(kernel)
+        self.LSUfullVw     = []
+        (vwdummy, eledummy, self.LSUfullVw, self.LSUelements) = writer.notLocalFullTileElements(kernel, False)
+        storevw = self.LSUfullVw
         atomic = False # atomic is for GSU > 1
         beta = True
         vectorDataTypes = VectorDataTypes()
-        ss = StoreState(writer, kernel, self.LSUfullVws[0], False, beta, atomic, self.LSUelements[0], vectorDataTypes, dim=0)
-        self.LSUelemCoord0, self.LSUelemCoord1 = ss.getStoreElementsInfoForBatch(kernel, self.LSUelements[0])
+        ss = StoreState(writer, kernel, storevw, False, beta, atomic, self.LSUelements, vectorDataTypes, dim=0)
+        self.LSUelemCoord0, self.LSUelemCoord1 = ss.getStoreElementsInfoForBatch(kernel, self.LSUelements)
 
         # search for valid lsu wave offset
         maxtt1 = 0
@@ -78,10 +72,10 @@ class LSUOn(LSU):
         self.LSUelemCoord1PerLSUWave = []
 
         # Check valid LSU/VW combination
-        if len(self.LSUelements[0]) >= kernel["LocalSplitU"]:
+        if len(self.LSUelements) >= kernel["LocalSplitU"]:
             if kernel["LocalSplitU"] == 4:
                 idxGrp = 1
-                for idxGrp in range(1, len(self.LSUelements[0])//4 + 1):
+                for idxGrp in range(1, len(self.LSUelements)//4 + 1):
                     for i in range(idxGrp):
                         i0 = i
                         i1 = i + 1 * idxGrp
@@ -102,13 +96,13 @@ class LSUOn(LSU):
                             break
                     if validOffset != -1:
                         break
-                for idx in range(0, len(self.LSUelements[0]), 4*idxGrp):
+                for idx in range(0, len(self.LSUelements), 4*idxGrp):
                     for idx2 in range(idxGrp):
-                        self.LSUelementsArchIdx[0].append(self.LSUfullVws[0]*(idx + idx2))
-                        self.LSUelementsArchIdx[1].append(self.LSUfullVws[0]*(idx + 1*idxGrp + idx2))
-                        self.LSUelementsArchIdx[2].append(self.LSUfullVws[0]*(idx + 2*idxGrp + idx2))
-                        self.LSUelementsArchIdx[3].append(self.LSUfullVws[0]*(idx + 3*idxGrp + idx2))
-                        self.LSUelementsPerLSUWave.append(self.LSUelements[0][idx + idx2])
+                        self.LSUelementsArchIdx[0].append(self.LSUfullVw*(idx + idx2))
+                        self.LSUelementsArchIdx[1].append(self.LSUfullVw*(idx + 1*idxGrp + idx2))
+                        self.LSUelementsArchIdx[2].append(self.LSUfullVw*(idx + 2*idxGrp + idx2))
+                        self.LSUelementsArchIdx[3].append(self.LSUfullVw*(idx + 3*idxGrp + idx2))
+                        self.LSUelementsPerLSUWave.append(self.LSUelements[idx + idx2])
                         self.LSUelemCoord0PerLSUWave.append(self.LSUelemCoord0[idx + idx2])
                         self.LSUelemCoord1PerLSUWave.append(self.LSUelemCoord1[idx + idx2])
             elif kernel["LocalSplitU"] == 2:
@@ -118,10 +112,10 @@ class LSUOn(LSU):
                 validOffset  = offset1 - offset0
                 validOffset0 = self.LSUelemCoord0[i + 1] - self.LSUelemCoord0[i]
                 validOffset1 = self.LSUelemCoord1[i + 1] - self.LSUelemCoord1[i]
-                for idx in range(0, len(self.LSUelements[0]), 2):
-                    self.LSUelementsArchIdx[0].append(self.LSUfullVws[0]*idx)
-                    self.LSUelementsArchIdx[1].append(self.LSUfullVws[0]*(idx+1))
-                    self.LSUelementsPerLSUWave.append(self.LSUelements[0][idx])
+                for idx in range(0, len(self.LSUelements), 2):
+                    self.LSUelementsArchIdx[0].append(self.LSUfullVw*idx)
+                    self.LSUelementsArchIdx[1].append(self.LSUfullVw*(idx+1))
+                    self.LSUelementsPerLSUWave.append(self.LSUelements[idx])
                     self.LSUelemCoord0PerLSUWave.append(self.LSUelemCoord0[idx])
                     self.LSUelemCoord1PerLSUWave.append(self.LSUelemCoord1[idx])
             else:
@@ -143,8 +137,6 @@ class LSUOn(LSU):
         module.add(Label("localSplitULocalWriteAndRead", ""))
 
         acc2arch, arch2acc = accToArchMapper(kernel)
-        accImOffset = accVgprImagNumOffset(kernel)
-        complexMultiplier = 2 if kernel["ProblemType"]["DataType"].isComplex() else 1
 
         # prepare the data that is to be Reduction in this wave
         # the output LSUelementsArchIdx has all arch-indices.
@@ -152,7 +144,7 @@ class LSUOn(LSU):
 
         numAccIdx    = len(self.LSUelementsArchIdx[0])
         numSetAccIdx = ceilDivide(numAccIdx, kernel["LocalSplitUReuseLDS"])
-        maxLDSConstOffset = writer.states.regCaps["maxLDSConstOffset"]
+
         # computeStoreVgprs
         if kernel["EnableMatrixInstruction"]:
             module.add(writer.computeStoreVgprs(kernel))
@@ -165,14 +157,13 @@ class LSUOn(LSU):
 
         # Checkout local read resource
         bpr            = 4 #bytes per register
-        regsPerElem = kernel["ProblemType"]["ComputeDataType"].numRegisters()
-        bytesPerElem   = int(kernel["ProblemType"]["ComputeDataType"].numBytes())
-        bytesPerVector = self.LSUfullVws[0] * bytesPerElem
+        bytesPerElem   = kernel["ProblemType"]["ComputeDataType"].numBytes()
+        bytesPerVector = self.LSUfullVw * bytesPerElem
         numWaves       = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1]
         regsPerStep = int((bytesPerVector+3)//4)
         elementStep = bytesPerVector // bytesPerElem
-        numTotalAccVgprLdsReduction = len(self.LSUelements[0])*regsPerStep*(self.LSUfullVws[0]//elementStep)
-        assert (numTotalAccVgprLdsReduction%kernel["LocalSplitU"]) == 0, "AccVgprLdsRedcution % LSU != 0"
+        numTotalAccVgprLdsReduction = len(self.LSUelements)*regsPerStep*(self.LSUfullVw//elementStep)
+        assert (numTotalAccVgprLdsReduction%kernel["LocalSplitU"]) == 0
         numTotalAccVgprLdsReduction = numTotalAccVgprLdsReduction // kernel["LocalSplitU"]
         self.accVgprLdsReduction    = writer.vgprPool.checkOutAligned(numTotalAccVgprLdsReduction, 4, "LsuReduction")
         module.add(RegSet("v", "vgprLsuReduction", self.accVgprLdsReduction))
@@ -184,8 +175,8 @@ class LSUOn(LSU):
 
         lsu_id = writer.vgprPool.checkOut(1,"lsu_id")
         wave_id = writer.vgprPool.checkOut(1,"wave_id")
-        tmpVgpr = writer.vgprPool.checkOutAligned(2, 2, tag="LSUOn_writeReadReduction_tmpVgpr")
-        tmpVgprRes = ContinuousRegister(tmpVgpr, 2)
+        tmpVgpr = writer.vgprPool.checkOutAligned(2, 2, "tmpVgpr")
+        tmpVgprRes = RegisterPoolResource(tmpVgpr, 2)
 
         module.add(vectorStaticDivide(wave_id, "Serial", \
             kernel["WavefrontSize"], tmpVgprRes))
@@ -193,11 +184,6 @@ class LSUOn(LSU):
             comment="Get LSU wave ID"))
         module.add(VAndB32(vgpr(wave_id), hex(numWaves - 1), vgpr(wave_id), \
             comment="Get wave ID"))
-
-        # accVgprs read in GSUAMBSK
-        codeAccVgprRead = []
-        if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
-            codeAccVgprRead = deepcopy(writer.codes.accVgprRead) if writer.states.serializedStore else None
 
         for reUseIdx in range(kernel["LocalSplitUReuseLDS"]):
             module.addComment1("LocalSplitU: local write %d/%d"%(reUseIdx+1,kernel["LocalSplitUReuseLDS"]))
@@ -209,30 +195,36 @@ class LSUOn(LSU):
             #scan the needed accVGPRIdx
             neededAccVGPRIdx = [[] for i in range(kernel["LocalSplitU"])]
             numAccVgpr = 0
-            miRegPerOut = kernel["MIRegPerOut"]
             for lsu in range(kernel["LocalSplitU"]):
                 for i in range(startLSUaccIdxSet, endLSUaccIdxSet):
-                    for j in range(self.LSUfullVws[0]):
-                        for cm in range(complexMultiplier):
-                            for r in range(miRegPerOut):
-                                accIdx = arch2acc[self.LSUelementsArchIdx[lsu][i] + j] * miRegPerOut + r + (cm*accImOffset)
-                                neededAccVGPRIdx[lsu].append(accIdx)
-                                numAccVgpr += 1
+                    for j in range(self.LSUfullVw):
+                        accIdx = arch2acc[self.LSUelementsArchIdx[lsu][i] + j]
+                        neededAccVGPRIdx[lsu].append(accIdx)
+                        numAccVgpr += 1
 
             # lsuProcessOffset is used when local read
             numVgprPerLSU    = len(neededAccVGPRIdx[0])
             lsuProcessOffset = numVgprPerLSU * kernel["WavefrontSize"] * 4
 
-            # break here instead of assert to release resource and do a post-rejection
-            # caused by range(startLSUaccIdxSet, endLSUaccIdxSet) = range(1,1)
-            if numAccVgpr <= 0:
-                writer.states.invalidLSUCode = True
-                break
-
             assert numAccVgpr > 0,"startLSUaccIdxSet=%u,endLSUaccIdxSet=%u,numAccIdx=%u"%(startLSUaccIdxSet,endLSUaccIdxSet,numAccIdx)
+            accVgprRes = writer.vgprPool.checkOutAligned(numAccVgpr, 4, "accLSUVgprRes")
+            
+            destIdx = 0
+            for lsu in range(kernel["LocalSplitU"]):
+                for i in range(numVgprPerLSU):
+                    srcIdx   = neededAccVGPRIdx[lsu][i]
+                    readInst = writer.accVgprReadWriteFunction(kernel, srcIdx, True)
+                    srcVgpr  = writer.accVgprReadWriteIndex(kernel, srcIdx)
+                    module.add(readInst(dst=vgpr(accVgprRes+destIdx),
+                                        src=srcVgpr,
+                                        comment="copy acc[%u] to vreg[%u], LSU%u will process" % (srcIdx,destIdx,lsu)))
+                    destIdx += 1
 
             dataPerWave = numAccVgpr * kernel["WavefrontSize"] * 4
             ldsStride   = dataPerWave * numWaves
+
+            addr = writer.vgprPool.checkOut(1,"addr")
+
             # Prepare Write/Read instruction info
             if bytesPerVector % 16 == 0:
                 DSStoreBX    = DSStoreB128
@@ -250,13 +242,7 @@ class LSUOn(LSU):
                 numInstPerVW = bytesPerVector // 4
                 regsPerStore = 1
 
-            accVgprRes = writer.vgprPool.checkOutAligned(regsPerStore, 4, "accLSUVgprRes")
-
-            regsPerVector = self.LSUfullVws[0] * regsPerElem
-            maxOffset = (kernel["LocalSplitU"] -1) * ldsStride + ((numVgprPerLSU // regsPerVector -1) * numInstPerVW + (numInstPerVW -1)) * regsPerStore * (bpr * kernel["WavefrontSize"])
-            numAddr = maxOffset // maxLDSConstOffset + 1
-            addr = writer.vgprPool.checkOut(numAddr,"addr")
-            with writer.allocTmpSgpr(1, tag="LSUOn_writeReadReduction_tmpSgprInfo") as tmpSgprInfo:
+            with writer.allocTmpSgpr(1) as tmpSgprInfo:
                 tmpSgpr = tmpSgprInfo.idx
                 module.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(dataPerWave), \
                     comment="dataPerWave (%d)"%dataPerWave))
@@ -273,26 +259,18 @@ class LSUOn(LSU):
                 module.add(VAddU32(vgpr(addr), vgpr(tmpVgpr), vgpr(addr), \
                     comment="addr += tmp"))
 
-            if reUseIdx > 0:
-                module.add(SWaitCnt(dscnt=0, comment="wait for all reads"))
-                module.add(writer._syncThreads(kernel, "pre-lsu local write"))
+            module.add(SWaitCnt(lgkmcnt=0, vscnt=0, comment="wait for all writes"))
+            module.add(writer._syncThreads(kernel, "pre-lsu local write"))
 
-            # # Do Local Write
-            for lsu in range(kernel["LocalSplitU"]):
-                for i in range(numVgprPerLSU // regsPerStore):
-                    for r in range(regsPerStore):
-                        srcIdx   = neededAccVGPRIdx[lsu][i*regsPerStore + r]
-                        readInst = writer.accVgprReadWriteFunction(kernel, srcIdx, True)
-                        srcVgpr  = writer.accVgprReadWriteIndex(kernel, srcIdx)
-                        module.add(readInst(dst=vgpr(accVgprRes+r),
-                                            src=srcVgpr,
-                                            comment="copy acc[%u] to vreg[%u], LSU%u will process" % (srcIdx, accVgprRes+r, lsu)))
-                    
-                    module.add(SNop(waitState=1, comment="2 wait states required before reading vgpr"))
-                    dstIdx = lsu * (numVgprPerLSU // regsPerStore) + i
-                    module.add(DSStoreBX(dstAddr=vgpr(addr), src=vgpr(accVgprRes, regsPerStore), \
-                            ds=DSModifiers(offset=(dstIdx * regsPerStore * (bpr * kernel["WavefrontSize"]))), \
-                            comment="arch[%d]"%dstIdx))
+            module.add(Label("localSplitULocalWrite_%d"%(reUseIdx+1), ""))
+
+            # Do Local Write
+            for i in range(0, numAccVgpr // self.LSUfullVw):
+                for v in range(numInstPerVW):
+                    regIdx = (i * numInstPerVW + v) * regsPerStore
+                    module.add(DSStoreBX(dstAddr=vgpr(addr), src=vgpr(accVgprRes+regIdx, regsPerStore), \
+                            ds=DSModifiers(offset=(regIdx * (bpr * kernel["WavefrontSize"]))), \
+                            comment="arch[%d]"%(i * numInstPerVW + v)))
 
             # Release local write resource
             writer.vgprPool.checkIn(accVgprRes)
@@ -300,7 +278,7 @@ class LSUOn(LSU):
             module.addComment1("LocalSplitU: local read %d/%d"%(reUseIdx+1,kernel["LocalSplitUReuseLDS"]))
 
             # Calculate offset for wave id and lsu id
-            with writer.allocTmpSgpr(1, tag="LSUOn_writeReadReduction_tmpSgprInfo2") as tmpSgprInfo:
+            with writer.allocTmpSgpr(1) as tmpSgprInfo:
                 tmpSgpr = tmpSgprInfo.idx
                 module.add(VAndB32(vgpr(addr), hex(kernel["WavefrontSize"]-1), vgpr("Serial"), \
                     comment="initial addr"))
@@ -316,11 +294,8 @@ class LSUOn(LSU):
                     comment="lsu offset = lsu_id * LSU Process Offset"))
                 module.add(VAddU32(dst=vgpr(addr), src0=vgpr(addr), src1=vgpr(tmpVgpr), \
                     comment="addr += lsu offset"))
-                for i in range(1,numAddr):
-                    module.add(VAddU32(vgpr(addr+i), maxLDSConstOffset*i, vgpr(addr), \
-                    comment="addr += maxLDSConstOffset*%u"%(i)))
 
-            module.add(SWaitCnt(dscnt=0, comment="wait for all writes"))
+            module.add(SWaitCnt(lgkmcnt=0, vscnt=0, comment="wait for all writes"))
             module.add(writer._syncThreads(kernel, "post-lsu local write"))
             module.add(Label("localSplitULocalRead_%d"%(reUseIdx+1), ""))
 
@@ -328,67 +303,38 @@ class LSUOn(LSU):
             inLoopTmpVgpr   = writer.vgprPool.checkOutAligned(numVgprPerLSU*(kernel["LocalSplitU"]-1), 4, "TempLsuReduction")
 
             # Do Local Read
-            for i in range(0, numVgprPerLSU // regsPerVector):
+            for i in range(0, numVgprPerLSU // self.LSUfullVw):
                 for v in range(numInstPerVW):
                     for r in range(0, kernel["LocalSplitU"]):
                         regIdx = (i * numInstPerVW + v) * regsPerStore
                         offset = r * ldsStride + regIdx * (bpr * kernel["WavefrontSize"])
-                        num = offset // maxLDSConstOffset
-                        offset -= num * maxLDSConstOffset
-                        srcvgpr = vgpr(addr+num)
                         if r == 0:
                             vgprStr = "LsuReduction+%u"%(localReadVgprIdx)
                         else:
                             vgprStr = inLoopTmpVgpr + (numVgprPerLSU * (r - 1) + regIdx)
-                        module.add(DSLoadBX(dst=vgpr(vgprStr, regsPerStore), src=srcvgpr, \
+                        module.add(DSLoadBX(dst=vgpr(vgprStr, regsPerStore), src=vgpr(addr), \
                                     ds=DSModifiers(offset=(offset)), \
                                     comment="r=%u i=%u, from acc[%d]"%(r, (i * numInstPerVW + v), neededAccVGPRIdx[0][(i * numInstPerVW + v)])))
                         # Generate Reduction code at the same time.
                         if r == 0:
                             # Insert waitcnt code here
-                            numTotalInst  = numVgprPerLSU // regsPerVector * numInstPerVW * kernel["LocalSplitU"]
+                            numTotalInst  = numVgprPerLSU // self.LSUfullVw * numInstPerVW * kernel["LocalSplitU"]
                             numPassedInst = (i * numInstPerVW + (v + 1)) * kernel["LocalSplitU"]
                             numLRWaitCnt = numTotalInst - numPassedInst
-                            moduleReduction.add(SWaitCnt(dscnt=numLRWaitCnt, comment="wait count is (%u-%u)"%(numTotalInst, numPassedInst)))
+                            moduleReduction.add(SWaitCnt(lgkmcnt=numLRWaitCnt, comment="wait count is (%u-%u)"%(numTotalInst, numPassedInst)))
+                            if writer.states.archCaps["SeparateVscnt"]:
+                                moduleReduction.add(SWaitCnt(vscnt=numLRWaitCnt))
                         if r > 0:
-                            for regToAdd in range(0, regsPerStore, regsPerElem):
+                            for regToAdd in range(regsPerStore):
                                 if kernel["ProblemType"]["ComputeDataType"].isSingle():
                                     moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), src0=vgpr(vgprStr+regToAdd), \
                                                 src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), comment=""))
                                 elif kernel["ProblemType"]["ComputeDataType"].isInt32():
                                     moduleReduction.add(VAddI32(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), src0=vgpr(vgprStr+regToAdd), \
                                                 src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)), comment=""))
-                                elif kernel["ProblemType"]["ComputeDataType"].isSingleComplex():
-                                    moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+0)), src0=vgpr(vgprStr+regToAdd+0), \
-                                                src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+0)), comment=""))
-                                    moduleReduction.add(VAddF32(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+1)), src0=vgpr(vgprStr+regToAdd+1), \
-                                                src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+1)), comment=""))
-                                elif kernel["ProblemType"]["ComputeDataType"].isDoubleComplex():
-                                    moduleReduction.add(VAddF64(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+0), 2), src0=vgpr(vgprStr+regToAdd+0, 2), \
-                                                src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+0), 2), comment=""))
-                                    moduleReduction.add(VAddF64(dst=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+2), 2), src0=vgpr(vgprStr+regToAdd+2, 2), \
-                                                src1=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd+2), 2), comment=""))
                                 else:
                                 # TODO: hpa_half, int8
                                     assert(0) # unsupported data type, need to modify here and LSU write/read code
-                    
-                    if kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
-                        if not kernel["MIArchVgpr"]:
-                            # write to accvgpr
-                            for regToAdd in range(regsPerStore):
-                                codeAccVgprReadInst = codeAccVgprRead.popFirstItem() # v_accvgpr_read_b32
-                                accIdx = codeAccVgprReadInst.srcs[0].regIdx
-                                writeInst = writer.accVgprReadWriteFunction(kernel, accIdx, False)
-                                dstVgpr  = writer.accVgprReadWriteIndex(kernel, accIdx)
-                                moduleReduction.add(writeInst(dst=dstVgpr, src=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)),
-                                                    comment="copy vreg[%u] to acc[%u]" % (localReadVgprIdx+regToAdd, accIdx)))
-                        else:
-                            # write to vgpr
-                            for regToAdd in range(regsPerStore):
-                                codeAccVgprReadInst = codeAccVgprRead.popFirstItem() # v_mov_b32
-                                dstVgpr = codeAccVgprReadInst.srcs[0]
-                                moduleReduction.add(VMovB32(dst=dstVgpr, src=vgpr("LsuReduction+%u"%(localReadVgprIdx+regToAdd)),
-                                                            comment="copy lsu results to vreg"))
                     localReadVgprIdx += regsPerStore
 
             # Release write/read resource
@@ -421,12 +367,12 @@ class LSUOn(LSU):
         strideD1 = "StrideD%s" % (writer.states.indexChars[packedC1[0]])
         wave_id = writer.vgprPool.checkOut(1, "tmpWaveID")
         tmpVgpr1 = writer.vgprPool.checkOutAligned(2,2,"tmpVgpr1")
-        tmpVgpr1Res = ContinuousRegister(tmpVgpr1, 2)
+        tmpVgpr1Res = RegisterPoolResource(tmpVgpr1, 2)
         module.add(vectorStaticDivide(wave_id, "Serial", kernel["WavefrontSize"], tmpVgpr1Res))
         numWaves = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1]
         module.add(vectorStaticDivide(wave_id, wave_id, numWaves, tmpVgpr1Res))
 
-        with writer.allocTmpSgpr(1, tag="LSUOn_globalWriteIndices_tmpSgprInfo") as tmpSgprInfo:
+        with writer.allocTmpSgpr(1) as tmpSgprInfo:
             tmpSgpr = tmpSgprInfo.idx
             if self.LSUValidOffset0 > 0:
                 module.add(SMovB32(dst=sgpr(tmpSgpr), \
@@ -449,7 +395,7 @@ class LSUOn(LSU):
                 strideD1 = "StrideD%s" % (writer.states.indexChars[packedC1[0]])
                 module.add(VMulLOU32(dst=vgpr(writer.vgprs.cinRowPtr), src0=vgpr(writer.vgprs.coord1InMT), src1=sgpr(strideC1), comment=" offset 1"))
                 module.add(VMulLOU32(dst=vgpr(writer.vgprs.coutRowPtrD), src0=vgpr(writer.vgprs.coord1InMT), src1=sgpr(strideD1), comment=" offset 1"))
-                if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1):
+                if kernel["ProblemType"]["UseE"] and (kernel["GlobalSplitU"] == 1):
                         module.add(VMovB32(dst=vgpr(writer.vgprs.coutRowPtrE), src=vgpr(writer.vgprs.coord1InMT), comment=" save offset 1 for E"))
                 if writer.vgprs.coutRowPtrBias != -1:
                         index = packedC1[0] - 1
@@ -474,7 +420,7 @@ class LSUOn(LSU):
             writer.vgprs.addrScaleBVec     = -1
             writer.vgprs.addrScaleAlphaVec = -1
         else:
-            writer.vgprs.addrD = writer.vgprPool.checkOut(2, tag="LSUOn_globalWriteIndices_addrD")
+            writer.vgprs.addrD = writer.vgprPool.checkOut(2)
             module.add(VMovB32(
                     dst=vgpr(writer.vgprs.addrD+0), \
                     src=sgpr("AddressD+0"), \
@@ -483,7 +429,7 @@ class LSUOn(LSU):
                     dst=vgpr(writer.vgprs.addrD+1), \
                     src=sgpr("AddressD+1"), \
                     comment="sgpr -> vgpr"))
-            writer.vgprs.addrC = writer.vgprPool.checkOut(2, tag="LSUOn_globalWriteIndices_addrC")
+            writer.vgprs.addrC = writer.vgprPool.checkOut(2)
             module.add(VMovB32(
                     dst=vgpr(writer.vgprs.addrC+0), \
                     src=sgpr("AddressC+0"), \
@@ -493,10 +439,10 @@ class LSUOn(LSU):
                     src=sgpr("AddressC+1"), \
                     comment="sgpr -> vgpr"))
 
-            if kernel["GlobalSplitU"] != 0:
+            if kernel["GlobalSplitU"] > 0:
                 gsuLabel = Label(label=writer.labels.getNameInc("GSU"), comment="")
-                with writer.allocTmpSgpr(1, tag="LSUOn_globalWriteIndices_tmpSgprGSU") as tmpSgprGSU:
-                    module.add(SAndB32(dst=sgpr(tmpSgprGSU.idx), src0=sgpr("GSU"), src1=writer.gsuMaskHex(kernel), comment="Restore GSU"))
+                with writer.allocTmpSgpr(1) as tmpSgprGSU:
+                    module.add(SAndB32(dst=sgpr(tmpSgprGSU.idx), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
                     module.add(SCmpEQU32(src0=sgpr(tmpSgprGSU.idx), src1=1, comment="GSU == 1 ?"))
                 module.add(SCBranchSCC0(labelName=gsuLabel.getLabelName(), comment="branch if GSU != 1"))
             if kernel["ProblemType"]["UseE"]:
@@ -548,7 +494,7 @@ class LSUOn(LSU):
                         dst=vgpr(self.vgprs.addrScaleAlphaVec+1), \
                         src=sgpr("AddressScaleAlphaVec+1"), \
                         comment="sgpr -> vgpr"))
-            if kernel["GlobalSplitU"] != 0:
+            if kernel["GlobalSplitU"] > 0:
                 module.add(gsuLabel)
 
         return module
@@ -564,10 +510,8 @@ class LSUOn(LSU):
         elements_1 = [[] for y in range(2)]
         elements_f0    = [[] for y in range(2)]
         elements_f1    = [[] for y in range(2)]
-        # TODO: LocalSplitU has special global write elements, we will not use all StoreVectorWidths
-        (fullVws, elementss_0, fullVws_1, elementss_1)           = writer.notLocalFullTileElements(kernel)
-        (fullVw, elements_0[False], fullVw_1, elements_1[False]) = (fullVws[0], elementss_0[0], fullVws_1[0], elementss_1[0])
-        (edgeVw, elements_0[True], edgeVw_1, elements_1[True] )  = (fullVws[-1], elementss_0[-1], fullVws_1[-1], elementss_1[-1])
+        (fullVw, elements_0[False], fullVw_1, elements_1[False]) = writer.notLocalFullTileElements(kernel, False)
+        (edgeVw, elements_0[True], edgeVw_1, elements_1[True] )    = writer.notLocalFullTileElements(kernel, True)
         edgeScaled_0 = len(elements_0[True]) // len(elements_1[False])
         edgeScaled_1 = len(elements_1[True]) // len(elements_1[False])
         noEgScaled_0 = len(elements_0[False]) // len(elements_1[False])
@@ -592,10 +536,9 @@ class LSUOn(LSU):
         vectorWidths     = [fullVw, edgeVw]
         vectorWidths_1 = [fullVw_1, edgeVw_1]
 
-        noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3 and kernel["StreamK"] != 4)
+        noGSUBranch = (kernel["GlobalSplitU"] == 0)
         module = Module("localSplitUGlobalWrite")
-        storeModule, _ = writer.globalWriteElements(kernel, tPA, tPB, vectorWidths, vectorWidths_1, elements_f0, elements_f1, noGSUBranch=noGSUBranch)
-        module.add(storeModule)
+        module.add(writer.globalWriteElements(kernel, tPA, tPB, vectorWidths, vectorWidths_1, elements_f0, elements_f1, noGSUBranch=noGSUBranch))
         writer.cleanupGlobalWrite(kernel)
         writer.vgprPool.checkIn(self.accVgprLdsReduction)
         return module

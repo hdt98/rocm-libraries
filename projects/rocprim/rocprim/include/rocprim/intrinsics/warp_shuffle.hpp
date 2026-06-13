@@ -21,15 +21,10 @@
 #ifndef ROCPRIM_INTRINSICS_WARP_SHUFFLE_HPP_
 #define ROCPRIM_INTRINSICS_WARP_SHUFFLE_HPP_
 
-#include <climits>
-#include <limits>
 #include <type_traits>
 
 #include "../config.hpp"
 #include "../detail/various.hpp"
-#include "../intrinsics/bit.hpp"
-#include "../intrinsics/warp.hpp"
-#include "../types.hpp"
 #include "thread.hpp"
 
 /// \addtogroup warpmodule
@@ -39,6 +34,7 @@ BEGIN_ROCPRIM_NAMESPACE
 
 namespace detail
 {
+
 template<class T, class ShuffleOp>
 ROCPRIM_DEVICE ROCPRIM_INLINE
 typename std::enable_if<std::is_trivially_copyable<T>::value && (sizeof(T) % sizeof(int) == 0), T>::type
@@ -78,6 +74,7 @@ warp_shuffle_op(const T& input, ShuffleOp&& op)
     }
 
     return output;
+
 }
 
 template<class T, int dpp_ctrl, int row_mask = 0xf, int bank_mask = 0xf, bool bound_ctrl = false>

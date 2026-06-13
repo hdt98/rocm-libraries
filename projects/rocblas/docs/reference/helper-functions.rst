@@ -19,10 +19,6 @@ Auxiliary functions
 .. doxygenfunction:: rocblas_get_pointer_mode
 .. doxygenfunction:: rocblas_set_atomics_mode
 .. doxygenfunction:: rocblas_get_atomics_mode
-.. doxygenfunction:: rocblas_set_batch_alpha_stride
-.. doxygenfunction:: rocblas_get_batch_alpha_stride
-.. doxygenfunction:: rocblas_set_batch_beta_stride
-.. doxygenfunction:: rocblas_get_batch_beta_stride
 .. doxygenfunction:: rocblas_pointer_to_mode
 .. doxygenfunction:: rocblas_initialize
 .. doxygenfunction:: rocblas_status_to_string
@@ -44,8 +40,10 @@ Device memory allocation functions
 .. doxygenfunction:: rocblas_start_device_memory_size_query
 .. doxygenfunction:: rocblas_stop_device_memory_size_query
 .. doxygenfunction:: rocblas_get_device_memory_size
+.. doxygenfunction:: rocblas_set_device_memory_size
 .. doxygenfunction:: rocblas_set_workspace
 .. doxygenfunction:: rocblas_is_managing_device_memory
+.. doxygenfunction:: rocblas_is_user_managing_device_memory
 
 For more detailed information, see the :ref:`Device Memory Allocation Usage` and :ref:`Device Memory allocation in detail` sections.
 
@@ -54,3 +52,4 @@ Build information functions
 
 .. doxygenfunction:: rocblas_get_version_string_size
 .. doxygenfunction:: rocblas_get_version_string
+

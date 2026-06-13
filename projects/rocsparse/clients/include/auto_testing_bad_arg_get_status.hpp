@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -156,48 +156,6 @@ inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spsv_alg& p)
 }
 
 template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_sptrsv_alg& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spic0_alg& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spic0_input& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spic0_output& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spilu0_alg& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spilu0_input& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spilu0_output& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
 inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spitsv_alg& p)
 {
     return rocsparse_status_invalid_value;
@@ -223,12 +181,6 @@ inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_gpsv_interleav
 
 template <>
 inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spsm_alg& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_sptrsm_alg& p)
 {
     return rocsparse_status_invalid_value;
 }
@@ -330,31 +282,7 @@ inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spmv_stage& p)
 }
 
 template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_v2_spmv_stage& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
 inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spsv_stage& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_sptrsv_stage& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spic0_stage& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spilu0_stage& p)
 {
     return rocsparse_status_invalid_value;
 }
@@ -367,12 +295,6 @@ inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spitsv_stage& 
 
 template <>
 inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_spsm_stage& p)
-{
-    return rocsparse_status_invalid_value;
-}
-
-template <>
-inline rocsparse_status auto_testing_bad_arg_get_status(rocsparse_sptrsm_stage& p)
 {
     return rocsparse_status_invalid_value;
 }

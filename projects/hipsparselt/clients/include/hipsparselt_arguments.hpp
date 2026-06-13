@@ -108,8 +108,6 @@ struct Arguments
 
     int8_t norm_check;
     int8_t unit_check;
-    bool norm_check_assert;
-
     int8_t timing;
 
     char transA;
@@ -138,9 +136,6 @@ struct Arguments
     char orderB;
     char orderC;
     char orderD;
-
-    bool inEqualOut;
-    int logging;
     /*************************************************************************
      *                     End Of Arguments                                  *
      *************************************************************************/
@@ -190,7 +185,6 @@ struct Arguments
     OPER(devices) SEP                \
     OPER(norm_check) SEP             \
     OPER(unit_check) SEP             \
-    OPER(norm_check_assert) SEP      \
     OPER(timing) SEP                 \
     OPER(transA) SEP                 \
     OPER(transB) SEP                 \
@@ -210,9 +204,7 @@ struct Arguments
     OPER(orderA) SEP                 \
     OPER(orderB) SEP                 \
     OPER(orderC) SEP                 \
-    OPER(orderD) SEP                 \
-    OPER(inEqualOut) SEP             \
-    OPER(logging) SEP
+    OPER(orderD) SEP
     // clang-format on
 
     // Validate input format.
@@ -301,6 +293,11 @@ enum hipsparselt_argument : int
 };
 #undef CREATE_ENUM
 
+#if __clang__
+#define HIPSPARSELT_CLANG_STATIC static
+#else
+#define HIPSPARSELT_CLANG_STATIC
+#endif
 
 // ArgumentsHelper contains a templated lambda apply<> where there is a template
 // specialization for each line in the CPP macro FOR_EACH_ARGUMENT. For example,
@@ -327,9 +324,9 @@ namespace ArgumentsHelper
     // Macro defining specializations for specific arguments
     // e_alpha and e_beta get turned into negative sentinel value specializations
     // clang-format off
-#define APPLY(NAME)                                                                             \
-    template <>                                                                                 \
-    constexpr auto                                                                              \
+#define APPLY(NAME)                                                                         \
+    template <>                                                                             \
+    HIPSPARSELT_CLANG_STATIC constexpr auto                                                     \
         apply<e_##NAME == e_alpha ? hipsparselt_argument(-1)                                    \
                                   : e_##NAME == e_beta ? hipsparselt_argument(-2) : e_##NAME> = \
             [](auto&& func, const Arguments& arg, auto) { func(#NAME, arg.NAME); }
@@ -339,14 +336,14 @@ namespace ArgumentsHelper
 
     // Specialization for e_alpha
     template <>
-    constexpr auto apply<e_alpha> =
+    HIPSPARSELT_CLANG_STATIC constexpr auto apply<e_alpha> =
         [](auto&& func, const Arguments& arg, auto T) {
             func("alpha", arg.get_alpha<decltype(T)>());
         };
 
     // Specialization for e_beta
     template <>
-    constexpr auto apply<e_beta> =
+    HIPSPARSELT_CLANG_STATIC constexpr auto apply<e_beta> =
         [](auto&& func, const Arguments& arg, auto T) {
             func("beta", arg.get_beta<decltype(T)>());
         };

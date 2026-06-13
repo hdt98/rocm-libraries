@@ -1,15 +1,10 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
-
 #ifndef MIOPEN_GUARD_MLOPEN_OP_KERNEL_ARGS_HPP
 #define MIOPEN_GUARD_MLOPEN_OP_KERNEL_ARGS_HPP
 
-#include <cstdint>
 #include <type_traits>
-#include <vector>
-
+#include <cstdint>
 #include <half/half.hpp>
-#include <miopen/bfloat16.hpp>
+#include <boost/container/small_vector.hpp>
 
 struct OpKernelArg
 {
@@ -19,8 +14,7 @@ struct OpKernelArg
     template <typename T>
     OpKernelArg(T arg) : buffer(sizeof(T))
     {
-        static_assert(std::is_trivial<T>{} || std::is_same<T, half_float::half>{} ||
-                          std::is_same<T, bfloat16>{},
+        static_assert(std::is_trivial<T>{} || std::is_same<T, half_float::half>{},
                       "Only for trivial types");
         *(reinterpret_cast<T*>(buffer.data())) = arg;
     }
@@ -34,7 +28,7 @@ struct OpKernelArg
     }
 
     std::size_t size() const { return buffer.size(); };
-    std::vector<char> buffer{8};
+    boost::container::small_vector<char, 8> buffer;
     bool is_ptr = false;
 };
 

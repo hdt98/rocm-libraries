@@ -54,7 +54,7 @@ bool ConvMlirIgemmBwd::IsApplicable(const ExecutionContext& ctx,
         return false;
     if(!problem.AllTensorsDimsFitIntoInt())
         return false;
-    if(!mlir::IsMlirSupportedHardware(ctx))
+    if(!IsComposableKernelSupportedHardware(ctx))
         return false;
     if(problem.IsTensorsCasted() || problem.IsFp8() || problem.IsBfp8())
         return false;

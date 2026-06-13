@@ -127,11 +127,7 @@ namespace
                                      "--incy",
                                      incy,
                                      "--batch_count",
-                                     batch_count,
-                                     "--alpha_stride",
-                                     handle->get_stride_alpha(),
-                                     "--beta_stride",
-                                     handle->get_stride_beta());
+                                     batch_count);
                 }
                 else
                 {
@@ -153,11 +149,7 @@ namespace
                                      "--incy",
                                      incy,
                                      "--batch_count",
-                                     batch_count,
-                                     "--alpha_stride",
-                                     handle->get_stride_alpha(),
-                                     "--beta_stride",
-                                     handle->get_stride_beta());
+                                     batch_count);
                 }
             }
 
@@ -238,29 +230,28 @@ namespace
         }
 
         // we don't instantiate _template for mixed types so directly calling launcher
-        rocblas_status status
-            = ROCBLAS_API(rocblas_internal_gemv_launcher)(handle,
-                                                          transA,
-                                                          m,
-                                                          n,
-                                                          alpha,
-                                                          handle->get_stride_alpha(),
-                                                          A,
-                                                          0,
-                                                          lda,
-                                                          0,
-                                                          x,
-                                                          0,
-                                                          incx,
-                                                          0,
-                                                          beta,
-                                                          handle->get_stride_beta(),
-                                                          y,
-                                                          0,
-                                                          incy,
-                                                          0,
-                                                          batch_count,
-                                                          (Tex*)w_mem);
+        rocblas_status status = ROCBLAS_API(rocblas_internal_gemv_launcher)(handle,
+                                                                            transA,
+                                                                            m,
+                                                                            n,
+                                                                            alpha,
+                                                                            0,
+                                                                            A,
+                                                                            0,
+                                                                            lda,
+                                                                            0,
+                                                                            x,
+                                                                            0,
+                                                                            incx,
+                                                                            0,
+                                                                            beta,
+                                                                            0,
+                                                                            y,
+                                                                            0,
+                                                                            incy,
+                                                                            0,
+                                                                            batch_count,
+                                                                            (Tex*)w_mem);
 
         status = (status != rocblas_status_success) ? status : perf_status;
         if(status != rocblas_status_success)

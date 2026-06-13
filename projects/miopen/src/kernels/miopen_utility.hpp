@@ -25,8 +25,7 @@
  *******************************************************************************/
 #pragma once
 
-#if HIP_PACKAGE_VERSION_FLAT < 7000000000ULL
-#ifdef MIOPEN_HIP_RUNTIME_COMPILE
+#ifdef MIOPEN_DONT_USE_HIP_RUNTIME_HEADERS
 
 #include "miopen_type_traits.hpp" // std::remove_reference
 
@@ -50,7 +49,4 @@ constexpr T&& forward(typename remove_reference<T>::type&& t_) noexcept
 
 #include <utility>
 
-#endif
-#else
-#include <utility>
 #endif

@@ -33,9 +33,6 @@
 #define _ROCBLASLT_TYPES_H_
 
 #include <hip/hip_bfloat16.h>
-#ifdef __cplusplus
-#include <array>
-#endif
 #ifndef LEGACY_HIPBLAS_DIRECT
 #include <hipblas-common/hipblas-common.h>
 #else
@@ -47,7 +44,7 @@
 #include <stdint.h>
 #include <vector>
 
-#include <hipblaslt/hipblaslt-ext.hpp>
+#include <hipblaslt-ext.hpp>
 
 #define ROCBLASLT_KERNEL __global__
 #define ROCBLASLT_DEVICE_ILF __device__
@@ -150,6 +147,7 @@ typedef struct
     uint8_t data;
 } rocblaslt_bf8_fnuz;
 
+#ifdef ROCM_USE_FLOAT8
 typedef struct
 {
     uint8_t data;
@@ -159,6 +157,7 @@ typedef struct
 {
     uint8_t data;
 } rocblaslt_bf8;
+#endif
 
 typedef int8_t  rocblasltInt8;
 typedef int32_t rocblasltInt32;
@@ -171,29 +170,20 @@ typedef int32_t rocblasltInt32;
  */
 typedef enum rocblaslt_epilogue_
 {
-    ROCBLASLT_EPILOGUE_DEFAULT            = 1,
-    ROCBLASLT_EPILOGUE_RELU               = 2,
-    ROCBLASLT_EPILOGUE_BIAS               = 4,
-    ROCBLASLT_EPILOGUE_RELU_BIAS          = 6,
-    ROCBLASLT_EPILOGUE_GELU               = 32,
-    ROCBLASLT_EPILOGUE_GELU_BIAS          = 36,
-    ROCBLASLT_EPILOGUE_RELU_AUX           = 130,
-    ROCBLASLT_EPILOGUE_RELU_AUX_BIAS      = 134,
-    ROCBLASLT_EPILOGUE_DRELU              = 136,
-    ROCBLASLT_EPILOGUE_DRELU_BGRAD        = 152,
-    ROCBLASLT_EPILOGUE_GELU_AUX           = 160,
-    ROCBLASLT_EPILOGUE_GELU_AUX_BIAS      = 164,
-    ROCBLASLT_EPILOGUE_DGELU              = 192,
-    ROCBLASLT_EPILOGUE_DGELU_BGRAD        = 208,
-    ROCBLASLT_EPILOGUE_BGRADA             = 256,
-    ROCBLASLT_EPILOGUE_BGRADB             = 512,
-    ROCBLASLT_EPILOGUE_SIGMOID            = 1024,
-    ROCBLASLT_EPILOGUE_SWISH_EXT          = 65536,
-    ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT     = 65540,
-    ROCBLASLT_EPILOGUE_CLAMP_EXT          = 131072,
-    ROCBLASLT_EPILOGUE_CLAMP_BIAS_EXT     = 131076,
-    ROCBLASLT_EPILOGUE_CLAMP_AUX_EXT      = 131200,
-    ROCBLASLT_EPILOGUE_CLAMP_AUX_BIAS_EXT = 131204,
+    ROCBLASLT_EPILOGUE_DEFAULT        = 1,
+    ROCBLASLT_EPILOGUE_RELU           = 2,
+    ROCBLASLT_EPILOGUE_BIAS           = 4,
+    ROCBLASLT_EPILOGUE_RELU_BIAS      = 6,
+    ROCBLASLT_EPILOGUE_GELU           = 32,
+    ROCBLASLT_EPILOGUE_GELU_BIAS      = 36,
+    ROCBLASLT_EPILOGUE_GELU_AUX       = 160,
+    ROCBLASLT_EPILOGUE_GELU_AUX_BIAS  = 164,
+    ROCBLASLT_EPILOGUE_DGELU          = 192,
+    ROCBLASLT_EPILOGUE_DGELU_BGRAD    = 208,
+    ROCBLASLT_EPILOGUE_BGRADA         = 256,
+    ROCBLASLT_EPILOGUE_BGRADB         = 512,
+    ROCBLASLT_EPILOGUE_SWISH_EXT      = 65536,
+    ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT = 65540,
 } rocblaslt_epilogue;
 
 /*! \ingroup types_module
@@ -272,22 +262,8 @@ typedef enum rocblaslt_status_
     rocblaslt_status_not_initialized         = 10, /**< descriptor has not been initialized. */
     rocblaslt_status_type_mismatch           = 11, /**< index types do not match. */
     rocblaslt_status_requires_sorted_storage = 12, /**< sorted storage required. */
-    rocblaslt_status_continue                = 13  /**< nothing preventing function to proceed. */
+    rocblaslt_status_continue                = 13 /**< nothing preventing function to proceed. */
 } rocblaslt_status;
-
-/*! \ingroup types_module
- *  \brief Bitmask controlling the post-GEMM NaN-check feature.
- *
- *  Set the env var \c HIPBLASLT_CHECK_NUMERICS to one of these values to
- *  enable scanning of every \c hipblasLtMatmul output (D) for NaN. The env
- *  var also accepts case-insensitive words: "none"/"off", "info", "warn".
- */
-typedef enum hipblaslt_check_numerics_mode_
-{
-    hipblaslt_check_numerics_mode_no_check = 0, /**< feature disabled (default). */
-    hipblaslt_check_numerics_mode_info     = 1, /**< always print check results. */
-    hipblaslt_check_numerics_mode_warn     = 2, /**< print only when NaN is found. */
-} hipblaslt_check_numerics_mode;
 
 /*! \ingroup types_module
  *  \brief Specify the compute precision modes of the matrix
@@ -342,8 +318,7 @@ typedef enum rocblaslt_matrix_layout_attribute_
     ROCBLASLT_MATRIX_LAYOUT_ROWS  = 4,
     ROCBLASLT_MATRIX_LAYOUT_COLS  = 5,
     ROCBLASLT_MATRIX_LAYOUT_LD    = 6,
-    ROCBLASLT_MATRIX_LAYOUT_BATCH_MODE = 7,
-    ROCBLASLT_MATRIX_LAYOUT_MAX   = 8
+    ROCBLASLT_MATRIX_LAYOUT_MAX   = 7
 } rocblaslt_matrix_layout_attribute;
 
 typedef enum
@@ -386,16 +361,12 @@ typedef enum rocblaslt_matmul_desc_attributes_
     ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE  = 12,
     ROCBLASLT_MATMUL_DESC_POINTER_MODE               = 13,
     ROCBLASLT_MATMUL_DESC_AMAX_D_POINTER             = 14,
-    ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE     = 22,
-    ROCBLASLT_MATMUL_DESC_BIAS_BATCH_STRIDE          = 23,
     ROCBLASLT_MATMUL_DESC_A_SCALE_MODE               = 31,
     ROCBLASLT_MATMUL_DESC_B_SCALE_MODE               = 32,
-    ROCBLASLT_MATMUL_DESC_SM_COUNT_TARGET            = 33,
     ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT   = 100,
     ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT,
-    ROCBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT,
-    ROCBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT,
-    ROCBLASLT_MATMUL_DESC_DYN_PERSISTENT_TILE_EXT    = 104,
+    ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER_VEC_EXT,
+    ROCBLASLT_MATMUL_DESC_B_SCALE_POINTER_VEC_EXT,
     ROCBLASLT_MATMUL_DESC_MAX,
 } rocblaslt_matmul_desc_attributes;
 
@@ -411,8 +382,7 @@ typedef enum rocblaslt_matmul_preference_attributes_
 {
     ROCBLASLT_MATMUL_PREF_SEARCH_MODE         = 0,
     ROCBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES = 1,
-    ROCBLASLT_MATMUL_PREF_SM_COUNT_TARGET     = 2,
-    ROCBLASLT_MATMUL_PREF_MAX                 = 3
+    ROCBLASLT_MATMUL_PREF_MAX                 = 2
 } rocblaslt_matmul_preference_attributes;
 
 /********************************************************************************
@@ -478,6 +448,172 @@ typedef struct _rocblaslt_matrix_transform_desc
 }
 #endif
 
+namespace rocblaslt
+{
+
+    enum class RocGemmType
+    {
+        ROCBLASLT_GEMM             = 1,
+        ROCBLASLT_GROUPED_GEMM     = 2,
+        ROCBLASLT_GEMMTYPE_UNKNOWN = 3
+    };
+
+    struct RocGemmProblemType
+    {
+        hipblasOperation_t     op_a;
+        hipblasOperation_t     op_b;
+        hipDataType            type_a;
+        hipDataType            type_b;
+        hipDataType            type_c;
+        hipDataType            type_d;
+        rocblaslt_compute_type type_compute;
+    };
+
+    class RocGemmProblemTypeV2
+    {
+    public:
+        hipblasOperation_t     op_a;
+        hipblasOperation_t     op_b;
+        hipDataType            type_a;
+        hipDataType            type_b;
+        hipDataType            type_c;
+        hipDataType            type_d;
+        rocblaslt_compute_type type_compute;
+    };
+
+    struct RocGemmEpilogue
+    {
+        rocblaslt_epilogue mode           = ROCBLASLT_EPILOGUE_DEFAULT;
+        hipDataType        bias_data_type = HIPBLASLT_DATATYPE_INVALID;
+        int                aux_ld         = 0;
+        int                aux_stride     = 0;
+    };
+
+    static_assert(sizeof(RocGemmEpilogue) == sizeof(hipblaslt_ext::GemmEpilogue),
+                  "RocGemmEpilogue struct does not match size of hipblaslt_ext::GemmEpilogue");
+
+    class RocGemmEpilogueV2
+    {
+    public:
+        rocblaslt_epilogue mode           = ROCBLASLT_EPILOGUE_DEFAULT;
+        hipDataType        bias_data_type = HIPBLASLT_DATATYPE_INVALID;
+        int                aux_ld         = 0;
+        int                aux_stride     = 0;
+        int                scaling_a_type = 0;
+        int                scaling_b_type = 0;
+    };
+
+    struct RocTuning
+    {
+        uint8_t gsu = 0;
+        uint8_t wgm = 0;
+    };
+
+    class RocTuningV2
+    {
+    public:
+        uint16_t gsu = 0;
+        int16_t  wgm = 0;
+    };
+
+    struct RocGemmInputs
+    {
+        void* a     = nullptr;
+        void* b     = nullptr;
+        void* c     = nullptr;
+        void* d     = nullptr;
+        void* alpha = nullptr;
+        void* beta  = nullptr;
+        // Epilogue inputs
+        void* bias          = nullptr;
+        void* scaleA        = nullptr;
+        void* scaleB        = nullptr;
+        void* scaleC        = nullptr;
+        void* scaleD        = nullptr;
+        void* scaleE        = nullptr;
+        void* scaleAlphaVec = nullptr;
+        void* aux           = nullptr;
+    };
+
+    static_assert(sizeof(RocGemmInputs) == sizeof(hipblaslt_ext::GemmInputs),
+                  "RocGemmInputs struct does not match size of hipblaslt_ext::GemmInputs");
+
+    struct RocGemmInputsV2
+    {
+        void* a     = nullptr;
+        void* b     = nullptr;
+        void* c     = nullptr;
+        void* d     = nullptr;
+        void* alpha = nullptr;
+        void* beta  = nullptr;
+        // Epilogue inputs
+        void* bias          = nullptr;
+        void* scaleA        = nullptr;
+        void* scaleB        = nullptr;
+        void* scaleC        = nullptr;
+        void* scaleD        = nullptr;
+        void* scaleE        = nullptr;
+        void* scaleAlphaVec = nullptr;
+        void* aux           = nullptr;
+        void* amaxD         = nullptr;
+    };
+
+    class RocGemm
+    {
+    public:
+        RocGemmType getGemmType()
+        {
+            return m_gemm_type;
+        }
+        size_t getGemmCount()
+        {
+            return m_gemm_count;
+        }
+        rocblaslt_handle getHandle()
+        {
+            return m_handle;
+        }
+        std::shared_ptr<void> getData()
+        {
+            return m_data;
+        }
+
+        void setGemmType(RocGemmType type)
+        {
+            m_gemm_type = type;
+        }
+        void setGemmCount(size_t gemm_count)
+        {
+            m_gemm_count = gemm_count;
+        }
+        void setHandle(rocblaslt_handle handle)
+        {
+            m_handle = handle;
+        }
+        void setData(std::shared_ptr<void> data)
+        {
+            m_data = data;
+        }
+        std::vector<RocGemmProblemType> getProblemTypes()
+        {
+            return m_problem_types;
+        }
+        void setProblemTypes(std::vector<RocGemmProblemType>& problem_types)
+        {
+            m_problem_types = problem_types;
+        }
+
+    private:
+        RocGemmType m_gemm_type  = RocGemmType::ROCBLASLT_GEMMTYPE_UNKNOWN;
+        size_t      m_gemm_count = 0;
+
+        std::vector<RocGemmProblemType> m_problem_types;
+
+        rocblaslt_handle      m_handle;
+        std::shared_ptr<void> m_data;
+    };
+} // End of namespace rocblaslt
+
 /********************************************************************
  * RocblasltContractionProblem captures the arguments for a GEMM-like *
  * contraction problem, to be passed to runContractionProblem.      *
@@ -489,13 +625,7 @@ struct RocblasltContractionProblem
         None = 0,
         Scalar,
         Vector,
-        Block_32_UE8M0,
-        Block_16_UE8M0,
-        Block_32_UE4M3,
-        Block_16_UE4M3,
-        Block_32_UE5M3,
-        Block_16_UE5M3,
-        Block_32_UE8M0_32_8_EXT,
+        Block
     };
 
     hipblasOperation_t trans_a;
@@ -510,12 +640,6 @@ struct RocblasltContractionProblem
     size_t k;
 
     const void* alpha;
-    // When certain features (e.g., scaleAlphaVec) require overriding alpha to a constant 1.0,
-    // we must ensure the backing storage outlives the scope that constructs the problem.
-    // ASAN caught a stack-use-after-return where alpha pointed to a stack-local buffer.
-    // This owned buffer is used to hold such overridden alpha values.
-    // NOTE: sized to 16 bytes to hold any supported scalar type representation.
-    std::array<int8_t, 16> alpha_owned = {0};
 
     hipDataType        a_type;
     const void*        A;
@@ -571,21 +695,20 @@ struct RocblasltContractionProblem
     ScalingFormat scaleAType;
     ScalingFormat scaleBType;
 
+    size_t             scaleABlockRowSize;
+    size_t             scaleABlockColSize;
+    size_t             scaleBBlockRowSize;
+    size_t             scaleBBlockColSize;
     hipDataType        bias_type;
-    hipDataType        aux_type;
     rocblaslt_epilogue epilogue;
     void*              amaxD;
     void*              workspace;
     size_t             workspaceSize;
-    float              act0;
-    float              act1;
 
     hipStream_t stream;
     void*       Synchronizer;
     bool        swizzleA;
     bool        swizzleB;
-    hipblasLtBatchMode_t batchMode;   
-    int32_t bias_stride; 
 
     // gemm_ex
     // gemm_strided_batched_ex
@@ -635,88 +758,19 @@ struct RocblasltContractionProblem
                                 const void*            scaleAlphaVec,
                                 ScalingFormat          scaleAType,
                                 ScalingFormat          scaleBType,
+                                size_t                 scaleABlockRowSize,
+                                size_t                 scaleABlockColSize,
+                                size_t                 scaleBBlockRowSize,
+                                size_t                 scaleBBlockColSize,
                                 hipDataType            bias_type,
-                                hipDataType            aux_type,
                                 rocblaslt_epilogue     epilogue,
                                 void*                  amaxD,
                                 void*                  workspace,
                                 size_t                 workspaceSize,
-                                float                  act0,
-                                float                  act1,
                                 hipStream_t            stream,
                                 void*                  Synchronizer,
                                 bool                   swizzleA,
-                                bool                   swizzleB,
-                                hipblasLtBatchMode_t   batchMode,
-                                int32_t                bias_stride);
+                                bool                   swizzleB);
 };
-
-namespace rocblaslt
-{
-
-    enum class RocGemmType
-    {
-        ROCBLASLT_GEMM             = 1,
-        ROCBLASLT_GROUPED_GEMM     = 2,
-        ROCBLASLT_GEMMTYPE_UNKNOWN = 3
-    };
-
-    class RocGemmProblemTypeV2
-    {
-    public:
-        hipblasOperation_t     op_a;
-        hipblasOperation_t     op_b;
-        hipDataType            type_a;
-        hipDataType            type_b;
-        hipDataType            type_c;
-        hipDataType            type_d;
-        rocblaslt_compute_type type_compute;
-        hipblasLtOrder_t       order_a;
-        hipblasLtOrder_t       order_b;
-    };
-
-    class RocGemmEpilogueV2
-    {
-    public:
-        rocblaslt_epilogue                         mode           = ROCBLASLT_EPILOGUE_DEFAULT;
-        hipDataType                                bias_data_type = HIPBLASLT_DATATYPE_INVALID;
-        hipDataType                                aux_data_type  = HIPBLASLT_DATATYPE_INVALID;
-        int                                        aux_ld         = 0;
-        int                                        aux_stride     = 0;
-        RocblasltContractionProblem::ScalingFormat scaling_a_type
-            = RocblasltContractionProblem::ScalingFormat::None;
-        RocblasltContractionProblem::ScalingFormat scaling_b_type
-            = RocblasltContractionProblem::ScalingFormat::None;
-        float act0 = 0.f;
-        float act1 = 0.f;
-    };
-
-    class RocTuningV2
-    {
-    public:
-        uint16_t gsu = 0;
-        int16_t  wgm = 0;
-    };
-
-    struct RocGemmInputsV2
-    {
-        void* a     = nullptr;
-        void* b     = nullptr;
-        void* c     = nullptr;
-        void* d     = nullptr;
-        void* alpha = nullptr;
-        void* beta  = nullptr;
-        // Epilogue inputs
-        void* bias          = nullptr;
-        void* scaleA        = nullptr;
-        void* scaleB        = nullptr;
-        void* scaleC        = nullptr;
-        void* scaleD        = nullptr;
-        void* scaleE        = nullptr;
-        void* scaleAlphaVec = nullptr;
-        void* aux           = nullptr;
-        void* amaxD         = nullptr;
-    };
-} // End of namespace rocblaslt
 
 #endif /* _ROCBLASLT_TYPES_H_ */

@@ -1,6 +1,6 @@
 .. meta::
-  :description: Introduction to  the hipSPARSELt documentation and API reference library
-  :keywords: hipSPARSELt, ROCm, API, documentation, introduction
+  :description: hipSPARSELt documentation and API reference library
+  :keywords: hipSPARSELt, ROCm, API, documentation
 
 .. _hipsparselt-docs-home:
 
@@ -8,47 +8,30 @@
 hipSPARSELt documentation
 ********************************************************************
 
-hipSPARSELt is a SPARSE marshalling library that presents a common interface for multiple supported backends.
-For more information, see :doc:`What is hipSPARSELt? <./what-is-hipsparselt>`
+Welcome to the hipSPARSELt docs home page! To learn more, see :ref:`what-is-hipsparselt`
 
-The hipSPARSELt public repository is located at `<https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsparselt>`_.
+Our documentation is structured as follows:
 
-.. note::
-
-   The hipSPARSELt repository for ROCm 6.4.3 and earlier is located at `<https://github.com/ROCm/hipSPARSELt>`_.
-
-.. grid:: 2
+.. grid:: 1 2 2 2
   :gutter: 3
 
-  .. grid-item-card:: Install
+  .. grid-item-card:: Reference
 
-    * :doc:`Install hipSPARSELt <./install/install>`
-    * :doc:`Build from source <./install/build>`
-
-.. grid:: 2
-  :gutter: 3
-
-  .. grid-item-card:: Conceptual
-
-    * :doc:`Storage formats <./conceptual/storage-format>`
-    * :doc:`Features for the Instinct MI300 series <./conceptual/mi300-features>`
-
-  .. grid-item-card:: How to
-
-    * :doc:`Manage devices and streams <./how-to/device-stream-management>`
-    * :doc:`Port from NVIDIA CUDA <./how-to/porting>`
-
-  .. grid-item-card:: Examples
-
-    * `Client samples <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsparselt/clients/samples>`_
-
-  .. grid-item-card:: API Reference
-
-    * :doc:`Supported functions <./reference/supported-functions>`
-    * :doc:`Data type support <./reference/data-type-support>`
-    * :doc:`Environment variables <./reference/env-variables>`
+    * :ref:`Supported functions <supported-functions>`
+    * :ref:`Data type support <data-type-support>`
+    * :ref:`Device & stream management <device-stream-manage>`
+    * :ref:`Storage formats <storage-format>`
+    * :ref:`MI300 features <mi300-features>`
+    * :ref:`Porting from CUDA <porting>`
     * :doc:`API library <../doxygen/html/index>`
 
-To contribute to the documentation, see `Contributing to ROCm <https://rocm.docs.amd.com/en/latest/contribute/contributing.html>`_.
+  ..  grid-item-card:: Tutorials
 
-You can find licensing information on the `Licensing <https://rocm.docs.amd.com/en/latest/about/license.html>`_ page.
+    * :ref:`install-linux-quick`
+    * :ref:`install-linux`
+
+To contribute to the documentation refer to
+`Contributing to ROCm  <https://rocm.docs.amd.com/en/latest/contribute/contributing.html>`_.
+
+Licensing information can be found on the
+`Licensing <https://rocm.docs.amd.com/en/latest/about/license.html>`_ page.

@@ -29,8 +29,7 @@
 
 #define HOST_MEMCHECK(T_, name_, args_) \
     T_ name_(UNWRAP_ARGS args_);        \
-    if(name_.memcheck() != hipSuccess)  \
-        throw std::bad_alloc{};
+    CHECK_HIP_ERROR(name_.memcheck());
 
 #define DEVICE_MEMCHECK(T_, name_, args_) \
     T_ name_(UNWRAP_ARGS args_);          \

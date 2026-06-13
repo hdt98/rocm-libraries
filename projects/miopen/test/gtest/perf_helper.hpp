@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2025 Advanced Micro Devices, Inc.
+ * Copyright (c) 2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,34 +29,36 @@
 #define NUM_PERF_RUNS 5
 #define NUM_WARMUP_RUNS 3
 
-#include <fstream>
-
+template <typename T>
 struct PerfHelper
 {
-    std::vector<std::tuple<std::string, double, double, double, double, double>> kernelTestStats;
+    std::vector<std::tuple<std::string, T, T, double, double, double>> kernelTestStats;
 
-    static double perf_min(const std::vector<double>& data)
+    // hold the min, max, mean, median, and standard deviation
+    std::tuple<T, T, double, double, double> gpuStats;
+
+    static T perf_min(const std::vector<T>& data)
     {
         if(data.empty())
             throw std::invalid_argument("Empty vector");
         return *std::min_element(data.begin(), data.end());
     }
 
-    static double perf_max(const std::vector<double>& data)
+    static T perf_max(const std::vector<T>& data)
     {
         if(data.empty())
             throw std::invalid_argument("Empty vector");
         return *std::max_element(data.begin(), data.end());
     }
 
-    static double perf_mean(const std::vector<double>& data)
+    static double perf_mean(const std::vector<T>& data)
     {
         if(data.empty())
             throw std::invalid_argument("Empty vector");
         return std::accumulate(data.begin(), data.end(), 0.0) / data.size();
     }
 
-    static double perf_median(std::vector<double> data)
+    static double perf_median(std::vector<T> data)
     {
         if(data.empty())
             throw std::invalid_argument("Empty vector");
@@ -72,29 +74,26 @@ struct PerfHelper
         }
     }
 
-    static double perf_standardDeviation(const std::vector<double>& data)
+    static double perf_standardDeviation(const std::vector<T>& data)
     {
         if(data.empty())
             throw std::invalid_argument("Empty vector");
         double data_mean = perf_mean(data);
         double sq_sum    = std::inner_product(
-            data.begin(),
-            data.end(),
-            data.begin(),
-            0.0,
-            std::plus<>(),
-            [data_mean](double a, double b) { return (a - data_mean) * (b - data_mean); });
+            data.begin(), data.end(), data.begin(), 0.0, std::plus<>(), [data_mean](T a, T b) {
+                return (a - data_mean) * (b - data_mean);
+            });
         return std::sqrt(sq_sum / data.size());
     }
 
-    static auto calcStats(const std::vector<double>& data)
+    static std::tuple<T, T, double, double, double> calcStats(const std::vector<T>& data)
     {
-        double min_val    = perf_min(data);
-        double max_val    = perf_max(data);
+        T min_val         = perf_min(data);
+        T max_val         = perf_max(data);
         double mean_val   = perf_mean(data);
         double median_val = perf_median(data); // Note: This modifies the data(sorts it)
         double sd_val     = perf_standardDeviation(data);
-        return std::make_tuple(min_val, max_val, mean_val, median_val, sd_val);
+        return {min_val, max_val, mean_val, median_val, sd_val};
     }
 
     void writeStatsToCSV(const std::string& filename, std::string test_info)
@@ -155,17 +154,25 @@ struct PerfHelper
     void perfTest(const miopen::Handle& handle,
                   const std::string& kernel_name,
                   const std::string& network_config,
+                  bool append,
                   Args&&... args)
     {
-        miopen::AutoEnableProfiling autoProfiling(handle);
-
         // Get kernels matching the kernel_name and network_config from the cache
         auto&& kernels = handle.GetKernels(kernel_name, network_config);
         // Ensure we have at least one kernel
         assert(!kernels.empty());
-
         // Vector to hold the execution times
-        std::vector<double> elapsedTime_ms;
+        std::vector<T> elapsedTime_ms;
+
+        if(handle.IsProfilingEnabled())
+        { // If profiling was enabled elsewhere, reset the kernel time
+            handle.ResetKernelTime();
+        }
+        else
+        {
+            handle.EnableProfiling(); // Enable profiling
+            handle.ResetKernelTime(); // for good measure?
+        }
         // Optionally ignore the first few runs to allow for warm-up
         for(size_t i = 0; i < NUM_PERF_RUNS + NUM_WARMUP_RUNS; i++)
         {
@@ -177,8 +184,9 @@ struct PerfHelper
             handle.ResetKernelTime();
         }
 
-        // Calculate the min, max, mean, median, and standard deviation
-        auto gpuStats = calcStats(elapsedTime_ms);
+        handle.EnableProfiling(false); // Disable profiling
+
+        gpuStats = calcStats(elapsedTime_ms);
         kernelTestStats.push_back({kernel_name,
                                    std::get<0>(gpuStats),
                                    std::get<1>(gpuStats),

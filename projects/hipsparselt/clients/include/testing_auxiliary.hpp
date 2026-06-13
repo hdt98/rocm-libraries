@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -36,25 +36,6 @@
 #include "unit.hpp"
 #include "utility.hpp"
 #include <hipsparselt/hipsparselt.h>
-
-void testing_aux_get_version(const Arguments& arg)
-{
-    static int version;
-    hipsparselt_local_handle handle;
-    hipsparseLtGetVersion(handle, &version);
-
-    int major;
-    int minor;
-    int patch;
-    hipsparseLtGetProperty(HIP_LIBRARY_MAJOR_VERSION, &major);
-    hipsparseLtGetProperty(HIP_LIBRARY_MINOR_VERSION, &minor);
-    hipsparseLtGetProperty(HIP_LIBRARY_PATCH_LEVEL, &patch);
-    int version_ = major * 100000 + minor * 100 + patch;
-    ASSERT_EQ(version, version_);
-
-    char *rev = nullptr;
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtGetGitRevision(handle, rev), HIPSPARSE_STATUS_INVALID_VALUE);
-}
 
 void testing_aux_handle_init_bad_arg(const Arguments& arg)
 {
@@ -258,48 +239,6 @@ void testing_aux_mat_init_structured_bad_arg(const Arguments& arg)
                                                                 HIPSPARSELT_SPARSITY_50_PERCENT),
                             HIPSPARSE_STATUS_NOT_SUPPORTED);
 #endif
-
-    // The row and column must be mulitples of num_elements.
-    int num_elements = 8;
-    switch(arg.a_type)
-    {
-    case HIP_R_8I:
-#if HIP_FP8_TYPE_OCP
-    case HIP_R_8F_E4M3:
-    case HIP_R_8F_E5M2:
-#endif
-#if HIP_FP8_TYPE_FNUZ
-    case HIP_R_8F_E4M3_FNUZ:
-    case HIP_R_8F_E5M2_FNUZ:
-#endif
-        num_elements = 16;
-        break;
-    default:
-        break;
-    }
-
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtStructuredDescriptorInit(handle,
-                                                                &m_descr,
-                                                                num_elements * 4 + 4,
-                                                                col,
-                                                                ld,
-                                                                16,
-                                                                arg.a_type,
-                                                                HIPSPARSE_ORDER_COL,
-                                                                HIPSPARSELT_SPARSITY_50_PERCENT),
-                            HIPSPARSE_STATUS_NOT_SUPPORTED);
-
-    // Chcek unsupported datatype
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtStructuredDescriptorInit(handle,
-                                                                &m_descr,
-                                                                row,
-                                                                col,
-                                                                ld,
-                                                                16,
-                                                                HIP_R_64F,
-                                                                HIPSPARSE_ORDER_COL,
-                                                                HIPSPARSELT_SPARSITY_50_PERCENT),
-                            HIPSPARSE_STATUS_NOT_SUPPORTED);
 }
 
 void testing_aux_mat_dense_init(const Arguments& arg)
@@ -681,35 +620,6 @@ void testing_aux_matmul_init_bad_arg(const Arguments& arg)
         HIPSPARSE_STATUS_INVALID_VALUE);
 #endif
 
-    hipsparselt_local_mat_descr matA_(
-        hipsparselt_matrix_type_structured, handle, K, N, ldb, HIP_R_32F, HIPSPARSE_ORDER_COL);
-    EXPECT_HIPSPARSE_STATUS(matA_.status(), HIPSPARSE_STATUS_SUCCESS);
-
-    // HIP_R_32F is unsupported.
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescriptorInit(
-            handle, &m_descr, opA, opB, matA_, matB, matC, matD, arg.compute_type),
-        HIPSPARSE_STATUS_NOT_SUPPORTED);
-
-    // C or D must be dense martrix
-    hipsparselt_local_mat_descr matCS_(
-        hipsparselt_matrix_type_structured, handle, M, N, ldc, arg.c_type, HIPSPARSE_ORDER_COL);
-    EXPECT_HIPSPARSE_STATUS(matCS_.status(), HIPSPARSE_STATUS_SUCCESS);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescriptorInit(
-            handle, &m_descr, opA, opB, matA, matB, matCS_, matD, arg.compute_type),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    // Only one of the A or B can be structured sparsity matrix
-    hipsparselt_local_mat_descr matBS(
-        hipsparselt_matrix_type_structured, handle, K, N, ldb, arg.b_type, HIPSPARSE_ORDER_COL);
-    EXPECT_HIPSPARSE_STATUS(matBS.status(), HIPSPARSE_STATUS_SUCCESS);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescriptorInit(
-            handle, &m_descr, opA, opB, matA, matBS, matC, matD, arg.compute_type),
-        HIPSPARSE_STATUS_NOT_SUPPORTED);
-
-    //
     hipDataType tmpDataType;
     auto        get_diff_datatype = [&](hipDataType type) {
         switch(type)
@@ -722,6 +632,7 @@ void testing_aux_matmul_init_bad_arg(const Arguments& arg)
     };
 
     tmpDataType = get_diff_datatype(arg.b_type);
+
     hipsparselt_local_mat_descr matB_(
         hipsparselt_matrix_type_dense, handle, K, N, ldb, tmpDataType, HIPSPARSE_ORDER_COL);
     EXPECT_HIPSPARSE_STATUS(matB_.status(), HIPSPARSE_STATUS_SUCCESS);
@@ -752,16 +663,6 @@ void testing_aux_matmul_init_bad_arg(const Arguments& arg)
             HIPSPARSE_STATUS_NOT_SUPPORTED);
     }
 #endif
-
-    // check the C and D matrices has the same memory order.
-    hipsparselt_local_mat_descr matDR_(
-        hipsparselt_matrix_type_dense, handle, M, N, ldc, arg.d_type, HIPSPARSE_ORDER_ROW);
-    EXPECT_HIPSPARSE_STATUS(matDR_.status(), HIPSPARSE_STATUS_SUCCESS);
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescriptorInit(
-            handle, &m_descr, opA, opB, matA, matB, matC, matDR_, arg.compute_type),
-        HIPSPARSE_STATUS_INVALID_VALUE);
 }
 
 void testing_aux_matmul_init(const Arguments& arg)
@@ -877,37 +778,6 @@ void testing_aux_matmul_set_attr_bad_arg(const Arguments& arg)
         hipsparseLtMatmulDescSetAttribute(
             handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_RELU_UPPERBOUND, &data64, 1),
         HIPSPARSE_STATUS_INVALID_VALUE);
-
-#ifdef __HIP_PLATFORM_AMD__
-    if(arg.d_type == HIP_R_8I)
-    {
-        int dataSigmoid = 1;
-        EXPECT_HIPSPARSE_STATUS(
-            hipsparseLtMatmulDescSetAttribute(
-                handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_SIGMOID, &dataSigmoid, sizeof(dataSigmoid)),
-            HIPSPARSE_STATUS_NOT_SUPPORTED);
-    }
-#endif
-
-    void* dBias;
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescSetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BIAS_POINTER, &dBias, sizeof(dBias) - 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    int64_t bias_stride = M - 1;
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescSetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BIAS_STRIDE, &bias_stride, sizeof(bias_stride)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-#ifdef __HIP_PLATFORM_AMD__
-        char bias_type;
-        EXPECT_HIPSPARSE_STATUS(
-            hipsparseLtMatmulDescSetAttribute(
-                handle, matmul, HIPSPARSELT_MATMUL_BIAS_TYPE, &bias_type, sizeof(char)),
-            HIPSPARSE_STATUS_INVALID_VALUE);
-#endif
 }
 
 void testing_aux_matmul_get_attr_bad_arg(const Arguments& arg)
@@ -988,85 +858,13 @@ void testing_aux_matmul_get_attr_bad_arg(const Arguments& arg)
             handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_RELU_UPPERBOUND, &data64, 1),
         HIPSPARSE_STATUS_INVALID_VALUE);
 
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_RELU_THRESHOLD, nullptr, sizeof(data64)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_RELU_THRESHOLD, &data64, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_LEAKYRELU_ALPHA, nullptr, sizeof(data64)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_LEAKYRELU_ALPHA, &data64, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_TANH_ALPHA, nullptr, sizeof(data64)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_TANH_ALPHA, &data64, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_TANH_BETA, nullptr, sizeof(data64)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_TANH_BETA, &data64, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    size_t bad_ptr_size = sizeof(void*) - 1;
+#ifdef __HIP_PLATFORM_NVIDIA__
     void* dBias;
-    CHECK_HIP_ERROR(hipMalloc((void**)&dBias, (M) * sizeof(float)));
+    hipMalloc((void**)&dBias, (M) * sizeof(float));
     EXPECT_HIPSPARSE_STATUS(hipsparseLtMatmulDescGetAttribute(
-                                handle, matmul, HIPSPARSELT_MATMUL_BIAS_POINTER, &dBias, bad_ptr_size),
+                                handle, matmul, HIPSPARSELT_MATMUL_BIAS_POINTER, &dBias, 4),
                             HIPSPARSE_STATUS_INVALID_VALUE);
     CHECK_HIP_ERROR(hipFree(dBias));
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BIAS_STRIDE, nullptr, sizeof(data64)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BIAS_STRIDE, &data64, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-#ifdef __HIP_PLATFORM_AMD__
-    hipDataType biasType;
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BIAS_STRIDE, nullptr, sizeof(biasType)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BIAS_STRIDE, &biasType, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-#endif
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ALPHA_VECTOR_SCALING, nullptr, sizeof(data)),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_ALPHA_VECTOR_SCALING, &data, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-#ifdef __HIP_PLATFORM_AMD__
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulDescGetAttribute(
-            handle, matmul, HIPSPARSELT_MATMUL_BETA_VECTOR_SCALING, &data, sizeof(data)),
-        HIPSPARSE_STATUS_NOT_SUPPORTED);
 #endif
 }
 
@@ -1519,16 +1317,6 @@ void testing_aux_matmul_alg_set_attr_bad_arg(const Arguments& arg)
         hipsparseLtMatmulAlgSetAttribute(
             handle, alg_sel, HIPSPARSELT_MATMUL_ALG_CONFIG_MAX_ID, &data, sizeof(data)),
         HIPSPARSE_STATUS_INVALID_VALUE);
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulAlgSetAttribute(
-            handle, alg_sel, HIPSPARSELT_MATMUL_SEARCH_ITERATIONS, &data, 1),
-            HIPSPARSE_STATUS_INVALID_VALUE);
-    data = 0;
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmulAlgSetAttribute(
-            handle, alg_sel, HIPSPARSELT_MATMUL_SEARCH_ITERATIONS, &data, sizeof(data)),
-            HIPSPARSE_STATUS_INVALID_VALUE);
 }
 
 void testing_aux_matmul_alg_get_attr_bad_arg(const Arguments& arg)
@@ -1660,25 +1448,6 @@ void testing_aux_matmul_plan_init_bad_arg(const Arguments& arg)
                             HIPSPARSE_STATUS_INVALID_VALUE);
     EXPECT_HIPSPARSE_STATUS(hipsparseLtMatmulPlanInit(handle, &plan, matmul, &alg_sel_),
                             HIPSPARSE_STATUS_INVALID_VALUE);
-
-    // check the A and B matrices has the same value of num_batches.
-    int num_batches_a = 2;
-    int num_batches_b = 3;
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtMatDescSetAttribute(
-            handle, matA, HIPSPARSELT_MAT_NUM_BATCHES, &num_batches_a, sizeof(num_batches_a)),
-        HIPSPARSE_STATUS_SUCCESS);
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtMatDescSetAttribute(
-            handle, matB, HIPSPARSELT_MAT_NUM_BATCHES, &num_batches_b, sizeof(num_batches_b)),
-        HIPSPARSE_STATUS_SUCCESS);
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtMatmulPlanInit(handle, &plan, matmul, alg_sel),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-}
-
-void testing_aux_matmul_plan_destroy_bad_arg(const Arguments& arg)
-{
-    hipsparseLtMatmulPlan_t plan;
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtMatmulPlanDestroy(nullptr), HIPSPARSE_STATUS_INVALID_VALUE);
-    EXPECT_HIPSPARSE_STATUS(hipsparseLtMatmulPlanDestroy(&plan), HIPSPARSE_STATUS_INVALID_VALUE);
 }
 
 void testing_aux_matmul_plan_init(const Arguments& arg)

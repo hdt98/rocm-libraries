@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -17,10 +17,6 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 
-#if __clang_major__ >= 23
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
-#endif
 namespace ck {
 namespace tensor_operation {
 namespace device {
@@ -73,29 +69,9 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
 {
     using DeviceOp = DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K;
 
-    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               1,
-                                                               1,
-                                                               true>();
-    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               1,
-                                                               1,
-                                                               false>();
-    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
-    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
-    using ADataType                        = InDataType;
-    using BDataType                        = WeiDataType;
-    using CDataType                        = OutDataType;
+    using ADataType = InDataType;
+    using BDataType = WeiDataType;
+    using CDataType = OutDataType;
 
     // TODO make A/B datatype different
     using ABDataType = InDataType;
@@ -348,8 +324,7 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
     using CGridDesc_M_N     = remove_cvref_t<decltype(ABCGridDescs{}[I2])>;
 
     // GridwiseGemm
-    template <typename WarpTileConfig>
-    using GridwiseGemmBase = GridwiseGemm_k0mk1_k0nk1_mn_xdlops_v2r3<
+    using GridwiseGemm = GridwiseGemm_k0mk1_k0nk1_mn_xdlops_v2r3<
         BlockSize,
         ABDataType, // TODO: distinguish A/B datatype
         AccDataType,
@@ -361,11 +336,11 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
         MPerBlock,
         NPerBlock,
         K0PerBlock,
-        WarpTileConfig::At(0),
-        WarpTileConfig::At(1),
+        MPerXDL,
+        NPerXDL,
         K1,
-        WarpTileConfig::At(2),
-        WarpTileConfig::At(3),
+        MXdlPerWave,
+        NXdlPerWave,
         ABlockTransferThreadClusterLengths_K0_M_K1,
         Sequence<1, 0, 2>, // ABlockTransferThreadClusterArrangeOrder,
         Sequence<1, 0, 2>, // ABlockTransferSrcAccessOrder,
@@ -385,8 +360,6 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
         Sequence<2, 3, 0, 1, 7, 5, 4, 6>, // CThreadTransferSrcDstAccessOrder,
         7,                                // CThreadTransferSrcDstVectorDim,
         CThreadTransferDstScalarPerVector>;
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
     // Argument
     struct Argument : public BaseArgument
@@ -457,8 +430,7 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
     {
         using Argument = DeviceOp::Argument;
 
-        template <typename GridwiseGemm>
-        float RunImp(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
+        float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
             {
@@ -538,8 +510,6 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
             return ave_time;
         }
 
-        INVOKER_RUN_IMPL
-
         float Run(const BaseArgument* p_arg,
                   const StreamConfig& stream_config = StreamConfig{}) override
         {
@@ -555,15 +525,11 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_xdl_wmma_supported<ADataType,
-                                      BDataType,
-                                      MPerXDL,
-                                      NPerXDL,
-                                      WarpTileConfig32.At(0),
-                                      WarpTileConfig32.At(1)>())
+        if(!ck::is_xdl_supported())
         {
             return false;
         }
+
         if constexpr(ConvForwardSpecialization ==
                      ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
         {
@@ -603,23 +569,8 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
         }
 
         // Gridwise GEMM size
-        if(get_warp_size() == 64)
-        {
-            if constexpr(NXdlPerWave64 > 0)
-            {
-                return GridwiseGemm64::CheckValidity(
-                    arg.a_grid_desc_k0_m_k1_, arg.b_grid_desc_k0_n_k1_, arg.c_grid_desc_m_n_);
-            }
-        }
-        else
-        {
-            if constexpr(NXdlPerWave32 > 0)
-            {
-                return GridwiseGemm32::CheckValidity(
-                    arg.a_grid_desc_k0_m_k1_, arg.b_grid_desc_k0_n_k1_, arg.c_grid_desc_m_n_);
-            }
-        }
-        return false;
+        return GridwiseGemm::CheckValidity(
+            arg.a_grid_desc_k0_m_k1_, arg.b_grid_desc_k0_n_k1_, arg.c_grid_desc_m_n_);
     }
 
     bool IsSupportedArgument(const BaseArgument* p_arg) override
@@ -727,7 +678,3 @@ struct DeviceConv2dFwdXdl_Input_N_Hi_Wi_C_Weight_K_Y_X_C_Output_N_Ho_Wo_K
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
-
-#if __clang_major__ >= 23
-#pragma clang diagnostic pop
-#endif

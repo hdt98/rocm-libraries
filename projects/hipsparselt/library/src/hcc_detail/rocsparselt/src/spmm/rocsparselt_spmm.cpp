@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,6 @@
 #include "rocsparselt_spmm.hpp"
 #include "definitions.h"
 #include "handle.h"
-#include "status.h"
 #include "rocsparselt_spmm_utils.hpp"
 #include "utility.hpp"
 
@@ -54,7 +53,7 @@ rocsparselt_status rocsparselt_matmul_get_workspace(const rocsparselt_handle*   
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -66,7 +65,7 @@ rocsparselt_status rocsparselt_matmul_get_workspace(const rocsparselt_handle*   
     auto _plan = reinterpret_cast<const _rocsparselt_matmul_plan*>(plan);
     if(!check_is_init_plan(_plan))
     {
-        log_error(_handle, __func__, "plan was not initialized or has already been destroyed");
+        log_error(_handle, __func__, "plan did not initialized or already destroyed");
         return rocsparselt_status_invalid_handle;
     }
 
@@ -83,10 +82,7 @@ rocsparselt_status rocsparselt_matmul_get_workspace(const rocsparselt_handle*   
         else
         {
             *workspaceSize = _plan->alg_selection->configs[_plan->alg_selection->config_id]
-                                 .max_workspace_bytes
-                            + _plan->alg_selection->configs[_plan->alg_selection->config_id]
-                                 .synchronizer_bytes;
-
+                                 .max_workspace_bytes;
         }
         log_api(_handle, __func__, *workspaceSize);
         return rocsparselt_status_success;
@@ -116,7 +112,7 @@ rocsparselt_status rocsparselt_matmul_impl(const char*                    caller
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -128,7 +124,7 @@ rocsparselt_status rocsparselt_matmul_impl(const char*                    caller
     auto _plan = reinterpret_cast<const _rocsparselt_matmul_plan*>(plan);
     if(!check_is_init_plan(_plan))
     {
-        log_error(_handle, caller, "plan was not initialized or has already been destroyed");
+        log_error(_handle, caller, "plan did not initialized or already destroyed");
         return rocsparselt_status_invalid_handle;
     }
 
@@ -169,55 +165,17 @@ rocsparselt_status rocsparselt_matmul_impl(const char*                    caller
         return rocsparselt_status_invalid_pointer;
     }
 
-    size_t workspaceSize = 0;
-    if(search)
+    size_t workspaceSize
+        = _plan->alg_selection->config_max_id == 0
+              ? 0
+              : _plan->alg_selection->configs[_plan->alg_selection->config_id].max_workspace_bytes;
+    if(workspace == nullptr && workspaceSize != 0)
     {
-        for(int id = 0; id < _plan->alg_selection->config_max_id; id++)
-        {
-            workspaceSize = max(workspaceSize, _plan->alg_selection->configs[id].max_workspace_bytes \
-                            + _plan->alg_selection->configs[id].synchronizer_bytes);
-        }
-    }
-    else
-    {
-        if (_plan->alg_selection->config_max_id != 0)
-        {
-            workspaceSize = _plan->alg_selection->configs[_plan->alg_selection->config_id].max_workspace_bytes \
-                            + _plan->alg_selection->configs[_plan->alg_selection->config_id].synchronizer_bytes;
-        }
-    }
-
-    size_t workspaceSizeIn = 0;
-    // Only check the input workspace's allocated size when the input workspace is going to be used.
-    if(workspace != nullptr && workspaceSize != 0)
-    {
-        RETURN_IF_HIP_ERROR(hipMemPtrGetInfo(workspace, &workspaceSizeIn));
-        workspaceSizeIn = min(workspaceSizeIn, workspaceSize);
-    }
-
-    // If search is enabled, it will search avaiable solutions with input workspace size.
-    if(workspaceSizeIn && workspaceSizeIn < workspaceSize)
-    {
-        if(search)
-        {
-            std::ostringstream stringStream;
-            stringStream << "The parameter number 9 (workspace) required a device memroy with ";
-            stringStream << workspaceSize  << " bytes, but current is " << workspaceSizeIn << " bytes.\n";
-            stringStream << "Some of the solutions will be skiped during the Search.";
-            auto msg = stringStream.str();
-            hipsparselt_cout << msg << std::endl;
-            log_info(_handle, caller, msg);
-        }
-        else
-        {
-            std::ostringstream stringStream;
-            stringStream << "The parameter number 9 (workspace) had an illegal value expected a device memroy with ";
-            stringStream << workspaceSize  << " bytes, but current is " << workspaceSizeIn << " bytes.";
-            auto msg = stringStream.str();
-            hipsparselt_cerr << msg << std::endl;
-            log_error(_handle, caller, msg);
-            return rocsparselt_status_invalid_value;
-        }
+        hipsparselt_cerr << "The parameter number 9 (workspace) had an illegal value "
+                            "expected a device memroy with "
+                         << workspaceSize << " bytes, but current is nullptr" << std::endl;
+        log_error(_handle, caller, "expected workspace is not a NULL pointer");
+        return rocsparselt_status_invalid_value;
     }
 
     if(numStreams < 0)
@@ -242,8 +200,8 @@ rocsparselt_status rocsparselt_matmul_impl(const char*                    caller
     int config_max_id     = _plan->alg_selection->config_max_id;
     int search_iterations = search ? _plan->alg_selection->search_iterations : 0; //default
 
-#define EX_PARM                                                                                               \
-    caller, _handle, _plan, alpha, beta, d_A, d_B, d_C, d_D, workspace, workspaceSizeIn, streams, numStreams, \
+#define EX_PARM                                                                              \
+    caller, _handle, _plan, alpha, beta, d_A, d_B, d_C, d_D, workspace, streams, numStreams, \
         &config_id, config_max_id, search_iterations
 
     log_api(_handle,
@@ -265,7 +223,7 @@ rocsparselt_status rocsparselt_matmul_impl(const char*                    caller
             "workspace[in]",
             workspace,
             "workspaceSize[in]",
-            workspaceSizeIn,
+            workspaceSize,
             "streams[in]",
             streams,
             "numStreams[in]",
@@ -527,14 +485,7 @@ GENERATE_DEFINITIONS(hip_bfloat16, hip_bfloat16, float)
 GENERATE_DEFINITIONS(int8_t, int8_t, float)
 GENERATE_DEFINITIONS(int8_t, __half, float)
 GENERATE_DEFINITIONS(int8_t, hip_bfloat16, float)
-GENERATE_DEFINITIONS(int8_t, int32_t, float)
-#if HIP_FP8_TYPE_OCP
 GENERATE_DEFINITIONS(__hip_fp8_e4m3, float, float)
 GENERATE_DEFINITIONS(__hip_fp8_e5m2, float, float)
-#endif
-#if HIP_FP8_TYPE_FNUZ
-GENERATE_DEFINITIONS(__hip_fp8_e4m3_fnuz, float, float)
-GENERATE_DEFINITIONS(__hip_fp8_e5m2_fnuz, float, float)
-#endif
 
 #undef GENERATE_DEFINITIONS

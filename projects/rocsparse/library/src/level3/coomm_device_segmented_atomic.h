@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
  * ************************************************************************ */
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -38,8 +38,6 @@ namespace rocsparse
               typename C>
     ROCSPARSE_DEVICE_ILF void coommnn_segmented_atomic_device(rocsparse_operation  trans_B,
                                                               int64_t              nnz,
-                                                              I                    m,
-                                                              I                    n,
                                                               I                    nstart,
                                                               int64_t              batch_stride_A,
                                                               T                    alpha,
@@ -59,9 +57,6 @@ namespace rocsparse
         const int lid = tid & (WF_SIZE - 1);
 
         const int batch = hipBlockIdx_z;
-
-        // Compute size of dense_C for 4-argument atomic_add
-        const int64_t dense_C_size = (order_C == rocsparse_order_column) ? (ldc * n) : (m * ldc);
 
         // Shared memory to hold row indices and values for segmented reduction
         __shared__ I shared_row[WF_SIZE];
@@ -159,22 +154,18 @@ namespace rocsparse
                     {
                         for(uint32_t p = 0; p < COLS; p++)
                         {
-                            rocsparse::atomic_add(dense_C,
-                                                  prevrow + (col_offset + p) * ldc
-                                                      + batch_stride_C * batch,
-                                                  dense_C_size,
-                                                  static_cast<C>(shared_val[p][WF_SIZE - 1]));
+                            rocsparse::atomic_add(
+                                &dense_C[prevrow + (col_offset + p) * ldc + batch_stride_C * batch],
+                                static_cast<C>(shared_val[p][WF_SIZE - 1]));
                         }
                     }
                     else
                     {
                         for(uint32_t p = 0; p < COLS; p++)
                         {
-                            rocsparse::atomic_add(dense_C,
-                                                  col_offset + p + prevrow * ldc
-                                                      + batch_stride_C * batch,
-                                                  dense_C_size,
-                                                  static_cast<C>(shared_val[p][WF_SIZE - 1]));
+                            rocsparse::atomic_add(
+                                &dense_C[(col_offset + p) + prevrow * ldc + batch_stride_C * batch],
+                                static_cast<C>(shared_val[p][WF_SIZE - 1]));
                         }
                     }
                 }
@@ -224,22 +215,18 @@ namespace rocsparse
                     {
                         for(uint32_t p = 0; p < COLS; p++)
                         {
-                            rocsparse::atomic_add(dense_C,
-                                                  row + (col_offset + p) * ldc
-                                                      + batch_stride_C * batch,
-                                                  dense_C_size,
-                                                  static_cast<C>(val[p]));
+                            rocsparse::atomic_add(
+                                &dense_C[row + (col_offset + p) * ldc + batch_stride_C * batch],
+                                static_cast<C>(val[p]));
                         }
                     }
                     else
                     {
                         for(uint32_t p = 0; p < COLS; p++)
                         {
-                            rocsparse::atomic_add(dense_C,
-                                                  col_offset + p + row * ldc
-                                                      + batch_stride_C * batch,
-                                                  dense_C_size,
-                                                  static_cast<C>(val[p]));
+                            rocsparse::atomic_add(
+                                &dense_C[(col_offset + p) + row * ldc + batch_stride_C * batch],
+                                static_cast<C>(val[p]));
                         }
                     }
                 }
@@ -253,20 +240,18 @@ namespace rocsparse
             {
                 for(uint32_t p = 0; p < COLS; p++)
                 {
-                    rocsparse::atomic_add(dense_C,
-                                          row + (col_offset + p) * ldc + batch_stride_C * batch,
-                                          dense_C_size,
-                                          static_cast<C>(val[p]));
+                    rocsparse::atomic_add(
+                        &dense_C[row + (col_offset + p) * ldc + batch_stride_C * batch],
+                        static_cast<C>(val[p]));
                 }
             }
             else
             {
                 for(uint32_t p = 0; p < COLS; p++)
                 {
-                    rocsparse::atomic_add(dense_C,
-                                          col_offset + p + row * ldc + batch_stride_C * batch,
-                                          dense_C_size,
-                                          static_cast<C>(val[p]));
+                    rocsparse::atomic_add(
+                        &dense_C[(col_offset + p) + row * ldc + batch_stride_C * batch],
+                        static_cast<C>(val[p]));
                 }
             }
         }

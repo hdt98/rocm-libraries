@@ -18,32 +18,23 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
+#if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_NVCC
 
-#if _CCCL_HAS_CUDA_COMPILER
+#include <thrust/system/cuda/config.h>
 
-#  include <thrust/system/cuda/config.h>
+#include <thrust/detail/raw_pointer_cast.h>
+#include <thrust/system/cuda/detail/execution_policy.h>
+#include <thrust/swap.h>
 
-#  include <thrust/detail/raw_pointer_cast.h>
-#  include <thrust/swap.h>
-#  include <thrust/system/cuda/detail/execution_policy.h>
-
-#  include <cuda/std/utility>
-
-#  include <nv/target>
+#include <nv/target>
 
 THRUST_NAMESPACE_BEGIN
-namespace cuda_cub
-{
+namespace cuda_cub {
 
-template <typename DerivedPolicy, typename Pointer1, typename Pointer2>
-inline _CCCL_HOST_DEVICE void iter_swap(thrust::cuda::execution_policy<DerivedPolicy>&, Pointer1 a, Pointer2 b)
+
+template<typename DerivedPolicy, typename Pointer1, typename Pointer2>
+inline _CCCL_HOST_DEVICE
+void iter_swap(thrust::cuda::execution_policy<DerivedPolicy> &, Pointer1 a, Pointer2 b)
 {
   // XXX war nvbugs/881631
   struct war_nvbugs_881631
@@ -55,15 +46,21 @@ inline _CCCL_HOST_DEVICE void iter_swap(thrust::cuda::execution_policy<DerivedPo
 
     _CCCL_DEVICE inline static void device_path(Pointer1 a, Pointer2 b)
     {
-      using ::cuda::std::swap;
-      swap(*thrust::raw_pointer_cast(a), *thrust::raw_pointer_cast(b));
+      using thrust::swap;
+      swap(*thrust::raw_pointer_cast(a),
+           *thrust::raw_pointer_cast(b));
     }
   };
 
-  NV_IF_TARGET(NV_IS_HOST, (war_nvbugs_881631::host_path(a, b);), (war_nvbugs_881631::device_path(a, b);));
+  NV_IF_TARGET(NV_IS_HOST, (
+    war_nvbugs_881631::host_path(a, b);
+  ), (
+    war_nvbugs_881631::device_path(a, b);
+  ));
 
 } // end iter_swap()
 
-} // namespace cuda_cub
+
+} // end cuda_cub
 THRUST_NAMESPACE_END
 #endif

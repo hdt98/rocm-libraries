@@ -65,7 +65,7 @@ class CSRRF_SOLVE : public ::TestWithParam<csrrf_solve_tuple>
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <typename T>

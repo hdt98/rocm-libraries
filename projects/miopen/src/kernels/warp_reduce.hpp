@@ -26,7 +26,7 @@
 #ifndef GUARD_WARP_REDUCE_HPP
 #define GUARD_WARP_REDUCE_HPP
 
-#ifndef MIOPEN_HIP_RUNTIME_COMPILE
+#ifndef MIOPEN_DONT_USE_HIP_RUNTIME_HEADERS
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 #endif
@@ -47,10 +47,10 @@ struct BinaryFunc<BinaryOp_t::Add, T>
     constexpr void exec(T& a, const T& b) { a += b; }
 };
 
-template <BinaryOp_t Op>
+template <BinaryOp_t Op, uint32_t ws = warpSize>
 __device__ FLOAT_ACCUM warp_reduce(FLOAT_ACCUM val)
 {
-    for(auto d = warpSize / 2; d >= 1; d >>= 1)
+    for(auto d = ws / 2; d >= 1; d >>= 1)
         BinaryFunc<Op, FLOAT_ACCUM>{}.exec(val, __shfl_down(val, d));
     return val;
 }

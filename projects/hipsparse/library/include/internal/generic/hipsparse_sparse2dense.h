@@ -29,16 +29,14 @@ extern "C" {
 #endif
 
 /*! \ingroup generic_module
-*  \details
-*  \p hipsparseSparseToDense_bufferSize computes the required user-allocated buffer size needed when converting
-*  a sparse matrix to a dense matrix. This routine currently accepts the sparse matrix descriptor \p matA in CSR,
-*  CSC, or COO format. This routine is used to determine the size of the buffer needed in \ref hipsparseSparseToDense.
+*  \brief Sparse matrix to dense matrix conversion
 *
-*  \p hipsparseSparseToDense_bufferSize supports different data types for the sparse and dense matrices. See
-*  \ref hipsparseSparseToDense for a complete listing of all the data types available.
+*  \details
+*  \p hipsparseSparseToDense_bufferSize computes the required user allocated buffer size needed when converting 
+*  a sparse matrix to a dense matrix.
 *
 *  @param[in]
-*  handle              handle to the hipSPARSE library context queue.
+*  handle              handle to the hipsparse library context queue.
 *  @param[in]
 *  matA                sparse matrix descriptor.
 *  @param[in]
@@ -72,35 +70,11 @@ hipsparseStatus_t hipsparseSparseToDense_bufferSize(hipsparseHandle_t           
 *  \brief Sparse matrix to dense matrix conversion
 *
 *  \details
-*  \p hipsparseSparseToDense converts a sparse matrix to a dense matrix. This routine accepts
-*  the sparse matrix descriptor \p matA in CSR, CSC, or COO format. It takes a user-allocated buffer
-*  with a size that must first be computed by calling \ref hipsparseSparseToDense_bufferSize.
-*
-*  The conversion of a sparse matrix into a dense one involves two steps. First, the user creates the sparse and
-*  dense matrix descriptors and calls \ref hipsparseSparseToDense_bufferSize to determine the size of the required
-*  temporary storage buffer. The user then allocates this buffer and passes it to \ref hipsparseSparseToDense
-*  to complete the conversion. After the conversion is complete, the user is free to deallocate the storage
-*  buffer. See the full example below for details.
-*
-*  \p hipsparseSparseToDense supports the following uniform precision data types for the sparse and dense matrices \f$A\f$
-*  and \f$B\f$:
-*
-*  \par Uniform Precisions:
-*  <table>
-*  <caption id="sparse2dense_uniform">Uniform Precisions</caption>
-*  <tr><th>A / B
-*  <tr><td>HIP_R_16F
-*  <tr><td>HIP_R_16BF
-*  <tr><td>HIP_R_32F
-*  <tr><td>HIP_R_64F
-*  <tr><td>HIP_C_32F
-*  <tr><td>HIP_C_64F
-*  </table>
-*
-*  \note Currently only the sparse matrix formats CSR, CSC, and COO are supported when converting a sparse matrix to a dense matrix.
+*  \p hipsparseSparseToDense converts a sparse matrix to a dense matrix. This routine takes a user allocated buffer 
+*  whose size must first be computed by calling \ref hipsparseSparseToDense_bufferSize
 *
 *  @param[in]
-*  handle          handle to the hipSPARSE library context queue.
+*  handle          handle to the hipsparse library context queue.
 *  @param[in]
 *  matA            sparse matrix descriptor.
 *  @param[in]

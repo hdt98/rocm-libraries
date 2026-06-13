@@ -33,5 +33,6 @@
 #endif
 #include <rocblaslt.h>
 #include <Debug.hpp>
+hipblasStatus_t hipErrorToHIPBLASStatus(hipError_t status);
 
 hipblasStatus_t RocBlasLtStatusToHIPStatus(rocblaslt_status_ status);

@@ -1,13 +1,8 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #pragma once
-#include <type_traits>
 
 bool run_gemm_add_multiply(const ProblemSize& problem_size, const ExecutionConfig& config)
 {
     using namespace ck::literals;
-    using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
     auto& [M, N, K, StrideA, StrideB, StrideD0, StrideD1, StrideE] = problem_size;
 
@@ -15,11 +10,11 @@ bool run_gemm_add_multiply(const ProblemSize& problem_size, const ExecutionConfi
         [](std::size_t row, std::size_t col, std::size_t stride, auto layout) {
             if constexpr(std::is_same_v<decltype(layout), ck::tensor_layout::gemm::RowMajor>)
             {
-                return HostTensorDescriptor({row, col}, {stride, 1_uz}, Bypass{});
+                return HostTensorDescriptor({row, col}, {stride, 1_uz});
             }
             else
             {
-                return HostTensorDescriptor({row, col}, {1_uz, stride}, Bypass{});
+                return HostTensorDescriptor({row, col}, {1_uz, stride});
             }
         };
 
@@ -128,16 +123,7 @@ bool run_gemm_add_multiply(const ProblemSize& problem_size, const ExecutionConfi
 
         e_device_buf.FromDevice(e_m_n_device_result.mData.data());
 
-        if(std::is_same_v<ck::ranges::range_value_t<decltype(e_m_n_device_result)>, ck::half_t> &&
-           std::is_same_v<ck::ranges::range_value_t<decltype(e_m_n_host_result)>, ck::half_t>)
-        {
-            return ck::utils::check_err(
-                e_m_n_device_result, e_m_n_host_result, "Error: Incorrect results!", 5e-3, 1e-3);
-        }
-        else
-        {
-            return ck::utils::check_err(e_m_n_device_result, e_m_n_host_result);
-        }
+        return ck::utils::check_err(e_m_n_device_result, e_m_n_host_result);
     }
 
     return true;

@@ -50,6 +50,4 @@ __all__ = [
     "StreamK",
     "PersistentLoop",
     "LSU",
-    "TensorDataMover",
-    "GL2Prefetch",
     ]

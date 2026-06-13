@@ -25,6 +25,7 @@
 #include "../../intrinsics/thread.hpp"
 
 #include "lookback_scan_state.hpp"
+#include "ordered_block_id.hpp"
 
 #include <hip/hip_runtime.h>
 
@@ -53,12 +54,12 @@ void access_indexed_lookback_value(LookBackScanState  lookback_scan_state,
     }
 }
 
-template<class LookBackScanState, class BlockIdWrapper>
-ROCPRIM_DEVICE ROCPRIM_INLINE
-void init_lookback_scan_state(LookBackScanState  lookback_scan_state,
-                              const unsigned int number_of_blocks,
-                              BlockIdWrapper     ordered_bid,
-                              unsigned int       flat_thread_id)
+template<typename LookBackScanState>
+ROCPRIM_DEVICE ROCPRIM_INLINE void
+    init_lookback_scan_state(LookBackScanState              lookback_scan_state,
+                             const unsigned int             number_of_blocks,
+                             ordered_block_id<unsigned int> ordered_bid,
+                             unsigned int                   flat_thread_id)
 {
     // Reset ordered_block_id.
     if(flat_thread_id == 0)
@@ -70,24 +71,25 @@ void init_lookback_scan_state(LookBackScanState  lookback_scan_state,
     lookback_scan_state.initialize_prefix(flat_thread_id, number_of_blocks);
 }
 
-template<class LookBackScanState>
-ROCPRIM_DEVICE ROCPRIM_INLINE
-void init_lookback_scan_state(LookBackScanState  lookback_scan_state,
-                              const unsigned int number_of_blocks,
-                              unsigned int       flat_thread_id)
+template<typename LookBackScanState>
+ROCPRIM_DEVICE ROCPRIM_INLINE void init_lookback_scan_state(LookBackScanState  lookback_scan_state,
+                                                            const unsigned int number_of_blocks,
+                                                            unsigned int       flat_thread_id)
 {
 
     // Initialize lookback scan status.
     lookback_scan_state.initialize_prefix(flat_thread_id, number_of_blocks);
 }
 
-template<class LookBackScanState, class WrappedBlockId>
-ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE 
-void init_lookback_scan_state_kernel_impl(LookBackScanState              lookback_scan_state,
-                                          const unsigned int             number_of_blocks,
-                                          WrappedBlockId ordered_bid, // ordered block id is passed by value, so no need to call its constructor
-                                          unsigned int                   save_index,
-                                          typename LookBackScanState::value_type* const save_dest)
+template<typename LookBackScanState>
+ROCPRIM_KERNEL
+    ROCPRIM_LAUNCH_BOUNDS(ROCPRIM_DEFAULT_MAX_BLOCK_SIZE) void
+    init_lookback_scan_state_kernel(LookBackScanState              lookback_scan_state,
+                                    const unsigned int             number_of_blocks,
+                                    ordered_block_id<unsigned int> ordered_bid,
+                                    unsigned int                   save_index = 0,
+                                    typename LookBackScanState::value_type* const save_dest
+                                    = nullptr)
 {
     const unsigned int block_id        = ::rocprim::detail::block_id<0>();
     const unsigned int block_size      = ::rocprim::detail::block_size<0>();
@@ -109,11 +111,13 @@ void init_lookback_scan_state_kernel_impl(LookBackScanState              lookbac
 }
 
 template<typename LookBackScanState>
-ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE 
-void init_lookback_scan_state_kernel_impl(LookBackScanState  lookback_scan_state,
+ROCPRIM_KERNEL
+    ROCPRIM_LAUNCH_BOUNDS(ROCPRIM_DEFAULT_MAX_BLOCK_SIZE) void
+    init_lookback_scan_state_kernel(LookBackScanState  lookback_scan_state,
                                     const unsigned int number_of_blocks,
-                                    unsigned int       save_index,
-                                    typename LookBackScanState::value_type* const save_dest)
+                                    unsigned int       save_index = 0,
+                                    typename LookBackScanState::value_type* const save_dest
+                                    = nullptr)
 {
     const unsigned int block_id        = ::rocprim::detail::block_id<0>();
     const unsigned int block_size      = ::rocprim::detail::block_size<0>();
@@ -134,76 +138,25 @@ void init_lookback_scan_state_kernel_impl(LookBackScanState  lookback_scan_state
     init_lookback_scan_state(lookback_scan_state, number_of_blocks, flat_thread_id);
 }
 
-template<class LookBackScanState, class WrappedBlockId>
-ROCPRIM_KERNEL
-    ROCPRIM_LAUNCH_BOUNDS(ROCPRIM_DEFAULT_MAX_BLOCK_SIZE) void
-    init_lookback_scan_state_kernel(LookBackScanState  lookback_scan_state,
-                                    const unsigned int number_of_blocks,
-                                    WrappedBlockId     ordered_bid,
-                                    unsigned int       save_index = 0,
-                                    typename LookBackScanState::value_type* const save_dest
-                                    = nullptr)
-{
-    init_lookback_scan_state_kernel_impl(lookback_scan_state,
-                                         number_of_blocks,
-                                         ordered_bid,
-                                         save_index,
-                                         save_dest);
-}
-
-template<typename LookBackScanState>
-ROCPRIM_KERNEL
-    ROCPRIM_LAUNCH_BOUNDS(ROCPRIM_DEFAULT_MAX_BLOCK_SIZE) void
-    init_lookback_scan_state_kernel(LookBackScanState  lookback_scan_state,
-                                    const unsigned int number_of_blocks,
-                                    unsigned int       save_index = 0,
-                                    typename LookBackScanState::value_type* const save_dest
-                                    = nullptr)
-{
-    init_lookback_scan_state_kernel_impl(lookback_scan_state,
-                                         number_of_blocks,
-                                         save_index,
-                                         save_dest);
-}
-
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-template<bool Exclusive,
-         class BlockScan,
-         class T,
-         unsigned int ItemsPerThread,
-         class BinaryFunction>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-auto lookback_block_scan(T (&values)[ItemsPerThread],
-                         T&                                reduction,
-                         typename BlockScan::storage_type& storage,
-                         BinaryFunction scan_op) -> typename std::enable_if<!Exclusive>::type
-{
-    BlockScan().inclusive_scan(values, // input
-                               values, // output
-                               reduction,
-                               storage,
-                               scan_op);
-}
-
-template<bool Exclusive,
-         class BlockScan,
-         class T,
-         unsigned int ItemsPerThread,
-         class BinaryFunction>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-auto lookback_block_scan(T (&values)[ItemsPerThread],
-                         T                                 initial_value,
-                         T&                                reduction,
-                         typename BlockScan::storage_type& storage,
-                         BinaryFunction scan_op) -> typename std::enable_if<!Exclusive>::type
-{
-    BlockScan().inclusive_scan(values, // input
-                               initial_value,
-                               values, // output
-                               reduction,
-                               storage,
-                               scan_op);
-}
+    template <bool Exclusive,
+              class BlockScan,
+              class T,
+              unsigned int ItemsPerThread,
+              class BinaryFunction>
+    ROCPRIM_DEVICE ROCPRIM_INLINE auto
+        lookback_block_scan(T (&values)[ItemsPerThread],
+                            T /* initial_value */,
+                            T&                                reduction,
+                            typename BlockScan::storage_type& storage,
+                            BinaryFunction scan_op) -> typename std::enable_if<!Exclusive>::type
+    {
+        BlockScan().inclusive_scan(values, // input
+                                   values, // output
+                                   reduction,
+                                   storage,
+                                   scan_op);
+    }
 
     template <bool Exclusive,
               class BlockScan,

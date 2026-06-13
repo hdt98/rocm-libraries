@@ -5,18 +5,16 @@
 .. _reference:
 
 ********************************************************************
-rocPRIM API Reference
+ rocPRIM API Reference
 ********************************************************************
 
-The rocPRIM API reference is split into the following sections:
-
-* :ref:`types`
-* :ref:`type_traits`
-* :ref:`iterators` 
-* :ref:`intrinsics` 
-* :ref:`data_mov_funcs`
+* :ref:`ops-summary`
+* :ref:`data-type-support`
 * :ref:`dev-index`
 * :ref:`block-index`
 * :ref:`warp-index` 
 * :ref:`thread-index` 
-
+* :ref:`iterators` 
+* :ref:`intrinsics` 
+* :ref:`type_traits` 
+* :ref:`types`

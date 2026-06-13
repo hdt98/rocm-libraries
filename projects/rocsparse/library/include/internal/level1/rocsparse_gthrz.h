@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,12 +28,10 @@
 #include "../../rocsparse-types.h"
 #include "rocsparse/rocsparse-export.h"
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 /*! \ingroup level1_module
-*  \brief Gather and zero out elements from a dense vector and store them in a sparse
+*  \brief Gather and zero out elements from a dense vector and store them into a sparse
 *  vector.
 *
 *  \details
@@ -50,14 +48,14 @@ extern "C" {
 *  \endcode
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  nnz         number of non-zero entries of \f$x\f$.
 *  @param[inout]
@@ -74,7 +72,7 @@ extern "C" {
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
 *  \retval     rocsparse_status_invalid_value \p idx_base is invalid.
 *  \retval     rocsparse_status_invalid_size \p nnz is invalid.
-*  \retval     rocsparse_status_invalid_pointer \p y, \p x_val, or \p x_ind pointer is
+*  \retval     rocsparse_status_invalid_pointer \p y, \p x_val or \p x_ind pointer is
 *              invalid.
 */
 /**@{*/
@@ -110,8 +108,6 @@ rocsparse_status rocsparse_zgthrz(rocsparse_handle          handle,
                                   const rocsparse_int*      x_ind,
                                   rocsparse_index_base      idx_base);
 /**@}*/
-#ifdef __cplusplus
 }
-#endif
 
 #endif // ROCSPARSE_GTHRZ_H

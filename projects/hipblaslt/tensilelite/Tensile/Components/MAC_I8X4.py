@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,14 +22,12 @@
 #
 ################################################################################
 
-from rocisa.code import Module
-from rocisa.enum import DataTypeEnum
-from ..Common.DataType import DataType
+from ..TensileInstructions import DataType, Module
 from ..Component import Component, MAC
 
 class MAC_I8X4_Plain(MAC):
     asmCaps = {"VOP3v_dot4_i32_i8": True}
-    kernel = {"ProblemType": {"DataType": DataType(DataTypeEnum.Int8x4)}}
+    kernel = {"ProblemType": {"DataType": DataType(DataType.int8x4)}}
 
     def __call__(self, writer, m, innerUnroll):
         kernel = writer.states.kernel
@@ -51,7 +49,7 @@ class MAC_I8X4_Plain(MAC):
                     cStr         = "v[vgprValuC+{a}+{b}*{ThreadTile0}]".format_map(vars)
                     aStr         = "v[vgprValuA_X{m}_I{iui}+{a}]".format_map(vars)
                     bStr         = "v[vgprValuB_X{m}_I{iui}+{b}]".format_map(vars)
-                    module.addInst("v_dot4_i32_i8", cStr, aStr, bStr, cStr, "valuC[%u]" % cidx)
+                    module.addInst("v_dot4_i32_i8", cStr, aStr, bStr, cStr, "op_sel:[0,0]", "op_sel_hi:[1,1]", "valuC[%u]" % cidx)
                     module.add(priority(writer, 1, "Raise priority while processing macs"))
 
         module.add(priority(writer, 0, "Reset priority after macs"))

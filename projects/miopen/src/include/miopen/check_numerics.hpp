@@ -1,6 +1,3 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
-
 #ifndef GUARD_MIOPEN_CHECK_NUMERICS_HPP
 #define GUARD_MIOPEN_CHECK_NUMERICS_HPP
 
@@ -20,12 +17,13 @@ struct CheckNumerics
     static const int ComputeStats = 0x10; // Print mean/absmean/min/max (slow)
 };
 
-bool CheckNumericsEnabled(int bitMask = -1);
+MIOPEN_INTERNALS_EXPORT bool CheckNumericsEnabled(int bitMask = -1);
 
 MIOPEN_INTERNALS_EXPORT bool
 checkNumericsInput(const Handle& handle, const TensorDescriptor& dDesc, ConstData_t data);
-bool checkNumericsOutput(const Handle& handle, const TensorDescriptor& dDesc, ConstData_t data);
-bool checkNumericsImpl(
+MIOPEN_INTERNALS_EXPORT bool
+checkNumericsOutput(const Handle& handle, const TensorDescriptor& dDesc, ConstData_t data);
+MIOPEN_INTERNALS_EXPORT bool checkNumericsImpl(
     const Handle& handle, int mode, const TensorDescriptor& dDesc, ConstData_t data, bool isInput);
 } // namespace miopen
 

@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -17,7 +17,6 @@ namespace tensor_operation {
 namespace device {
 namespace instance {
 
-#if defined(CK_USE_XDL)
 void add_device_grouped_gemm_xdl_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_comp_default_instances(
     std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
                                                           Row,
@@ -173,21 +172,6 @@ void add_device_grouped_gemm_xdl_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_mem_v2
                                                           PassThrough,
                                                           PassThrough,
                                                           Multiply>>>& instances);
-#endif // CK_USE_XDL
-#if defined(CK_USE_WMMA)
-void add_device_grouped_gemm_wmma_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_instances(
-    std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
-                                                          Row,
-                                                          Row_Tuple,
-                                                          Row,
-                                                          BF16,
-                                                          I8,
-                                                          BF16_Tuple,
-                                                          BF16,
-                                                          PassThrough,
-                                                          PassThrough,
-                                                          Multiply>>>& instances);
-#endif
 
 template <typename ALayout,
           typename BLayout,
@@ -232,7 +216,6 @@ struct DeviceOperationInstanceFactory<
             if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
                          is_same_v<ELayout, Row>)
             {
-#if defined(CK_USE_XDL)
                 add_device_grouped_gemm_xdl_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_comp_default_instances(
                     op_ptrs);
                 add_device_grouped_gemm_xdl_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_comp_mnkpadding_instances(
@@ -257,18 +240,12 @@ struct DeviceOperationInstanceFactory<
                     op_ptrs);
                 add_device_grouped_gemm_xdl_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_mem_v2_kpadding_instances(
                     op_ptrs);
-#endif // CK_USE_XDL
-#if defined(CK_USE_WMMA)
-                add_device_grouped_gemm_wmma_tile_loop_multiply_bf16_i8_bf16_mk_kn_mn_instances(
-                    op_ptrs);
-#endif // CK_USE_WMMA
             }
         }
         return op_ptrs;
     }
 };
 
-#if defined(CK_USE_XDL)
 void add_device_grouped_gemm_xdl_tile_loop_multiply_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
     std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
                                                           Row,
@@ -281,21 +258,7 @@ void add_device_grouped_gemm_xdl_tile_loop_multiply_fastgelu_bf16_i8_bf16_mk_kn_
                                                           PassThrough,
                                                           PassThrough,
                                                           MultiplyFastGelu>>>& instances);
-#endif
-#if defined(CK_USE_WMMA)
-void add_device_grouped_gemm_wmma_tile_loop_multiply_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
-    std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
-                                                          Row,
-                                                          Row_Tuple,
-                                                          Row,
-                                                          BF16,
-                                                          I8,
-                                                          BF16_Tuple,
-                                                          BF16,
-                                                          PassThrough,
-                                                          PassThrough,
-                                                          MultiplyFastGelu>>>& instances);
-#endif
+
 template <typename ALayout,
           typename BLayout,
           typename D0Layout,
@@ -339,21 +302,14 @@ struct DeviceOperationInstanceFactory<
             if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
                          is_same_v<ELayout, Row>)
             {
-#if defined(CK_USE_XDL)
                 add_device_grouped_gemm_xdl_tile_loop_multiply_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
                     op_ptrs);
-#endif
-#if defined(CK_USE_WMMA)
-                add_device_grouped_gemm_wmma_tile_loop_multiply_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
-                    op_ptrs);
-#endif
             }
         }
         return op_ptrs;
     }
 };
 
-#if defined(CK_USE_XDL)
 void add_device_grouped_gemm_xdl_tile_loop_multiply_bias_bf16_i8_bf16_mk_kn_mn_instances(
     std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
                                                           Row,
@@ -366,21 +322,6 @@ void add_device_grouped_gemm_xdl_tile_loop_multiply_bias_bf16_i8_bf16_mk_kn_mn_i
                                                           PassThrough,
                                                           PassThrough,
                                                           MultiplyAdd>>>& instances);
-#endif
-#if defined(CK_USE_WMMA)
-void add_device_grouped_gemm_wmma_tile_loop_multiply_bias_bf16_i8_bf16_mk_kn_mn_instances(
-    std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
-                                                          Row,
-                                                          Row_Row_Tuple,
-                                                          Row,
-                                                          BF16,
-                                                          I8,
-                                                          BF16_BF16_Tuple,
-                                                          BF16,
-                                                          PassThrough,
-                                                          PassThrough,
-                                                          MultiplyAdd>>>& instances);
-#endif
 
 template <typename ALayout,
           typename BLayout,
@@ -427,20 +368,14 @@ struct DeviceOperationInstanceFactory<
             if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
                          is_same_v<ELayout, Row>)
             {
-#if defined(CK_USE_XDL)
                 add_device_grouped_gemm_xdl_tile_loop_multiply_bias_bf16_i8_bf16_mk_kn_mn_instances(
                     op_ptrs);
-#endif
-#if defined(CK_USE_WMMA)
-                add_device_grouped_gemm_wmma_tile_loop_multiply_bias_bf16_i8_bf16_mk_kn_mn_instances(
-                    op_ptrs);
-#endif
             }
         }
         return op_ptrs;
     }
 };
-#if defined(CK_USE_XDL)
+
 void add_device_grouped_gemm_xdl_tile_loop_multiply_bias_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
     std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
                                                           Row,
@@ -453,21 +388,6 @@ void add_device_grouped_gemm_xdl_tile_loop_multiply_bias_fastgelu_bf16_i8_bf16_m
                                                           PassThrough,
                                                           PassThrough,
                                                           MultiplyAddFastGelu>>>& instances);
-#endif
-#if defined(CK_USE_WMMA)
-void add_device_grouped_gemm_wmma_tile_loop_multiply_bias_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
-    std::vector<std::unique_ptr<DeviceGroupedGemmTileLoop<Row,
-                                                          Row,
-                                                          Row_Row_Tuple,
-                                                          Row,
-                                                          BF16,
-                                                          I8,
-                                                          BF16_BF16_Tuple,
-                                                          BF16,
-                                                          PassThrough,
-                                                          PassThrough,
-                                                          MultiplyAddFastGelu>>>& instances);
-#endif
 
 template <typename ALayout,
           typename BLayout,
@@ -514,14 +434,8 @@ struct DeviceOperationInstanceFactory<
             if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
                          is_same_v<ELayout, Row>)
             {
-#if defined(CK_USE_XDL)
                 add_device_grouped_gemm_xdl_tile_loop_multiply_bias_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
                     op_ptrs);
-#endif
-#if defined(CK_USE_WMMA)
-                add_device_grouped_gemm_wmma_tile_loop_multiply_bias_fastgelu_bf16_i8_bf16_mk_kn_mn_instances(
-                    op_ptrs);
-#endif
             }
         }
         return op_ptrs;

@@ -36,6 +36,7 @@
 #include "../intrinsics/thread.hpp"
 #include "../thread/thread_search.hpp"
 
+#include <hip/hip_cooperative_groups.h>
 #include <hip/hip_runtime.h>
 
 #include <chrono>
@@ -262,8 +263,7 @@ struct merge_inplace_impl
     static auto get_num_global_divisions(size_t left_size, size_t right_size)
     {
         const offset_t max_size = max(left_size, right_size);
-        const int32_t  set_bits = max_size == 0 ? std::numeric_limits<size_t>::digits :
-                                  std::numeric_limits<size_t>::digits - clz(max_size);
+        const int32_t  set_bits = std::numeric_limits<size_t>::digits - clz(max_size);
 
         // compute 2 + ceil(log_2(max(left, right))) - log_2(items_per_thread)
         return max(2, 2 + set_bits - Log2<block_merge_items_per_block>::VALUE);
@@ -378,11 +378,11 @@ struct merge_inplace_impl
 
             const offset_t left_index  = left_start + reverse_offset;
             const offset_t right_index = right_end - reverse_offset - 1;
-            const bool     swap        = left_index != right_index;
 
-            ::rocprim::detail::swap_if<rocprim::detail::swap_method::ternary>(swap,
-                                                                              data[left_index],
-                                                                              data[right_index]);
+            if(left_index != right_index)
+            {
+                rocprim::swap(data[left_index], data[right_index]);
+            }
         }
     }
 
@@ -424,11 +424,11 @@ struct merge_inplace_impl
 
             const auto left_index  = pivot.left + work_offset;
             const auto right_index = pivot.right - work_offset - 1;
-            const bool swap        = left_index != right_index;
 
-            ::rocprim::detail::swap_if<rocprim::detail::swap_method::ternary>(swap,
-                                                                              data[left_index],
-                                                                              data[right_index]);
+            if(left_index != right_index)
+            {
+                rocprim::swap(data[left_index], data[right_index]);
+            }
         }
     }
 
@@ -555,7 +555,7 @@ struct merge_inplace_impl
     ROCPRIM_DETAIL_GENERATE_DISPATCH_KERNEL(update_work_tree);
 #undef ROCPRIM_DETAIL_GENERATE_DISPATCH_KERNEL
 
-    static ROCPRIM_KERNEL
+    static __global__
     void block_merge_kernel(iterator_t     data,
                             size_t         num_items,
                             BinaryFunction compare_function,
@@ -652,7 +652,7 @@ struct merge_inplace_impl
 /// signature of the function should be equivalent to the following: `bool f(const T &a, const T &b);`.
 /// The signature does not need to have `const &`, but the function object must not modify
 /// the objects passed to it. The default value is `BinaryFunction()`.
-/// \param [in] stream The HIP stream object. Default is `0` (`hipStreamDefault`).
+/// \param [in] stream The HIP stream object. Default is `0` (`hipDefaultStream`).
 /// \param [in] debug_synchronous If `true`, forces a device synchronization after every kernel
 /// launch in order to check for errors. Default value is `false`.
 ///
@@ -662,9 +662,6 @@ struct merge_inplace_impl
 /// \par Example
 /// \parblock
 /// \code{.cpp}
-///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/device/example_device_merge_inplace.cpp).
-///
 /// #include <rocprim/rocprim.hpp>
 ///
 /// size_t left_size;  // e.g. 4
@@ -889,24 +886,20 @@ inline hipError_t merge_inplace(void*             temporary_storage,
                                                                    block_block_size,
                                                                    impl::block_merge_kernel,
                                                                    stream));
-
-    const int min_grid_size = rocprim::min(
-        block_merge_grid_size,
-        static_cast<int>(rocprim::detail::ceiling_div(left_size + right_size, block_block_size)));
-
     if(debug_synchronous)
     {
         std::cout << "block_merge_kernel\n"
-                  << "  grid_size     : " << min_grid_size << "\n"
+                  << "  grid_size     : " << block_merge_grid_size << "\n"
                   << "  block_size    : " << block_block_size << std::endl;
     }
 
     // each of the sub merging problem can be solved within a block
-    impl::block_merge_kernel<<<min_grid_size, block_block_size, 0, stream>>>(data,
-                                                                             left_size + right_size,
-                                                                             compare_function,
-                                                                             work_storage,
-                                                                             scratch_storage);
+    impl::block_merge_kernel<<<block_merge_grid_size, block_block_size, 0, stream>>>(
+        data,
+        left_size + right_size,
+        compare_function,
+        work_storage,
+        scratch_storage);
     ROCPRIM_RETURN_ON_ERROR(hipGetLastError());
     if(debug_synchronous)
     {

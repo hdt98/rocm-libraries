@@ -17,7 +17,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/allocator_aware_execution_policy.h>
 #include <thrust/system/cpp/detail/execution_policy.h>
 
@@ -29,27 +28,33 @@ namespace cpp
 namespace detail
 {
 
-struct par_t
-    : thrust::system::cpp::detail::execution_policy<par_t>
-    , thrust::detail::allocator_aware_execution_policy<thrust::system::cpp::detail::execution_policy>
+
+struct par_t : thrust::system::cpp::detail::execution_policy<par_t>,
+  thrust::detail::allocator_aware_execution_policy<
+    thrust::system::cpp::detail::execution_policy>
 {
-  THRUST_HOST_DEVICE constexpr par_t()
-      : thrust::system::cpp::detail::execution_policy<par_t>()
-  {}
+  THRUST_HOST_DEVICE
+  constexpr par_t() : thrust::system::cpp::detail::execution_policy<par_t>() {}
 };
 
-} // namespace detail
+
+} // end detail
+
 
 THRUST_INLINE_CONSTANT detail::par_t par;
 
-} // namespace cpp
-} // namespace system
+
+} // end cpp
+} // end system
+
 
 // alias par here
 namespace cpp
 {
 
+
 using thrust::system::cpp::par;
 
-} // namespace cpp
+
+} // end cpp
 THRUST_NAMESPACE_END

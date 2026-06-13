@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #include "internal/extra/rocsparse_bsrgeam.h"
 #include "rocsparse_csrgeam.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "bsrgeam_device.h"
 
@@ -480,12 +480,10 @@ namespace rocsparse
                 handle->pointer_mode == rocsparse_pointer_mode_host);
 #undef BSRGEAM_DIM
         }
-        // LCOV_EXCL_START
         else
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-        // LCOV_EXCL_STOP
 
         return rocsparse_status_success;
     }
@@ -518,31 +516,29 @@ namespace rocsparse
         // Stream
         if(block_dim == 1)
         {
-            void* temp_buffer = nullptr;
-            RETURN_IF_ROCSPARSE_ERROR((rocsparse::csrgeam_template<T, rocsparse_int, rocsparse_int>(
-                handle,
-                rocsparse_operation_none,
-                rocsparse_operation_none,
-                mb,
-                nb,
-                alpha_device_host,
-                descr_A,
-                nnzb_A,
-                bsr_val_A,
-                bsr_row_ptr_A,
-                bsr_col_ind_A,
-                beta_device_host,
-                descr_B,
-                nnzb_B,
-                bsr_val_B,
-                bsr_row_ptr_B,
-                bsr_col_ind_B,
-                descr_C,
-                bsr_val_C,
-                bsr_row_ptr_C,
-                bsr_col_ind_C,
-                temp_buffer)));
-
+            RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrgeam_template(handle,
+                                                                  rocsparse_operation_none,
+                                                                  rocsparse_operation_none,
+                                                                  mb,
+                                                                  nb,
+                                                                  alpha_device_host,
+                                                                  descr_A,
+                                                                  nnzb_A,
+                                                                  bsr_val_A,
+                                                                  bsr_row_ptr_A,
+                                                                  bsr_col_ind_A,
+                                                                  beta_device_host,
+                                                                  descr_B,
+                                                                  nnzb_B,
+                                                                  bsr_val_B,
+                                                                  bsr_row_ptr_B,
+                                                                  bsr_col_ind_B,
+                                                                  descr_C,
+                                                                  bsr_val_C,
+                                                                  bsr_row_ptr_C,
+                                                                  bsr_col_ind_C,
+                                                                  nullptr,
+                                                                  nullptr));
             return rocsparse_status_success;
         }
 

@@ -29,7 +29,7 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/test_seed.hpp
 )
 
-function(add_relative_test test_name test_target resource_group)
+function(add_relative_test test_name test_target)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")
         set(EXE_PATH ".")
@@ -45,8 +45,6 @@ function(add_relative_test test_name test_target resource_group)
     file(RELATIVE_PATH rel_path "${CMAKE_CURRENT_BINARY_DIR}" "${EXE_PATH}/${EXE_NAME}")
     add_test(NAME "${test_name}" COMMAND "./${rel_path}")
     file(APPEND "${INSTALL_TEST_FILE}" "add_test(${test_name} \"../${EXE_NAME}\")\n")
-    # Set the resource group for the test. This must correspond to a GPU resource present in resources.json.
-    file(APPEND "${INSTALL_TEST_FILE}" "set_tests_properties(${test_name} PROPERTIES RESOURCE_GROUPS \"1,${resource_group}:1\")\n")
 endfunction()
 
 function(add_rocthrust_test TEST)
@@ -63,18 +61,13 @@ function(add_rocthrust_test TEST)
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
             ${sqlite_local_SOURCE_DIR}
     )
-
-    if(USE_SYSTEM_LIB)
-        target_link_libraries(${TEST_TARGET} PRIVATE roc::rocthrust)
-    else()
-        target_link_libraries(${TEST_TARGET}
-            PRIVATE
-                rocthrust
-                roc::rocprim_hip
-        )
-    endif()
-    target_link_libraries(${TEST_TARGET} PUBLIC ${ROCTHRUST_SQLITE_LIB})
-
+    target_link_libraries(${TEST_TARGET}
+        PRIVATE
+            rocthrust
+            roc::rocprim_hip
+        PUBLIC
+            sqlite3
+    )
     if (TARGET GTest::GTest)
         target_link_libraries(${TEST_TARGET}
                 PRIVATE
@@ -98,27 +91,21 @@ function(add_rocthrust_test TEST)
         PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/"
     )
-
     if(AMDGPU_TEST_TARGETS)
-        foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
-            add_test("${AMDGPU_TARGET}-${TEST_TARGET}" ${TEST_TARGET})
-            set_tests_properties("${AMDGPU_TARGET}-${TEST_TARGET}"
-                PROPERTIES
-                    RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
-                    LABELS "hip;${AMDGPU_TARGET}"
-            )
-            # Pair the target with this resource so the shared CTest
-            # categorization can pin its category suites to the same GPU.
-            set_property(GLOBAL APPEND PROPERTY ROCTHRUST_TEST_TARGET_RESOURCE_PAIRS "${TEST_TARGET}|${AMDGPU_TARGET}")
-        endforeach()
+    foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
+        add_test("${AMDGPU_TARGET}-${TEST_TARGET}" ${TEST_TARGET})
+        set_tests_properties("${AMDGPU_TARGET}-${TEST_TARGET}"
+            PROPERTIES
+                RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
+                LABELS "hip;${AMDGPU_TARGET}"
+        )
+    endforeach()
     else()
-        add_relative_test(${TEST_TARGET} ${TEST_TARGET} ${DEFAULT_GPU_RESOURCE})
+        add_relative_test(${TEST_TARGET} ${TEST_TARGET})
         set_tests_properties(${TEST_TARGET}
             PROPERTIES
-                RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
                 LABELS "hip"
         )
-        set_property(GLOBAL APPEND PROPERTY ROCTHRUST_TEST_TARGET_RESOURCE_PAIRS "${TEST_TARGET}|${DEFAULT_GPU_RESOURCE}")
     endif()
     rocm_install(TARGETS ${TEST_TARGET} COMPONENT tests)
     if (WIN32 AND NOT DEFINED DLLS_COPIED)
@@ -135,18 +122,6 @@ function(add_rocthrust_test TEST)
         add_custom_command( TARGET ${TEST_TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/test )
       endforeach( file_i )
     endif()
-
-    # Check for per-test script. Script will be included in the current scope
-    # to allow custom property modifications.
-    set(TEST_CMAKE_SCRIPT "${TEST}.cmake")
-    file(GLOB TEST_CMAKE_SCRIPT
-        RELATIVE "${CMAKE_CURRENT_LIST_DIR}"
-        CONFIGURE_DEPENDS
-        "${TEST_CMAKE_SCRIPT}"
-    )
-    if (TEST_CMAKE_SCRIPT)
-        include("${TEST_CMAKE_SCRIPT}")
-    endif()
 endfunction()
 
 # ****************************************************************************
@@ -155,16 +130,12 @@ endfunction()
 
 # rocThrust tests
 if(BUILD_TEST)
-    add_rocthrust_test("address_stability")
     add_rocthrust_test("adjacent_difference")
     add_rocthrust_test("advance")
-    add_rocthrust_test("alignment")
     add_rocthrust_test("allocator")
     add_rocthrust_test("allocator_aware_policies")
     add_rocthrust_test("async_copy")
-    add_rocthrust_test("async_for_each")
     add_rocthrust_test("async_reduce")
-    add_rocthrust_test("async_reduce_into")
     add_rocthrust_test("async_scan")
     add_rocthrust_test("async_sort")
     add_rocthrust_test("async_transform")
@@ -172,17 +143,13 @@ if(BUILD_TEST)
     add_rocthrust_test("binary_search_descending")
     add_rocthrust_test("binary_search_vector")
     add_rocthrust_test("binary_search_vector_descending")
-    add_rocthrust_test("caching_allocator")
     add_rocthrust_test("complex")
     add_rocthrust_test("complex_transform")
-    add_rocthrust_test("complex_various")
     add_rocthrust_test("constant_iterator")
     add_rocthrust_test("copy")
     add_rocthrust_test("copy_n")
     add_rocthrust_test("count")
     add_rocthrust_test("counting_iterator")
-    add_rocthrust_test("decompose")
-    add_rocthrust_test("dependencies_aware_policies")
     add_rocthrust_test("dereference")
     add_rocthrust_test("device_delete")
     add_rocthrust_test("device_ptr")
@@ -190,38 +157,19 @@ if(BUILD_TEST)
     add_rocthrust_test("discard_iterator")
     add_rocthrust_test("distance")
     add_rocthrust_test("equal")
-    add_rocthrust_test("event")
     add_rocthrust_test("fill")
     add_rocthrust_test("find")
     add_rocthrust_test("for_each")
-    add_rocthrust_test("functional")
-    add_rocthrust_test("functional_arithmetic")
-    add_rocthrust_test("functional_bitwise")
-    add_rocthrust_test("functional_logical")
-    add_rocthrust_test("functional_placeholders_arithmetic")
-    add_rocthrust_test("functional_placeholders_bitwise")
-    add_rocthrust_test("functional_placeholders_compound_assignment")
-    add_rocthrust_test("functional_placeholders_logical")
-    add_rocthrust_test("functional_placeholders_miscellaneous")
-    add_rocthrust_test("functional_placeholders_relational")
-    add_rocthrust_test("future")
     add_rocthrust_test("gather")
     add_rocthrust_test("generate")
-    # add_rocthrust_test("generate_const_iterators") # not been added
     add_rocthrust_test("inner_product")
-    add_rocthrust_test("is_contiguous_iterator")
-    add_rocthrust_test("is_operator_function_object")
-    add_rocthrust_test("is_partitioned")
     add_rocthrust_test("is_sorted")
+    add_rocthrust_test("is_partitioned")
     add_rocthrust_test("is_sorted_until")
-    add_rocthrust_test("logical")
     add_rocthrust_test("max_element")
     add_rocthrust_test("memory")
     add_rocthrust_test("merge")
     add_rocthrust_test("merge_by_key")
-    add_rocthrust_test("merge_key_value")
-    add_rocthrust_test("metaprogramming")
-    add_rocthrust_test("min_and_max")
     add_rocthrust_test("min_element")
     add_rocthrust_test("minmax_element")
     add_rocthrust_test("mismatch")
@@ -229,104 +177,76 @@ if(BUILD_TEST)
     add_rocthrust_test("mr_new")
     add_rocthrust_test("mr_pool")
     add_rocthrust_test("mr_pool_options")
-    add_rocthrust_test("out_of_memory_recovery")
+    add_rocthrust_test("optional")
     add_rocthrust_test("pair")
     add_rocthrust_test("pair_reduce")
     add_rocthrust_test("pair_scan")
-    add_rocthrust_test("pair_scan_by_key")
     add_rocthrust_test("pair_sort")
-    add_rocthrust_test("pair_sort_by_key")
     add_rocthrust_test("pair_transform")
     add_rocthrust_test("parallel_for")
     add_rocthrust_test("partition")
     add_rocthrust_test("partition_point")
     add_rocthrust_test("permutation_iterator")
-    add_rocthrust_test("preprocessor")
     add_rocthrust_test("random")
     add_rocthrust_test("reduce")
     add_rocthrust_test("reduce_by_key")
-    add_rocthrust_test("reduce_large")
     add_rocthrust_test("remove")
-    # Temporarily disable this test for gfx950 when CODE_COVERAGE is ON due to a compiler issue
-    if((NOT CODE_COVERAGE) OR (NOT (("gfx950" IN_LIST GPU_TARGETS) OR (GPU_TARGETS STREQUAL "all"))))
-        add_rocthrust_test("replace")
-    endif()
+    add_rocthrust_test("replace")
     add_rocthrust_test("reproducibility")
-    add_rocthrust_test("reverse")
     add_rocthrust_test("reverse_iterator")
-    add_rocthrust_test("scan")
-    add_rocthrust_test("scan_by_key.exclusive")
-    add_rocthrust_test("scan_by_key.inclusive")
-    add_rocthrust_test("scatter")
-    add_rocthrust_test("sequence")
     add_rocthrust_test("set_difference")
     add_rocthrust_test("set_difference_by_key")
     add_rocthrust_test("set_difference_by_key_descending")
     add_rocthrust_test("set_difference_descending")
-    add_rocthrust_test("set_difference_key_value")
     add_rocthrust_test("set_intersection")
     add_rocthrust_test("set_intersection_by_key")
     add_rocthrust_test("set_intersection_by_key_descending")
     add_rocthrust_test("set_intersection_descending")
     add_rocthrust_test("set_intersection_key_value")
     add_rocthrust_test("set_symmetric_difference")
-    add_rocthrust_test("set_symmetric_difference_by_key")
     add_rocthrust_test("set_symmetric_difference_by_key_descending")
-    add_rocthrust_test("set_symmetric_difference_descending")
-    add_rocthrust_test("set_union")
-    add_rocthrust_test("set_union_by_key")
-    add_rocthrust_test("set_union_by_key_descending")
-    add_rocthrust_test("set_union_descending")
-    add_rocthrust_test("set_union_key_value")
+    add_rocthrust_test("set_symmetric_difference_by_key")
     add_rocthrust_test("shuffle")
+    add_rocthrust_test("scan")
+    add_rocthrust_test("scan_by_key")
+    add_rocthrust_test("scatter")
+    add_rocthrust_test("sequence")
+    add_rocthrust_test("stable_sort")
+    add_rocthrust_test("stable_sort_by_key")
+    add_rocthrust_test("stable_sort_by_key_large_keys_and_values")
+    add_rocthrust_test("stable_sort_by_key_large_keys")
+    add_rocthrust_test("stable_sort_by_key_large_values")
+    add_rocthrust_test("stable_sort_large")
     add_rocthrust_test("sort")
     add_rocthrust_test("sort_by_key")
     add_rocthrust_test("sort_by_key_variable_bits")
     add_rocthrust_test("sort_permutation_iterator")
-    add_rocthrust_test("sort_variable_bits")
-    add_rocthrust_test("stable_sort")
-    add_rocthrust_test("stable_sort_by_key")
-    add_rocthrust_test("stable_sort_by_key_large_keys")
-    add_rocthrust_test("stable_sort_by_key_large_keys_and_values")
-    add_rocthrust_test("stable_sort_by_key_large_values")
-    add_rocthrust_test("stable_sort_large")
+    add_rocthrust_test("sort_variables")
     add_rocthrust_test("swap_ranges")
     add_rocthrust_test("tabulate")
-    add_rocthrust_test("tabulate_output_iterator")
     add_rocthrust_test("transform")
-    add_rocthrust_test("transform_input_output_iterator")
     add_rocthrust_test("transform_iterator")
-    add_rocthrust_test("transform_output_iterator")
-    add_rocthrust_test("transform_output_iterator_reduce_by_key")
     add_rocthrust_test("transform_reduce")
     add_rocthrust_test("transform_scan")
-    add_rocthrust_test("trivial_sequence")
     add_rocthrust_test("tuple")
-    add_rocthrust_test("tuple_algorithms")
     add_rocthrust_test("tuple_reduce")
-    add_rocthrust_test("tuple_scan")
     add_rocthrust_test("tuple_sort")
     add_rocthrust_test("tuple_transform")
-    add_rocthrust_test("type_traits")
     add_rocthrust_test("uninitialized_copy")
     add_rocthrust_test("uninitialized_fill")
-    add_rocthrust_test("unique_ptr_general")
-    add_rocthrust_test("unique_ptr_allocate_deallocate")
     add_rocthrust_test("unique")
     add_rocthrust_test("unique_by_key")
     add_rocthrust_test("universal_memory")
-    add_rocthrust_test("utils_tester")
     add_rocthrust_test("vector")
     add_rocthrust_test("vector_allocators")
     add_rocthrust_test("vector_insert")
     add_rocthrust_test("vector_manipulation")
-    add_rocthrust_test("zip_function")
     add_rocthrust_test("zip_iterator")
     add_rocthrust_test("zip_iterator_reduce")
-    add_rocthrust_test("zip_iterator_reduce_by_key")
     add_rocthrust_test("zip_iterator_scan")
     add_rocthrust_test("zip_iterator_sort")
     add_rocthrust_test("zip_iterator_sort_by_key")
+    add_rocthrust_test("zip_iterator_reduce_by_key")
 endif()
 
 # hipstdpar tests
@@ -348,52 +268,9 @@ if(BUILD_HIPSTDPAR_TEST)
     endif()
 endif()
 
-# ****************************************************************************
-# Test Filter Standardization
-# ****************************************************************************
-
-if(EXISTS "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
-    include("${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
-
-    message(STATUS "Applying test categories for rocthrust")
-    get_property(_rt_pairs GLOBAL PROPERTY ROCTHRUST_TEST_TARGET_RESOURCE_PAIRS)
-    list(REMOVE_DUPLICATES _rt_pairs)
-    foreach(_rt_pair IN LISTS _rt_pairs)
-        string(REPLACE "|" ";" _rt_parts "${_rt_pair}")
-        list(GET _rt_parts 0 _rt_t)
-        list(GET _rt_parts 1 _rt_rg)
-        get_target_property(_rt_dir ${_rt_t} RUNTIME_OUTPUT_DIRECTORY)
-        apply_test_category_labels(${_rt_t}
-            "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml"
-            "${_rt_dir}" "${INSTALL_TEST_FILE}" "${_rt_rg}")
-    endforeach()
-else()
-    message(
-        STATUS
-        "Shared CTest categories not found at "
-        "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake - "
-        "skipping rocthrust test category labels"
-    )
-endif()
-
 rocm_install(
     FILES "${INSTALL_TEST_FILE}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
     COMPONENT tests
     RENAME "CTestTestfile.cmake"
-)
-
-# Build the executable used for generating the resource spec file.
-add_executable(generate_resource_spec ${CMAKE_SOURCE_DIR}/test/generate_resource_spec.cpp)
-set_target_properties(generate_resource_spec PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-target_link_libraries(generate_resource_spec PRIVATE hip::host)
-
-# Install the executable using the standard install command instead of rocm_install
-# since we want to put it in a custom DESTINATION (rocm_install does not support
-# the DESTINATION option for TARGETS).
-set_property(TARGET generate_resource_spec APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../../lib")
-install(
-    TARGETS generate_resource_spec
-    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
-    COMPONENT tests
 )

@@ -2,79 +2,14 @@
 
 Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](https://rocm.docs.amd.com/projects/hipSOLVER/en/latest/index.html).
 
+## hipSOLVER 2.5.0 for ROCm 6.5.0
 
-## (Unreleased) hipSOLVER
-
-### Added
-### Changed
-### Removed
-### Optimized
-### Resolved issues
-### Known issues
 ### Upcoming changes
 
-
-## hipSOLVER 3.4.0 for ROCm 7.13.0
-
-### Added
-
-* Added compatibility-only functions
-  * geev
-    * hipsolverDnXgeev_bufferSize
-    * hipsolverDnXgeev
-  * syevBatched
-    * hipsolverDnXsyevBatched_bufferSize
-    * hipsolverDnXsyevBatched
-  * syevd
-    * hipsolverDnXsyevd_bufferSize
-    * hipsolverDnXsyevd
-  * sytrs
-    * hipsolverDnXsytrs_bufferSize
-    * hipsolverDnXsytrs
-
-
-## hipSOLVER 3.3.0 for ROCm 7.12.0
-
-### Changed
-
-* Minor internal changes
-
-
-## hipSOLVER 3.2.0 for ROCm 7.2.0
-
-### Added
-
-* Added ability to control rocSOLVER logging using the environment variables `ROCSOLVER_LEVELS` and `ROCSOLVER_LAYER`
-
-
-## hipSOLVER 3.1.0 for ROCm 7.1.0
-
-### Added
-
-* Extended test suites for hipsolverDn compatibility functions
-
-### Changed
-
-* Changed code coverage to use llvm-cov instead of gcov
-
-
-## hipSOLVER 3.0.0 for ROCm 7.0.0
-
-### Added
-
-* Added compatibility-only functions
-  * csrlsvqr
-    * hipsolverSpCcsrlsvqr, hipsolverSpZcsrlsvqr
-
-### Resolved issues
-
-* Corrected the value of `lwork` returned by various `bufferSize` functions to be consistent with NVIDIA cuSOLVER. The following functions will
-  now return `lwork` such that the workspace size (in bytes) is `sizeof(T) * lwork`, rather than `lwork`. To restore the original behavior, set
-  environment variable `HIPSOLVER_BUFFERSIZE_RETURN_BYTES`.
-  * hipsolverXorgbr_bufferSize, hipsolverXorgqr_bufferSize, hipsolverXorgtr_bufferSize, hipsolverXormqr_bufferSize, hipsolverXormtr_bufferSize,
-    hipsolverXgesvd_bufferSize, hipsolverXgesvdj_bufferSize, hipsolverXgesvdBatched_bufferSize, hipsolverXgesvdaStridedBatched_bufferSize,
-    hipsolverXsyevd_bufferSize, hipsolverXsyevdx_bufferSize, hipsolverXsyevj_bufferSize, hipsolverXsyevjBatched_bufferSize,
-    hipsolverXsygvd_bufferSize, hipsolverXsygvdx_bufferSize, hipsolverXsygvj_bufferSize, hipsolverXsytrd_bufferSize, hipsolverXsytrf_bufferSize
+* With the rocSOLVER backend, the bufferSize methods are currently outputting lwork such that the required workspace 
+size (in bytes) is lwork. In ROCm 7.0 this will change to make the rocSOLVER backend consistent with cuSOLVER. The 
+changed bufferSize methods will then return lwork such that the required workspace size (in bytes) is sizeof(T) * lwork,
+where T is the used precision. This change will break ABI backward compatibility.
 
 
 ## hipSOLVER 2.4.0 for ROCm 6.4.0
@@ -82,14 +17,7 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 ### Added
 * Added compatibility-only functions
   * csrlsvqr
-    * hipsolverSpScsrlsvqr, hipsolverSpDcsrlsvqr
-
-### Upcoming changes
-
-* With the rocSOLVER backend, the bufferSize methods are currently outputting lwork such that the required workspace
-  size (in bytes) is lwork. In ROCm 7.0 this will change to make the rocSOLVER backend consistent with cuSOLVER. The
-  changed bufferSize methods will then return lwork such that the required workspace size (in bytes) is sizeof(T) * lwork,
-  where T is the used precision. This change will break ABI backward compatibility.
+    * hipsolverSpScsrlsvqr, hipsolverSpDcsrlsvqr, hipsolverSpCcsrlsvqr, hipsolverSpZcsrlsvqr
 
 
 ## hipSOLVER 2.3.0 for ROCm 6.3.0

@@ -28,17 +28,7 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
-#if _CCCL_HAS_CUDA_COMPILER
-
-#  include <thrust/system/cuda/config.h>
+#if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_NVCC
 
 #  include <cub/device/dispatch/dispatch_select_if.cuh>
 #  include <cub/util_device.cuh>
@@ -48,6 +38,7 @@
 #  include <thrust/distance.h>
 #  include <thrust/pair.h>
 #  include <thrust/partition.h>
+#  include <thrust/system/cuda/config.h>
 #  include <thrust/system/cuda/detail/cdp_dispatch.h>
 #  include <thrust/system/cuda/detail/find.h>
 #  include <thrust/system/cuda/detail/par_to_seq.h>
@@ -58,8 +49,7 @@
 #  include <cstdint>
 
 THRUST_NAMESPACE_BEGIN
-namespace cuda_cub
-{
+namespace cuda_cub {
 
 namespace detail
 {
@@ -113,7 +103,7 @@ struct DispatchPartitionIf
                            stream);
     CUDA_CUB_RET_IF_FAIL(status);
 
-    status = cub::detail::AliasTemporaries(d_temp_storage, temp_storage_bytes, allocations, allocation_sizes);
+    status = cub::AliasTemporaries(d_temp_storage, temp_storage_bytes, allocations, allocation_sizes);
     CUDA_CUB_RET_IF_FAIL(status);
 
     // Return if we're only querying temporary storage requirements
@@ -225,15 +215,14 @@ THRUST_RUNTIME_FUNCTION pair<SelectedOutIt, RejectedOutIt> stable_partition_copy
   RejectedOutIt rejected_result,
   Predicate predicate)
 {
-  if (thrust::distance(first, last) <= 0)
-  {
+  if(thrust::distance(first, last) <= 0){
     return thrust::make_pair(selected_result, rejected_result);
   }
 
-  using output_it_wrapper_t = cub::detail::select::partition_distinct_output_t<SelectedOutIt, RejectedOutIt>;
-  std::size_t num_items     = static_cast<std::size_t>(thrust::distance(first, last));
-  std::size_t num_selected =
-    partition(policy, first, last, stencil, output_it_wrapper_t{selected_result, rejected_result}, predicate);
+  using output_it_wrapper_t = cub::detail::partition_distinct_output_t<SelectedOutIt, RejectedOutIt>;
+  std::size_t num_items    = static_cast<std::size_t>(thrust::distance(first, last));
+  std::size_t num_selected = partition(
+    policy, first, last, stencil, output_it_wrapper_t{selected_result, rejected_result}, predicate);
   return thrust::make_pair(selected_result + num_selected, rejected_result + num_items - num_selected);
 }
 
@@ -241,8 +230,7 @@ template <typename Derived, typename InputIt, typename StencilIt, typename Predi
 THRUST_RUNTIME_FUNCTION InputIt inplace_partition(
   execution_policy<Derived>& policy, InputIt first, InputIt last, StencilIt stencil, Predicate predicate)
 {
-  if (thrust::distance(first, last) <= 0)
-  {
+  if(thrust::distance(first, last) <= 0){
     return first;
   }
 
@@ -397,15 +385,21 @@ stable_partition(execution_policy<Derived>& policy, Iterator first, Iterator las
   return ret;
 }
 
-template <class Derived, class ItemsIt, class Predicate>
+template <class Derived,
+          class ItemsIt,
+          class Predicate>
 bool _CCCL_HOST_DEVICE
-is_partitioned(execution_policy<Derived>& policy, ItemsIt first, ItemsIt last, Predicate predicate)
+is_partitioned(execution_policy<Derived> &policy,
+               ItemsIt                    first,
+               ItemsIt                    last,
+               Predicate                  predicate)
 {
   ItemsIt boundary = cuda_cub::find_if_not(policy, first, last, predicate);
-  ItemsIt end      = cuda_cub::find_if(policy, boundary, last, predicate);
+  ItemsIt end      = cuda_cub::find_if(policy,boundary,last,predicate);
   return end == last;
 }
 
-} // namespace cuda_cub
+
+}    // namespace cuda_cub
 THRUST_NAMESPACE_END
 #endif

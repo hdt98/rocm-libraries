@@ -40,7 +40,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <utility>
-#ifdef _WIN32
+#ifdef WIN32
 #include <io.h>
 #include <iostream>
 #include <sstream>

@@ -43,11 +43,7 @@ using HipEventPtr = MIOPEN_MANAGE_PTR(hipEvent_t, hipEventDestroy);
 inline HipEventPtr make_hip_event()
 {
     hipEvent_t result = nullptr;
-
-    const auto status = hipEventCreate(&result);
-    if(status != hipSuccess)
-        MIOPEN_THROW_HIP_STATUS(status, "hipEventCreate failed");
-
+    hipEventCreate(&result);
     return HipEventPtr{result};
 }
 
@@ -57,8 +53,8 @@ struct HipEventProfiler
     HipEventPtr start;
     HipEventPtr stop;
 
-    MIOPEN_INTERNALS_EXPORT HipEventProfiler(const Handle& handle_);
-    MIOPEN_INTERNALS_EXPORT ~HipEventProfiler();
+    HipEventProfiler(const Handle& handle_);
+    ~HipEventProfiler();
 };
 
 #if 1 // Keep around other storage techinques -- @pfultz2 27.03.2017
@@ -123,7 +119,7 @@ struct KernelArgs
     uint64_t hidden[6] = {};
 };
 
-struct HIPOCKernelInvoke
+struct MIOPEN_INTERNALS_EXPORT HIPOCKernelInvoke
 {
     HIPOCKernelInvoke() {}
     HIPOCKernelInvoke(hipStream_t pstream,
@@ -189,8 +185,8 @@ struct HIPOCKernelInvoke
     const std::string& GetName() const { return name; }
 
 private:
-    MIOPEN_INTERNALS_EXPORT void run(void* args, std::size_t size) const;
-    MIOPEN_INTERNALS_EXPORT void run_cooperative(void** kern_args) const;
+    void run(void* args, std::size_t size) const;
+    void run_cooperative(void** kern_args) const;
 
     hipStream_t stream          = nullptr;
     hipFunction_t fun           = nullptr;
@@ -201,7 +197,7 @@ private:
     bool coop_launch;
 };
 
-struct HIPOCKernel
+struct MIOPEN_INTERNALS_EXPORT HIPOCKernel
 {
     HIPOCProgram program;
     std::string name;
@@ -229,16 +225,9 @@ struct HIPOCKernel
         auto status   = hipModuleGetFunction(&fun, program.GetModule(), kernel_module.c_str());
         if(hipSuccess != status)
         {
-            if(program.IsCodeObjectInFile())
-            {
-                MIOPEN_THROW_HIP_STATUS(status,
-                                        "Failed to get function: " + kernel_module + " from " +
-                                            program.GetCodeObjectPathname());
-            }
-            else
-            {
-                MIOPEN_THROW_HIP_STATUS(status, "Failed to get function: " + kernel_module);
-            }
+            MIOPEN_THROW_HIP_STATUS(status,
+                                    "Failed to get function: " + kernel_module + " from " +
+                                        program.GetCodeObjectPathname());
         }
     }
 

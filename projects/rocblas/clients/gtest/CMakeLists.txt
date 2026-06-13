@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,7 +20,7 @@
 #
 # ########################################################################
 
-# CTest categorization: see ROCBLAS_ENABLE_CTEST / ROCBLAS_HAS_CTEST_CATEGORIES in cmake/build-options.cmake
+#enable_testing()
 find_package( GTest REQUIRED )
 
 if( BUILD_WITH_TENSILE )
@@ -40,11 +40,9 @@ set(rocblas_no_tensile_test_source
     # general
     rocblas_gtest_main.cpp
     rocblas_test.cpp
-    asan_helpers_gtest.cpp
     general_gtest.cpp
     set_get_pointer_mode_gtest.cpp
     set_get_atomics_mode_gtest.cpp
-    set_get_alpha_beta_stride_gtest.cpp
     logging_mode_gtest.cpp
     ostream_threadsafety_gtest.cpp
     set_get_vector_gtest.cpp
@@ -94,6 +92,7 @@ set(rocblas_no_tensile_test_source
     # blas3 may use tensile or source gemm
     blas3/gemm_gtest.cpp
     blas_ex/gemm_ex_gtest.cpp
+    blas_ex/gemm_ex3_gtest.cpp
     blas3/symm_gtest.cpp
     blas3/hemm_gtest.cpp
     blas3/trsm_gtest.cpp
@@ -109,8 +108,6 @@ set(rocblas_no_tensile_test_source
     blas3/geam_gtest.cpp
     blas_ex/gemmt_gtest.cpp
     blas_ex/geam_ex_gtest.cpp
-    blas_ex/syrk_ex_gtest.cpp
-    blas_ex/herk_ex_gtest.cpp
   )
 
 # Keep ${rocblas_tensile_test_source} first, so that multiheaded tests are the
@@ -135,17 +132,17 @@ if (NOT WIN32)
   list( APPEND COMMON_LINK_LIBS "-lm -lstdc++fs" )
 endif()
 target_link_libraries( rocblas-test PRIVATE ${COMMON_LINK_LIBS} )
-apply_omp_settings( rocblas-test )
 
 target_compile_options(rocblas-test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_CXX_OPTIONS}>)
 
 target_compile_definitions( rocblas-test PRIVATE ROCM_USE_FLOAT16 ROCBLAS_INTERNAL_API ROCBLAS_NO_DEPRECATED_WARNINGS )
 
-if (CREATE_TEST_APP_LOCAL_DEPLOY AND WIN32)
-  # HIP and tooling (OpenBLAS DLLs come from the same install CMake linked when using ILP64).
+if (WIN32)
+  # for now adding in all .dll as dependency chain is not cmake based on win32
   file( GLOB third_party_dlls
     LIST_DIRECTORIES OFF
     CONFIGURE_DEPENDS
+    ${OPENBLAS_DIR}/bin/*.dll
     ${HIP_DIR}/bin/amd*.dll
     ${HIP_DIR}/bin/hiprt*.dll
     ${HIP_DIR}/bin/hipinfo.exe
@@ -155,30 +152,6 @@ if (CREATE_TEST_APP_LOCAL_DEPLOY AND WIN32)
   foreach( file_i ${third_party_dlls})
     add_custom_command( TARGET rocblas-test POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy ${file_i} ${PROJECT_BINARY_DIR}/staging/ )
   endforeach( file_i )
-
-  if( NOT LINK_BLIS AND ROCBLAS_CLIENTS_REFERENCE_ILP64 )
-    if( CMAKE_VERSION VERSION_GREATER_EQUAL "3.21" )
-      add_custom_command(
-        TARGET rocblas-test POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          $<TARGET_RUNTIME_DLLS:rocblas-test>
-          $<TARGET_FILE_DIR:rocblas-test>
-        COMMAND_EXPAND_LISTS
-        COMMENT "Copying reference BLAS and other runtime DLLs for rocblas-test (ILP64)" )
-    elseif( DEFINED OpenBLAS64_DIR AND EXISTS "${OpenBLAS64_DIR}/bin" )
-      file( GLOB _openblas64_dlls LIST_DIRECTORIES OFF CONFIGURE_DEPENDS "${OpenBLAS64_DIR}/bin/*.dll" )
-      foreach( file_i ${_openblas64_dlls})
-        add_custom_command( TARGET rocblas-test POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy ${file_i} ${PROJECT_BINARY_DIR}/staging/ )
-      endforeach()
-    else()
-      message( WARNING "rocblas-test local deploy: CMake < 3.21 and OpenBLAS64_DIR not set; reference OpenBLAS DLLs may be missing from staging. Set OpenBLAS64_DIR or use CMake 3.21+." )
-    endif()
-  elseif( NOT LINK_BLIS )
-    file( GLOB third_party_openblas_dlls LIST_DIRECTORIES OFF CONFIGURE_DEPENDS ${OPENBLAS_DIR}/bin/*.dll )
-    foreach( file_i ${third_party_openblas_dlls})
-      add_custom_command( TARGET rocblas-test POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy ${file_i} ${PROJECT_BINARY_DIR}/staging/ )
-    endforeach()
-  endif()
 endif()
 
 set_target_properties( rocblas-test PROPERTIES
@@ -191,7 +164,7 @@ set_target_properties( rocblas-test PROPERTIES
 file(GLOB yaml_files "${CMAKE_CURRENT_SOURCE_DIR}/*.yaml")
 set( ROCBLAS_TEST_DATA "${PROJECT_BINARY_DIR}/staging/rocblas_gtest.data")
 add_custom_command( OUTPUT "${ROCBLAS_TEST_DATA}"
-                    COMMAND ${Python3_EXECUTABLE} ../common/rocblas_gentest.py -I ../include rocblas_gtest.yaml -o "${ROCBLAS_TEST_DATA}"
+                    COMMAND ${python} ../common/rocblas_gentest.py -I ../include rocblas_gtest.yaml -o "${ROCBLAS_TEST_DATA}"
                     DEPENDS ../common/rocblas_gentest.py ../include/rocblas_common.yaml ${yaml_files}
                     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" )
 add_custom_target( rocblas-test-data DEPENDS "${ROCBLAS_TEST_DATA}" )
@@ -224,29 +197,6 @@ add_custom_target( rocblas-test-files DEPENDS "${ROCBLAS_SMOKE}" "${ROCBLAS_EXTR
 
 add_dependencies( rocblas-test rocblas-test-data rocblas-test-files rocblas-common )
 
-# CTest categories: quick (= smoke), standard (= precheckin), comprehensive (= extended), stress (= weekly)
-set(ROCBLAS_CTEST_INSTALL_FILE "")
-if(ROCBLAS_HAS_CTEST_CATEGORIES)
-  message(STATUS "rocBLAS: YAML-based test categorization")
-  file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/staging")
-  # Install-time CTestTestfile for TheRock: relative paths so ctest can run from installed location
-  set(ROCBLAS_CTEST_INSTALL_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_CTestTestfile.cmake")
-  file(WRITE "${ROCBLAS_CTEST_INSTALL_FILE}"
-[=[
-# This is a test file generated by rocBLAS for install time.
-# Tests are defined with relative paths to work in the installed location.
-]=]
-  )
-  apply_test_category_labels(
-    rocblas-test
-    "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml"
-    "${PROJECT_BINARY_DIR}/staging"
-    "${ROCBLAS_CTEST_INSTALL_FILE}"
-  )
-elseif(BUILD_CLIENTS_TESTS AND NOT ROCBLAS_ENABLE_CTEST)
-  message(STATUS "rocBLAS: ROCBLAS_ENABLE_CTEST=OFF (CTest category labels not applied)")
-endif()
-
 rocm_install(TARGETS rocblas-test COMPONENT tests)
 
 rocm_install(
@@ -265,13 +215,3 @@ rocm_install(FILES ${ROCBLAS_TEST_DATA}
   DESTINATION "${CMAKE_INSTALL_BINDIR}"
   COMPONENT tests
 )
-
-# Install CTestTestfile.cmake to bin/rocblas/ for TheRock (relocatable tests; run ctest from that dir)
-if(ROCBLAS_ENABLE_CTEST AND ROCBLAS_CTEST_INSTALL_FILE)
-  install(
-    FILES "${ROCBLAS_CTEST_INSTALL_FILE}"
-    DESTINATION "${CMAKE_INSTALL_BINDIR}/rocblas"
-    COMPONENT tests
-    RENAME "CTestTestfile.cmake"
-  )
-endif()

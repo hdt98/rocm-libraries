@@ -1,6 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 #include <iostream>
 #include <numeric>
 #include <initializer_list>
@@ -18,11 +17,6 @@
 #include "ck/library/utility/host_tensor_generator.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_batched_gemm.hpp"
 #include "ck/library/utility/literals.hpp"
-
-using ::ck::DeviceMem;
-using ::ck::hip_check_error;
-using ::ck::HostTensorDescriptor;
-using ::ck::Tensor;
 
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
@@ -69,15 +63,15 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceBatchedGemmMultiD
     CDEElementOp,
     GemmDefault,
     256,            // BlockSize
-    128,            // MPerBlock
+    256,            // MPerBlock
     128,            // NPerBlock
     32,             // KPerBlock
     8,              // AK1
     8,              // BK1
-    16,             // MPerXDL
-    16,             // NPerXDL
+    32,             // MPerXDL
+    32,             // NPerXDL
     4,              // MXdlPerWave
-    4,              // NXdlPerWave
+    2,              // NXdlPerWave
     S<4, 64, 1>,    // ABlockTransferThreadClusterLengths_AK0_M_AK1
     S<1, 0, 2>,     // ABlockTransferThreadClusterArrangeOrder
     S<1, 0, 2>,     // ABlockTransferSrcAccessOrder
@@ -95,11 +89,11 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceBatchedGemmMultiD
     1,              // CShuffleMXdlPerWavePerShuffle
     1,              // CShuffleNXdlPerWavePerShuffle
     S<1, 32, 1, 8>, // CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
-    S<4>,           // CDEShuffleBlockTransferScalarPerVectors
+    S<8>,           // CDEShuffleBlockTransferScalarPerVectors
     ck::BlockGemmPipelineScheduler::Intrawave, // BlockGemmPipelineScheduler
     ck::BlockGemmPipelineVersion::v3           // BlockGemmPipelineVersion
     >;
 
 #include "run_batched_gemm_example.inc"
 
-int main(int argc, char* argv[]) { return run_batched_gemm_example(argc, argv); }
+int main(int argc, char* argv[]) { return !run_batched_gemm_example(argc, argv); }

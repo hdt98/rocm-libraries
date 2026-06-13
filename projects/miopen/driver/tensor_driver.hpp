@@ -37,37 +37,20 @@
 #include <numeric>
 #include <vector>
 
-inline miopenTensorLayout_t StringToLayoutType(std::string layout_str)
+inline miopenTensorLayout_t StringToLayoutType(std::string layout)
 {
     miopenTensorLayout_t default_layout = miopenTensorNCHW;
-    if(layout_str == "NCHWc4")
+    if(layout == "NCHWc4")
         return miopenTensorNCHWc4;
-    else if(layout_str == "NCHWc8")
+    else if(layout == "NCHWc8")
         return miopenTensorNCHWc8;
-    else if(layout_str == "CHWNc4")
+    else if(layout == "CHWNc4")
         return miopenTensorCHWNc4;
-    else if(layout_str == "CHWNc8")
+    else if(layout == "CHWNc8")
         return miopenTensorCHWNc8;
-    else if(layout_str == "NCHW")
-    {
-        return miopenTensorNCHW;
-    }
-    else if(layout_str == "NHWC")
-    {
-        return miopenTensorNHWC;
-    }
-    else if(layout_str == "NDHWC")
-    {
-        return miopenTensorNDHWC;
-    }
-    else if(layout_str == "NCDHW")
-    {
-        return miopenTensorNCDHW;
-    }
     else
     {
-        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
-                     "vectorized tensor layout.");
+        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8 vectorized tensor layout.");
         return default_layout;
     }
 }
@@ -167,8 +150,7 @@ inline int SetTensorNdVector(miopenTensorDescriptor_t t,
                              miopenTensorLayout_t layout,
                              miopenDataType_t data_type = miopenFloat)
 {
-    if(layout == miopenTensorNCHWc4 || layout == miopenTensorNCHWc8 || layout == miopenTensorNHWC ||
-       layout == miopenTensorNCHW || layout == miopenTensorNDHWC || layout == miopenTensorNCDHW)
+    if(layout == miopenTensorNCHWc4 || layout == miopenTensorNCHWc8)
     {
         // Do nothing, MIOpen implicit logic that lens are in NCHW order.
     }
@@ -178,8 +160,7 @@ inline int SetTensorNdVector(miopenTensorDescriptor_t t,
     }
     else
     {
-        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8, NCHW, NHWC, NDHWC, NCDHW "
-                     "vectorized tensor layout.");
+        MIOPEN_THROW("We only support NCHWc4, NCHWc8, CHWNc4, CHWNc8 vectorized tensor layout.");
         return -1;
     }
     return miopenSetNdTensorDescriptorWithLayout(t, data_type, layout, len.data(), len.size());

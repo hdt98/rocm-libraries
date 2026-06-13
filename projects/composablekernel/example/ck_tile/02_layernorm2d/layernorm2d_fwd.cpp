@@ -1,9 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #include "ck_tile/host.hpp"
 #include "layernorm2d_fwd.hpp"
-#include "ck_tile/utility/json_dump.hpp"
 #include <algorithm>
 #include <cstring>
 
@@ -57,9 +53,7 @@ auto create_args(int argc, char* argv[])
         .insert("fadd", "0", "fused-add, 0:no fused add, 1:preadd+store, 2:preadd only")
         .insert("fquant", "0", "fused-quant, 0:no, 1:smooth-dynamic-quant, 2:dynamic-quant")
         .insert("warmup", "5", "cold iter")
-        .insert("repeat", "20", "hot iter")
-        .insert("json", "0", "0: No Json, 1: Dump Results in Json format")
-        .insert("jsonfile", "layernorm2d_fwd.json", "json file name to dump results");
+        .insert("repeat", "20", "hot iter");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -197,7 +191,8 @@ bool run(const ck_tile::ArgParser& arg_parser)
         return base_str;
     }();
 
-    std::cout << "[" << prec_str << "]" << " m:" << m << ", n:" << n << ", x_stride:" << x_stride
+    std::cout << "[" << prec_str << "]"
+              << " m:" << m << ", n:" << n << ", x_stride:" << x_stride
               << ", xr_stride:" << xr_stride << ", y_stride:" << y_stride
               << ", yr_stride:" << yr_stride << std::flush;
 
@@ -411,24 +406,6 @@ bool run(const ck_tile::ArgParser& arg_parser)
         std::cout << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
     }
 
-    if(arg_parser.get_int("json") == 1)
-    {
-        dump_layernorm2d_fwd_json_results(arg_parser.get_str("jsonfile"),
-                                          prec_i,
-                                          prec_o,
-                                          prec_sm,
-                                          prec_sy,
-                                          m,
-                                          n,
-                                          x_stride,
-                                          xr_stride,
-                                          y_stride,
-                                          yr_stride,
-                                          pass,
-                                          ave_time,
-                                          0,
-                                          gb_per_sec);
-    }
     return pass;
 }
 

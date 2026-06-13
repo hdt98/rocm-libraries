@@ -22,14 +22,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
 #include <thrust/iterator/detail/transform_input_output_iterator.inl>
 
 THRUST_NAMESPACE_BEGIN
@@ -93,20 +85,23 @@ THRUST_NAMESPACE_BEGIN
  */
 
 template <typename InputFunction, typename OutputFunction, typename Iterator>
-class transform_input_output_iterator
+  class transform_input_output_iterator
     : public detail::transform_input_output_iterator_base<InputFunction, OutputFunction, Iterator>::type
 {
+
   /*! \cond
    */
 
-public:
-  using super_t = typename detail::transform_input_output_iterator_base<InputFunction, OutputFunction, Iterator>::type;
+  public:
 
-  friend class iterator_core_access;
+    using super_t = typename
+      detail::transform_input_output_iterator_base<InputFunction, OutputFunction, Iterator>::type;
+
+    friend class thrust::iterator_core_access;
   /*! \endcond
    */
 
-  transform_input_output_iterator() = default;
+    transform_input_output_iterator() = default;
 
   /*! This constructor takes as argument a \c Iterator an \c InputFunction and an
    * \c OutputFunction and copies them to a new \p transform_input_output_iterator
@@ -116,28 +111,29 @@ public:
    * \param input_function An \c InputFunction to be executed on values read from the iterator
    * \param output_function An \c OutputFunction to be executed on values written to the iterator
    */
-  THRUST_HOST_DEVICE
-  transform_input_output_iterator(Iterator const& io, InputFunction input_function, OutputFunction output_function)
-      : super_t(io)
-      , input_function(input_function)
-      , output_function(output_function)
-  {}
+    THRUST_HOST_DEVICE
+    transform_input_output_iterator(Iterator const& io, InputFunction input_function, OutputFunction output_function)
+      : super_t(io), input_function(input_function), output_function(output_function)
+    {
+    }
 
-  /*! \cond
-   */
+    /*! \cond
+     */
+  private:
 
-private:
-  THRUST_HOST_DEVICE typename super_t::reference dereference() const
-  {
-    return detail::transform_input_output_iterator_proxy<InputFunction, OutputFunction, Iterator>(
-      this->base_reference(), input_function, output_function);
-  }
+    THRUST_HOST_DEVICE
+    typename super_t::reference dereference() const
+    {
+      return detail::transform_input_output_iterator_proxy<
+        InputFunction, OutputFunction, Iterator
+      >(this->base_reference(), input_function, output_function);
+    }
 
-  InputFunction input_function;
-  OutputFunction output_function;
+    InputFunction input_function;
+    OutputFunction output_function;
 
-  /*! \endcond
-   */
+    /*! \endcond
+     */
 }; // end transform_input_output_iterator
 
 /*! \p make_transform_input_output_iterator creates a \p transform_input_output_iterator from
@@ -150,10 +146,11 @@ private:
  *  \see transform_input_output_iterator
  */
 template <typename InputFunction, typename OutputFunction, typename Iterator>
-transform_input_output_iterator<InputFunction, OutputFunction, Iterator> THRUST_HOST_DEVICE
+transform_input_output_iterator<InputFunction, OutputFunction, Iterator>
+THRUST_HOST_DEVICE
 make_transform_input_output_iterator(Iterator io, InputFunction input_function, OutputFunction output_function)
 {
-  return transform_input_output_iterator<InputFunction, OutputFunction, Iterator>(io, input_function, output_function);
+    return transform_input_output_iterator<InputFunction, OutputFunction, Iterator>(io, input_function, output_function);
 } // end make_transform_input_output_iterator
 
 /*! \} // end fancyiterators

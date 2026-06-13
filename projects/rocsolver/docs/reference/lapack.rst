@@ -1,44 +1,43 @@
 .. meta::
-  :description: rocSOLVER LAPACK functions API documentation
-  :keywords: rocSOLVER, ROCm, API, documentation, LAPACK
+  :description: rocSOLVER documentation and API reference library
+  :keywords: rocSOLVER, ROCm, API, documentation
 
 .. _lapackfunc:
 
 ***************************
-rocSOLVER LAPACK functions
+rocSOLVER LAPACK Functions
 ***************************
 
-LAPACK routines solve complex numerical linear algebra problems. These functions are organized
-into the following categories:
+LAPACK routines solve complex Numerical Linear Algebra problems. These functions are organized
+in the following categories:
 
-* :ref:`triangular`: Based on Gaussian elimination.
-* :ref:`orthogonal`: Based on Householder reflections.
-* :ref:`reductions`: Transformation of matrices and problems into equivalent forms.
-* :ref:`linears`: Based on triangular factorizations.
-* :ref:`leastsqr`: Based on orthogonal factorizations.
-* :ref:`eigens`: Eigenproblems for symmetric matrices.
-* :ref:`svds`: Singular values and related problems for general matrices.
+* :ref:`triangular`. Based on Gaussian elimination.
+* :ref:`orthogonal`. Based on Householder reflections.
+* :ref:`reductions`. Transformation of matrices and problems into equivalent forms.
+* :ref:`linears`. Based on triangular factorizations.
+* :ref:`leastsqr`. Based on orthogonal factorizations.
+* :ref:`eigens`. Eigenproblems for symmetric matrices.
+* :ref:`svds`. Singular values and related problems for general matrices.
 
 .. note::
+    Throughout the APIs' descriptions, we use the following notations:
 
-   The API descriptions use the following notations:
-
-   *  ``i``, ``j``, and ``k`` are used as general purpose indices. In some legacy LAPACK APIs, ``k`` can be
-      a parameter indicating some problem or matrix dimension.
-   *  Depending on the context, when it is necessary to index rows, columns, and blocks or submatrices,
-      ``i`` is assigned to rows, ``j`` to columns, and ``k`` to blocks. ``l`` is always used to index
-      matrices or problems in a batch.
-   *  ``x[i]`` stands for the i-th element of vector x, while ``A[i,j]`` represents the element
-      in the i-th row and j-th column of matrix ``A``. Indices are 1-based, for instance, ``x[1]`` is the first
-      element of ``x``.
-   *  To identify a block in a matrix or a matrix in the batch, ``k`` and ``l`` are used as sub-indices
-   *  ``x_i`` :math:`=x_i`. Both notations are used, :math:`x_i` when displaying mathematical
-      equations and ``x_i`` in the text describing the function parameters.
-   *  If ``X`` is a real vector or matrix, :math:`X^T` indicates its transpose. If ``X`` is complex, then
-      :math:`X^H` represents its conjugate transpose. When ``X`` could be real or complex, the descriptions use ``X'`` to
-      indicate ``X`` transposed or ``X`` conjugate transposed, accordingly.
-   *  When a matrix ``A`` is formed as the product of several matrices, the following notation is used:
-      ``A=M(1)M(2)...M(t)``.
+    * i, j, and k are used as general purpose indices. In some legacy LAPACK APIs, k could be
+      a parameter indicating some problem/matrix dimension.
+    * Depending on the context, when it is necessary to index rows, columns and blocks or submatrices,
+      i is assigned to rows, j to columns and k to blocks. :math:`l` is always used to index
+      matrices/problems in a batch.
+    * x[i] stands for the i-th element of vector x, while A[i,j] represents the element
+      in the i-th row and j-th column of matrix A. Indices are 1-based, i.e. x[1] is the first
+      element of x.
+    * To identify a block in a matrix or a matrix in the batch, k and :math:`l` are used as sub-indices
+    * x_i :math:`=x_i`; we sometimes use both notations, :math:`x_i` when displaying mathematical
+      equations, and x_i in the text describing the function parameters.
+    * If X is a real vector or matrix, :math:`X^T` indicates its transpose; if X is complex, then
+      :math:`X^H` represents its conjugate transpose. When X could be real or complex, we use X' to
+      indicate X transposed or X conjugate transposed, accordingly.
+    * When a matrix `A` is formed as the product of several matrices, the following notation is used:
+      `A=M(1)M(2)...M(t)`.
 
 
 
@@ -1176,118 +1175,6 @@ rocsolver_<type>posv_strided_batched()
    :outline:
 .. doxygenfunction:: rocsolver_sposv_strided_batched
 
-.. _sytrs:
-
-rocsolver_<type>sytrs()
----------------------------------------------------
-.. doxygenfunction:: rocsolver_zsytrs_64
-   :outline:
-.. doxygenfunction:: rocsolver_csytrs_64
-   :outline:
-.. doxygenfunction:: rocsolver_dsytrs_64
-   :outline:
-.. doxygenfunction:: rocsolver_ssytrs_64
-   :outline:
-.. doxygenfunction:: rocsolver_zsytrs
-   :outline:
-.. doxygenfunction:: rocsolver_csytrs
-   :outline:
-.. doxygenfunction:: rocsolver_dsytrs
-   :outline:
-.. doxygenfunction:: rocsolver_ssytrs
-
-rocsolver_<type>sytrs_batched()
----------------------------------------------------
-.. doxygenfunction:: rocsolver_zsytrs_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_csytrs_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_dsytrs_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_ssytrs_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_zsytrs_batched
-   :outline:
-.. doxygenfunction:: rocsolver_csytrs_batched
-   :outline:
-.. doxygenfunction:: rocsolver_dsytrs_batched
-   :outline:
-.. doxygenfunction:: rocsolver_ssytrs_batched
-
-rocsolver_<type>sytrs_strided_batched()
----------------------------------------------------
-.. doxygenfunction:: rocsolver_zsytrs_strided_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_csytrs_strided_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_dsytrs_strided_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_ssytrs_strided_batched_64
-   :outline:
-.. doxygenfunction:: rocsolver_zsytrs_strided_batched
-   :outline:
-.. doxygenfunction:: rocsolver_csytrs_strided_batched
-   :outline:
-.. doxygenfunction:: rocsolver_dsytrs_strided_batched
-   :outline:
-.. doxygenfunction:: rocsolver_ssytrs_strided_batched
-
-.. .. _sytrs2:
-.. 
-.. rocsolver_<type>sytrs2()
-.. ---------------------------------------------------
-.. .. doxygenfunction:: rocsolver_zsytrs2_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_csytrs2_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_dsytrs2_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_ssytrs2_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_zsytrs2
-..    :outline:
-.. .. doxygenfunction:: rocsolver_csytrs2
-..    :outline:
-.. .. doxygenfunction:: rocsolver_dsytrs2
-..    :outline:
-.. .. doxygenfunction:: rocsolver_ssytrs2
-.. 
-.. rocsolver_<type>sytrs2_batched()
-.. ---------------------------------------------------
-.. .. doxygenfunction:: rocsolver_zsytrs2_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_csytrs2_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_dsytrs2_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_ssytrs2_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_zsytrs2_batched
-..    :outline:
-.. .. doxygenfunction:: rocsolver_csytrs2_batched
-..    :outline:
-.. .. doxygenfunction:: rocsolver_dsytrs2_batched
-..    :outline:
-.. .. doxygenfunction:: rocsolver_ssytrs2_batched
-.. 
-.. rocsolver_<type>sytrs2_strided_batched()
-.. ---------------------------------------------------
-.. .. doxygenfunction:: rocsolver_zsytrs2_strided_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_csytrs2_strided_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_dsytrs2_strided_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_ssytrs2_strided_batched_64
-..    :outline:
-.. .. doxygenfunction:: rocsolver_zsytrs2_strided_batched
-..    :outline:
-.. .. doxygenfunction:: rocsolver_csytrs2_strided_batched
-..    :outline:
-.. .. doxygenfunction:: rocsolver_dsytrs2_strided_batched
-..    :outline:
-.. .. doxygenfunction:: rocsolver_ssytrs2_strided_batched
-
 
 
 .. _leastsqr:
@@ -1589,7 +1476,7 @@ rocsolver_<type>hegvx_strided_batched()
 Singular value decomposition
 ================================
 
-.. contents:: List of SVD-related functions
+.. contents:: List of SVD related functions
    :local:
    :backlinks: top
 
@@ -1656,36 +1543,3 @@ rocsolver_<type>gesvdx_strided_batched()
 .. doxygenfunction:: rocsolver_dgesvdx_strided_batched
    :outline:
 .. doxygenfunction:: rocsolver_sgesvdx_strided_batched
-
-.. _gesdd:
-
-rocsolver_<type>gesdd()
----------------------------------------------------
-.. doxygenfunction:: rocsolver_zgesdd
-   :outline:
-.. doxygenfunction:: rocsolver_cgesdd
-   :outline:
-.. doxygenfunction:: rocsolver_dgesdd
-   :outline:
-.. doxygenfunction:: rocsolver_sgesdd
-
-rocsolver_<type>gesdd_batched()
----------------------------------------------------
-.. doxygenfunction:: rocsolver_zgesdd_batched
-   :outline:
-.. doxygenfunction:: rocsolver_cgesdd_batched
-   :outline:
-.. doxygenfunction:: rocsolver_dgesdd_batched
-   :outline:
-.. doxygenfunction:: rocsolver_sgesdd_batched
-
-rocsolver_<type>gesdd_strided_batched()
----------------------------------------------------
-.. doxygenfunction:: rocsolver_zgesdd_strided_batched
-   :outline:
-.. doxygenfunction:: rocsolver_cgesdd_strided_batched
-   :outline:
-.. doxygenfunction:: rocsolver_dgesdd_strided_batched
-   :outline:
-.. doxygenfunction:: rocsolver_sgesdd_strided_batched
-

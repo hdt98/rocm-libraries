@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,8 +34,7 @@ namespace rocrand_impl::host
 template<class T>
 struct generator_config_selector<ROCRAND_RNG_PSEUDO_THREEFRY2_32_20, T>
 {
-    __host__ __device__
-    static constexpr unsigned int get_threads(const target_arch arch)
+    __host__ __device__ static constexpr unsigned int get_threads(const target_arch arch)
     {
         switch(arch)
         {
@@ -47,15 +46,13 @@ struct generator_config_selector<ROCRAND_RNG_PSEUDO_THREEFRY2_32_20, T>
             case target_arch::gfx90a: return 512;
             case target_arch::gfx908: return 512;
             case target_arch::gfx906: return 256;
-            case target_arch::gfx1150: return 1024;
             case target_arch::gfx1201: return 1024;
             default:
                 return generator_config_defaults<ROCRAND_RNG_PSEUDO_THREEFRY2_32_20, T>::threads;
         }
     }
 
-    __host__ __device__
-    static constexpr unsigned int get_blocks(const target_arch arch)
+    __host__ __device__ static constexpr unsigned int get_blocks(const target_arch arch)
     {
         switch(arch)
         {
@@ -67,7 +64,6 @@ struct generator_config_selector<ROCRAND_RNG_PSEUDO_THREEFRY2_32_20, T>
             case target_arch::gfx90a: return 2048;
             case target_arch::gfx908: return 1200;
             case target_arch::gfx906: return 896;
-            case target_arch::gfx1150: return 1024;
             case target_arch::gfx1201: return 2048;
             default:
                 return generator_config_defaults<ROCRAND_RNG_PSEUDO_THREEFRY2_32_20, T>::blocks;

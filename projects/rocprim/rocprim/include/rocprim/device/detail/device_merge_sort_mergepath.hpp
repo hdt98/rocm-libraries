@@ -1,6 +1,6 @@
 /******************************************************************************
 * Copyright (c) 2011-2021, NVIDIA CORPORATION.  All rights reserved.
-* Modifications Copyright (c) 2022-2026, Advanced Micro Devices, Inc.  All rights reserved.
+* Modifications Copyright (c) 2022-2025, Advanced Micro Devices, Inc.  All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
@@ -33,99 +33,93 @@
 
 #include "../../detail/various.hpp"
 
-#include "device_merge.hpp"
 #include "device_merge_sort.hpp"
+#include "device_merge.hpp"
 
 BEGIN_ROCPRIM_NAMESPACE
 
 namespace detail
 {
-// Load items from input1 and input2 from global memory
-template<unsigned int ItemsPerThread, class KeyT, class InputIterator>
+    // Load items from input1 and input2 from global memory
+    template <unsigned int ItemsPerThread, class KeyT, class InputIterator>
     ROCPRIM_DEVICE ROCPRIM_INLINE
-void gmem_to_reg(KeyT (&output)[ItemsPerThread],
-                 InputIterator input1,
-                 InputIterator input2,
-                 unsigned int  count1,
-                 unsigned int  count2,
-                 bool          IsLastTile)
-{
-    if(IsLastTile)
+    void gmem_to_reg(KeyT (&output)[ItemsPerThread],
+                     InputIterator input1,
+                     InputIterator input2,
+                     unsigned int count1,
+                     unsigned int count2,
+                     bool IsLastTile)
     {
-        ROCPRIM_UNROLL
-        for(unsigned int item = 0; item < ItemsPerThread; ++item)
+        if(IsLastTile)
         {
-            unsigned int idx = rocprim::flat_block_size() * item + threadIdx.x;
-            if(idx < count1 + count2)
+            ROCPRIM_UNROLL
+            for (unsigned int item = 0; item < ItemsPerThread; ++item)
             {
+                unsigned int idx = rocprim::flat_block_size() * item + threadIdx.x;
+                if (idx < count1 + count2)
+                {
+                    output[item] = (idx < count1) ? input1[idx] : input2[idx - count1];
+                }
+            }
+
+        }
+        else
+        {
+            ROCPRIM_UNROLL
+            for (unsigned int item = 0; item < ItemsPerThread; ++item)
+            {
+                unsigned int idx = rocprim::flat_block_size() * item + threadIdx.x;
                 output[item] = (idx < count1) ? input1[idx] : input2[idx - count1];
             }
         }
     }
-    else
+
+    template <unsigned int BlockSize, unsigned int ItemsPerThread, class KeyT, class OutputIterator>
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void reg_to_shared(OutputIterator output,
+                       KeyT (&input)[ItemsPerThread])
     {
         ROCPRIM_UNROLL
-        for(unsigned int item = 0; item < ItemsPerThread; ++item)
+        for (unsigned int item = 0; item < ItemsPerThread; ++item)
         {
-            unsigned int idx = rocprim::flat_block_size() * item + threadIdx.x;
-            output[item]     = (idx < count1) ? input1[idx] : input2[idx - count1];
+            unsigned int idx = BlockSize * item + threadIdx.x;
+            output[idx] = input[item];
         }
     }
-}
 
-template<unsigned int BlockSize, unsigned int ItemsPerThread, class KeyT, class OutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-void reg_to_shared(OutputIterator output, KeyT (&input)[ItemsPerThread])
-{
-    ROCPRIM_UNROLL
-    for(unsigned int item = 0; item < ItemsPerThread; ++item)
+    template<class Key,
+             class Value,
+             unsigned int BlockSize,
+             unsigned int ItemsPerThread,
+             typename Enable = void>
+    struct block_merge_impl;
+
+    template<class Key, class Value, unsigned int BlockSize, unsigned int ItemsPerThread>
+    struct block_merge_impl<Key,
+                            Value,
+                            BlockSize,
+                            ItemsPerThread,
+                            std::enable_if_t<!std::is_trivially_copyable<Value>::value
+                                             || rocprim::is_floating_point<Value>::value
+                                             || std::is_integral<Value>::value>>
     {
-        unsigned int idx = BlockSize * item + threadIdx.x;
-        output[idx]      = input[item];
-    }
-}
 
-template<class Key,
-         class Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize,
-         typename Enable = void>
-struct block_merge_impl;
+        static constexpr bool with_values = !std::is_same<Value, ::rocprim::empty_type>::value;
+        static constexpr unsigned int items_per_tile = BlockSize * ItemsPerThread;
 
-template<class Key,
-         class Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
-struct block_merge_impl<
-    Key,
-    Value,
-    BlockSize,
-    ItemsPerThread,
-    TargetWaveSize,
-    std::enable_if_t<
-        !std::is_trivially_copyable<Value>::value || rocprim::is_floating_point<Value>::value
-        || rocprim::is_integral<Value>::value || std::is_same<Value, ::rocprim::empty_type>::value>>
-{
+        using block_store = block_store_impl<with_values, BlockSize, ItemsPerThread, Key, Value>;
 
-    static constexpr bool         with_values = !std::is_same<Value, ::rocprim::empty_type>::value;
-    static constexpr unsigned int items_per_tile = BlockSize * ItemsPerThread;
+        using keys_storage_   = Key[items_per_tile + 1];
+        using values_storage_ = Value[items_per_tile + 1];
 
-    using block_store
-        = block_store_impl<with_values, BlockSize, ItemsPerThread, Key, Value, TargetWaveSize>;
-
-    using keys_storage_   = Key[items_per_tile + 1];
-    using values_storage_ = Value[items_per_tile + 1];
-
-    union storage_type
-    {
-        typename block_store::storage_type store;
-        ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_WITH_PUSH
-        detail::raw_storage<keys_storage_>   keys;
-        detail::raw_storage<values_storage_> values;
-        ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_POP
-    };
+        union storage_type
+        {
+            typename block_store::storage_type   store;
+            ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_WITH_PUSH
+            detail::raw_storage<keys_storage_>   keys;
+            detail::raw_storage<values_storage_> values;
+            ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_POP
+        };
 
         template<class KeysInputIterator,
                  class KeysOutputIterator,
@@ -133,7 +127,7 @@ struct block_merge_impl<
                  class ValuesOutputIterator,
                  class OffsetT,
                  class BinaryFunction>
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void process_tile(KeysInputIterator    keys_input,
+        ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void process_tile(KeysInputIterator    keys_input,
                                                               KeysOutputIterator   keys_output,
                                                               ValuesInputIterator  values_input,
                                                               ValuesOutputIterator values_output,
@@ -200,7 +194,7 @@ struct block_merge_impl<
             reg_to_shared<BlockSize, ItemsPerThread>(keys_shared, keys);
 
             Value values[ItemsPerThread];
-            if constexpr(with_values)
+            if ROCPRIM_IF_CONSTEXPR(with_values)
             {
                 gmem_to_reg<ItemsPerThread>(values,
                                             values_input + keys1_beg,
@@ -234,7 +228,7 @@ struct block_merge_impl<
             serial_merge<false>(keys_shared, keys, indices, range_local, compare_function);
             rocprim::syncthreads();
 
-            if constexpr(with_values)
+            if ROCPRIM_IF_CONSTEXPR(with_values)
             {
                 reg_to_shared<BlockSize, ItemsPerThread>(values_shared, values);
 
@@ -259,44 +253,38 @@ struct block_merge_impl<
                                 values,
                                 storage.store);
         }
-};
-
-// The specialization below exists because the compiler creates slow code for
-// ValueTypes with misaligned datastructures in them (e.g. custom_char_double)
-// when storing/loading those ValueTypes to/from registers.
-// Thus this is a temporary workaround.
-template<class Key,
-         class Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
-struct block_merge_impl<Key,
-                        Value,
-                        BlockSize,
-                        ItemsPerThread,
-                        TargetWaveSize,
-                        std::enable_if_t<std::is_trivially_copyable<Value>::value
-                                         && !rocprim::is_floating_point<Value>::value
-                                         && !rocprim::is_integral<Value>::value
-                                         && !std::is_same<Value, ::rocprim::empty_type>::value>>
-{
-    static constexpr bool         with_values = !std::is_same<Value, ::rocprim::empty_type>::value;
-    static constexpr unsigned int items_per_tile = BlockSize * ItemsPerThread;
-
-    using block_store
-        = block_store_impl<false, BlockSize, ItemsPerThread, Key, Value, TargetWaveSize>;
-
-    using keys_storage_   = Key[items_per_tile + 1];
-    using values_storage_ = Value[items_per_tile + 1];
-
-    union storage_type
-    {
-        typename block_store::storage_type store;
-        ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_WITH_PUSH
-        detail::raw_storage<keys_storage_>   keys;
-        detail::raw_storage<values_storage_> values;
-        ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_POP
     };
+
+    // The specialization below exists because the compiler creates slow code for
+    // ValueTypes with misaligned datastructures in them (e.g. custom_char_double)
+    // when storing/loading those ValueTypes to/from registers.
+    // Thus this is a temporary workaround.
+    template<class Key, class Value, unsigned int BlockSize, unsigned int ItemsPerThread>
+    struct block_merge_impl<Key,
+                            Value,
+                            BlockSize,
+                            ItemsPerThread,
+                            std::enable_if_t<std::is_trivially_copyable<Value>::value
+                                             && !rocprim::is_floating_point<Value>::value
+                                             && !std::is_integral<Value>::value>>
+    {
+
+        static constexpr bool with_values = !std::is_same<Value, ::rocprim::empty_type>::value;
+        static constexpr unsigned int items_per_tile = BlockSize * ItemsPerThread;
+
+        using block_store = block_store_impl<false, BlockSize, ItemsPerThread, Key, Value>;
+
+        using keys_storage_   = Key[items_per_tile + 1];
+        using values_storage_ = Value[items_per_tile + 1];
+
+        union storage_type
+        {
+            typename block_store::storage_type   store;
+            ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_WITH_PUSH
+            detail::raw_storage<keys_storage_>   keys;
+            detail::raw_storage<values_storage_> values;
+            ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_POP
+        };
 
         template<class KeysInputIterator,
                  class KeysOutputIterator,
@@ -304,7 +292,7 @@ struct block_merge_impl<Key,
                  class ValuesOutputIterator,
                  class OffsetT,
                  class BinaryFunction>
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void process_tile(KeysInputIterator  keys_input,
+        ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE void process_tile(KeysInputIterator  keys_input,
                                                               KeysOutputIterator   keys_output,
                                                               ValuesInputIterator  values_input,
                                                               ValuesOutputIterator values_output,
@@ -315,6 +303,7 @@ struct block_merge_impl<Key,
                                                               const OffsetT*       merge_partitions,
                                                               storage_type&        storage)
         {
+
             auto& keys_shared   = storage.keys.get();
             auto& values_shared = storage.values.get();
 
@@ -393,7 +382,7 @@ struct block_merge_impl<Key,
             serial_merge<false>(keys_shared, keys, indices, range_local, compare_function);
             rocprim::syncthreads();
 
-            if constexpr(with_values)
+            if ROCPRIM_IF_CONSTEXPR(with_values)
             {
                 const ValuesInputIterator input1 = values_input + keys1_beg;
                 const ValuesInputIterator input2 = values_input + keys2_beg;
@@ -467,9 +456,9 @@ struct block_merge_impl<Key,
                                 values,
                                 storage.store);
         }
-};
+    };
 
-} // namespace detail
+} // end of detail namespace
 
 END_ROCPRIM_NAMESPACE
 

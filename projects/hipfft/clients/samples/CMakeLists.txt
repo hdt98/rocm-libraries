@@ -1,5 +1,5 @@
 # #############################################################################
-# Copyright (C) 2016 - 2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +24,8 @@ CMAKE_MINIMUM_REQUIRED( VERSION 3.16 )
 
 project( hipfft-clients-samples-rocfft LANGUAGES CXX )
 
-# We use C++20 features, this will add compile option: -std=c++20
-set( CMAKE_CXX_STANDARD 20 )
+# We use C++17 features, this will add compile option: -std=c++17
+set( CMAKE_CXX_STANDARD 17 )
 
 if( NOT TARGET hipfft )
   find_package( hipfft REQUIRED CONFIG PATHS )
@@ -61,7 +61,7 @@ foreach( sample ${sample_list} )
 
   add_executable( ${sample} ${sample}.cpp )
 
-  set_target_properties( ${sample} PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON )
+  set_target_properties( ${sample} PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON )
 
   target_link_libraries( ${sample} PRIVATE hip::hipfft )
 
@@ -71,7 +71,7 @@ foreach( sample ${sample_list} )
     if( WIN32 )
       find_package( HIP CONFIG REQUIRED )
     else()
-      find_package( HIP REQUIRED )
+      find_package( HIP MODULE REQUIRED )
     endif()
     if( NOT BUILD_WITH_LIB STREQUAL "CUDA" )
       target_link_libraries( ${sample} PRIVATE hip::host hip::device )
@@ -86,9 +86,16 @@ foreach( sample ${sample_list} )
       target_compile_options( ${sample} PRIVATE -cuda -Xptxas=-w)
       target_link_options( ${sample} PRIVATE -cuda)
     else()
-      target_compile_options( ${sample} PRIVATE -arch sm_100 -gencode=arch=compute_100,code=sm_100 -Xptxas=-w)
+      target_compile_options( ${sample} PRIVATE -arch sm_53 -gencode=arch=compute_53,code=sm_53 -Xptxas=-w)
     endif()
     target_link_libraries( ${sample} PRIVATE ${CUDA_LIBRARIES} )
+  else()
+    if( USE_HIPRAND AND NOT hiprand_FOUND )
+      find_package( hiprand REQUIRED )
+    endif()
+    if ( USE_HIPRAND )
+      target_link_libraries( ${sample} PRIVATE hip::hiprand )
+    endif()
   endif()
 
   target_include_directories( ${sample}
@@ -117,15 +124,8 @@ foreach( sample ${sample_list} )
   
 endforeach()
 
-# callback code must be compiled as relocatable device code
-if( hipfft_callback IN_LIST sample_list )
-  if( BUILD_WITH_LIB STREQUAL "CUDA" )
-    target_compile_options( hipfft_callback PRIVATE -dc )
-  else()
-    # -fgpu-rdc causes failure at link stage on Windows
-    if (NOT WIN32)
-      target_compile_options( hipfft_callback PRIVATE -fgpu-rdc )
-      target_link_options( hipfft_callback PRIVATE -fgpu-rdc )
-    endif()
-  endif()
+# cuFFT callback code must be compiled with -dc to enable relocatable
+# device code
+if( BUILD_WITH_LIB STREQUAL "CUDA" AND hipfft_callback IN_LIST sample_list )
+  target_compile_options( hipfft_callback PRIVATE -dc )
 endif()

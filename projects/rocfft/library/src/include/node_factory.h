@@ -32,12 +32,6 @@ private:
     static const Map1DLength         map1DLengthSingle;
     static const Map1DLength         map1DLengthDouble;
 
-    // Maps from length[0] to divLength1 for TRTRT decomposition.
-    // Normally we would choose the largest kernel that helps decompose
-    // a 1D length, but this map holds exceptions that are known to be
-    // better
-    static const Map1DLength map1DLengthTRTRT;
-
     static bool Large1DLengthsValid(const function_pool& pool,
                                     const Map1DLength&   map1DLength,
                                     rocfft_precision     precision);
@@ -67,22 +61,17 @@ public:
     static ComputeScheme
         DecideNodeScheme(const function_pool& pool, NodeMetaData& nodeData, TreeNode* parent);
     static ComputeScheme DecideRealScheme(const function_pool& pool, NodeMetaData& nodeData);
-    static ComputeScheme
-        Decide1DScheme(const function_pool& pool, NodeMetaData& nodeData, TreeNode* parent);
+    static ComputeScheme Decide1DScheme(const function_pool& pool, NodeMetaData& nodeData);
     static ComputeScheme Decide2DScheme(const function_pool& pool, NodeMetaData& nodeData);
     static ComputeScheme Decide3DScheme(const function_pool& pool, NodeMetaData& nodeData);
 
     // determine function:
     static bool use_CS_2D_SINGLE(const function_pool& pool,
-                                 const NodeMetaData&  nodeData,
-                                 rocfft_array_type    inArrayType,
-                                 rocfft_array_type    outArrayType);
+                                 NodeMetaData& nodeData); // using scheme CS_KERNEL_2D_SINGLE or not
     static bool use_CS_2D_RC(const function_pool& pool,
                              NodeMetaData&        nodeData); // using scheme CS_2D_RC or not
     static bool use_CS_3D_BLOCK_RC(const function_pool& pool, NodeMetaData& nodeData);
     static bool use_CS_3D_RC(const function_pool& pool, NodeMetaData& nodeData);
-    static bool use_CS_3D_PP(const function_pool& pool, NodeMetaData& nodeData);
-    static bool use_CS_REAL_3D_PP(const function_pool& pool, NodeMetaData& nodeData);
     // how many SBRC kernels can we put into a 3D transform?
     static size_t count_3D_SBRC_nodes(const function_pool& pool, NodeMetaData& nodeData);
 

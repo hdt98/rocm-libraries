@@ -17,7 +17,7 @@ def runCI =
     def prj = new rocProject('rocSOLVER', 'Debug')
 
     prj.timeout.compile = 600
-    prj.timeout.test = 300
+    prj.timeout.test = 45
     prj.defaults.ccache = true
 
     // customize for project
@@ -36,6 +36,14 @@ def runCI =
         commonGroovy.runCompileCommand(platform, project, jobName)
     }
 
+    def testCommand =
+    {
+        platform, project->
+
+        def gfilter = 'checkin*'
+        commonGroovy.runTestCommand(platform, project, gfilter)
+    }
+
     def packageCommand =
     {
         platform, project->
@@ -43,7 +51,7 @@ def runCI =
         commonGroovy.runPackageCommand(platform, project)
     }
 
-    buildProject(prj, formatCheck, nodes.dockerArray, compileCommand, null, packageCommand)
+    buildProject(prj, formatCheck, nodes.dockerArray, compileCommand, testCommand, packageCommand)
 
 }
 
@@ -70,13 +78,18 @@ ci: {
     {
         jobName, nodeDetails->
         if (urlJobName == jobName)
-            runCI(nodeDetails, jobName)
+            stage(jobName) {
+                runCI(nodeDetails, jobName)
+            }
     }
 
     // For url job names that are not listed by the jobNameList i.e. compute-rocm-dkms-no-npi-1901
     if(!jobNameList.keySet().contains(urlJobName))
     {
         properties(auxiliary.addCommonProperties([pipelineTriggers([cron('0 5 * * *')])]))
-        runCI([ubuntu18:['gfx906']], urlJobName)
+        stage(urlJobName) {
+            runCI([ubuntu18:['gfx906']], urlJobName)
+        }
     }
 }
+

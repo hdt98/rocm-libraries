@@ -1,7 +1,4 @@
 #!/bin/bash
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 FILE=$1
 
 for num in {0..255}

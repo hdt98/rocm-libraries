@@ -33,7 +33,6 @@
 
 #include <cassert>
 #include <string>
-#include <optional>
 
 namespace miopen {
 
@@ -53,6 +52,9 @@ struct ProblemDescriptionTag
 {
 };
 
+bool is_fp16_or_bfp16(miopenDataType_t type);
+bool is_fp32_or_fp64(miopenDataType_t type);
+
 struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
                                                     ProblemDescriptionTag
 #if MIOPEN_ENABLE_SQLITE
@@ -60,7 +62,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
                                                     SQLiteSerializable<ProblemDescription>
 #endif
 {
-    // Forward Training without activation
+    // Forward Training
     ProblemDescription(miopenBatchNormMode_t bn_mode_,
                        const TensorDescriptor& xDesc_,
                        const TensorDescriptor& yDesc_,
@@ -92,41 +94,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
         out_layout = ComputeOutLayout();
     }
 
-    // Forward Training with activation
-    ProblemDescription(miopenBatchNormMode_t bn_mode_,
-                       const TensorDescriptor& xDesc_,
-                       const TensorDescriptor& yDesc_,
-                       const TensorDescriptor& scaleDesc_,
-                       const TensorDescriptor& biasDesc_,
-                       const TensorDescriptor& sMeanDesc_,
-                       const TensorDescriptor& sVarianceDesc_,
-                       double expAvgFactor_,
-                       double epsilon_,
-                       bool resultsave_,
-                       bool resultrunning_,
-                       size_t min_workgroups_,
-                       const ActivationDescriptor& activDesc_)
-        : direction(Direction::ForwardTraining),
-          bn_mode(bn_mode_),
-          xDesc(xDesc_),
-          yOrDyDesc(yDesc_),
-          scaleDesc(scaleDesc_),
-          biasDesc(biasDesc_),
-          sMeanDesc(sMeanDesc_),
-          sVarianceDesc(sVarianceDesc_),
-          expAvgFactor(expAvgFactor_),
-          epsilon(epsilon_),
-          resultsave(resultsave_),
-          resultrunning(resultrunning_),
-          min_workgroups(min_workgroups_),
-          activDesc(activDesc_)
-    {
-        SetSpatialDims();
-        in_layout  = ComputeInLayout();
-        out_layout = ComputeOutLayout();
-    }
-
-    // Forward Inference without activation
+    // Forward Inference
     ProblemDescription(miopenBatchNormMode_t bn_mode_,
                        const TensorDescriptor& xDesc_,
                        const TensorDescriptor& yDesc_,
@@ -150,40 +118,7 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
         out_layout = ComputeOutLayout();
     }
 
-    // Forward Inference with activation, epsilon_ doesn't have a value if using inverse variance.
-    ProblemDescription(miopenBatchNormMode_t bn_mode_,
-                       const TensorDescriptor& xDesc_,
-                       const TensorDescriptor& yDesc_,
-                       const TensorDescriptor& scaleDesc_,
-                       const TensorDescriptor& biasDesc_,
-                       const TensorDescriptor& sMeanDesc_,
-                       const TensorDescriptor& sVarianceDesc_,
-                       std::optional<double> epsilon_,
-                       const ActivationDescriptor& activDesc_)
-        : direction(Direction::ForwardInference),
-          bn_mode(bn_mode_),
-          xDesc(xDesc_),
-          yOrDyDesc(yDesc_),
-          scaleDesc(scaleDesc_),
-          biasDesc(biasDesc_),
-          sMeanDesc(sMeanDesc_),
-          sVarianceDesc(sVarianceDesc_),
-          activDesc(activDesc_)
-    {
-        if(epsilon_.has_value())
-        {
-            epsilon = epsilon_.value();
-        }
-        else
-        {
-            useInverseVariance = true;
-        }
-        SetSpatialDims();
-        in_layout  = ComputeInLayout();
-        out_layout = ComputeOutLayout();
-    }
-
-    // Backward without activation
+    // Backward
     ProblemDescription(miopenBatchNormMode_t bn_mode_,
                        const TensorDescriptor& xDesc_,
                        const TensorDescriptor& dyDesc_,
@@ -207,39 +142,6 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
           epsilon(epsilon_),
           useSaved(useSaved_),
           min_workgroups(min_workgroups_)
-    {
-        SetSpatialDims();
-        in_layout  = ComputeInLayout();
-        out_layout = ComputeOutLayout();
-        din_layout = ComputeDinLayout();
-    }
-
-    // Backward with activation
-    ProblemDescription(miopenBatchNormMode_t bn_mode_,
-                       const TensorDescriptor& xDesc_,
-                       const TensorDescriptor& dyDesc_,
-                       const TensorDescriptor& dxDesc_,
-                       const TensorDescriptor& scaleDesc_,
-                       const TensorDescriptor& biasDesc_,
-                       const TensorDescriptor& sMeanDesc_,
-                       const TensorDescriptor& sVarianceDesc_,
-                       double epsilon_,
-                       bool useSaved_,
-                       size_t min_workgroups_,
-                       const ActivationDescriptor& activDesc_)
-        : direction(Direction::Backward),
-          bn_mode(bn_mode_),
-          xDesc(xDesc_),
-          yOrDyDesc(dyDesc_),
-          dxDesc(dxDesc_),
-          scaleDesc(scaleDesc_),
-          biasDesc(biasDesc_),
-          sMeanDesc(sMeanDesc_),
-          sVarianceDesc(sVarianceDesc_),
-          epsilon(epsilon_),
-          useSaved(useSaved_),
-          min_workgroups(min_workgroups_),
-          activDesc(activDesc_)
     {
         SetSpatialDims();
         in_layout  = ComputeInLayout();
@@ -298,8 +200,6 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
         return resultrunning;
     }
 
-    const ActivationDescriptor& GetActivationDesc() const { return activDesc; }
-
     std::size_t GetMinWorkgroups() const
     {
         assert(direction == Direction::ForwardTraining || direction == Direction::Backward);
@@ -342,7 +242,6 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase,
 
     bool Is2D() const { return xDesc.GetLengths().size() == 4; }
     bool Is3D() const { return xDesc.GetLengths().size() == 5; }
-    bool isInverseVariance() const { return useInverseVariance; }
 
     bool IsFp64() const { return xDesc.GetType() == miopenDouble; }
     bool IsFp32() const { return xDesc.GetType() == miopenFloat; }
@@ -421,14 +320,11 @@ private:
     bool resultsave            = false;
     bool resultrunning         = false;
     bool useSaved              = false;
-    bool useInverseVariance    = false;
     std::string in_layout      = "NCHW";
     std::string out_layout     = "NCHW";
     std::string din_layout     = "NCHW";
     std::size_t spatial_dim    = 2;
     std::size_t min_workgroups = 1;
-
-    ActivationDescriptor activDesc;
 
     std::string ComputeLayout(const TensorDescriptor& td) const { return td.GetLayout_str(); }
     std::string ComputeInLayout() const { return ComputeLayout(xDesc); }
@@ -445,14 +341,17 @@ private:
 
     std::string GetDirectionStr() const
     {
+        std::string s;
+
         switch(direction)
         {
-        case Direction::ForwardInference: return "Inf";
+        case Direction::ForwardInference: return "Inf"; ;
         case Direction::ForwardTraining: return "Trn";
         case Direction::Backward: return "Bwd";
+        default: MIOPEN_THROW(miopenStatusInvalidValue, "Wrong Batchnorm Direction provided");
         }
 
-        MIOPEN_THROW(miopenStatusInvalidValue, "Wrong Batchnorm Direction provided");
+        return s;
     }
 
     std::string GetModeStr() const
@@ -461,9 +360,8 @@ private:
         {
         case miopenBNPerActivation: return "0";
         case miopenBNSpatial: return "1";
+        default: MIOPEN_THROW(miopenStatusInvalidValue, "Wrong Batchnorm Mode provided");
         }
-
-        MIOPEN_THROW(miopenStatusInvalidValue, "Wrong Batchnorm Mode provided");
     }
 };
 

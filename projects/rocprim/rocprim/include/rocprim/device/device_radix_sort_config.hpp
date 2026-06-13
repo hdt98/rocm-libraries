@@ -23,7 +23,6 @@
 
 #include "config_types.hpp"
 #include "detail/config/device_radix_sort_block_sort.hpp"
-#include "detail/config/device_radix_sort_onesweep.hpp"
 #include "detail/device_config_helper.hpp"
 
 /// \addtogroup primitivesmodule_deviceconfigs
@@ -66,53 +65,76 @@ struct radix_sort_config
 namespace detail
 {
 
-template<class Key, class Value>
-struct radix_sort_onesweep_config_selector
+// sub-algorithm onesweep:
+template<typename RadixSortOnesweepConfig, typename, typename>
+struct wrapped_radix_sort_onesweep_config
 {
-    using targets    = radix_sort_onesweep_targets;
-    using param_type = radix_sort_onesweep_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr radix_sort_onesweep_config_selector(Target)
-        : params(radix_sort_onesweep_config_picker<Target, Key, Value>())
-    {}
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr radix_sort_onesweep_config_params params = RadixSortOnesweepConfig();
+    };
 };
 
-template<class Config, class Selector, class Target>
-struct radix_sort_onesweep_histogram_config_static_selector
+template<typename Key, typename Value>
+struct wrapped_radix_sort_onesweep_config<default_config, Key, Value>
 {
-    static constexpr auto block_size = target_config<Config, Selector, Target>::params
-                                           .radix_sort_onesweep_config_params::histogram.block_size;
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr radix_sort_onesweep_config_params params
+            = default_radix_sort_onesweep_config<static_cast<unsigned int>(Arch), Key, Value>();
+    };
 };
 
-template<class Config, class Selector, class Target>
-struct radix_sort_onesweep_sort_config_static_selector
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<typename RadixSortOnesweepConfig, typename Key, typename Value>
+template<target_arch Arch>
+constexpr radix_sort_onesweep_config_params
+    wrapped_radix_sort_onesweep_config<RadixSortOnesweepConfig, Key, Value>::architecture_config<
+        Arch>::params;
+
+template<typename Key, typename Value>
+template<target_arch Arch>
+constexpr radix_sort_onesweep_config_params
+    wrapped_radix_sort_onesweep_config<default_config, Key, Value>::architecture_config<
+        Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
+
+// Sub-algorithm block_sort:
+template<typename RadixSortBlockSortConfig, typename, typename>
+struct wrapped_radix_sort_block_sort_config
 {
-    static constexpr auto block_size = target_config<Config, Selector, Target>::params
-                                           .radix_sort_onesweep_config_params::sort.block_size;
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr kernel_config_params params = RadixSortBlockSortConfig();
+    };
 };
 
-template<class Key, class Value>
-struct radix_sort_block_sort_config_selector
+template<typename Key, typename Value>
+struct wrapped_radix_sort_block_sort_config<default_config, Key, Value>
 {
-    using targets    = radix_sort_block_sort_targets;
-    using param_type = kernel_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr radix_sort_block_sort_config_selector(Target)
-        : params(radix_sort_block_sort_config_picker<Target, Key, Value>())
-    {}
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr kernel_config_params params
+            = default_radix_sort_block_sort_config<static_cast<unsigned int>(Arch), Key, Value>();
+    };
 };
 
-template<typename Config, class Selector, class Target>
-struct radix_sort_block_sort_config_static_selector
-{
-    static constexpr auto block_size = target_config<Config, Selector, Target>::params.block_size;
-};
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<typename RadixSortBlockSortConfig, typename Key, typename Value>
+template<target_arch Arch>
+constexpr kernel_config_params
+    wrapped_radix_sort_block_sort_config<RadixSortBlockSortConfig, Key, Value>::architecture_config<
+        Arch>::params;
+
+template<typename Key, typename Value>
+template<target_arch Arch>
+constexpr kernel_config_params wrapped_radix_sort_block_sort_config<default_config, Key, Value>::
+    architecture_config<Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } // namespace detail
 

@@ -17,12 +17,11 @@
 
 #include <thrust/detail/config.h>
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
+#if THRUST_CPP_DIALECT >= 2014
 
-#if THRUST_CPP_DIALECT >= 2017
+#include <async/test_policy_overloads.h>
 
-#  include <async/inclusive_scan/mixin.h>
-#  include <async/test_policy_overloads.h>
+#include <async/inclusive_scan/mixin.h>
 
 namespace
 {
@@ -33,23 +32,21 @@ struct stateful_operator
 {
   T offset;
 
-  __host__ __device__ T operator()(T v1, T v2)
-  {
-    return v1 + v2 + offset;
-  }
+  THRUST_HOST_DEVICE T operator()(T v1, T v2) { return v1 + v2 + offset; }
 };
 
 // Postfix args overload definition that uses a stateful custom binary operator
 template <typename value_type>
 struct use_stateful_operator
 {
-  using postfix_args_type = std::tuple< // Single overload:
+  using postfix_args_type = std::tuple<       // Single overload:
     std::tuple<stateful_operator<value_type>> // bin_op
     >;
 
   static postfix_args_type generate_postfix_args()
   {
-    return postfix_args_type{std::make_tuple(stateful_operator<value_type>{value_type{2}})};
+    return postfix_args_type{
+      std::make_tuple(stateful_operator<value_type>{value_type{2}})};
   }
 };
 
@@ -58,14 +55,12 @@ struct invoker
     : testing::async::mixin::input::device_vector<value_type>
     , testing::async::mixin::output::device_vector<value_type>
     , use_stateful_operator<value_type>
-    , testing::async::inclusive_scan::mixin::invoke_reference::host_synchronous<value_type>
+    , testing::async::inclusive_scan::mixin::invoke_reference::host_synchronous<
+        value_type>
     , testing::async::inclusive_scan::mixin::invoke_async::simple
     , testing::async::mixin::compare_outputs::assert_almost_equal_if_fp_quiet
 {
-  static std::string description()
-  {
-    return "scan with stateful operator";
-  }
+  static std::string description() { return "scan with stateful operator"; }
 };
 
 } // namespace
@@ -80,9 +75,4 @@ struct test_stateful_operator
 };
 DECLARE_GENERIC_SIZED_UNITTEST_WITH_TYPES(test_stateful_operator, NumericTypes);
 
-#endif // C++17
-
-// we need to leak the suppression on clang/MSVC to suppresses warnings from the cudafe1.stub.c file
-#if THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
-THRUST_SUPPRESS_DEPRECATED_POP
-#endif // THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
+#endif // C++14

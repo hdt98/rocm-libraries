@@ -1,6 +1,3 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #include "ck_tile/host.hpp"
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
@@ -65,13 +62,14 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     assert(stride >= n);
 
-    using ADataType       = DataType;
-    using BDataType       = DataType;
-    using GammaDataType   = DataType;
-    using XDataType       = DataType;
-    using YScaleDataType  = float;
-    using QYDataType      = ck_tile::int8_t;
-    using ComputeDataType = float;
+    using ADataType        = DataType;
+    using BDataType        = DataType;
+    using GammaDataType    = DataType;
+    using XDataType        = DataType;
+    using UnquantYDataType = ck_tile::null_type;
+    using YScaleDataType   = float;
+    using QYDataType       = ck_tile::int8_t;
+    using ComputeDataType  = float;
 
     // host verify
     ck_tile::HostTensor<ADataType> a_host({m, n}, {stride, 1});
@@ -84,6 +82,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
     ck_tile::HostTensor<YScaleDataType> yscale_host_dev({m}, {1});
     ck_tile::HostTensor<QYDataType> qy_host_ref({m, n}, {stride, 1});
     ck_tile::HostTensor<QYDataType> qy_host_dev({m, n}, {stride, 1});
+    ck_tile::HostTensor<UnquantYDataType> unquant_y_host_ref({m, n}, {stride, 1});
 
     ck_tile::FillUniformDistribution<ADataType>{-.5f, .5f}(a_host);
     ck_tile::FillUniformDistribution<BDataType>{-.5f, .5f}(b_host);
@@ -102,11 +101,12 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     constexpr bool kThreePass = true;
 
-    using BlockTile      = ck_tile::sequence<4, 128>;
-    using Vector         = ck_tile::sequence<1, 1>;
-    using ThreadPerBlock = ck_tile::sequence<4, 64>;
+    using BlockWarps = ck_tile::sequence<4, 1>;
+    using BlockTile  = ck_tile::sequence<4, 128>;
+    using WarpTile   = ck_tile::sequence<1, 64>;
+    using Vector     = ck_tile::sequence<1, 1>;
 
-    using Shape   = ck_tile::Generic2dBlockShape<BlockTile, ThreadPerBlock, Vector>;
+    using Shape   = ck_tile::Generic2dBlockShape<BlockTile, BlockWarps, WarpTile, Vector>;
     using Problem = ck_tile::AddRmsnorm2dRdquantFwdPipelineProblem<ADataType,
                                                                    BDataType,
                                                                    GammaDataType,
@@ -138,11 +138,12 @@ bool run(const ck_tile::ArgParser& arg_parser)
     auto kargs = Kernel::MakeKargs(args);
 
     const dim3 grids                       = Kernel::GridSize(args);
-    const dim3 blocks                      = Kernel::BlockSize();
+    constexpr dim3 blocks                  = Kernel::BlockSize();
     constexpr ck_tile::index_t kBlockPerCu = 1;
     auto s = ck_tile::stream_config{nullptr, true, 0, warmup, repeat};
 
-    ck_tile::launch_kernel(s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+    ck_tile::launch_kernel(
+        s, ck_tile::make_kernel<blocks.x, kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
 
     bool pass = true;
 
@@ -187,14 +188,15 @@ bool run(const ck_tile::ArgParser& arg_parser)
         // Rmsnorm2d
         {
             ck_tile::HostTensor<InvRmsDataType> invRms_host_ref({m});
-            ck_tile::HostTensor<ck_tile::null_type> unquant_y_host_ref({m, n});
+
             // CAUSION: kernel use ComputeDataType version of x, but we use XDataType here for
             // simplicity
             ck_tile::reference_rmsnorm2d_fwd<XDataType,
                                              GammaDataType,
                                              ComputeDataType,
                                              YDataType,
-                                             InvRmsDataType>(
+                                             InvRmsDataType,
+                                             UnquantYDataType>(
                 x_host_ref, gamma_host, y_host, invRms_host_ref, unquant_y_host_ref, epsilon);
         }
 
@@ -257,7 +259,8 @@ bool run(const ck_tile::ArgParser& arg_parser)
             }
         }
 
-        std::cout << "[" << data_type << "]" << " m:" << m << ", n:" << n << ", stride:" << stride
+        std::cout << "[" << data_type << "]"
+                  << " m:" << m << ", n:" << n << ", stride:" << stride
                   << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
     }
 

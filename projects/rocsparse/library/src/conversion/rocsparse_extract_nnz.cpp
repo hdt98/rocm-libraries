@@ -23,7 +23,7 @@
 
 #include "rocsparse_extract.hpp"
 #include "rocsparse_extract_alg_default.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {

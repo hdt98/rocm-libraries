@@ -3,74 +3,28 @@
 Documentation for hipBLAS is available at
 [https://rocm.docs.amd.com/projects/hipBLAS/en/latest/](https://rocm.docs.amd.com/projects/hipBLAS/en/latest/).
 
-## hipBLAS 3.5.0
-
-### Added
-
-* Added the `hipblasGetVersion()` API.
-* Added the `hipblasGetProperty()` API.
-
-## hipBLAS 3.4.0
-
-### Added
-
-* gfx1250 and gfx90c support to clients.
-* Version and other properties to Windows `hipblas.dll`.
-* Support for `OpenBLAS` ILP64-based API usage in clients.
-
-### Resolved issue
-
-* Restored fallback of using the deprecated rocBLAS API `rocblas_set_device_memory_size` if allocations are failing.
-
-## hipBLAS 3.3.0
-
-### Added
-
-* Added the `hipblasHerkEx()` API.
-* Added the `hipblasSyrkEx()` API.
-
-## hipBLAS 3.2.0 for ROCm 7.2
-
-### Resolved issues
-* Corrected client memory use counts for the `HIPBLAS_CLIENT_RAM_GB_LIMIT` environment variable.
-* Fix to avoid false Clang static analysis warnings.
-
-## hipBLAS 3.1.0 for ROCm 7.1
-
-### Added
-
-* `--clients-only` build option to only build clients against a prebuilt library.
-* gfx1103, gfx1150, gfx1151, gfx1200, and gfx1201 support to clients.
-* FORTRAN enabled for the Microsoft Windows build and tests.
-* Additional reference library fallback options added.
-
-### Changed
-
-* Improve the build time for clients by removing `clients_common.cpp` from the hipblas-test build.
-
-## hipBLAS 3.0.0 for ROCm 7.0
+## hipBLAS 2.5.0 for ROCm 6.5.0
 
 ### Added
 
 * Added the `hipblasSetWorkspace()` API
-* Support for codecoverage tests
 
 ### Changed
 
-* HIPBLAS_V2 API is now the only available API using `hipComplex` and `hipDatatype` types
 * Documentation updates
-* Verbose compilation for `hipblas.cpp`
 
 ### Removed
 
-* `hipblasDatatype_t` type
-* `hipComplex` and `hipDoubleComplex` types
 * Support code for non-production gfx targets
 
 ### Resolved issues
 
 * The build time `CMake` configuration for the dependency on `hipBLAS-common` is fixed
-* Compiler warnings for unhandled enums have been resolved
+
+### Upcoming changes
+
+* The deprecated `hipblasDatatype_t` will be replaced with `hipDataType` in the near future, as announced in hipBLAS 2.0.0
+* The deprecated `hipblasComplex` types will be replaced with `hipComplex` types in the near future, as announced in hipBLAS 2.0.0
 
 ##  hipBLAS 2.4.0 for ROCm 6.4.0
 

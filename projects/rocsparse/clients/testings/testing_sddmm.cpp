@@ -25,7 +25,7 @@
 
 #include "testing_sddmm_dispatch.hpp"
 
-template <typename I, typename J, typename A, typename B, typename C, typename T>
+template <typename I, typename J, typename T>
 void testing_sddmm_bad_arg(const Arguments& arg)
 {
 
@@ -33,42 +33,35 @@ void testing_sddmm_bad_arg(const Arguments& arg)
     {
     case rocsparse_format_coo:
     {
-        testing_sddmm_dispatch<rocsparse_format_coo, I, I, A, B, C, T>::testing_sddmm_bad_arg(arg);
+        testing_sddmm_dispatch<rocsparse_format_coo, I, I, T>::testing_sddmm_bad_arg(arg);
         return;
     }
 
     case rocsparse_format_coo_aos:
     {
-        testing_sddmm_dispatch<rocsparse_format_coo_aos, I, I, A, B, C, T>::testing_sddmm_bad_arg(
-            arg);
+        testing_sddmm_dispatch<rocsparse_format_coo_aos, I, I, T>::testing_sddmm_bad_arg(arg);
         return;
     }
 
     case rocsparse_format_csr:
     {
-        testing_sddmm_dispatch<rocsparse_format_csr, I, J, A, B, C, T>::testing_sddmm_bad_arg(arg);
+        testing_sddmm_dispatch<rocsparse_format_csr, I, J, T>::testing_sddmm_bad_arg(arg);
         return;
     }
 
     case rocsparse_format_csc:
     {
-        testing_sddmm_dispatch<rocsparse_format_csc, I, J, A, B, C, T>::testing_sddmm_bad_arg(arg);
+        testing_sddmm_dispatch<rocsparse_format_csc, I, J, T>::testing_sddmm_bad_arg(arg);
         return;
     }
     case rocsparse_format_ell:
     {
-        testing_sddmm_dispatch<rocsparse_format_ell, I, I, A, B, C, T>::testing_sddmm_bad_arg(arg);
+        testing_sddmm_dispatch<rocsparse_format_ell, I, I, T>::testing_sddmm_bad_arg(arg);
         return;
     }
     case rocsparse_format_bell:
     {
         std::cerr << "testing_sddmm not_implemented for bell format." << std::endl;
-        exit(1);
-        return;
-    }
-    case rocsparse_format_sell:
-    {
-        std::cerr << "testing_sddmm not_implemented for sell format." << std::endl;
         exit(1);
         return;
     }
@@ -81,7 +74,7 @@ void testing_sddmm_bad_arg(const Arguments& arg)
     }
 }
 
-template <typename I, typename J, typename A, typename B, typename C, typename T>
+template <typename I, typename J, typename T>
 void testing_sddmm(const Arguments& arg)
 {
 
@@ -90,42 +83,35 @@ void testing_sddmm(const Arguments& arg)
 
     case rocsparse_format_coo:
     {
-        testing_sddmm_dispatch<rocsparse_format_coo, I, I, A, B, C, T>::testing_sddmm(arg);
+        testing_sddmm_dispatch<rocsparse_format_coo, I, I, T>::testing_sddmm(arg);
         return;
     }
 
     case rocsparse_format_csr:
     {
-        testing_sddmm_dispatch<rocsparse_format_csr, I, J, A, B, C, T>::testing_sddmm(arg);
+        testing_sddmm_dispatch<rocsparse_format_csr, I, J, T>::testing_sddmm(arg);
         return;
     }
 
     case rocsparse_format_coo_aos:
     {
-        testing_sddmm_dispatch<rocsparse_format_coo_aos, I, I, A, B, C, T>::testing_sddmm(arg);
+        testing_sddmm_dispatch<rocsparse_format_coo_aos, I, I, T>::testing_sddmm(arg);
         return;
     }
 
     case rocsparse_format_csc:
     {
-        testing_sddmm_dispatch<rocsparse_format_csc, I, J, A, B, C, T>::testing_sddmm(arg);
+        testing_sddmm_dispatch<rocsparse_format_csc, I, J, T>::testing_sddmm(arg);
         return;
     }
 
     case rocsparse_format_ell:
     {
-        testing_sddmm_dispatch<rocsparse_format_ell, I, I, A, B, C, T>::testing_sddmm(arg);
+        testing_sddmm_dispatch<rocsparse_format_ell, I, I, T>::testing_sddmm(arg);
         return;
     }
 
     case rocsparse_format_bell:
-    {
-        std::cerr << "rocsparse_status_not_implemented" << std::endl;
-        exit(1);
-        return;
-    }
-
-    case rocsparse_format_sell:
     {
         std::cerr << "rocsparse_status_not_implemented" << std::endl;
         exit(1);
@@ -141,39 +127,22 @@ void testing_sddmm(const Arguments& arg)
     }
 }
 
-#define INSTANTIATE(ITYPE, JTYPE, TTYPE)                                           \
-    template void testing_sddmm_bad_arg<ITYPE, JTYPE, TTYPE, TTYPE, TTYPE, TTYPE>( \
-        const Arguments& arg);                                                     \
-    template void testing_sddmm<ITYPE, JTYPE, TTYPE, TTYPE, TTYPE, TTYPE>(const Arguments& arg)
+#define INSTANTIATE(ITYPE, JTYPE, TTYPE)                                            \
+    template void testing_sddmm_bad_arg<ITYPE, JTYPE, TTYPE>(const Arguments& arg); \
+    template void testing_sddmm<ITYPE, JTYPE, TTYPE>(const Arguments& arg)
 
-#define INSTANTIATE_MIXED(ITYPE, JTYPE, ATYPE, BTYPE, CTYPE, TTYPE)                \
-    template void testing_sddmm_bad_arg<ITYPE, JTYPE, ATYPE, BTYPE, CTYPE, TTYPE>( \
-        const Arguments& arg);                                                     \
-    template void testing_sddmm<ITYPE, JTYPE, ATYPE, BTYPE, CTYPE, TTYPE>(const Arguments& arg)
-
-INSTANTIATE(int32_t, int32_t, _Float16);
 INSTANTIATE(int32_t, int32_t, float);
 INSTANTIATE(int32_t, int32_t, double);
 INSTANTIATE(int32_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, int32_t, rocsparse_double_complex);
 
-INSTANTIATE(int64_t, int32_t, _Float16);
 INSTANTIATE(int64_t, int32_t, float);
 INSTANTIATE(int64_t, int32_t, double);
 INSTANTIATE(int64_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int32_t, rocsparse_double_complex);
 
-INSTANTIATE(int64_t, int64_t, _Float16);
 INSTANTIATE(int64_t, int64_t, float);
 INSTANTIATE(int64_t, int64_t, double);
 INSTANTIATE(int64_t, int64_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int64_t, rocsparse_double_complex);
-
-INSTANTIATE_MIXED(int32_t, int32_t, _Float16, _Float16, float, float);
-INSTANTIATE_MIXED(int64_t, int32_t, _Float16, _Float16, float, float);
-INSTANTIATE_MIXED(int64_t, int64_t, _Float16, _Float16, float, float);
-INSTANTIATE_MIXED(int32_t, int32_t, _Float16, _Float16, _Float16, float);
-INSTANTIATE_MIXED(int64_t, int32_t, _Float16, _Float16, _Float16, float);
-INSTANTIATE_MIXED(int64_t, int64_t, _Float16, _Float16, _Float16, float);
-
 void testing_sddmm_extra(const Arguments& arg) {}

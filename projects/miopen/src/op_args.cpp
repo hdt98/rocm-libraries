@@ -23,12 +23,29 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include <ostream>
+#include <cassert>
 #include <miopen/fusion.hpp>
+#include <miopen/logger.hpp>
 
 namespace miopen {
 
 // operator args
-std::ostream& operator<<(std::ostream& stream, const OperatorArgs& /* x */) { return stream; }
+std::ostream& operator<<(std::ostream& stream, const OperatorArgs&) // x )
+{
+    /*MIOPEN_LOG_ENUM(stream,
+                    x.mode,
+                    miopenActivationPASTHRU,
+                    miopenActivationLOGISTIC,
+                    miopenActivationTANH,
+                    miopenActivationRELU,
+                    miopenActivationSOFTRELU,
+                    miopenActivationABS,
+                    miopenActivationPOWER,
+                    miopenActivationCLIPPEDRELU,
+                    miopenActivationLEAKYRELU,
+                    miopenActivationELU)*/
+    // LogRange(stream, x.parms, ", ") << ", ";
+    return stream;
+}
 
 } // namespace miopen

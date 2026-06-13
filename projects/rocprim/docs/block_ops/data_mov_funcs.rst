@@ -5,10 +5,8 @@
 .. _data_mov_funcs:
 
 ********************************************************************
-rocPRIM data movement functions
+ Data movement functions
 ********************************************************************
-
-API reference for rocPRIM data movement functions.
 
 Direct Blocked
 ===============

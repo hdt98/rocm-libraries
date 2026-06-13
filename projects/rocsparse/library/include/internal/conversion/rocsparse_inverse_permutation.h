@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 /*! \ingroup conv_module
-*  \brief Create the identity map.
+*  \brief Create the identity map
 *
 *  \details
 *  \p rocsparse_create_identity_permutation stores the identity map in \p p, such that
@@ -46,14 +46,14 @@ extern "C" {
 *  \endcode
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  n           size of the map \p p.
 *  @param[out]
@@ -66,7 +66,16 @@ extern "C" {
 *
 *  \par Example
 *  The following example creates an identity permutation.
-*  \snippet example_rocsparse_create_identity_permutation.cpp doc example
+*  \code{.c}
+*      rocsparse_int size = 200;
+*
+*      // Allocate memory to hold the identity map
+*      rocsparse_int* perm;
+*      hipMalloc((void**)&perm, sizeof(rocsparse_int) * size);
+*
+*      // Fill perm with the identity permutation
+*      rocsparse_create_identity_permutation(handle, size, perm);
+*  \endcode
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_create_identity_permutation(rocsparse_handle handle,
@@ -87,14 +96,14 @@ rocsparse_status rocsparse_create_identity_permutation(rocsparse_handle handle,
 *  \endcode
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  n           size of the permutation vector \p p.
 *  @param[in]
@@ -119,7 +128,7 @@ rocsparse_status rocsparse_inverse_permutation(rocsparse_handle     handle,
                                                rocsparse_index_base base);
 
 /*! \ingroup conv_module
-*  \brief Create the identity map.
+*  \brief Create the identity map
 *
 *  \details
 *  \p rocsparse_set_identity_permutation stores the identity map in \p p, such that
@@ -133,14 +142,14 @@ rocsparse_status rocsparse_inverse_permutation(rocsparse_handle     handle,
 *  \endcode
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  n           size of the map \p p.
 *  @param[out]

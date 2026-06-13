@@ -39,8 +39,7 @@
 
 using namespace hipsparse_test;
 
-template <typename I, typename J, typename T>
-void testing_dense_to_sparse_csc_bad_arg(const Arguments& argus)
+void testing_dense_to_sparse_csc_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION))
     int64_t safe_size = 100;
@@ -143,7 +142,7 @@ void testing_dense_to_sparse_csc_bad_arg(const Arguments& argus)
 }
 
 template <typename I, typename J, typename T>
-void testing_dense_to_sparse_csc(Arguments argus)
+hipsparseStatus_t testing_dense_to_sparse_csc(Arguments argus)
 {
 #if(!defined(CUDART_VERSION))
     J                           m        = argus.M;
@@ -368,6 +367,8 @@ void testing_dense_to_sparse_csc(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnMat(matA));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpMat(matB));
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_DENSE_TO_SPARSE_CSC_HPP

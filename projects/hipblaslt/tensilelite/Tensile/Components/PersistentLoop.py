@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,11 +20,7 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from math import ceil, log2
-
-from rocisa.code import Module, Label
-from rocisa.container import vgpr, sgpr
-from rocisa.instruction import VMovB32, SBarrier, SCmpGeU32, SLShiftRightB32, VReadfirstlaneB32, SLongBranchNegative
+from ..TensileInstructions import Module, Label, VMovB32, vgpr, sgpr, SCmpGeU32
 from ..Component import Component
 import abc
 
@@ -58,7 +54,7 @@ class PersistentLoopOff(PersistentLoop):
     def openPersistentLoop(self, writer, kernel):
         module = Module("PersistentLoop Off openPersistentLoop")
         return module
-
+    
     def recalcLocalWriteAddresses(self, writer, kernel, tc):
         module = Module("PersistentLoop Off recalcLocalWriteAddresses")
         return module
@@ -66,11 +62,11 @@ class PersistentLoopOff(PersistentLoop):
     def recalcLocalReadAddressesAB(self, writer, kernel):
         module = Module("PersistentLoop Off recalcLocalReadAddressesAB")
         return module
-
+    
     def closePersistentLoop(self, writer, kernel):
         module = Module("PersistentLoop Off closePersistentLoop")
         return module
-
+    
 
 class PersistentLoopOn(PersistentLoop):
     # Stream-K persistent loop
@@ -78,7 +74,7 @@ class PersistentLoopOn(PersistentLoop):
     @classmethod
     def matches(cls, writer, debug=False):
         return writer.states.kernel["StreamK"] > 0
-
+    
     def openPersistentLoop(self, writer, kernel):
         module = Module("PersistentLoop On openPersistentLoop")
 
@@ -87,21 +83,11 @@ class PersistentLoopOn(PersistentLoop):
         persistentLabel = Label(label="PersistentLoopStart", comment="")
         module.add(persistentLabel)
 
-        # Re-init sgprWaveIdx every persistent loop iteration: TDM init reads
-        # s[sgprWaveIdx] but the same sgpr is later UNDEFed and reused as a temp,
-        # so on the 2nd iteration the value would be stale.
-        if kernel["enableTDMA"] or kernel["enableTDMB"]:
-            wavelen = kernel["WavefrontSize"]
-            with writer.allocTmpSgpr(1, tag="PersistentLoopOn_openPersistentLoop_tmpSgprRes") as tmpSgprRes:
-                module.add(VReadfirstlaneB32(sgpr(tmpSgprRes.idx), vgpr("Serial"), "first tId"))
-                module.add(SLShiftRightB32(sgpr("WaveIdx"), ceil(log2(wavelen)), sgpr(tmpSgprRes.idx),
-                                           "re-init WaveIdx for persistent loop iteration"))
-
         # TODO remove?
         # kStr += inst("s_add_u32", sgpr("PersistentLoopIter"), sgpr("PersistentLoopIter"), hex(1), "Inc PersistentLoop Iter")     # Back-up: not needed now
         #kStr += str(Code.WaitCnt(self.version, 0,0,"wait for outstanding stores"))
         return module
-
+    
     def recalcLocalWriteAddresses(self, writer, kernel, tc):
         module = Module("PersistentLoop On recalcLocalWriteAddresses")
 
@@ -110,7 +96,7 @@ class PersistentLoopOn(PersistentLoop):
             module.add(VMovB32(dst=vgpr(getattr(writer, "oriLwa%s" % tc)), src=vgpr("LocalWriteAddr%s" % tc), comment="back up LWA for persistent kernel + wider local read"))
 
         return module
-
+    
     def recalcLocalReadAddressesAB(self, writer, kernel):
         module = Module("PersistentLoop On recalcLocalReadAddressesAB")
 
@@ -135,28 +121,11 @@ class PersistentLoopOn(PersistentLoop):
         #         module.add(VMovB32(dst=vgpr(writer.oriLraB), src=vgpr("LocalReadAddrB"), comment="back up LRA for persistent kernel + wider local read"))
 
         return module
-
+    
     def closePersistentLoop(self, writer, kernel):
         module = Module("PersistentLoop On closePersistentLoop")
-        skCloseLoopLabel = Label("SK_CloseLoop", "")
-        module.add(skCloseLoopLabel)
-        if kernel.get("DebugPersistentKernelLoopForever", False):
-            # StreamK 1/2/3 have no other exit, so this makes the kernel loop infinitely.
-            with writer.allocTmpSgpr(3, tag="PersistentLoopOn_closePersistentLoop_tmpSgprInfo") as tmpSgprInfo:
-                module.add(SLongBranchNegative(Label("PersistentLoopStart", ""), tmpSgprInfo))
-        elif kernel["StreamK"] == 4:
-            # module.add(SCmpGeU32(src0=sgpr("StreamKTileIdx"), src1=sgpr("SKTiles"), comment="Check if done all StreamK tiles"))
-            module.add(SBarrier(comment="Sync before SK4 persistent re-entry"))
-            with writer.allocTmpSgpr(3, tag="PersistentLoopOn_closePersistentLoop_tmpSgprInfo2") as tmpSgprInfo:
-                module.add(SLongBranchNegative(Label("PersistentLoopStart", ""), tmpSgprInfo))
-        elif kernel["StreamK"] == 2:
-            streamk = Component.StreamK.find(writer)
-            sTmp = writer.sgprPool.checkOut(1, "TotalIters")
-            module.add(streamk.computeTotalIters(writer, kernel, sTmp))
-            module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr(sTmp), comment="Check if done all StreamK iterations"))
-            writer.sgprPool.checkIn(sTmp)
-            module.add(writer.longBranchScc0(Label("PersistentLoopStart", ""), posNeg=-1))
-        else:
-            module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr("StreamKIterEnd"), comment="Check if done all StreamK iterations"))
-            module.add(writer.longBranchScc0(Label("PersistentLoopStart", ""), posNeg=-1))
+        # endIter = "StreamKIterEnd" if kernel["StreamK"] == 1 else "TotalIters"
+        endIter = "TotalIters" if kernel["StreamK"] == 2 else "StreamKIterEnd"
+        module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr(endIter), comment="Check if done all StreamK iterations"))
+        module.add(writer.longBranchScc0(Label("PersistentLoopStart", ""), posNeg=-1))
         return module

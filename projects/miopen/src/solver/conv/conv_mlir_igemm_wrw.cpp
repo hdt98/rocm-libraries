@@ -51,7 +51,7 @@ bool ConvMlirIgemmWrW::IsApplicable(const ExecutionContext& ctx,
         return false;
     if(!problem.IsDirectionBackwardWrW())
         return false;
-    if(!mlir::IsMlirSupportedHardware(ctx))
+    if(!IsComposableKernelSupportedHardware(ctx))
         return false;
     if(problem.HasNonPackedTensors())
         return false;

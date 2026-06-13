@@ -25,7 +25,6 @@
 #include "../../shared/rocfft_hip.h"
 #include "logging.h"
 #include "repo.h"
-#include "rocfft/rocfft-version.h"
 #include "rocfft/rocfft.h"
 #include "rocfft_exception.h"
 #include "rocfft_ostream.hpp"
@@ -47,8 +46,6 @@ int log_rtc_fd      = -1;
 int log_tuning_fd   = -1;
 int log_graph_fd    = -1;
 
-extern const char* ROCFFT_VERSION_STRING;
-
 /**
  *  @brief Logging function
  *
@@ -65,7 +62,7 @@ extern const char* ROCFFT_VERSION_STRING;
  *                              Name of environment variable that contains
  *                              the full logfile path.
  *
- *  @param[out]
+ *  @parm[out]
  *  log_fd      int&
  *              Output file descriptor.
  */
@@ -74,7 +71,8 @@ static void open_log_stream(const char* environment_variable_name, int& log_fd)
 
 {
     // if environment variable is set, open file at logfile_pathname contained in
-    // the environment variable
+    // the
+    // environment variable
     auto logfile_pathname = rocfft_getenv(environment_variable_name);
     if(!logfile_pathname.empty())
     {
@@ -145,7 +143,7 @@ try
     solution_map::get_solution_map().setup(arch_name);
     TuningBenchmarker::GetSingleton().Setup();
 
-    log_trace(__func__, ROCFFT_VERSION_STRING);
+    log_trace(__func__);
     return rocfft_status_success;
 }
 catch(...)

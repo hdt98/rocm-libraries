@@ -30,8 +30,9 @@
 #include <miopen/exec_utils.hpp>
 #include <miopen/logger.hpp>
 #include <miopen/env.hpp>
+#include <miopen/solver/implicitgemm_util.hpp>
 #include <miopen/target_properties.hpp>
-
+#include <boost/optional.hpp>
 #include <sstream>
 #include <string>
 
@@ -213,6 +214,8 @@ fs::path HipBuild(const TmpDir& tmp_dir,
                   std::string params,
                   const TargetProperties& target)
 {
+    if(miopen::solver::support_amd_buffer_atomic_fadd(target.Name()))
+        params += " -DCK_AMD_BUFFER_ATOMIC_FADD_RETURNS_FLOAT=1";
     return HipBuildImpl(tmp_dir, filename, std::string{src}, params, target, false);
 }
 

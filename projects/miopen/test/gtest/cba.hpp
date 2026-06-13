@@ -1,42 +1,60 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2022 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 #pragma once
 
-#include <fusionHost.hpp>
+#include <random>
+
 #include <gtest/gtest.h>
 #include <miopen/miopen.h>
+#include <miopen/solver_id.hpp>
+#include <serialize.hpp>
+#include <fusionHost.hpp>
 
+#include "tensor_util.hpp"
+#include "get_handle.hpp"
 #include "conv_common.hpp"
-#include "cpu_bias.hpp"
+
 #include "conv_test_base.hpp"
 #include "conv_tensor_gen.hpp"
-#include "get_handle.hpp"
-#include "tensor_util.hpp"
 
-template <typename T = float, typename TestCaseType = ConvTestCaseBase>
-struct ConvBiasActivInferTest : public ::testing::TestWithParam<std::tuple<miopenActivationMode_t,
-                                                                           TestCaseType,
-                                                                           miopenTensorLayout_t,
-                                                                           float,
-                                                                           float,
-                                                                           float>>,
-                                ConvFwdSolverTestBase<T, T, TestCaseType>
+template <typename T = float>
+struct ConvBiasActivInferTest
+    : public ::testing::TestWithParam<
+          std::tuple<miopenActivationMode_t, ConvTestCaseBase, miopenTensorLayout_t>>,
+      ConvFwdSolverTestBase<T, T>
 {
 protected:
     void SetUp() override
     {
-        prng::reset_seed();
-        test_skipped = false;
-        std::tie(activ_mode, conv_config, tensor_layout, activ_alpha, activ_beta, activ_gamma) =
-            this->GetParam();
+        test_skipped                                     = false;
+        std::tie(activ_mode, conv_config, tensor_layout) = GetParam();
 
         cfsb::SetUpImpl(conv_config, tensor_layout);
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
-        int dim    = cfsb::output.desc.GetNumDims() - 2;
-        if(dim == 3)
-            bias = tensor<T>{1, static_cast<size_t>(conv_config.k), 1, 1, 1};
-        else
-            bias = tensor<T>{1, static_cast<size_t>(conv_config.k), 1, 1};
+        bias       = tensor<T>{1, static_cast<size_t>(conv_config.k), 1, 1};
         bias.generate(tensor_elem_gen_integer{3});
         auto&& handle = get_handle();
         std::fill(
@@ -72,7 +90,7 @@ protected:
                             cfsb::ref_out.data);
         cfsb::ThresholdChecks();
     }
-    TestCaseType conv_config;
+    ConvTestCaseBase conv_config;
     miopen::ActivationDescriptor activ_desc;
     tensor<T> bias;
     miopen::Allocator::ManageDataPtr bias_dev;
@@ -80,12 +98,11 @@ protected:
     miopenActivationMode_t activ_mode;
     miopen::FusionPlanDescriptor fusePlanDesc;
     miopen::OperatorArgs params;
-    const float alpha = 1.0f;
-    const float beta  = 0.0f;
-    float activ_alpha = 0.25f;
-    float activ_beta  = 0.75f;
-    float activ_gamma = 0.5f;
+    const float alpha       = static_cast<float>(1.0f);
+    const float beta        = static_cast<float>(0);
+    const float activ_alpha = static_cast<double>(0.5f);
+    const float activ_beta  = static_cast<double>(0.5f);
+    const float activ_gamma = static_cast<double>(0.5f);
     miopenTensorLayout_t tensor_layout;
-    using cfsb = ConvFwdSolverTestBase<T, T, TestCaseType>;
-    Workspace wspace{};
+    using cfsb = ConvFwdSolverTestBase<T, T>;
 };

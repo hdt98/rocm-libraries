@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -58,8 +58,7 @@ template <typename ALayout,
           index_t CDEBlockTransferScalarPerVector_NPerBlock,
           LoopScheduler LoopSched     = make_default_loop_scheduler(),
           PipelineVersion PipelineVer = PipelineVersion::v4,
-          typename ComputeDataType    = EDataType,
-          index_t MinimumOccupancy    = CK_MIN_BLOCK_PER_CU>
+          typename ComputeDataType    = EDataType>
 struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
                                                                  BLayout,
                                                                  ELayout,
@@ -70,30 +69,9 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
                                                                  BElementwiseOperation,
                                                                  CDEElementwiseOperation>
 {
-    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               true>();
-    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               false>();
-    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
-    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
-    static constexpr auto I1               = Number<1>{};
+    static constexpr auto I1 = Number<1>{};
 
-    template <typename WarpTileConfig>
-    using GridwiseGemmBase = GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad<
+    using GridwiseGemm = GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad<
         ALayout,
         BLayout,
         ck::Tuple<>,
@@ -117,10 +95,10 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
         KPerBlock,
         AK1,
         BK1,
-        WarpTileConfig::At(0),
-        WarpTileConfig::At(1),
-        WarpTileConfig::At(2),
-        WarpTileConfig::At(3),
+        MPerXDL,
+        NPerXDL,
+        MXdlPerWave,
+        NXdlPerWave,
         ABlockTransferThreadClusterLengths_AK0_M_AK1,
         ABlockTransferSrcAccessOrder,
         ABlockTransferSrcVectorDim,
@@ -131,24 +109,18 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
         BBlockTransferSrcVectorDim,
         BBlockTransferScalarPerVector,
         BBlockLdsExtraN,
-        WarpTileConfig::At(4),
-        WarpTileConfig::At(5),
+        CShuffleMXdlPerWavePerShuffle,
+        CShuffleNXdlPerWavePerShuffle,
         CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CDEBlockTransferScalarPerVector_NPerBlock,
         LoopSched,
-        PipelineVer,
-        ComputeDataType>;
+        PipelineVer>;
 
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
-
-    using Argument = typename GridwiseGemm64::Argument;
+    using Argument = typename GridwiseGemm::Argument;
 
     struct Invoker : public BaseInvoker
     {
-        template <typename GridwiseGemm>
-        float RunImp(const typename GridwiseGemm::Argument& arg,
-                     const StreamConfig& stream_config = StreamConfig{})
+        float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             if(!GridwiseGemm::CheckValidity(arg.a_grid_desc_m_k_,
                                             arg.b_grid_desc_n_k_,
@@ -179,8 +151,7 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
                     typename GridwiseGemm::DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
                     typename GridwiseGemm::EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
                     typename GridwiseGemm::Block2ETileMap,
-                    has_main_loop,
-                    MinimumOccupancy>;
+                    has_main_loop>;
 
                 return launch_and_time_kernel(stream_config,
                                               kernel,
@@ -214,8 +185,6 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
             }
         }
 
-        INVOKER_RUN3_IMPL
-
         float Run(const BaseArgument* p_arg,
                   const StreamConfig& stream_config = StreamConfig{}) override
         {
@@ -225,26 +194,14 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_xdl_wmma_supported<ADataType,
-                                      BDataType,
-                                      MPerXDL,
-                                      NPerXDL,
-                                      WarpTileConfig32.At(0),
-                                      WarpTileConfig32.At(1)>())
-        {
-            return false;
-        }
-        if(!ck::is_lds_direct_load_supported())
+        if(!ck::is_xdl_supported())
         {
             return false;
         }
 
-        if constexpr(is_same_v<ComputeDataType, ck::tf32_t>)
+        if(!ck::is_lds_direct_load_supported())
         {
-            if(!is_tf32_supported())
-            {
-                return false;
-            }
+            return false;
         }
 
         // Check vector load/store.
@@ -307,29 +264,11 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
             }
         }
 
-        if(get_warp_size() == 64)
-        {
-            if constexpr(NXdlPerWave64 > 0)
-            {
-                return GridwiseGemm64::CheckValidity(arg.a_grid_desc_m_k_,
-                                                     arg.b_grid_desc_n_k_,
-                                                     arg.ds_grid_desc_m_n_,
-                                                     arg.e_grid_desc_m_n_,
-                                                     arg.block_2_etile_map_);
-            }
-        }
-        else
-        {
-            if constexpr(NXdlPerWave32 > 0)
-            {
-                return GridwiseGemm32::CheckValidity(arg.a_grid_desc_m_k_,
-                                                     arg.b_grid_desc_n_k_,
-                                                     arg.ds_grid_desc_m_n_,
-                                                     arg.e_grid_desc_m_n_,
-                                                     arg.block_2_etile_map_);
-            }
-        }
-        return false;
+        return GridwiseGemm::CheckValidity(arg.a_grid_desc_m_k_,
+                                           arg.b_grid_desc_n_k_,
+                                           arg.ds_grid_desc_m_n_,
+                                           arg.e_grid_desc_m_n_,
+                                           arg.block_2_etile_map_);
     }
 
     bool IsSupportedArgument(const BaseArgument* p_arg) override

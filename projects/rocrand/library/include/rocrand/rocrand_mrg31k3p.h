@@ -24,8 +24,6 @@
 #include "rocrand/rocrand_common.h"
 #include "rocrand/rocrand_mrg31k3p_precomputed.h"
 
-#include <hip/hip_runtime.h>
-
 #define ROCRAND_MRG31K3P_M1 2147483647U // 2 ^ 31 - 1
 #define ROCRAND_MRG31K3P_M2 2147462579U // 2 ^ 31 - 21069
 #define ROCRAND_MRG31K3P_MASK12 511U // 2 ^ 9 - 1
@@ -54,17 +52,20 @@ class mrg31k3p_engine
 public:
     struct mrg31k3p_state
     {
+        unsigned int x1[3];
+        unsigned int x2[3];
+
 #ifndef ROCRAND_DETAIL_BM_NOT_IN_STATE
         // The Box–Muller transform requires two inputs to convert uniformly
         // distributed real values [0; 1] to normally distributed real values
         // (with mean = 0, and stddev = 1). Often user wants only one
         // normally distributed number, to save performance and random
         // numbers the 2nd value is saved for future requests.
-        double boxmuller_double; // normally distributed double
-        float  boxmuller_float; // normally distributed float
+        unsigned int boxmuller_float_state; // is there a float in boxmuller_float
+        unsigned int boxmuller_double_state; // is there a double in boxmuller_double
+        float        boxmuller_float; // normally distributed float
+        double       boxmuller_double; // normally distributed double
 #endif
-        unsigned int x1[3];
-        unsigned int x2[3];
     };
 
     __forceinline__ __device__ __host__ mrg31k3p_engine()
@@ -138,8 +139,8 @@ public:
                                                      const unsigned long long offset)
     {
 #ifndef ROCRAND_DETAIL_BM_NOT_IN_STATE
-        m_state.boxmuller_float  = ROCRAND_NAN_FLOAT;
-        m_state.boxmuller_double = ROCRAND_NAN_DOUBLE;
+        m_state.boxmuller_float_state  = 0;
+        m_state.boxmuller_double_state = 0;
 #endif
         this->discard_subsequence_impl(subsequence);
         this->discard_impl(offset);

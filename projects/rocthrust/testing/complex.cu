@@ -1,6 +1,6 @@
 /*
  *  Copyright 2008-2024 NVIDIA Corporation
- *  Modifications Copyright© 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ *  Modifications Copyright© 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -14,22 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-#include <thrust/detail/config.h>
-
 #include <thrust/complex.h>
+#include <thrust/detail/config.h>
 
 #include <complex>
 #include <iostream>
 #include <sstream>
+#include <type_traits>
 
 #include <unittest/assertions.h>
 #include <unittest/unittest.h>
-
-#if !_THRUST_HAS_DEVICE_SYSTEM_STD
-#  include <type_traits>
-#endif
-
-THRUST_DIAG_SUPPRESS_MSVC(4244) // conversion from 'const T1' to 'const T', possible loss of data
 
 /*
    The following tests do not check for the numerical accuracy of the operations.
@@ -168,7 +162,8 @@ struct TestComplexConstructionAndAssignment
     }
   }
 };
-SimpleUnitTest<TestComplexConstructionAndAssignment, FloatingPointTypes> TestComplexConstructionAndAssignmentInstance;
+SimpleUnitTest<TestComplexConstructionAndAssignment, FloatingPointTypes>
+  TestComplexConstructionAndAssignmentInstance;
 
 template <typename T>
 struct TestComplexConstructionAndAssignmentWithPromoting
@@ -332,7 +327,8 @@ struct TestComplexComparisionOperators
     }
   }
 };
-SimpleUnitTest<TestComplexComparisionOperators, FloatingPointTypes> TestComplexComparisionOperatorsInstance;
+SimpleUnitTest<TestComplexComparisionOperators, FloatingPointTypes>
+  TestComplexComparisionOperatorsInstance;
 
 template <typename T>
 struct TestComplexMemberOperators
@@ -384,7 +380,7 @@ struct TestComplexMemberOperators
       ASSERT_ALMOST_EQUAL(a_thrust, a_std);
 
       // casting operator
-      a_std = (std::complex<T>) a_thrust;
+      a_std = (std::complex<T>)a_thrust;
       ASSERT_ALMOST_EQUAL(a_thrust.real(), a_std.real());
       ASSERT_ALMOST_EQUAL(a_thrust.imag(), a_std.imag());
     }
@@ -462,14 +458,14 @@ struct TestComplexBasicArithmetic
     ASSERT_ALMOST_EQUAL(thrust::norm(a), std::norm(b));
 
     ASSERT_EQUAL(thrust::conj(a), std::conj(b));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::conj(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::conj(a))>::value, "");
 
     ASSERT_ALMOST_EQUAL(thrust::polar(data[0], data[1]), std::polar(data[0], data[1]));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::polar(data[0], data[1]))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::polar(data[0], data[1]))>::value, "");
 
     // random_samples does not seem to produce infinities so proj(z) == z
     ASSERT_EQUAL(thrust::proj(a), a);
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::proj(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::proj(a))>::value, "");
   }
 };
 SimpleUnitTest<TestComplexBasicArithmetic, FloatingPointTypes> TestComplexBasicArithmeticInstance;
@@ -566,12 +562,13 @@ struct TestComplexExponentialFunctions
     ASSERT_ALMOST_EQUAL(thrust::exp(a), std::exp(b));
     ASSERT_ALMOST_EQUAL(thrust::log(a), std::log(b));
     ASSERT_ALMOST_EQUAL(thrust::log10(a), std::log10(b));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::exp(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::log(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::log10(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::exp(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::log(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::log10(a))>::value, "");
   }
 };
-SimpleUnitTest<TestComplexExponentialFunctions, FloatingPointTypes> TestComplexExponentialFunctionsInstance;
+SimpleUnitTest<TestComplexExponentialFunctions, FloatingPointTypes>
+  TestComplexExponentialFunctionsInstance;
 
 template <typename T>
 struct TestComplexPowerFunctions
@@ -587,26 +584,24 @@ struct TestComplexPowerFunctions
       const std::complex<T> b_std(b_thrust);
 
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust, b_thrust), std::pow(a_std, b_std));
-      static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust, b_thrust))>::value, "");
+      static_assert(std::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust, b_thrust))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust, b_thrust.real()), std::pow(a_std, b_std.real()));
-      static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust, b_thrust.real()))>::value,
-                    "");
+      static_assert(std::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust, b_thrust.real()))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust.real(), b_thrust), std::pow(a_std.real(), b_std));
-      static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust.real(), b_thrust))>::value,
-                    "");
+      static_assert(std::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust.real(), b_thrust))>::value, "");
 
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust, 4), std::pow(a_std, 4));
-      static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust, 4))>::value, "");
+      static_assert(std::is_same<thrust::complex<T>, decltype(thrust::pow(a_thrust, 4))>::value, "");
 
       ASSERT_ALMOST_EQUAL(thrust::sqrt(a_thrust), std::sqrt(a_std));
-      static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::sqrt(a_thrust))>::value, "");
+      static_assert(std::is_same<thrust::complex<T>, decltype(thrust::sqrt(a_thrust))>::value, "");
     }
 
     // Test power functions with promoted types.
     {
-      using T0       = T;
-      using T1       = other_floating_point_type_t<T0>;
-      using promoted = _THRUST_STD::common_type_t<T0, T1>;
+      using T0 = T;
+      using T1 = other_floating_point_type_t<T0>;
+      using promoted = typename thrust::detail::promoted_numerical_type<T0, T1>::type;
 
       thrust::host_vector<T0> data = unittest::random_samples<T0>(4);
 
@@ -616,23 +611,17 @@ struct TestComplexPowerFunctions
       const std::complex<T0> b_std(data[2], data[3]);
 
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust, b_thrust), std::pow(a_std, b_std));
-      static_assert(_THRUST_STD::is_same<thrust::complex<promoted>, decltype(thrust::pow(a_thrust, b_thrust))>::value,
-                    "");
+      static_assert(std::is_same<thrust::complex<promoted>, decltype(thrust::pow(a_thrust, b_thrust))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(b_thrust, a_thrust), std::pow(b_std, a_std));
-      static_assert(_THRUST_STD::is_same<thrust::complex<promoted>, decltype(thrust::pow(b_thrust, a_thrust))>::value,
-                    "");
+      static_assert(std::is_same<thrust::complex<promoted>, decltype(thrust::pow(b_thrust, a_thrust))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust, b_thrust.real()), std::pow(a_std, b_std.real()));
-      static_assert(
-        _THRUST_STD::is_same<thrust::complex<promoted>, decltype(thrust::pow(a_thrust, b_thrust.real()))>::value, "");
+      static_assert(std::is_same<thrust::complex<promoted>, decltype(thrust::pow(a_thrust, b_thrust.real()))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(b_thrust, a_thrust.real()), std::pow(b_std, a_std.real()));
-      static_assert(
-        _THRUST_STD::is_same<thrust::complex<promoted>, decltype(thrust::pow(b_thrust, a_thrust.real()))>::value, "");
+      static_assert(std::is_same<thrust::complex<promoted>, decltype(thrust::pow(b_thrust, a_thrust.real()))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(a_thrust.real(), b_thrust), std::pow(a_std.real(), b_std));
-      static_assert(
-        _THRUST_STD::is_same<thrust::complex<promoted>, decltype(thrust::pow(a_thrust.real(), b_thrust))>::value, "");
+      static_assert(std::is_same<thrust::complex<promoted>, decltype(thrust::pow(a_thrust.real(), b_thrust))>::value, "");
       ASSERT_ALMOST_EQUAL(thrust::pow(b_thrust.real(), a_thrust), std::pow(b_std.real(), a_std));
-      static_assert(
-        _THRUST_STD::is_same<thrust::complex<promoted>, decltype(thrust::pow(b_thrust.real(), a_thrust))>::value, "");
+      static_assert(std::is_same<thrust::complex<promoted>, decltype(thrust::pow(b_thrust.real(), a_thrust))>::value, "");
     }
   }
 };
@@ -651,33 +640,36 @@ struct TestComplexTrigonometricFunctions
     ASSERT_ALMOST_EQUAL(thrust::cos(a), std::cos(c));
     ASSERT_ALMOST_EQUAL(thrust::sin(a), std::sin(c));
     ASSERT_ALMOST_EQUAL(thrust::tan(a), std::tan(c));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::cos(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::sin(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::tan(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::cos(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::sin(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::tan(a))>::value, "");
 
     ASSERT_ALMOST_EQUAL(thrust::cosh(a), std::cosh(c));
     ASSERT_ALMOST_EQUAL(thrust::sinh(a), std::sinh(c));
     ASSERT_ALMOST_EQUAL(thrust::tanh(a), std::tanh(c));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::cosh(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::sinh(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::tanh(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::cosh(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::sinh(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::tanh(a))>::value, "");
+
 
     ASSERT_ALMOST_EQUAL(thrust::acos(a), std::acos(c));
     ASSERT_ALMOST_EQUAL(thrust::asin(a), std::asin(c));
     ASSERT_ALMOST_EQUAL(thrust::atan(a), std::atan(c));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::acos(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::asin(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::atan(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::acos(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::asin(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::atan(a))>::value, "");
 
     ASSERT_ALMOST_EQUAL(thrust::acosh(a), std::acosh(c));
     ASSERT_ALMOST_EQUAL(thrust::asinh(a), std::asinh(c));
     ASSERT_ALMOST_EQUAL(thrust::atanh(a), std::atanh(c));
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::acosh(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::asinh(a))>::value, "");
-    static_assert(_THRUST_STD::is_same<thrust::complex<T>, decltype(thrust::atanh(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::acosh(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::asinh(a))>::value, "");
+    static_assert(std::is_same<thrust::complex<T>, decltype(thrust::atanh(a))>::value, "");
+
   }
 };
-SimpleUnitTest<TestComplexTrigonometricFunctions, FloatingPointTypes> TestComplexTrigonometricFunctionsInstance;
+SimpleUnitTest<TestComplexTrigonometricFunctions, FloatingPointTypes>
+  TestComplexTrigonometricFunctionsInstance;
 
 template <typename T>
 struct TestComplexStreamOperators
@@ -716,7 +708,8 @@ struct TestComplexStdComplexDeviceInterop
     ASSERT_ALMOST_EQUAL(vec[2].imag(), thrust::complex<T>(device_vec[2]).imag());
   }
 };
-SimpleUnitTest<TestComplexStdComplexDeviceInterop, FloatingPointTypes> TestComplexStdComplexDeviceInteropInstance;
+SimpleUnitTest<TestComplexStdComplexDeviceInterop, FloatingPointTypes>
+  TestComplexStdComplexDeviceInteropInstance;
 
 template <typename T>
 struct TestComplexExplicitConstruction
@@ -734,4 +727,5 @@ struct TestComplexExplicitConstruction
     (void) result;
   }
 };
-SimpleUnitTest<TestComplexExplicitConstruction, FloatingPointTypes> TestComplexExplicitConstructionInstance;
+SimpleUnitTest<TestComplexExplicitConstruction, FloatingPointTypes>
+  TestComplexExplicitConstructionInstance;

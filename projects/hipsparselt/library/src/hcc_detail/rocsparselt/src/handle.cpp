@@ -106,11 +106,7 @@ void _rocsparselt_handle::init()
 #endif
 
 #if HIP_FP8_TYPE_OCP
-    has_fp8_ocp = gpu_arch_match(rocsparselt_internal_get_arch_name(properties), "950")
-                  || gpu_arch_match(rocsparselt_internal_get_arch_name(properties), "1250");
-#endif
-#if HIP_FP8_TYPE_FNUZ
-    has_fp8_fnuz = gpu_arch_match(rocsparselt_internal_get_arch_name(properties), "942");
+    has_fp8_ocp = gpu_arch_match(rocsparselt_internal_get_arch_name(properties), "950");
 #endif
 
     is_init = (uintptr_t)(this);
@@ -141,7 +137,7 @@ std::ostream& operator<<(std::ostream& stream, const _rocsparselt_mat_descr& t)
     stream << "{"
            << "ptr=" << (&t) << ", format=" << rocsparselt_matrix_type_to_string(t.m_type)
            << ", row=" << t.m << ", col=" << t.n << ", ld=" << t.ld << ", alignment=" << t.alignment
-           << ", datatype=" << hip_datatype_to_string(t.type)
+           << ", datatype=" << hipDataType_to_string(t.type)
            << ", order=" << rocsparselt_order_to_string(t.order);
     if(t.m_type == rocsparselt_matrix_type_structured)
         stream << ", sparsity=" << rocsparselt_sparsity_to_string(t.sparsity);
@@ -167,7 +163,7 @@ std::ostream& operator<<(std::ostream& stream, const _rocsparselt_matmul_descr& 
            << ", activation_tanh_beta=" << t.activation_tanh_beta
            << ", activation_gelu_scaling=" << t.activation_gelu_scaling
            << ", bias_pointer=" << t.bias_pointer << ", bias_stride=" << t.bias_stride
-           << ", bias_type=" << hip_datatype_to_string(t.bias_type) << ", m=" << t.m << ", n=" << t.n
+           << ", bias_type=" << hipDataType_to_string(t.bias_type) << ", m=" << t.m << ", n=" << t.n
            << ", k=" << t.k << ", is_sparse_a=" << t.is_sparse_a << "}";
     return stream;
 }
@@ -209,7 +205,7 @@ bool check_is_init_matmul_descr(const _rocsparselt_matmul_descr* matmul)
 
 bool check_is_init_matmul_alg_selection(const _rocsparselt_matmul_alg_selection* alg_selection)
 {
-    return alg_selection != nullptr && alg_selection->is_init != 0
+    return alg_selection->is_init != 0
            && alg_selection->is_init == (uintptr_t)alg_selection->handle;
 }
 
@@ -219,13 +215,3 @@ bool check_is_init_plan(const _rocsparselt_matmul_plan* plan)
         return (plan->matmul_descr == nullptr || plan->alg_selection == nullptr) ? false : true;
     return false;
 }
-
-_rocsparselt_matmul_datatype is_matmul_datatype_valid(hipDataType a, hipDataType b, hipDataType c, hipDataType d, rocsparselt_compute_type compute)
-{
-    for(auto valid : valid_matmul_datatypes)
-    {
-        if(a == valid.a && b == valid.b && c == valid.c && d == valid.d && compute == valid.compute)
-          return valid.type;
-    }
-    return MATMUL_DATATYPE_UNKNOWN;
-};

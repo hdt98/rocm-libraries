@@ -21,7 +21,7 @@ def parse_args():
     Checks build arguments
     """)
 
-    default_gpus = 'gfx906:xnack-,gfx1030,gfx1100,gfx1101,gfx1102,gfx1150,gfx1151,gfx1152,gfx1153,gfx1200,gfx1201'
+    default_gpus = 'gfx906:xnack-,gfx1030,gfx1100,gfx1101,gfx1102,gfx1151,gfx1200,gfx1201'
 
     parser.add_argument('-g', '--debug', required=False, default=False,  action='store_true',
                         help='Generate Debug build (default: False)')
@@ -87,11 +87,10 @@ def config_cmd():
     cmake_executable = ""
     cmake_options = []
     cmake_platform_opts = []
-
+    
     if (OS_info["ID"] == 'windows'):
         # we don't have ROCM on windows but have hip, ROCM can be downloaded if required
-        raw_rocm_path = cmake_path(os.getenv('HIP_PATH', "C:/hip"))
-        rocm_path = f'"{raw_rocm_path}"' # guard against spaces in path
+        rocm_path = os.getenv( 'ROCM_PATH', "C:/hipsdk/rocm-cmake-master") #C:/hip") # rocm/Utils/cmake-rocm4.2.0"
         cmake_executable = "cmake.exe"
         toolchain = os.path.join( src_path, "toolchain-windows.cmake" )
         #set CPACK_PACKAGING_INSTALL_PREFIX= defined as blank as it is appended to end of path for archive creation
@@ -175,11 +174,6 @@ def config_cmd():
 
     return cmake_executable, cmd_opts
 
-def cmake_path(os_path):
-    if OS_info["ID"] == "windows":
-        return os_path.replace("\\", "/")
-    else:
-        return os.path.realpath(os_path)
 
 def make_cmd():
     global args

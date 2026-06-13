@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -150,48 +150,6 @@ inline void auto_testing_bad_arg_set_invalid(rocsparse_spsv_alg& p)
 }
 
 template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_sptrsv_alg& p)
-{
-    p = (rocsparse_sptrsv_alg)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spic0_alg& p)
-{
-    p = (rocsparse_spic0_alg)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spic0_output& p)
-{
-    p = (rocsparse_spic0_output)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spilu0_output& p)
-{
-    p = (rocsparse_spilu0_output)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spic0_input& p)
-{
-    p = (rocsparse_spic0_input)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spilu0_input& p)
-{
-    p = (rocsparse_spilu0_input)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spilu0_alg& p)
-{
-    p = (rocsparse_spilu0_alg)-1;
-}
-
-template <>
 inline void auto_testing_bad_arg_set_invalid(rocsparse_spitsv_alg& p)
 {
     p = (rocsparse_spitsv_alg)-1;
@@ -201,12 +159,6 @@ template <>
 inline void auto_testing_bad_arg_set_invalid(rocsparse_spsm_alg& p)
 {
     p = (rocsparse_spsm_alg)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_sptrsm_alg& p)
-{
-    p = (rocsparse_sptrsm_alg)-1;
 }
 
 template <>
@@ -324,33 +276,9 @@ inline void auto_testing_bad_arg_set_invalid(rocsparse_spmv_stage& p)
 }
 
 template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_v2_spmv_stage& p)
-{
-    p = (rocsparse_v2_spmv_stage)-1;
-}
-
-template <>
 inline void auto_testing_bad_arg_set_invalid(rocsparse_spsv_stage& p)
 {
     p = (rocsparse_spsv_stage)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_sptrsv_stage& p)
-{
-    p = (rocsparse_sptrsv_stage)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spic0_stage& p)
-{
-    p = (rocsparse_spic0_stage)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_spilu0_stage& p)
-{
-    p = (rocsparse_spilu0_stage)-1;
 }
 
 template <>
@@ -363,12 +291,6 @@ template <>
 inline void auto_testing_bad_arg_set_invalid(rocsparse_spsm_stage& p)
 {
     p = (rocsparse_spsm_stage)-1;
-}
-
-template <>
-inline void auto_testing_bad_arg_set_invalid(rocsparse_sptrsm_stage& p)
-{
-    p = (rocsparse_sptrsm_stage)-1;
 }
 
 template <>

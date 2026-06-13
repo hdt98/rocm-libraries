@@ -21,11 +21,11 @@
  * THE SOFTWARE.
  *
  * ************************************************************************ */
-#include "rocsparse_common.hpp"
-#include "rocsparse_control.hpp"
+#include "common.h"
+#include "control.h"
 #include "rocsparse_csxsldu.hpp"
-#include "rocsparse_primitives.hpp"
-#include "rocsparse_utility.hpp"
+#include "rocsparse_primitives.h"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -57,7 +57,7 @@ namespace rocsparse
 
         if(temp_alloc)
         {
-            RETURN_IF_HIP_ERROR(rocsparse_hipFreeAsync(temp_storage_ptr, handle->stream));
+            RETURN_IF_HIP_ERROR(rocsparse_hipFree(temp_storage_ptr));
         }
 
         return rocsparse_status_success;

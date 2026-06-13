@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,6 @@ inline void testname_her2(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_her2_bad_arg(const Arguments& arg)
 {
-    using Ts           = hipblas_internal_type<T>;
     bool FORTRAN       = arg.api == hipblas_client_api::FORTRAN;
     auto hipblasHer2Fn = FORTRAN ? hipblasHer2<T, true> : hipblasHer2<T, false>;
     auto hipblasHer2Fn_64
@@ -59,9 +58,9 @@ void testing_her2_bad_arg(const Arguments& arg)
 
         device_vector<T> d_alpha(1), d_zero(1);
 
-        const Ts  h_alpha{1}, h_zero{0};
-        const Ts* alpha = &h_alpha;
-        const Ts* zero  = &h_zero;
+        const T  h_alpha(1), h_zero(0);
+        const T* alpha = &h_alpha;
+        const T* zero  = &h_zero;
 
         if(pointer_mode == HIPBLAS_POINTER_MODE_DEVICE)
         {
@@ -125,7 +124,6 @@ void testing_her2_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_her2(const Arguments& arg)
 {
-    using Ts           = hipblas_internal_type<T>;
     bool FORTRAN       = arg.api == hipblas_client_api::FORTRAN;
     auto hipblasHer2Fn = FORTRAN ? hipblasHer2<T, true> : hipblasHer2<T, false>;
     auto hipblasHer2Fn_64
@@ -172,7 +170,7 @@ void testing_her2(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dy.memcheck());
     CHECK_DEVICE_ALLOCATION(d_alpha.memcheck());
 
-    double hipblas_error_host{0}, hipblas_error_device{0};
+    double hipblas_error_host, hipblas_error_device;
 
     T h_alpha = arg.get_alpha<T>();
 
@@ -196,8 +194,7 @@ void testing_her2(const Arguments& arg)
             HIPBLAS
         =================================================================== */
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
-        DAPI_CHECK(hipblasHer2Fn,
-                   (handle, uplo, N, reinterpret_cast<Ts*>(&h_alpha), dx, incx, dy, incy, dA, lda));
+        DAPI_CHECK(hipblasHer2Fn, (handle, uplo, N, (T*)&h_alpha, dx, incx, dy, incy, dA, lda));
 
         CHECK_HIP_ERROR(hA_host.transfer_from(dA));
         CHECK_HIP_ERROR(dA.transfer_from(hA));
@@ -221,7 +218,7 @@ void testing_her2(const Arguments& arg)
             // NOTE: on cuBLAS, with alpha == 0 and alpha on the device, there is not a quick-return,
             // instead, the imaginary part of the diagonal elements are set to 0. in rocBLAS, we are quick-returning
             // as well as in our reference code. For this reason, I've disabled the check here.
-            if(h_alpha != T(0))
+            if(h_alpha != 0)
                 unit_check_general<T>(N, N, lda, hA_cpu.data(), hA_device.data());
         }
         if(arg.norm_check)
@@ -233,7 +230,7 @@ void testing_her2(const Arguments& arg)
 
     if(arg.timing)
     {
-        double gpu_time_used{0};
+        double gpu_time_used;
         CHECK_HIP_ERROR(dA.transfer_from(hA));
         hipStream_t stream;
         CHECK_HIPBLAS_ERROR(hipblasGetStream(handle, &stream));

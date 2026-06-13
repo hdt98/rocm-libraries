@@ -1,12 +1,34 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 
 #include <miopen/env.hpp>
 #include <miopen/errors.hpp>
 #include <miopen/hipoc_kernel.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/handle_lock.hpp>
-#include <miopen/kernel_tuning_mode.hpp>
 #include <miopen/logger.hpp>
 
 #include <hip/hip_ext.h>
@@ -25,7 +47,7 @@ HipEventProfiler::HipEventProfiler(const Handle& handle_)
     {
         start = make_hip_event();
         stop  = make_hip_event();
-        (void)hipEventRecord(start.get(), handle.GetStream());
+        hipEventRecord(start.get(), handle.GetStream());
     }
 }
 
@@ -33,10 +55,10 @@ HipEventProfiler::~HipEventProfiler()
 {
     if(start)
     {
-        (void)hipEventRecord(stop.get(), handle.GetStream());
-        (void)hipEventSynchronize(stop.get());
+        hipEventRecord(stop.get(), handle.GetStream());
+        hipEventSynchronize(stop.get());
         float event_time = 0.0f;
-        (void)hipEventElapsedTime(&event_time, start.get(), stop.get());
+        hipEventElapsedTime(&event_time, start.get(), stop.get());
         handle.ResetKernelTime();
         handle.AccumKernelTime(event_time);
     }
@@ -75,7 +97,7 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
                       &size,
                       // NOLINTNEXTLINE cppcoreguidelines-pro-type-cstyle-cast
                       HIP_LAUNCH_PARAM_END};
-       if(callback)
+    if(callback)
     {
         start = make_hip_event();
         stop  = make_hip_event();
@@ -119,16 +141,8 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
             }
         }
 #else
-        (void)hipEventSynchronize(stop.get());
+        hipEventSynchronize(stop.get());
 #endif
-        if(IsLoggingKernel())
-        {
-            float elapsed_time = 0.0f;
-            (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
-
-            const bool is_transpose = IsTransposeOrTransformKernel(GetName());
-            AddKernelToJsonAccumulator(GetName(), elapsed_time, is_transpose);
-        }
         callback(start.get(), stop.get());
     }
 }
@@ -201,17 +215,7 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
 
     if(callback)
     {
-        status = hipEventSynchronize(stop.get());
-        if(status != hipSuccess)
-            MIOPEN_THROW_HIP_STATUS(status, "hipEventSynchronize() failed");
-        if(IsLoggingKernel())
-        {
-            float elapsed_time = 0.0f;
-            (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
-
-            const bool is_transpose = IsTransposeOrTransformKernel(GetName());
-            AddKernelToJsonAccumulator(GetName(), elapsed_time, is_transpose);
-        }
+        hipEventSynchronize(stop.get());
         callback(start.get(), stop.get());
     }
 }

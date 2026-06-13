@@ -26,36 +26,26 @@
  ******************************************************************************/
 #pragma once
 
-#include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
-#include <cub/config.cuh>
-
-#include <cub/detail/device_synchronize.cuh>
-#include <cub/util_device.cuh>
-
-#include <thrust/iterator/iterator_traits.h>
-#include <thrust/system/cuda/detail/execution_policy.h>
-#include <thrust/system/cuda/error.h>
-#include <thrust/system_error.h>
-
 #include <cstdio>
 #include <exception>
+#include <thrust/detail/config.h>
+#include <thrust/iterator/iterator_traits.h>
+#include <thrust/system/cuda/detail/execution_policy.h>
+#include <thrust/system_error.h>
+#include <thrust/system/cuda/error.h>
+
+#include <cub/detail/device_synchronize.cuh>
+#include <cub/config.cuh>
+#include <cub/util_device.cuh>
 
 #include <nv/target>
 
 THRUST_NAMESPACE_BEGIN
-namespace cuda_cub
-{
+namespace cuda_cub {
 
-inline _CCCL_HOST_DEVICE cudaStream_t default_stream()
+inline _CCCL_HOST_DEVICE
+cudaStream_t
+default_stream()
 {
 #ifdef CUDA_API_PER_THREAD_DEFAULT_STREAM
   return cudaStreamPerThread;
@@ -66,43 +56,55 @@ inline _CCCL_HOST_DEVICE cudaStream_t default_stream()
 
 // Fallback implementation of the customization point.
 template <class Derived>
-_CCCL_HOST_DEVICE cudaStream_t get_stream(execution_policy<Derived>&)
+_CCCL_HOST_DEVICE
+cudaStream_t
+get_stream(execution_policy<Derived> &)
 {
   return default_stream();
 }
 
 // Entry point/interface.
 template <class Derived>
-_CCCL_HOST_DEVICE cudaStream_t stream(execution_policy<Derived>& policy)
+_CCCL_HOST_DEVICE cudaStream_t
+stream(execution_policy<Derived> &policy)
 {
   return get_stream(derived_cast(policy));
 }
 
+
 // Fallback implementation of the customization point.
 template <class Derived>
-_CCCL_HOST_DEVICE bool must_perform_optional_stream_synchronization(execution_policy<Derived>&)
+_CCCL_HOST_DEVICE
+bool
+must_perform_optional_stream_synchronization(execution_policy<Derived> &)
 {
   return true;
 }
 
 // Entry point/interface.
 template <class Derived>
-_CCCL_HOST_DEVICE bool must_perform_optional_synchronization(execution_policy<Derived>& policy)
+_CCCL_HOST_DEVICE bool
+must_perform_optional_synchronization(execution_policy<Derived> &policy)
 {
   return must_perform_optional_stream_synchronization(derived_cast(policy));
 }
 
+
 // Fallback implementation of the customization point.
 _CCCL_EXEC_CHECK_DISABLE
 template <class Derived>
-_CCCL_HOST_DEVICE cudaError_t synchronize_stream(execution_policy<Derived>& policy)
+_CCCL_HOST_DEVICE
+cudaError_t
+synchronize_stream(execution_policy<Derived> &policy)
 {
   return cub::SyncStream(stream(policy));
 }
 
 // Entry point/interface.
 template <class Policy>
-_CCCL_HOST_DEVICE cudaError_t synchronize(Policy& policy)
+_CCCL_HOST_DEVICE
+cudaError_t
+synchronize(Policy &policy)
 {
   return synchronize_stream(derived_cast(policy));
 }
@@ -110,7 +112,9 @@ _CCCL_HOST_DEVICE cudaError_t synchronize(Policy& policy)
 // Fallback implementation of the customization point.
 _CCCL_EXEC_CHECK_DISABLE
 template <class Derived>
-_CCCL_HOST_DEVICE cudaError_t synchronize_stream_optional(execution_policy<Derived>& policy)
+_CCCL_HOST_DEVICE
+cudaError_t
+synchronize_stream_optional(execution_policy<Derived> &policy)
 {
   cudaError_t result;
 
@@ -128,62 +132,123 @@ _CCCL_HOST_DEVICE cudaError_t synchronize_stream_optional(execution_policy<Deriv
 
 // Entry point/interface.
 template <class Policy>
-_CCCL_HOST_DEVICE cudaError_t synchronize_optional(Policy& policy)
+_CCCL_HOST_DEVICE
+cudaError_t
+synchronize_optional(Policy &policy)
 {
   return synchronize_stream_optional(derived_cast(policy));
 }
 
 template <class Type>
-THRUST_HOST_FUNCTION cudaError_t trivial_copy_from_device(Type* dst, Type const* src, size_t count, cudaStream_t stream)
+THRUST_HOST_FUNCTION cudaError_t
+trivial_copy_from_device(Type *       dst,
+                         Type const * src,
+                         size_t       count,
+                         cudaStream_t stream)
 {
   cudaError status = cudaSuccess;
-  if (count == 0)
-  {
-    return status;
-  }
+  if (count == 0) return status;
 
-  status = ::cudaMemcpyAsync(dst, src, sizeof(Type) * count, cudaMemcpyDeviceToHost, stream);
+  status = ::cudaMemcpyAsync(dst,
+                             src,
+                             sizeof(Type) * count,
+                             cudaMemcpyDeviceToHost,
+                             stream);
   cudaStreamSynchronize(stream);
   return status;
 }
 
 template <class Type>
-THRUST_HOST_FUNCTION cudaError_t trivial_copy_to_device(Type* dst, Type const* src, size_t count, cudaStream_t stream)
+THRUST_HOST_FUNCTION cudaError_t
+trivial_copy_to_device(Type *       dst,
+                       Type const * src,
+                       size_t       count,
+                       cudaStream_t stream)
 {
   cudaError status = cudaSuccess;
-  if (count == 0)
-  {
-    return status;
-  }
+  if (count == 0) return status;
 
-  status = ::cudaMemcpyAsync(dst, src, sizeof(Type) * count, cudaMemcpyHostToDevice, stream);
+  status = ::cudaMemcpyAsync(dst,
+                             src,
+                             sizeof(Type) * count,
+                             cudaMemcpyHostToDevice,
+                             stream);
   cudaStreamSynchronize(stream);
   return status;
 }
 
 template <class Policy, class Type>
-THRUST_RUNTIME_FUNCTION cudaError_t
-trivial_copy_device_to_device(Policy& policy, Type* dst, Type const* src, size_t count)
+_CCCL_HOST_DEVICE cudaError_t
+trivial_copy_device_to_device(Policy &    policy,
+                              Type *      dst,
+                              Type const *src,
+                              size_t      count)
 {
-  cudaError_t status = cudaSuccess;
-  if (count == 0)
-  {
-    return status;
-  }
+  cudaError_t  status = cudaSuccess;
+  if (count == 0) return status;
 
   cudaStream_t stream = cuda_cub::stream(policy);
   //
-  status = ::cudaMemcpyAsync(dst, src, sizeof(Type) * count, cudaMemcpyDeviceToDevice, stream);
-  cuda_cub::synchronize_optional(policy);
+  status = ::cudaMemcpyAsync(dst,
+                             src,
+                             sizeof(Type) * count,
+                             cudaMemcpyDeviceToDevice,
+                             stream);
+  cuda_cub::synchronize(policy);
   return status;
 }
 
-CCCL_DEPRECATED_BECAUSE("Use cuda::std::terminate() instead") inline void _CCCL_HOST_DEVICE terminate()
+inline void _CCCL_HOST_DEVICE
+terminate()
 {
   NV_IF_TARGET(NV_IS_HOST, (std::terminate();), (asm("trap;");));
 }
 
-_CCCL_HOST_DEVICE inline void throw_on_error(cudaError_t status)
+_CCCL_HOST_DEVICE
+inline void throw_on_error(cudaError_t status)
+{
+  // Clear the global CUDA error state which may have been set by the last
+  // call. Otherwise, errors may "leak" to unrelated kernel launches.
+#ifdef THRUST_RDC_ENABLED
+  cudaGetLastError();
+#else
+  NV_IF_TARGET(NV_IS_HOST, (cudaGetLastError();));
+#endif
+
+  if (cudaSuccess != status)
+  {
+
+    // Can't use #if inside NV_IF_TARGET, use a temp macro to hoist the device
+    // instructions out of the target logic.
+#ifdef THRUST_RDC_ENABLED
+
+#define THRUST_TEMP_DEVICE_CODE \
+  printf("Thrust CUDA backend error: %s: %s\n", \
+         cudaGetErrorName(status), \
+         cudaGetErrorString(status))
+
+#else
+
+#define THRUST_TEMP_DEVICE_CODE \
+  printf("Thrust CUDA backend error: %d\n", \
+         static_cast<int>(status))
+
+#endif
+
+    NV_IF_TARGET(NV_IS_HOST, (
+      throw thrust::system_error(status, thrust::cuda_category());
+    ), (
+      THRUST_TEMP_DEVICE_CODE;
+      cuda_cub::terminate();
+    ));
+
+#undef THRUST_TEMP_DEVICE_CODE
+
+  }
+}
+
+_CCCL_HOST_DEVICE
+inline void throw_on_error(cudaError_t status, char const *msg)
 {
   // Clear the global CUDA error state which may have been set by the last
   // call. Otherwise, errors may "leak" to unrelated kernel launches.
@@ -199,82 +264,60 @@ _CCCL_HOST_DEVICE inline void throw_on_error(cudaError_t status)
     // instructions out of the target logic.
 #ifdef THRUST_RDC_ENABLED
 
-#  define THRUST_TEMP_DEVICE_CODE \
-    printf("Thrust CUDA backend error: %s: %s\n", cudaGetErrorName(status), cudaGetErrorString(status))
+#define THRUST_TEMP_DEVICE_CODE \
+  printf("Thrust CUDA backend error: %s: %s: %s\n", \
+         cudaGetErrorName(status), \
+         cudaGetErrorString(status),\
+         msg)
 
 #else
 
-#  define THRUST_TEMP_DEVICE_CODE printf("Thrust CUDA backend error: %d\n", static_cast<int>(status))
+#define THRUST_TEMP_DEVICE_CODE \
+  printf("Thrust CUDA backend error: %d: %s\n", \
+         static_cast<int>(status),              \
+         msg)
 
 #endif
 
-    NV_IF_TARGET(NV_IS_HOST,
-                 (throw thrust::system_error(status, thrust::cuda_category());),
-                 (THRUST_TEMP_DEVICE_CODE; ::cuda::std::terminate();));
+    NV_IF_TARGET(NV_IS_HOST, (
+      throw thrust::system_error(status, thrust::cuda_category(), msg);
+    ), (
+      THRUST_TEMP_DEVICE_CODE;
+      cuda_cub::terminate();
+    ));
 
 #undef THRUST_TEMP_DEVICE_CODE
+
   }
 }
 
-_CCCL_HOST_DEVICE inline void throw_on_error(cudaError_t status, char const* msg)
+// FIXME: Move the iterators elsewhere.
+
+template <class ValueType,
+          class InputIt,
+          class UnaryOp>
+struct transform_input_iterator_t
 {
-  // Clear the global CUDA error state which may have been set by the last
-  // call. Otherwise, errors may "leak" to unrelated kernel launches.
-#ifdef THRUST_RDC_ENABLED
-  cudaGetLastError();
-#else
-  NV_IF_TARGET(NV_IS_HOST, (cudaGetLastError();));
-#endif
-
-  if (cudaSuccess != status)
-  {
-    // Can't use #if inside NV_IF_TARGET, use a temp macro to hoist the device
-    // instructions out of the target logic.
-#ifdef THRUST_RDC_ENABLED
-
-#  define THRUST_TEMP_DEVICE_CODE \
-    printf("Thrust CUDA backend error: %s: %s: %s\n", cudaGetErrorName(status), cudaGetErrorString(status), msg)
-
-#else
-
-#  define THRUST_TEMP_DEVICE_CODE printf("Thrust CUDA backend error: %d: %s\n", static_cast<int>(status), msg)
-
-#endif
-
-    NV_IF_TARGET(NV_IS_HOST,
-                 (throw thrust::system_error(status, thrust::cuda_category(), msg);),
-                 (THRUST_TEMP_DEVICE_CODE; ::cuda::std::terminate();));
-
-#undef THRUST_TEMP_DEVICE_CODE
-  }
-}
-
-// deprecated [Since 2.8]
-template <class ValueType, class InputIt, class UnaryOp>
-struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator") transform_input_iterator_t
-{
-  _CCCL_SUPPRESS_DEPRECATED_PUSH
-  using self_t = transform_input_iterator_t;
-  _CCCL_SUPPRESS_DEPRECATED_POP
+  using self_t            = transform_input_iterator_t;
   using difference_type   = typename iterator_traits<InputIt>::difference_type;
   using value_type        = ValueType;
   using pointer           = void;
   using reference         = value_type;
-  using iterator_category = ::cuda::std::random_access_iterator_tag;
+  using iterator_category = std::random_access_iterator_tag;
 
-  InputIt input;
+  InputIt         input;
   mutable UnaryOp op;
 
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE transform_input_iterator_t(InputIt input, UnaryOp op)
-      : input(input)
-      , op(op)
-  {}
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE
+  transform_input_iterator_t(InputIt input, UnaryOp op)
+      : input(input), op(op) {}
 
-  transform_input_iterator_t(const self_t&) = default;
+  transform_input_iterator_t(const self_t &) = default;
 
   // UnaryOp might not be copy assignable, such as when it is a lambda.  Define
   // an explicit copy assignment operator that doesn't try to assign it.
-  _CCCL_HOST_DEVICE self_t& operator=(const self_t& o)
+  _CCCL_HOST_DEVICE
+  self_t& operator=(const self_t& o)
   {
     input = o.input;
     return *this;
@@ -315,7 +358,7 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator") transform_input
   }
 
   /// Addition assignment
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t& operator+=(difference_type n)
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t &operator+=(difference_type n)
   {
     input += n;
     return *this;
@@ -328,7 +371,7 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator") transform_input
   }
 
   /// Subtraction assignment
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t& operator-=(difference_type n)
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t &operator-=(difference_type n)
   {
     input -= n;
     return *this;
@@ -347,48 +390,47 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator") transform_input
   }
 
   /// Equal to
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator==(const self_t& rhs) const
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator==(const self_t &rhs) const
   {
     return (input == rhs.input);
   }
 
   /// Not equal to
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator!=(const self_t& rhs) const
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator!=(const self_t &rhs) const
   {
     return (input != rhs.input);
   }
-}; // struct transform_input_iterarot_t
+};    // struct transform_input_iterarot_t
 
-// deprecated [Since 2.8]
-template <class ValueType, class InputIt1, class InputIt2, class BinaryOp>
-struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator of a thrust::zip_iterator")
-  transform_pair_of_input_iterators_t
+template <class ValueType,
+          class InputIt1,
+          class InputIt2,
+          class BinaryOp>
+struct transform_pair_of_input_iterators_t
 {
-  _CCCL_SUPPRESS_DEPRECATED_PUSH
-  using self_t = transform_pair_of_input_iterators_t;
-  _CCCL_SUPPRESS_DEPRECATED_POP
+  using self_t            = transform_pair_of_input_iterators_t;
   using difference_type   = typename iterator_traits<InputIt1>::difference_type;
   using value_type        = ValueType;
   using pointer           = void;
   using reference         = value_type;
-  using iterator_category = ::cuda::std::random_access_iterator_tag;
+  using iterator_category = std::random_access_iterator_tag;
 
-  InputIt1 input1;
-  InputIt2 input2;
+  InputIt1         input1;
+  InputIt2         input2;
   mutable BinaryOp op;
 
   _CCCL_HOST_DEVICE _CCCL_FORCEINLINE
-  transform_pair_of_input_iterators_t(InputIt1 input1_, InputIt2 input2_, BinaryOp op_)
-      : input1(input1_)
-      , input2(input2_)
-      , op(op_)
-  {}
+  transform_pair_of_input_iterators_t(InputIt1 input1_,
+                                      InputIt2 input2_,
+                                      BinaryOp op_)
+      : input1(input1_), input2(input2_), op(op_) {}
 
-  transform_pair_of_input_iterators_t(const self_t&) = default;
+  transform_pair_of_input_iterators_t(const self_t &) = default;
 
   // BinaryOp might not be copy assignable, such as when it is a lambda.
   // Define an explicit copy assignment operator that doesn't try to assign it.
-  _CCCL_HOST_DEVICE self_t& operator=(const self_t& o)
+  _CCCL_HOST_DEVICE
+  self_t& operator=(const self_t& o)
   {
     input1 = o.input1;
     input2 = o.input2;
@@ -430,7 +472,7 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator of a thrust::zip_
   }
 
   /// Addition assignment
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t& operator+=(difference_type n)
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t &operator+=(difference_type n)
   {
     input1 += n;
     input2 += n;
@@ -444,7 +486,7 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator of a thrust::zip_
   }
 
   /// Subtraction assignment
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t& operator-=(difference_type n)
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t &operator-=(difference_type n)
   {
     input1 -= n;
     input2 -= n;
@@ -464,53 +506,52 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::transform_iterator of a thrust::zip_
   }
 
   /// Equal to
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator==(const self_t& rhs) const
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator==(const self_t &rhs) const
   {
     return (input1 == rhs.input1) && (input2 == rhs.input2);
   }
 
   /// Not equal to
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator!=(const self_t& rhs) const
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator!=(const self_t &rhs) const
   {
     return (input1 != rhs.input1) || (input2 != rhs.input2);
   }
 
-}; // struct transform_pair_of_input_iterators_t
+};    // struct transform_pair_of_input_iterators_t
 
-// deprecated [Since 2.8]
-struct CCCL_DEPRECATED_BECAUSE("Use cuda::std::identity") identity
+
+struct identity
 {
   template <class T>
-  _CCCL_HOST_DEVICE T const& operator()(T const& t) const
+  _CCCL_HOST_DEVICE T const &
+  operator()(T const &t) const
   {
     return t;
   }
 
   template <class T>
-  _CCCL_HOST_DEVICE T& operator()(T& t) const
+  _CCCL_HOST_DEVICE T &
+  operator()(T &t) const
   {
     return t;
   }
 };
 
-// deprecated [Since 2.8]
+
 template <class T>
-struct CCCL_DEPRECATED_BECAUSE("Use thrust::counting_iterator") counting_iterator_t
+struct counting_iterator_t
 {
-  _CCCL_SUPPRESS_DEPRECATED_PUSH
-  using self_t = counting_iterator_t;
-  _CCCL_SUPPRESS_DEPRECATED_POP
+  using self_t            = counting_iterator_t;
   using difference_type   = T;
   using value_type        = T;
   using pointer           = void;
   using reference         = T;
-  using iterator_category = ::cuda::std::random_access_iterator_tag;
+  using iterator_category = std::random_access_iterator_tag;
 
   T count;
 
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE counting_iterator_t(T count_)
-      : count(count_)
-  {}
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE
+  counting_iterator_t(T count_) : count(count_) {}
 
   /// Postfix increment
   _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t operator++(int)
@@ -546,7 +587,7 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::counting_iterator") counting_iterato
   }
 
   /// Addition assignment
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t& operator+=(difference_type n)
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t &operator+=(difference_type n)
   {
     count += n;
     return *this;
@@ -559,7 +600,7 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::counting_iterator") counting_iterato
   }
 
   /// Subtraction assignment
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t& operator-=(difference_type n)
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE self_t &operator-=(difference_type n)
   {
     count -= n;
     return *this;
@@ -578,19 +619,19 @@ struct CCCL_DEPRECATED_BECAUSE("Use thrust::counting_iterator") counting_iterato
   }
 
   /// Equal to
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator==(const self_t& rhs) const
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator==(const self_t &rhs) const
   {
     return (count == rhs.count);
   }
 
   /// Not equal to
-  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator!=(const self_t& rhs) const
+  _CCCL_HOST_DEVICE _CCCL_FORCEINLINE bool operator!=(const self_t &rhs) const
   {
     return (count != rhs.count);
   }
 
-}; // struct count_iterator_t
+};    // struct count_iterator_t
 
-} // namespace cuda_cub
+}    // cuda_
 
 THRUST_NAMESPACE_END

@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -162,8 +162,6 @@ namespace detail
         return __hip_atomic_load(address, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
     }
 
-// atomic_load for uint128 is not supported for unknown targets or spirv
-#if !defined(ROCPRIM_TARGET_UNKNOWN) && !defined(ROCPRIM_TARGET_SPIRV)
     ROCPRIM_DEVICE ROCPRIM_INLINE
     __uint128_t atomic_load(const __uint128_t* address)
     {
@@ -172,7 +170,7 @@ namespace detail
 #define ROCPRIM_ATOMIC_LOAD(inst, mod, wait, ptr) \
     asm volatile(inst " %0, %1 " mod "\t\n" wait : "=v"(result) : "v"(ptr) : "memory")
 
-#if ROCPRIM_TARGET_CDNA3
+#if ROCPRIM_TARGET_CDNA4 || ROCPRIM_TARGET_CDNA3
     #define ROCPRIM_ATOMIC_LOAD_FLAT(ptr) \
         ROCPRIM_ATOMIC_LOAD("flat_load_dwordx4", "sc1", "s_waitcnt vmcnt(0)", ptr)
     #define ROCPRIM_ATOMIC_LOAD_SHARED(ptr) \
@@ -199,24 +197,22 @@ namespace detail
     #define ROCPRIM_ATOMIC_LOAD_SHARED(ptr) \
         ROCPRIM_ATOMIC_LOAD("ds_read_b128", "", "s_waitcnt lgkmcnt(0)", ptr)
     // This architecture doesn't support atomics on the global AS.
-        #define ROCPRIM_ATOMIC_LOAD_GLOBAL(ptr) ROCPRIM_ATOMIC_LOAD_FLAT(ptr)
-    #elif ROCPRIM_TARGET_RDNA3 || ROCPRIM_TARGET_CDNA2 || ROCPRIM_TARGET_CDNA1 \
-        || ROCPRIM_TARGET_GCN5
-        #define ROCPRIM_ATOMIC_LOAD_FLAT(ptr) \
-            ROCPRIM_ATOMIC_LOAD("flat_load_dwordx4", "glc", "s_waitcnt vmcnt(0)", ptr)
-        #define ROCPRIM_ATOMIC_LOAD_SHARED(ptr) \
-            ROCPRIM_ATOMIC_LOAD("ds_read_b128", "", "s_waitcnt lgkmcnt(0)", ptr)
-        #define ROCPRIM_ATOMIC_LOAD_GLOBAL(ptr) \
-            ROCPRIM_ATOMIC_LOAD("global_load_dwordx4", "off glc", "s_waitcnt vmcnt(0)", ptr)
-    #elif defined(__HIP_DEVICE_COMPILE__)
-        // Please submit an issue or pull request!
-        #error support for 128-bit atomics not implemented for current architecture
-    #endif
+    #define ROCPRIM_ATOMIC_LOAD_GLOBAL(ptr) ROCPRIM_ATOMIC_LOAD_FLAT(ptr)
+#elif ROCPRIM_TARGET_RDNA3 || ROCPRIM_TARGET_CDNA2 || ROCPRIM_TARGET_CDNA1 || ROCPRIM_TARGET_GCN5
+    #define ROCPRIM_ATOMIC_LOAD_FLAT(ptr) \
+        ROCPRIM_ATOMIC_LOAD("flat_load_dwordx4", "glc", "s_waitcnt vmcnt(0)", ptr)
+    #define ROCPRIM_ATOMIC_LOAD_SHARED(ptr) \
+        ROCPRIM_ATOMIC_LOAD("ds_read_b128", "", "s_waitcnt lgkmcnt(0)", ptr)
+    #define ROCPRIM_ATOMIC_LOAD_GLOBAL(ptr) \
+        ROCPRIM_ATOMIC_LOAD("global_load_dwordx4", "off glc", "s_waitcnt vmcnt(0)", ptr)
+#elif defined(__HIP_DEVICE_COMPILE__)
+    // Please submit an issue or pull request!
+    #error support for 128-bit atomics not implemented for current architecture
+#endif
 
-    #ifdef __HIP_DEVICE_COMPILE__
-        #if !ROCPRIM_TARGET_SPIRV && defined(__has_builtin) \
-            && __has_builtin(__builtin_amdgcn_is_shared)    \
-            && __has_builtin(__builtin_amdgcn_is_private)
+#ifdef __HIP_DEVICE_COMPILE__
+    #if defined(__has_builtin) && __has_builtin(__builtin_amdgcn_is_shared) \
+        && __has_builtin(__builtin_amdgcn_is_private)
 
         auto* ptr = (const __attribute__((address_space(0 /*flat*/))) __uint128_t*)address;
         if(__builtin_amdgcn_is_shared(ptr))
@@ -235,15 +231,13 @@ namespace detail
                 = (const __attribute__((address_space(1 /*global*/))) __uint128_t*)address;
             ROCPRIM_ATOMIC_LOAD_GLOBAL(global_ptr);
         }
-        #else
-        // SPIR-V does not like the address-space checks. For now
-        // lets just do flat loading/storing.
-        ROCPRIM_ATOMIC_LOAD_FLAT(address);
-        #endif
     #else
+        ROCPRIM_ATOMIC_LOAD_FLAT(address);
+    #endif
+#else
         (void)address;
         result = 0;
-    #endif
+#endif
 
         return result;
 
@@ -252,7 +246,6 @@ namespace detail
 #undef ROCPRIM_ATOMIC_LOAD_SHARED
 #undef ROCPRIM_ATOMIC_LOAD_GLOBAL
     }
-#endif
 
     ROCPRIM_DEVICE ROCPRIM_INLINE
     void atomic_store(unsigned char* address, unsigned char value)
@@ -281,15 +274,13 @@ namespace detail
         __hip_atomic_store(address, value, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
     }
 
-// atomic_store for uint128 is not supported for unknown targets or spirv
-#if !defined(ROCPRIM_TARGET_UNKNOWN) && !defined(ROCPRIM_TARGET_SPIRV)
     ROCPRIM_DEVICE ROCPRIM_INLINE
     void atomic_store(__uint128_t* address, const __uint128_t value)
     {
 #define ROCPRIM_ATOMIC_STORE(inst, mod, wait, ptr) \
     asm volatile(inst " %0, %1 " mod "\t\n" wait : : "v"(ptr), "v"(value) : "memory")
 
-#if ROCPRIM_TARGET_CDNA3
+#if ROCPRIM_TARGET_CDNA4 || ROCPRIM_TARGET_CDNA3
     #define ROCPRIM_ATOMIC_STORE_FLAT(ptr) \
         ROCPRIM_ATOMIC_STORE("flat_store_dwordx4", "sc1", "s_waitcnt vmcnt(0)", ptr)
     #define ROCPRIM_ATOMIC_STORE_SHARED(ptr) \
@@ -311,9 +302,7 @@ namespace detail
     // This architecture doesn't support atomics on the global AS.
     #define ROCPRIM_ATOMIC_STORE_GLOBAL(ptr) ROCPRIM_ATOMIC_STORE_FLAT(ptr)
 #elif ROCPRIM_TARGET_RDNA3 || ROCPRIM_TARGET_RDNA2 || ROCPRIM_TARGET_RDNA1 || ROCPRIM_TARGET_CDNA2 \
-    || ROCPRIM_TARGET_CDNA1 || ROCPRIM_TARGET_GCN5 || ROCPRIM_TARGET_SPIRV
-    // We don't really know what architecture we are on when targeting
-    // SPIR-V. Lets just assume it's one of these.
+    || ROCPRIM_TARGET_CDNA1 || ROCPRIM_TARGET_GCN5
     #define ROCPRIM_ATOMIC_STORE_FLAT(ptr) \
         ROCPRIM_ATOMIC_STORE("flat_store_dwordx4", "", "s_waitcnt vmcnt(0)", ptr)
     #define ROCPRIM_ATOMIC_STORE_SHARED(ptr) \
@@ -326,8 +315,8 @@ namespace detail
 #endif
 
 #ifdef __HIP_DEVICE_COMPILE__
-    #if !ROCPRIM_TARGET_SPIRV && defined(__has_builtin) \
-        && __has_builtin(__builtin_amdgcn_is_shared) && __has_builtin(__builtin_amdgcn_is_private)
+    #if defined(__has_builtin) && __has_builtin(__builtin_amdgcn_is_shared) \
+        && __has_builtin(__builtin_amdgcn_is_private)
 
         auto* ptr = (__attribute__((address_space(0 /*flat*/))) __uint128_t*)address;
         if(__builtin_amdgcn_is_shared(ptr))
@@ -345,8 +334,6 @@ namespace detail
             ROCPRIM_ATOMIC_STORE_GLOBAL(global_ptr);
         }
     #else
-        // SPIR-V does not like the address-space checks. For now
-        // lets just do flat loading/storing.
         ROCPRIM_ATOMIC_STORE_FLAT(address);
     #endif
 #else
@@ -359,7 +346,6 @@ namespace detail
 #undef ROCPRIM_ATOMIC_STORE_SHARED
 #undef ROCPRIM_ATOMIC_STORE_GLOBAL
     }
-#endif
 
     /// \brief Wait for all vector memory operations to complete
     ///

@@ -33,43 +33,22 @@ cmake -DBUILD_DOCS=ON ...
 
 ## Build and install
 
-1. Checkout the hipBLAS code using either a sparse checkout or a full clone of the rocm-libraries repository.
-
-   To limit your local checkout to only the hipBLAS project, configure ``sparse-checkout`` before cloning.
-   This uses the Git partial clone feature (``--filter=blob:none``) to reduce how much data is downloaded.
-   Use the following commands for a sparse checkout:
+1. Download the hipBLAS source code (clone this repository):
 
     ```bash
-
-    git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libraries.git
-    cd rocm-libraries
-    git sparse-checkout init --cone
-    git sparse-checkout set projects/hipblas # add projects/rocsolver projects/rocblas projects/hipblas-common to include dependencies
-    git checkout develop # or use the branch you want to work with
-    ```
-
-   To clone the entire rocm-libraries repository, use the following commands. This process takes more time,
-   but is recommended if you want to work with a large number of libraries.
-
-    ```bash
-
-    # Clone rocm-libraries, including hipBLAS, using Git
-    git clone https://github.com/ROCm/rocm-libraries.git
-
-    # Go to hipBLAS directory
-    cd rocm-libraries/projects/hipblas
+        git clone https://github.com/ROCmSoftwarePlatform/hipBLAS.git
     ```
 
     ```note
         hipBLAS requires specific versions of rocBLAS and rocSOLVER. Refer to
-        [CMakeLists.txt](https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipblas/library/CMakeLists.txt)
+        [CMakeLists.txt](https://github.com/ROCmSoftwarePlatform/hipBLAS/blob/develop/library/CMakeLists.txt)
         for details.
     ```
 
-2. Build hipBLAS using the `install.sh` script and install it into `/opt/rocm/hipblas`:
+2. Build hipBLAS and install it into `/opt/rocm/hipblas`:
 
     ```bash
-        cd rocm-libraries/projects/hipblas
+        cd hipblas
         ./install.sh -i
     ```
 

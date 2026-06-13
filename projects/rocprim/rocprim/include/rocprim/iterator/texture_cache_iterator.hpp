@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,13 +23,11 @@
 
 #include <iterator>
 #include <cstddef>
-#include <cstring>
 #include <type_traits>
 
 #include "../config.hpp"
-#include "../detail/various.hpp"
 #include "../functional.hpp"
-#include "detail/common.hpp"
+#include "../detail/various.hpp"
 
 /// \addtogroup iteratormodule
 /// @{
@@ -123,8 +121,8 @@ struct match_texture_type
 /// * Can only be constructed within host functions, and can only be dereferenced within
 /// device functions.
 /// * Accepts any data type from memory, and loads through texture cache.
-/// * This iterator is not functional on gfx94x, gfx120x or gfx95x architectures,
-/// as native texture fetch functions are not supported in these architectures.
+/// * This iterator is not functional on gfx94x architectures, as native texture fetch functions 
+/// are not supported in gfx94x.
 ///
 /// \tparam T type of value that can be obtained by dereferencing the iterator.
 /// \tparam Difference a type used for identify distance between iterators.
@@ -140,7 +138,7 @@ public:
     /// \brief A reference type of the type iterated over (\p value_type).
     using reference = const value_type&;
     /// \brief A pointer type of the type iterated over (\p value_type).
-    using pointer = detail::proxy_pointer<value_type>;
+    using pointer = const value_type*;
     /// A type used for identify distance between iterators.
     using difference_type = Difference;
     /// The category of the iterator.
@@ -220,8 +218,9 @@ public:
         #else
         texture_type words[multiple];
 
-        #if defined(__gfx942__) || defined(__gfx950__) || defined(__gfx9_4_generic__) || defined(__GFX12__)
-        __builtin_trap();
+        #if defined(__gfx942__) || defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__)
+        #pragma message "Texture cache iterator is not supported on gfx94x, gfx120x or gfx95x as the texture fetch functions in HIP are not available."
+        ROCPRIM_PRINT_ERROR_ONCE("WARNING: Usage of texture_cache_iterator on gfx94x, gfx120x or gfx95x devices is not supported and will not produce valid results.")
         #else
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < multiple; i++)
@@ -237,11 +236,10 @@ public:
         #endif
     }
 
-    ROCPRIM_HOST_DEVICE
-    inline pointer
-        operator->() const
+    ROCPRIM_HOST_DEVICE inline
+    pointer operator->() const
     {
-        return pointer(*(*this));
+        return &(*(*this));
     }
 
     ROCPRIM_HOST_DEVICE inline
@@ -308,25 +306,31 @@ public:
     ROCPRIM_HOST_DEVICE inline
     bool operator<(texture_cache_iterator other) const
     {
-        return (ptr - other.ptr) < 0;
+        return (ptr - other.ptr) > 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     bool operator<=(texture_cache_iterator other) const
     {
-        return (ptr - other.ptr) <= 0;
+        return (ptr - other.ptr) >= 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     bool operator>(texture_cache_iterator other) const
     {
-        return (ptr - other.ptr) > 0;
+        return (ptr - other.ptr) < 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     bool operator>=(texture_cache_iterator other) const
     {
-        return (ptr - other.ptr) >= 0;
+        return (ptr - other.ptr) <= 0;
+    }
+
+    [[deprecated]] friend std::ostream& operator<<(std::ostream& os,
+                                                   const texture_cache_iterator& /* iter */)
+    {
+        return os;
     }
     #endif // DOXYGEN_SHOULD_SKIP_THIS
 

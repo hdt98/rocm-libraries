@@ -2,105 +2,7 @@
 
 Full documentation for rocSOLVER is available at the [rocSOLVER documentation](https://rocm.docs.amd.com/projects/rocSOLVER/en/latest/index.html).
 
-
-## (Unreleased) rocSOLVER
-
-### Added
-* Support added for the gfx1250 architecture.
-
-### Changed
-### Removed
-### Optimized
-### Resolved issues
-### Known issues
-### Upcoming changes
-
-
-
-## rocSOLVER 3.34.0 for ROCm 7.13.0
-
-### Added
-
-* Computation of solution for LU factorization without pivoting
-    * GETRS_NPVT (with batched and strided\_batched versions)
-    * GETRS_NPVT_64 (with batched and strided\_batched versions)
-* Linear solver routines for symmetric matrices
-    * SYTRS (with batched and strided\_batched versions)
-    * SYTRS_64 (with batched and strided\_batched versions)
-
-### Optimized
-
-* Improved the performance of POTF2 and downstream functions such as POTRF.
-
-### Resolved issues
-
-* Fixed a memory access error in SYTRF and synchronization issues in LASYF and SYTF2.
-
-
-
-## rocSOLVER 3.33.0 for ROCm 7.12.0
-
-### Added
-
-* Support added for the gfx1150, gfx1152, and gfx1153 architectures
-* Computation of different matrix norms
-    * LANGE
-    * LANGE_64
-* Computation of different matrix condition numbers
-    * GECON
-    * GECON_64
-
-### Resolved issues
-
-* Fixed a synchronization issue in STEBZ and downstream functions, such as SYEVX and SYEVDX.
-* Fixed a synchronization issue in GETF2.
-
-
-
-## rocSOLVER 3.32.0 for ROCm 7.2.0
-
-### Optimized
-
-* Improved the performance of LARFB and downstream functions such as GEQRF and ORMTR.
-
-
-
-## rocSOLVER 3.31.0 for ROCm 7.1.0
-
-### Optimized
-
-* Improved the performance of LARF, LARFT, GEQR2, and downstream functions such as GEQRF
-* Improved the performance of STEDC and divide and conquer Eigensolvers
-
-
-
-## rocSOLVER 3.30.1 for ROCm 7.0.2
-
-### Optimized
-
-* Improved the performance of LARFT and downstream functions such as GEQRF and ORMTR.
-* Improved the performance of LARF and downstream functions such as GEQR2.
-* Improved the performance of ORMTR and downstream functions such as SYEVD.
-* Improved the performance of GEQR2 and downstream functions such as GEQRF.
-
-
-
-## rocSOLVER 3.30.0 for ROCm 7.0.0
-
-### Added
-
-* Hybrid computation support for existing routines:
-    - STEQR
-
-### Optimized
-
-* Improved the performance of BDSQR and downstream functions such as GESVD
-* Improved the performance of STEQR and downstream functions such as SYEV/HEEV
-* Improved the performance of LARFT and downstream functions such as GEQR2 and GEQRF
-
-
-
-## rocSOLVER 3.28.2 for ROCm 6.4.2
+## rocSOLVER 3.29.0 for ROCm 6.5.0
 
 ### Added
 
@@ -113,7 +15,8 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 * Reduced the device memory requirements for STEDC, SYEVD/HEEVD, and SYGVD/HEGVD
 * Improved the performance of STEDC and divide and conquer Eigensolvers
-* Improved the performance of SYTRD, the initial step for Eigensolvers that start with the tridiagonalization of the input matrix
+* Improved performance of STEQR and downstream functions such as SYEV/HEEV
+* Improved performance of SYTRD, the initial step of the Eigensolvers that start with the tridiagonalization of the input matrix
 
 
 ## rocSOLVER 3.28.0 for ROCm 6.4.0

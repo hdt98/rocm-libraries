@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2020-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2020-2024, Advanced Micro Devices, Inc.  All rights reserved.
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -29,43 +29,35 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
 #if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP
 
-#  include <thrust/system/hip/config.h>
+#include <thrust/system/hip/config.h>
 
-#  include <thrust/system/hip/detail/execution_policy.h>
-#  include <thrust/system/hip/detail/util.h>
+#include <thrust/system/hip/detail/execution_policy.h>
 
-#  include <mutex>
-#  include <unordered_map>
+#include <mutex>
+#include <unordered_map>
 
 THRUST_NAMESPACE_BEGIN
 
 namespace hip_rocprim
 {
 
-template <typename MR, typename DerivedPolicy>
-THRUST_HOST MR* get_per_device_resource(execution_policy<DerivedPolicy>&)
+template<typename MR, typename DerivedPolicy>
+THRUST_HOST
+MR * get_per_device_resource(execution_policy<DerivedPolicy>&)
 {
-  static std::mutex map_lock;
-  static std::unordered_map<int, MR> device_id_to_resource;
+    static std::mutex map_lock;
+    static std::unordered_map<int, MR> device_id_to_resource;
 
-  int device_id;
-  thrust::hip_rocprim::throw_on_error(hipGetDevice(&device_id));
+    int device_id;
+    thrust::hip_rocprim::throw_on_error(hipGetDevice(&device_id));
 
-  std::lock_guard<std::mutex> lock{map_lock};
-  return &device_id_to_resource[device_id];
+    std::lock_guard<std::mutex> lock{map_lock};
+    return &device_id_to_resource[device_id];
 }
 
-} // namespace hip_rocprim
+}
 
 THRUST_NAMESPACE_END
 

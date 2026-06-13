@@ -4,7 +4,7 @@
 # are installed, and if so, uses the installed version to format
 # the staged changes.
 
-base=clang-format-18
+base=clang-format-12
 format=""
 
 # Redirect output to stderr.
@@ -40,3 +40,4 @@ do
         "$format" -i -style=file "$file"
     fi
 done
+

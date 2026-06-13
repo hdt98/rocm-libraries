@@ -32,13 +32,12 @@
 #include "test_utils.hpp"
 #include "test_utils_assertions.hpp"
 #include "test_utils_data_generation.hpp"
-#include "test_utils_sort_checker.hpp"
 #include "test_utils_sort_comparator.hpp"
 
 #include <rocprim/block/block_load_func.hpp>
 #include <rocprim/block/block_radix_sort.hpp>
 #include <rocprim/block/block_store_func.hpp>
-#include <rocprim/type_traits.hpp>
+#include <rocprim/type_traits_interface.hpp>
 #include <rocprim/types.hpp>
 
 #include <algorithm>
@@ -49,14 +48,22 @@
 #include <utility>
 #include <vector>
 
-static constexpr size_t       n_sizes              = 12;
-static constexpr unsigned int items_radix[n_sizes] = {1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3};
-static constexpr bool         desc_radix[n_sizes]
-    = {false, false, false, false, false, false, true, true, true, true, true, true};
-static constexpr bool striped_radix[n_sizes]
-    = {false, false, false, true, true, true, false, false, false, true, true, true};
-static constexpr unsigned int start_radix[n_sizes] = {0, 0, 0, 3, 4, 8, 0, 0, 0, 3, 4, 8};
-static constexpr unsigned int end_radix[n_sizes]   = {0, 0, 0, 10, 11, 12, 0, 0, 0, 10, 11, 12};
+static constexpr size_t n_sizes = 12;
+static constexpr unsigned int items_radix[n_sizes] = {
+    1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3
+};
+static constexpr bool desc_radix[n_sizes] = {
+    false, false, false, false, false, false, true, true, true, true, true, true
+};
+static constexpr bool striped_radix[n_sizes] = {
+    false, false, false, true, true, true, false, false, false, true, true, true
+};
+static constexpr unsigned int start_radix[n_sizes] = {
+    0, 0, 0, 3, 4, 8, 0, 0, 0, 3, 4, 8
+};
+static constexpr unsigned int end_radix[n_sizes] = {
+    0, 0, 0, 10, 11, 12, 0, 0, 0, 10, 11, 12
+};
 
 static constexpr unsigned int bits_per_pass_radix[n_sizes] = {4, 3, 1, 1, 3, 4, 4, 3, 1, 1, 3, 4};
 
@@ -64,59 +71,52 @@ template<unsigned int BlockSize,
          unsigned int ItemsPerThread,
          unsigned int RadixBitsPerPass,
          class key_type>
-__global__ __launch_bounds__(BlockSize)
-void sort_key_kernel(key_type*    device_keys_output,
-                     bool         to_striped,
-                     bool         descending,
-                     unsigned int start_bit,
-                     unsigned int end_bit)
+__global__ __launch_bounds__(BlockSize) void sort_key_kernel(key_type*    device_keys_output,
+                                                             bool         to_striped,
+                                                             bool         descending,
+                                                             unsigned int start_bit,
+                                                             unsigned int end_bit)
 {
     constexpr unsigned int items_per_block = BlockSize * ItemsPerThread;
-    const unsigned int     lid             = threadIdx.x;
-    const unsigned int     block_offset    = blockIdx.x * items_per_block;
+    const unsigned int lid = threadIdx.x;
+    const unsigned int block_offset = blockIdx.x * items_per_block;
 
     key_type keys[ItemsPerThread];
     rocprim::block_load_direct_blocked(lid, device_keys_output + block_offset, keys);
 
-    using block_radix_sort = rocprim::block_radix_sort<key_type,
-                                                       BlockSize,
-                                                       ItemsPerThread,
-                                                       rocprim::empty_type,
-                                                       1,
-                                                       1,
-                                                       RadixBitsPerPass>;
-    block_radix_sort                          bsort;
+    rocprim::block_radix_sort<key_type,
+                              BlockSize,
+                              ItemsPerThread,
+                              rocprim::empty_type,
+                              1,
+                              1,
+                              RadixBitsPerPass>
+        bsort;
+
     test_utils::select_decomposer_t<key_type> decomposer{};
 
-    // Share LDS storage between all different sort invocations explicitely.
-    // This resolves local memory allocation exceeding limits when targeting SPIR-V.
-    __shared__ typename block_radix_sort::storage_type storage;
-
-    // Sort differently depending on passed flags.
     if(to_striped)
     {
         if(descending)
         {
-            bsort.sort_desc_to_striped(keys, storage, start_bit, end_bit, decomposer);
+            bsort.sort_desc_to_striped(keys, start_bit, end_bit, decomposer);
         }
         else
         {
-            bsort.sort_to_striped(keys, storage, start_bit, end_bit, decomposer);
+            bsort.sort_to_striped(keys, start_bit, end_bit, decomposer);
         }
 
-        rocprim::block_store_direct_striped<BlockSize>(lid,
-                                                       device_keys_output + block_offset,
-                                                       keys);
+        rocprim::block_store_direct_striped<BlockSize>(lid, device_keys_output + block_offset, keys);
     }
     else
     {
         if(descending)
         {
-            bsort.sort_desc(keys, storage, start_bit, end_bit, decomposer);
+            bsort.sort_desc(keys, start_bit, end_bit, decomposer);
         }
         else
         {
-            bsort.sort(keys, storage, start_bit, end_bit, decomposer);
+            bsort.sort(keys, start_bit, end_bit, decomposer);
         }
 
         rocprim::block_store_direct_blocked(lid, device_keys_output + block_offset, keys);
@@ -128,60 +128,49 @@ template<unsigned int BlockSize,
          unsigned int RadixBitsPerPass,
          class key_type,
          class value_type>
-__global__ __launch_bounds__(BlockSize)
-void sort_key_value_kernel(key_type*    device_keys_output,
-                           value_type*  device_values_output,
-                           bool         to_striped,
-                           bool         descending,
-                           unsigned int start_bit,
-                           unsigned int end_bit)
+__global__ __launch_bounds__(BlockSize) void sort_key_value_kernel(key_type*   device_keys_output,
+                                                                   value_type* device_values_output,
+                                                                   bool        to_striped,
+                                                                   bool        descending,
+                                                                   unsigned int start_bit,
+                                                                   unsigned int end_bit)
 {
     constexpr unsigned int items_per_block = BlockSize * ItemsPerThread;
-    const unsigned int     lid             = threadIdx.x;
-    const unsigned int     block_offset    = blockIdx.x * items_per_block;
+    const unsigned int lid = threadIdx.x;
+    const unsigned int block_offset = blockIdx.x * items_per_block;
 
-    key_type   keys[ItemsPerThread];
+    key_type keys[ItemsPerThread];
     value_type values[ItemsPerThread];
     rocprim::block_load_direct_blocked(lid, device_keys_output + block_offset, keys);
     rocprim::block_load_direct_blocked(lid, device_values_output + block_offset, values);
 
-    using block_radix_sort = rocprim::
-        block_radix_sort<key_type, BlockSize, ItemsPerThread, value_type, 1, 1, RadixBitsPerPass>;
-    block_radix_sort                          bsort;
+    rocprim::
+        block_radix_sort<key_type, BlockSize, ItemsPerThread, value_type, 1, 1, RadixBitsPerPass>
+                                              bsort;
     test_utils::select_decomposer_t<key_type> decomposer{};
-
-    // Share LDS storage between all different sort invocations explicitely.
-    // This resolved local memory allocation exceeding limits when targeting SPIR-V.
-    __shared__ typename block_radix_sort::storage_type storage;
-
-    // Sort differently depending on passed flags.
     if(to_striped)
     {
         if(descending)
         {
-            bsort.sort_desc_to_striped(keys, values, storage, start_bit, end_bit, decomposer);
+            bsort.sort_desc_to_striped(keys, values, start_bit, end_bit, decomposer);
         }
         else
         {
-            bsort.sort_to_striped(keys, values, storage, start_bit, end_bit, decomposer);
+            bsort.sort_to_striped(keys, values, start_bit, end_bit, decomposer);
         }
 
-        rocprim::block_store_direct_striped<BlockSize>(lid,
-                                                       device_keys_output + block_offset,
-                                                       keys);
-        rocprim::block_store_direct_striped<BlockSize>(lid,
-                                                       device_values_output + block_offset,
-                                                       values);
+        rocprim::block_store_direct_striped<BlockSize>(lid, device_keys_output + block_offset, keys);
+        rocprim::block_store_direct_striped<BlockSize>(lid, device_values_output + block_offset, values);
     }
     else
     {
         if(descending)
         {
-            bsort.sort_desc(keys, values, storage, start_bit, end_bit, decomposer);
+            bsort.sort_desc(keys, values, start_bit, end_bit, decomposer);
         }
         else
         {
-            bsort.sort(keys, values, storage, start_bit, end_bit, decomposer);
+            bsort.sort(keys, values, start_bit, end_bit, decomposer);
         }
 
         rocprim::block_store_direct_blocked(lid, device_keys_output + block_offset, keys);
@@ -218,8 +207,8 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 0>::type
         return;
     }
 
-    const size_t size      = items_per_block * 19;
-    const size_t grid_size = rocprim::detail::ceiling_div(size, items_per_block);
+    const size_t size = items_per_block * 19;
+    const size_t grid_size = size / items_per_block;
 
     SCOPED_TRACE(testing::Message() << "with items_per_block = " << items_per_block);
     SCOPED_TRACE(testing::Message() << "with size = " << size);
@@ -227,8 +216,7 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 0>::type
 
     for(size_t seed_index = 0; seed_index < number_of_runs; seed_index++)
     {
-        unsigned int seed_value
-            = seed_index < random_seeds_count ? rand() : seeds[seed_index - random_seeds_count];
+        unsigned int seed_value = seed_index < random_seeds_count  ? rand() : seeds[seed_index - random_seeds_count];
         SCOPED_TRACE(testing::Message() << "with seed = " << seed_value);
 
         engine_type rng_engine(seed_value);
@@ -241,6 +229,17 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 0>::type
                                            common::generate_limits<key_type>::max(),
                                            rng_engine);
 
+        // Calculate expected results on host
+        std::vector<key_type> expected(keys_output.get(), keys_output.get() + size);
+        for(size_t i = 0; i < size / items_per_block; i++)
+        {
+            std::stable_sort(
+                expected.begin() + (i * items_per_block),
+                expected.begin() + ((i + 1) * items_per_block),
+                test_utils::key_comparator<key_type, descending, start_bit, end_bit>()
+            );
+        }
+
         // Preparing device
         common::device_ptr<key_type> device_keys_output(keys_output, size);
 
@@ -252,15 +251,14 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 0>::type
                                                           end_bit);
         HIP_CHECK(hipGetLastError());
 
-        bool all_blocks_sorted = true;
-        for(size_t b = 0; b < grid_size; ++b)
-        {
-            all_blocks_sorted &= test_utils::device_sort_check(
-                device_keys_output.get() + b * items_per_block,
-                items_per_block,
-                test_utils::key_comparator<key_type, descending, start_bit, end_bit>());
-        }
-        ASSERT_TRUE(all_blocks_sorted);
+        // Getting results to host
+        keys_output = device_keys_output.load_to_unique_ptr();
+
+        // Verifying results
+        ASSERT_NO_FATAL_FAILURE(test_utils::assert_eq(keys_output.get(),
+                                                      keys_output.get() + size,
+                                                      expected.begin(),
+                                                      expected.end()));
     }
 }
 
@@ -296,8 +294,8 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 1>::type
         return;
     }
 
-    const size_t size      = items_per_block * 19;
-    const size_t grid_size = rocprim::detail::ceiling_div(size, items_per_block);
+    const size_t size = items_per_block * 19;
+    const size_t grid_size = size / items_per_block;
 
     SCOPED_TRACE(testing::Message() << "with items_per_block = " << items_per_block);
     SCOPED_TRACE(testing::Message() << "with size = " << size);
@@ -305,8 +303,7 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 1>::type
 
     for(size_t seed_index = 0; seed_index < number_of_runs; seed_index++)
     {
-        seed_type seed_value
-            = seed_index < random_seeds_count ? rand() : seeds[seed_index - random_seeds_count];
+        seed_type seed_value = seed_index < random_seeds_count ? rand() : seeds[seed_index - random_seeds_count];
         SCOPED_TRACE(testing::Message() << "with seed = " << seed_value);
 
         engine_type rng_engine(seed_value);
@@ -336,15 +333,15 @@ auto test_block_radix_sort() -> typename std::enable_if<Method == 1>::type
             std::stable_sort(
                 expected.begin() + (i * items_per_block),
                 expected.begin() + ((i + 1) * items_per_block),
-                test_utils::
-                    key_value_comparator<key_type, value_type, descending, start_bit, end_bit>());
+                test_utils::key_value_comparator<key_type, value_type, descending, start_bit, end_bit>()
+            );
         }
 
-        std::vector<key_type>   keys_expected(size);
+        std::vector<key_type> keys_expected(size);
         std::vector<value_type> values_expected(size);
         for(size_t i = 0; i < size; i++)
         {
-            keys_expected[i]   = expected[i].first;
+            keys_expected[i] = expected[i].first;
             values_expected[i] = expected[i].second;
         }
 

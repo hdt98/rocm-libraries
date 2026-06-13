@@ -1,4 +1,4 @@
-// Copyright (C) 2021 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2021 - 2022 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,6 @@
 #include <memory>
 #include <numeric>
 #include <optional>
-#include <regex>
 #include <string.h>
 #include <string>
 #include <variant>
@@ -87,6 +86,7 @@ class ComplexLiteral;
 class Add;
 class Subtract;
 class Multiply;
+class ComplexMultiply;
 class Divide;
 class Modulus;
 
@@ -130,6 +130,7 @@ using Expression = std::variant<Variable,
                                 Add,
                                 Subtract,
                                 Multiply,
+                                ComplexMultiply,
                                 Divide,
                                 Modulus,
                                 ShiftLeft,
@@ -230,6 +231,12 @@ public:
              bool restrict              = false,
              unsigned int size          = 0);
 
+    Variable(const std::string& _name,
+             const std::string& _type,
+             bool               pointer,
+             bool restrict,
+             const Expression& _size);
+
     Variable(const Variable& v);
     Variable(Variable&& v) = default;
     Variable(const Variable& v, const Expression& _index);
@@ -306,6 +313,24 @@ public:
     CallExpr& operator=(const CallExpr&) = default;
 
     std::string render() const;
+};
+
+class ComplexMultiply
+{
+public:
+    static const unsigned int precedence = 5;
+    explicit ComplexMultiply(const std::vector<Expression>& args)
+        : args(args)
+    {
+    }
+    ComplexMultiply(ComplexMultiply&&)      = default;
+    ComplexMultiply(const ComplexMultiply&) = default;
+    ComplexMultiply& operator=(ComplexMultiply&&) = default;
+    ComplexMultiply& operator=(const ComplexMultiply&) = default;
+
+    std::string render() const;
+
+    std::vector<Expression> args;
 };
 
 class Ternary
@@ -391,7 +416,9 @@ class Parens
 public:
     static const unsigned int precedence = 0;
     explicit Parens(Expression&& inside);
+    explicit Parens(const Expression& inside);
     explicit Parens(std::vector<Expression>&& args);
+    explicit Parens(const std::vector<Expression>& args);
     Parens(Parens&&)      = default;
     Parens(const Parens&) = default;
     Parens& operator=(Parens&&) = default;
@@ -600,11 +627,7 @@ class StatementList;
 class Butterfly;
 class IntrinsicStore;
 class IntrinsicStorePlanar;
-class Printf;
-
-// Forward declare Statement as a class so it can be used in std::vector<Statement>
-// before all variant types are complete. Statement is defined after all types.
-class Statement;
+class IntrinsicLoadToDest;
 
 struct LineBreak
 {
@@ -659,6 +682,30 @@ struct CommentLines
         : comments(il){};
 };
 
+using Statement = std::variant<Assign,
+                               ReturnExpr,
+                               Call,
+                               CallbackLoadDeclaration,
+                               CallbackStoreDeclaration,
+                               CommentLines,
+                               Declaration,
+                               LDSDeclaration,
+                               For,
+                               While,
+                               If,
+                               ElseIf,
+                               Else,
+                               StoreGlobal,
+                               StoreGlobalPlanar,
+                               LineBreak,
+                               Return,
+                               Break,
+                               SyncThreads,
+                               Butterfly,
+                               IntrinsicStore,
+                               IntrinsicStorePlanar,
+                               IntrinsicLoadToDest>;
+
 class Assign
 {
 public:
@@ -681,10 +728,6 @@ public:
 static Assign AddAssign(const Variable& lhs, const Expression& rhs)
 {
     return Assign(lhs, rhs, "+=");
-}
-static Assign DivideAssign(const Variable& lhs, const Expression& rhs)
-{
-    return Assign(lhs, rhs, "/=");
 }
 static Assign MultiplyAssign(const Variable& lhs, const Expression& rhs)
 {
@@ -842,64 +885,65 @@ public:
     }
 };
 
+class StatementList
+{
+public:
+    std::vector<Statement> statements;
+    StatementList();
+    StatementList(const std::initializer_list<Statement>& il);
+    std::string render() const;
+};
+
 class For
 {
 public:
-    Variable               var;
-    Expression             initial;
-    Expression             condition;
-    Expression             increment;
-    std::vector<Statement> body;
-    bool                   pragma_unroll;
-    For(const Variable&               var,
-        const Expression&             initial,
-        const Expression&             condition,
-        const Expression&             increment,
-        const std::vector<Statement>& body,
-        bool                          pragma_unroll = false);
-    // Constructor with empty body for C++20 compatibility
-    For(const Variable&   var,
-        const Expression& initial,
-        const Expression& condition,
-        const Expression& increment,
-        bool              pragma_unroll = false);
+    Variable      var;
+    Expression    initial;
+    Expression    condition;
+    Expression    increment;
+    StatementList body;
+    bool          pragma_unroll;
+    For(const Variable&      var,
+        const Expression&    initial,
+        const Expression&    condition,
+        const Expression&    increment,
+        const StatementList& body          = {},
+        bool                 pragma_unroll = false);
     std::string render() const;
 };
 
 class While
 {
 public:
-    Expression             condition;
-    std::vector<Statement> body;
-    While(const Expression& condition, const std::vector<Statement>& body);
-    // Constructor with empty body for C++20 compatibility
-    explicit While(const Expression& condition);
+    Expression    condition;
+    StatementList body;
+    While(const Expression& condition, const StatementList& body = {});
     std::string render() const;
 };
 
 class If
 {
 public:
-    Expression             condition;
-    std::vector<Statement> body;
-    If(const Expression& condition, const std::vector<Statement>& body);
+    Expression    condition;
+    StatementList body;
+    If(const Expression& condition, const StatementList& body);
     std::string render() const;
 };
 
 class ElseIf
 {
 public:
-    Expression             condition;
-    std::vector<Statement> body;
-    ElseIf(const Expression& condition, const std::vector<Statement>& body);
+    Expression    condition;
+    StatementList body;
+    ElseIf(const Expression& condition, const StatementList& body);
     std::string render() const;
 };
 
 class Else
 {
 public:
-    std::vector<Statement> body;
-    explicit Else(const std::vector<Statement>& body);
+    StatementList body;
+    explicit Else(const StatementList& body);
     std::string render() const;
 };
 
@@ -1020,111 +1064,35 @@ public:
     Expression rw_flag;
 };
 
-class Printf
+class IntrinsicLoadToDest
 {
 public:
-    const char*             fmt;
-    std::vector<Expression> args;
-
-    Printf(const char* format, const std::vector<Expression>& arguments)
-        : fmt(format)
-        , args(arguments){};
-
+    IntrinsicLoadToDest(const Expression& dest,
+                        const Expression& data,
+                        const Expression& voffset,
+                        const Expression& soffset,
+                        const Expression& rw_flag)
+        : dest{dest}
+        , data{data}
+        , voffset{voffset}
+        , soffset{soffset}
+        , rw_flag{rw_flag}
+    {
+    }
     std::string render() const
     {
-        auto fmt_render = std::string(fmt);
-        fmt_render      = "\"" + std::regex_replace(fmt_render, std::regex(R"(\n)"), "\\n") + "\"";
-
-        auto args_render = args;
-        args_render.insert(args_render.begin(), Literal(fmt_render));
-
-        return Call{"printf", args_render}.render();
+        return "intrinsic_load_to_dest(" + vrender(dest) + "," + vrender(data) + ","
+               + vrender(voffset) + "," + vrender(soffset) + "," + vrender(rw_flag) + ");";
     }
+
+    Expression dest;
+    Expression data;
+    Expression voffset;
+    Expression soffset;
+    Expression rw_flag;
 };
 
 // end of Statement class declarations
-
-// Define Statement as a class wrapper around std::variant.
-// This is required for C++20 because:
-// 1. std::variant requires all types to be complete at declaration time
-// 2. We need Statement to be forward-declarable so classes can use std::vector<Statement>
-// 3. A class can be forward-declared, unlike a type alias
-using StatementVariant = std::variant<Assign,
-                                      ReturnExpr,
-                                      Call,
-                                      CallbackLoadDeclaration,
-                                      CallbackStoreDeclaration,
-                                      CommentLines,
-                                      Declaration,
-                                      LDSDeclaration,
-                                      For,
-                                      While,
-                                      If,
-                                      ElseIf,
-                                      Else,
-                                      StoreGlobal,
-                                      StoreGlobalPlanar,
-                                      LineBreak,
-                                      Return,
-                                      Break,
-                                      SyncThreads,
-                                      Butterfly,
-                                      IntrinsicStore,
-                                      IntrinsicStorePlanar,
-                                      Printf>;
-
-class Statement
-{
-public:
-    StatementVariant data;
-
-    // No default constructor - std::variant's first type must be default-constructible
-    // and Assign is not. Use LineBreak as a placeholder if needed.
-
-    // Implicit conversion constructor from any variant alternative
-    template <typename T, typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, Statement>>>
-    Statement(T&& t)
-        : data(std::forward<T>(t))
-    {
-    }
-
-    // Copy and move constructors/assignment
-    Statement(const Statement&) = default;
-    Statement(Statement&&)      = default;
-    Statement& operator=(const Statement&) = default;
-    Statement& operator=(Statement&&) = default;
-
-    // Assignment from any variant alternative
-    template <typename T, typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, Statement>>>
-    Statement& operator=(T&& t)
-    {
-        data = std::forward<T>(t);
-        return *this;
-    }
-
-    // Render method - visits the variant
-    std::string render() const
-    {
-        return std::visit([](const auto& a) { return a.render(); }, data);
-    }
-};
-
-// StatementList is defined here after Statement
-class StatementList
-{
-public:
-    std::vector<Statement> statements;
-    StatementList();
-    StatementList(const std::initializer_list<Statement>& il);
-    std::string render() const;
-
-    // Implicit conversion to std::vector<Statement> for compatibility with
-    // If, ElseIf, Else, For, While constructors
-    operator std::vector<Statement>() const
-    {
-        return statements;
-    }
-};
 
 static void operator+=(StatementList& stmts, const Statement& s)
 {
@@ -1151,33 +1119,6 @@ static void operator+=(StatementList& stmts, StatementList&& s)
     for(auto&& x : s.statements)
     {
         stmts += std::move(x);
-    }
-}
-
-// Overloads for std::vector<Statement> (used by For::body, While::body, etc.)
-static void operator+=(std::vector<Statement>& stmts, const Statement& s)
-{
-    stmts.emplace_back(s);
-}
-
-static void operator+=(std::vector<Statement>& stmts, Statement&& s)
-{
-    stmts.emplace_back(std::move(s));
-}
-
-static void operator+=(std::vector<Statement>& stmts, const StatementList& s)
-{
-    for(const auto& x : s.statements)
-    {
-        stmts.emplace_back(x);
-    }
-}
-
-static void operator+=(std::vector<Statement>& stmts, StatementList&& s)
-{
-    for(auto&& x : s.statements)
-    {
-        stmts.emplace_back(std::move(x));
     }
 }
 
@@ -1249,6 +1190,7 @@ struct BaseVisitor
     MAKE_VISITOR_OPERATOR(Expression, Ternary);
     MAKE_VISITOR_OPERATOR(Expression, LoadGlobal);
     MAKE_VISITOR_OPERATOR(Expression, LoadGlobalPlanar);
+    MAKE_VISITOR_OPERATOR(Expression, ComplexMultiply);
     MAKE_VISITOR_OPERATOR(Expression, TwiddleMultiply);
     MAKE_VISITOR_OPERATOR(Expression, TwiddleMultiplyConjugate);
     MAKE_VISITOR_OPERATOR(Expression, Parens);
@@ -1278,7 +1220,7 @@ struct BaseVisitor
     MAKE_VISITOR_OPERATOR(StatementList, Butterfly);
     MAKE_VISITOR_OPERATOR(StatementList, IntrinsicStore);
     MAKE_VISITOR_OPERATOR(StatementList, IntrinsicStorePlanar);
-    MAKE_VISITOR_OPERATOR(StatementList, Printf);
+    MAKE_VISITOR_OPERATOR(StatementList, IntrinsicLoadToDest);
 
     MAKE_VISITOR_OPERATOR(ArgumentList, ArgumentList);
 
@@ -1291,7 +1233,7 @@ struct BaseVisitor
         StatementList ret;
         for(const auto& stmt : x.statements)
         {
-            StatementList new_stmts = std::visit(*this, stmt.data);
+            StatementList new_stmts = std::visit(*this, stmt);
             for(auto& s : new_stmts.statements)
                 ret.statements.emplace_back(std::move(s));
         }
@@ -1357,6 +1299,7 @@ struct BaseVisitor
     MAKE_EXPR_VISIT(LoadGlobal);
     MAKE_EXPR_VISIT(LoadGlobalPlanar);
 
+    MAKE_TRIVIAL_VISIT(Expression, ComplexMultiply);
     MAKE_TRIVIAL_VISIT(Expression, TwiddleMultiply);
     MAKE_TRIVIAL_VISIT(Expression, TwiddleMultiplyConjugate);
 
@@ -1379,29 +1322,16 @@ struct BaseVisitor
     MAKE_TRIVIAL_STATEMENT_VISIT(Break)
     MAKE_TRIVIAL_STATEMENT_VISIT(SyncThreads)
     MAKE_TRIVIAL_STATEMENT_VISIT(Butterfly);
-    MAKE_TRIVIAL_STATEMENT_VISIT(Printf);
+    MAKE_TRIVIAL_STATEMENT_VISIT(IntrinsicLoadToDest);
 
     MAKE_TRIVIAL_VISIT(Expression, Variable)
 
     virtual StatementList visit_StatementList(const StatementList& x)
     {
         auto y = StatementList();
-        for(const auto& s : x.statements)
+        for(auto s : x.statements)
         {
-            y += std::visit(*this, s.data);
-        }
-        return y;
-    }
-
-    // Helper to visit a vector of statements
-    virtual std::vector<Statement> visit_statements(const std::vector<Statement>& x)
-    {
-        std::vector<Statement> y;
-        for(const auto& s : x)
-        {
-            StatementList new_stmts = std::visit(*this, s.data);
-            for(auto& stmt : new_stmts.statements)
-                y.emplace_back(std::move(stmt));
+            y += std::visit(*this, s);
         }
         return y;
     }
@@ -1456,34 +1386,34 @@ struct BaseVisitor
         auto initial   = std::visit(*this, x.initial);
         auto condition = std::visit(*this, x.condition);
         auto increment = std::visit(*this, x.increment);
-        auto body      = visit_statements(x.body);
+        auto body      = visit_StatementList(x.body);
         return StatementList{For(var, initial, condition, increment, body, x.pragma_unroll)};
     }
 
     virtual StatementList visit_While(const While& x)
     {
         auto condition = std::visit(*this, x.condition);
-        auto body      = visit_statements(x.body);
+        auto body      = visit_StatementList(x.body);
         return StatementList{While(condition, body)};
     }
 
     virtual StatementList visit_If(const If& x)
     {
         auto condition = std::visit(*this, x.condition);
-        auto body      = visit_statements(x.body);
+        auto body      = visit_StatementList(x.body);
         return StatementList{If(condition, body)};
     }
 
     virtual StatementList visit_ElseIf(const ElseIf& x)
     {
         auto condition = std::visit(*this, x.condition);
-        auto body      = visit_statements(x.body);
+        auto body      = visit_StatementList(x.body);
         return StatementList{ElseIf(condition, body)};
     }
 
     virtual StatementList visit_Else(const Else& x)
     {
-        auto body = visit_statements(x.body);
+        auto body = visit_StatementList(x.body);
         return StatementList{Else(body)};
     }
 
@@ -1786,8 +1716,7 @@ static Function make_outofplace(const Function&    f,
                                 const std::string& bufName         = "buf",
                                 bool               rename_function = true)
 {
-    auto visitor = MakeOutOfPlaceVisitor({bufName, "stride", "stride0", "offset", "offset_pp"},
-                                         rename_function);
+    auto visitor = MakeOutOfPlaceVisitor({bufName, "stride", "stride0", "offset"}, rename_function);
     return visitor(f);
 }
 

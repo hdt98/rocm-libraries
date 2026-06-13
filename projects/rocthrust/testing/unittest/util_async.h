@@ -18,18 +18,21 @@
 #pragma once
 
 #include <thrust/detail/config.h>
+#include <thrust/detail/cpp14_required.h>
 
-#include <thrust/detail/cpp_version_check.h>
+#if THRUST_CPP_DIALECT >= 2014
 
-#if THRUST_CPP_DIALECT >= 2017
+#include <unittest/unittest.h>
 
-#  include <thrust/future.h>
+#include <thrust/future.h>
 
-#  include <unittest/unittest.h>
+#define TEST_EVENT_WAIT(e)                                                    \
+  ::unittest::test_event_wait(e, __FILE__, __LINE__)                          \
+  /**/
 
-#  define TEST_EVENT_WAIT(e) ::unittest::test_event_wait(e, __FILE__, __LINE__) /**/
-
-#  define TEST_FUTURE_VALUE_RETRIEVAL(f) ::unittest::test_future_value_retrieval(f, __FILE__, __LINE__) /**/
+#define TEST_FUTURE_VALUE_RETRIEVAL(f)                                        \
+  ::unittest::test_future_value_retrieval(f, __FILE__, __LINE__)              \
+  /**/
 
 namespace unittest
 {
@@ -40,10 +43,7 @@ THRUST_HOST void test_event_wait(Event&& e, std::string const& filename = "unkno
   ASSERT_EQUAL_WITH_FILE_AND_LINE(true, e.valid_stream(), filename, lineno);
 
   e.wait();
-  while (!e.ready())
-  {
-    e.wait();
-  }
+  e.wait();
 
   ASSERT_EQUAL_WITH_FILE_AND_LINE(true, e.valid_stream(), filename, lineno);
   ASSERT_EQUAL_WITH_FILE_AND_LINE(true, e.ready(), filename, lineno);
@@ -68,7 +68,11 @@ THRUST_HOST auto test_future_value_retrieval(Future&& f, std::string const& file
 
   ASSERT_THROWS_EQUAL_WITH_FILE_AND_LINE(
     auto x = f.extract();
-    THRUST_UNUSED_VAR(x), thrust::event_error, thrust::event_error(thrust::event_errc::no_content), filename, lineno);
+    THRUST_UNUSED_VAR(x)
+  , thrust::event_error
+  , thrust::event_error(thrust::event_errc::no_content)
+  , filename, lineno
+  );
 
   ASSERT_EQUAL_WITH_FILE_AND_LINE(false, f.ready(), filename, lineno);
   ASSERT_EQUAL_WITH_FILE_AND_LINE(false, f.valid_stream(), filename, lineno);
@@ -81,4 +85,4 @@ THRUST_HOST auto test_future_value_retrieval(Future&& f, std::string const& file
 
 } // namespace unittest
 
-#endif // THRUST_CPP_DIALECT >= 2017
+#endif // THRUST_CPP_DIALECT >= 2014

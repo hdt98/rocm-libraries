@@ -23,7 +23,7 @@
  * ************************************************************************ */
 
 #include "rocsparse_csritilu0x_history.hpp"
-#include "rocsparse_common.hpp"
+#include "common.h"
 #include "rocsparse_csritilu0x_driver.hpp"
 
 namespace rocsparse

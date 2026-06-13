@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,12 +22,12 @@
  *
  * ************************************************************************ */
 #include "internal/conversion/rocsparse_csrsort.h"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
+#include "control.h"
 #include "csrsort_device.h"
-#include "rocsparse_control.hpp"
 
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 extern "C" rocsparse_status rocsparse_csrsort_buffer_size(rocsparse_handle     handle,
                                                           rocsparse_int        m,
@@ -90,7 +90,7 @@ try
     // perm buffer
     *buffer_size += ((sizeof(rocsparse_int) * nnz - 1) / 256 + 1) * 256;
     // segm buffer
-    *buffer_size += ((sizeof(rocsparse_int) * (m + 1)) / 256 + 1) * 256;
+    *buffer_size += ((sizeof(rocsparse_int) * m) / 256 + 1) * 256;
 
     return rocsparse_status_success;
     // LCOV_EXCL_START
@@ -178,7 +178,7 @@ try
 
     // segm buffer
     rocsparse_int* tmp_segm = reinterpret_cast<rocsparse_int*>(ptr);
-    ptr += ((sizeof(rocsparse_int) * (m + 1)) / 256 + 1) * 256;
+    ptr += ((sizeof(rocsparse_int) * m) / 256 + 1) * 256;
 
     // Index base one requires shift of offset positions
     if(descr->base == rocsparse_index_base_one)

@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -74,31 +74,10 @@ struct DeviceGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
                                  BElementwiseOperation,
                                  CDEElementwiseOperation>
 {
-    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               true>();
-    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               false>();
-    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
-    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
-    static constexpr auto I1               = Number<1>{};
-    static constexpr index_t NumDTensor    = DsDataType::Size();
+    static constexpr auto I1            = Number<1>{};
+    static constexpr index_t NumDTensor = DsDataType::Size();
 
-    template <typename WarpTileConfig>
-    using GridwiseGemmBase = GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad<
+    using GridwiseGemm = GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad<
         ALayout,
         BLayout,
         DsLayout,
@@ -122,10 +101,10 @@ struct DeviceGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
         KPerBlock,
         AK1,
         BK1,
-        WarpTileConfig::At(0),
-        WarpTileConfig::At(1),
-        WarpTileConfig::At(2),
-        WarpTileConfig::At(3),
+        MPerXDL,
+        NPerXDL,
+        MXdlPerWave,
+        NXdlPerWave,
         ABlockTransferThreadClusterLengths_AK0_M_AK1,
         ABlockTransferSrcAccessOrder,
         ABlockTransferSrcVectorDim,
@@ -136,23 +115,19 @@ struct DeviceGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
         BBlockTransferSrcVectorDim,
         BBlockTransferScalarPerVector,
         BBlockLdsExtraN,
-        WarpTileConfig::At(4),
-        WarpTileConfig::At(5),
+        CShuffleMXdlPerWavePerShuffle,
+        CShuffleNXdlPerWavePerShuffle,
         CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CDEBlockTransferScalarPerVector_NPerBlock,
         LoopSched,
         PipelineVer>;
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
-    using Argument = typename GridwiseGemm64::Argument;
+    using Argument = typename GridwiseGemm::Argument;
 
     struct Invoker : public BaseInvoker
     {
 
-        template <typename GridwiseGemm>
-        float RunImp(const typename GridwiseGemm::Argument& arg,
-                     const StreamConfig& stream_config = StreamConfig{})
+        float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             if(!GridwiseGemm::CheckValidity(arg.a_grid_desc_m_k_,
                                             arg.b_grid_desc_n_k_,
@@ -216,8 +191,6 @@ struct DeviceGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
             }
         }
 
-        INVOKER_RUN3_IMPL
-
         float Run(const BaseArgument* p_arg,
                   const StreamConfig& stream_config = StreamConfig{}) override
         {
@@ -227,15 +200,11 @@ struct DeviceGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_xdl_wmma_supported<ADataType,
-                                      BDataType,
-                                      MPerXDL,
-                                      NPerXDL,
-                                      WarpTileConfig32.At(0),
-                                      WarpTileConfig32.At(1)>())
+        if(!ck::is_xdl_supported())
         {
             return false;
         }
+
         if(!ck::is_lds_direct_load_supported())
         {
             return false;
@@ -319,29 +288,11 @@ struct DeviceGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
             }
         }
 
-        if(get_warp_size() == 64)
-        {
-            if constexpr(NXdlPerWave64 > 0)
-            {
-                return GridwiseGemm64::CheckValidity(arg.a_grid_desc_m_k_,
-                                                     arg.b_grid_desc_n_k_,
-                                                     arg.ds_grid_desc_m_n_,
-                                                     arg.e_grid_desc_m_n_,
-                                                     arg.block_2_etile_map_);
-            }
-        }
-        else
-        {
-            if constexpr(NXdlPerWave32 > 0)
-            {
-                return GridwiseGemm32::CheckValidity(arg.a_grid_desc_m_k_,
-                                                     arg.b_grid_desc_n_k_,
-                                                     arg.ds_grid_desc_m_n_,
-                                                     arg.e_grid_desc_m_n_,
-                                                     arg.block_2_etile_map_);
-            }
-        }
-        return false;
+        return GridwiseGemm::CheckValidity(arg.a_grid_desc_m_k_,
+                                           arg.b_grid_desc_n_k_,
+                                           arg.ds_grid_desc_m_n_,
+                                           arg.e_grid_desc_m_n_,
+                                           arg.block_2_etile_map_);
     }
 
     bool IsSupportedArgument(const BaseArgument* p_arg) override

@@ -52,15 +52,13 @@ ROCBLAS_KERNEL_ILF void rocblas_tpmvn_kernel_calc(bool        is_upper,
         T res = x[tid * incx];
         if(is_upper)
         {
-            size_t index = tmpv_calc_upperat(tid, tid);
             if(!is_unit_diag)
             {
-                res *= AP[index];
+                res *= AP[tmpv_calc_upperat(tid, tid)];
             }
             for(rocblas_int col = tid + 1; col < n; ++col)
             {
-                index += col;
-                res += AP[index] * x[col * incx];
+                res += AP[tmpv_calc_upperat(tid, col)] * x[col * incx];
             }
         }
         else
@@ -70,10 +68,9 @@ ROCBLAS_KERNEL_ILF void rocblas_tpmvn_kernel_calc(bool        is_upper,
                 //cppcheck-suppress duplicateExpression
                 res *= AP[tmpv_calc_lowerat(tid, tid)];
             }
-            size_t index = tid;
-            for(rocblas_int col = 0; col < tid; ++col, index += n - col)
+            for(rocblas_int col = 0; col < tid; ++col)
             {
-                res += AP[index] * x[col * incx];
+                res += AP[tmpv_calc_lowerat(tid, col)] * x[col * incx];
             }
         }
 
@@ -97,29 +94,25 @@ ROCBLAS_KERNEL_ILF void rocblas_tpmvc_kernel_calc(bool        is_upper,
         T res = x[tid * incx];
         if(is_upper)
         {
-            size_t index = tmpv_calc_upperat(tid, tid);
             if(!is_unit_diag)
             {
-                res *= conj(AP[index]);
+                res *= conj(AP[tmpv_calc_upperat(tid, tid)]);
             }
-            index -= tid;
-            for(rocblas_int row = 0; row < tid; ++row, ++index)
+            for(rocblas_int row = 0; row < tid; ++row)
             {
-                res += conj(AP[index]) * x[row * incx];
+                res += conj(AP[tmpv_calc_upperat(row, tid)]) * x[row * incx];
             }
         }
         else
         {
-            size_t index = tmpv_calc_lowerat(tid, tid);
             if(!is_unit_diag)
             {
                 //cppcheck-suppress duplicateExpression
-                res *= conj(AP[index]);
+                res *= conj(AP[tmpv_calc_lowerat(tid, tid)]);
             }
             for(rocblas_int row = tid + 1; row < n; ++row)
             {
-                ++index;
-                res += conj(AP[index]) * x[row * incx];
+                res += conj(AP[tmpv_calc_lowerat(row, tid)]) * x[row * incx];
             }
         }
         workspace[tid] = res;
@@ -145,31 +138,27 @@ ROCBLAS_KERNEL_ILF void rocblas_tpmvt_kernel_calc(bool        is_upper,
         res = x[tid * incx];
         if(is_upper)
         {
-            size_t index = tmpv_calc_upperat(tid, tid);
             if(!is_unit_diag)
             {
-                res *= AP[index];
+                res *= AP[tmpv_calc_upperat(tid, tid)];
             }
 
-            index -= tid;
-            for(row = 0; row < tid; ++row, ++index)
+            for(row = 0; row < tid; ++row)
             {
-                res += AP[index] * x[row * incx];
+                res += AP[tmpv_calc_upperat(row, tid)] * x[row * incx];
             }
         }
         else
         {
-            size_t index = tmpv_calc_lowerat(tid, tid);
             if(!is_unit_diag)
             {
                 //cppcheck-suppress duplicateExpression
-                res *= AP[index];
+                res *= AP[tmpv_calc_lowerat(tid, tid)];
             }
 
             for(row = tid + 1; row < n; ++row)
             {
-                ++index;
-                res += AP[index] * x[row * incx];
+                res += AP[tmpv_calc_lowerat(row, tid)] * x[row * incx];
             }
         }
         workspace[tid] = res;
@@ -196,8 +185,10 @@ rocblas_tpmvn_kernel(bool           is_upper,
 
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
         rocblas_tpmvn_kernel_calc<NB>(is_upper,
                                       is_unit_diag,
                                       n,
@@ -205,7 +196,10 @@ rocblas_tpmvn_kernel(bool           is_upper,
                                       load_ptr_batch(x, batch, shift_x, stride_x),
                                       incx,
                                       load_ptr_batch(workspace, batch, shift_w, stride_w));
+
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 template <rocblas_int NB, typename TConstPtr, typename TPtr, typename TWork>
@@ -228,8 +222,10 @@ rocblas_tpmvt_kernel(bool           is_upper,
 
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
 
         rocblas_tpmvt_kernel_calc<NB>(is_upper,
                                       is_unit_diag,
@@ -238,7 +234,9 @@ rocblas_tpmvt_kernel(bool           is_upper,
                                       load_ptr_batch(x, batch, shift_x, stride_x),
                                       incx,
                                       load_ptr_batch(workspace, batch, shift_w, stride_w));
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 template <rocblas_int NB, typename TConstPtr, typename TPtr, typename TWork>
@@ -261,8 +259,10 @@ rocblas_tpmvc_kernel(bool           is_upper,
 
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
         rocblas_tpmvc_kernel_calc<NB>(is_upper,
                                       is_unit_diag,
                                       n,
@@ -270,7 +270,9 @@ rocblas_tpmvc_kernel(bool           is_upper,
                                       load_ptr_batch(x, batch, shift_x, stride_x),
                                       incx,
                                       load_ptr_batch(workspace, batch, shift_w, stride_w));
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 #undef tmpv_calc_upperat

@@ -1,15 +1,15 @@
 .. meta::
-  :description: rocSOLVER types documentation
-  :keywords: rocSOLVER, ROCm, API, documentation, data types
+  :description: rocSOLVER documentation and API reference library
+  :keywords: rocSOLVER, ROCm, API, documentation
 
 .. _rocsolver-types:
 
 ********************************************************************
-rocSOLVER types
+rocSOLVER Types
 ********************************************************************
 
 rocSOLVER uses most types and enumerations defined in rocBLAS for the general operation and
-dense matrix computations along with some defined in rocSPARSE for sparse matrix computations, such as direct solvers.
+dense matrix computations, and some defined in rocSPARSE for sparse matrix computations (direct solvers).
 For more information, see the :doc:`rocBLAS types <rocblas:reference/datatypes>` and
 :doc:`rocSPARSE types <rocsparse:reference/types>` documentation.
 
@@ -78,7 +78,3 @@ rocsolver_alg_mode
 rocsolver_function
 ------------------------
 .. doxygenenum:: rocsolver_function
-
-rocsolver_norm_type
-------------------------
-.. doxygenenum:: rocsolver_norm_type

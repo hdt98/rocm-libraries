@@ -27,20 +27,19 @@
  *
  ******************************************************************************/
 
-#include <hipcub/thread/thread_load.hpp>
-#include <hipcub/thread/thread_reduce.hpp>
-#include <hipcub/thread/thread_scan.hpp>
-#include <hipcub/thread/thread_search.hpp>
-#include <hipcub/thread/thread_store.hpp>
+#include "hipcub/thread/thread_load.hpp"
+#include "hipcub/thread/thread_store.hpp"
+#include "hipcub/thread/thread_reduce.hpp"
+#include "hipcub/thread/thread_scan.hpp"
+#include "hipcub/thread/thread_search.hpp"
 
 #include "test_utils_bfloat16.hpp"
 #include "test_utils_half.hpp"
 
 #include "common_test_header.hpp"
-
-#include <stdint.h>
+#include <cstdint>
+#include <ostream>
 #include <type_traits>
-#include <vector>
 
 template<class T>
 struct params
@@ -64,9 +63,13 @@ using ThreadOperationTestParams = ::testing::Types<params<int8_t>,
                                                    params<float>,
                                                    params<double>,
                                                    params<test_utils::bfloat16>,
-                                                   params<test_utils::half>,
+                                                   params<test_utils::half>
+#ifdef __HIP_PLATFORM_AMD__
+                                                   ,
                                                    params<test_utils::custom_test_type<uint64_t>>,
-                                                   params<test_utils::custom_test_type<double>>>;
+                                                   params<test_utils::custom_test_type<double>>
+#endif
+                                                   >;
 
 TYPED_TEST_SUITE(HipcubThreadOperationTests, ThreadOperationTestParams);
 
@@ -76,46 +79,43 @@ void thread_load_kernel(Type* volatile const device_input, Type* device_output)
 {
     size_t index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
 
-    if(index % 8 == hipcub::LOAD_DEFAULT)
+    if(index % 8 == 0)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_DEFAULT>(device_input + index);
     }
-    else if(index % 8 == hipcub::LOAD_CA)
+    else if(index % 8 == 1)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_CA>(device_input + index);
     }
-    else if(index % 8 == hipcub::LOAD_CG)
+    else if(index % 8 == 2)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_CG>(device_input + index);
     }
-    else if(index % 8 == hipcub::LOAD_CS)
+    else if(index % 8 == 3)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_CS>(device_input + index);
     }
-    else if(index % 8 == hipcub::LOAD_CV)
+    else if(index % 8 == 4)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_CV>(device_input + index);
     }
-    else if(index % 8 == hipcub::LOAD_LDG)
+    else if(index % 8 == 5)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_LDG>(device_input + index);
     }
-    else if(index % 8 == hipcub::LOAD_VOLATILE)
+    else if(index % 8 == 5)
+    {
+        device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_LDG>(device_input + index);
+    }
+    else if(index % 8 == 6)
     {
         device_output[index] = hipcub::ThreadLoad<hipcub::LOAD_VOLATILE>(device_input + index);
     }
     else // index % 8 == 7
     {
-        // TODO: For compatibility, should also change this API in rocm backend
-#ifdef __HIP_PLATFORM_NVIDIA__
         device_output[index] = hipcub::ThreadLoadVolatilePointer(
             device_input + index,
-            ::cuda::std::integral_constant<bool, std::is_fundamental<Type>::value>{});
-#else
-        device_output[index] = hipcub::ThreadLoadVolatilePointer(
-            device_input + index,
-            std::bool_constant<std::is_fundamental<Type>::value>());
-#endif
+            hipcub::Int2Type<std::is_fundamental<Type>::value>());
     }
 }
 
@@ -167,7 +167,6 @@ TYPED_TEST(HipcubThreadOperationTests, Load)
         );
 
         thread_load_kernel<T><<<grid_size, block_size>>>(device_input, device_output);
-        HIP_CHECK(hipGetLastError());
 
         // Reading results back
         HIP_CHECK(
@@ -196,6 +195,7 @@ void thread_unroll_kernel(Type* volatile const device_input, Type* device_output
     size_t id    = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     size_t index = id * ItemsPerThread;
 
+#ifdef __HIP_PLATFORM_AMD__
     if(id % 2 == 0)
     {
         hipcub::UnrolledThreadLoad<ItemsPerThread, hipcub::LOAD_VOLATILE>(device_input + index,
@@ -205,6 +205,9 @@ void thread_unroll_kernel(Type* volatile const device_input, Type* device_output
     {
         hipcub::UnrolledCopy<ItemsPerThread>(device_input + index, device_output + index);
     }
+#else
+    hipcub::UnrolledCopy<ItemsPerThread>(device_input + index, device_output + index);
+#endif
 }
 
 TYPED_TEST(HipcubThreadOperationTests, Unrolled)
@@ -278,43 +281,35 @@ void thread_store_kernel(Type* const device_input, Type* device_output)
 {
     size_t index = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
 
-    if(index % 7 == hipcub::STORE_DEFAULT)
+    if(index % 7 == 0)
     {
         hipcub::ThreadStore<hipcub::STORE_DEFAULT>(device_output + index, device_input[index]);
     }
-    else if(index % 7 == hipcub::STORE_WB)
+    else if(index % 7 == 1)
     {
         hipcub::ThreadStore<hipcub::STORE_WB>(device_output + index, device_input[index]);
     }
-    else if(index % 7 == hipcub::STORE_CG)
+    else if(index % 7 == 2)
     {
         hipcub::ThreadStore<hipcub::STORE_CG>(device_output + index, device_input[index]);
     }
-    else if(index % 7 == hipcub::STORE_CS)
+    else if(index % 7 == 3)
     {
         hipcub::ThreadStore<hipcub::STORE_CS>(device_output + index, device_input[index]);
     }
-    else if(index % 7 == hipcub::STORE_WT)
+    else if(index % 7 == 4)
     {
         hipcub::ThreadStore<hipcub::STORE_WT>(device_output + index, device_input[index]);
     }
-    else if(index % 7 == hipcub::STORE_VOLATILE)
+    else if(index % 7 == 5)
     {
         hipcub::ThreadStore<hipcub::STORE_VOLATILE>(device_output + index, device_input[index]);
     }
     else // index % 7 == 6
     {
-        // TODO: For compatibility, should also change this API in rocm backend
-#ifdef __HIP_PLATFORM_NVIDIA__
-        hipcub::ThreadStoreVolatilePtr(
-            device_output + index,
-            device_input[index],
-            ::cuda::std::integral_constant<bool, std::is_fundamental<Type>::value>{});
-#else
         hipcub::ThreadStoreVolatilePtr(device_output + index,
                                        device_input[index],
-                                       std::bool_constant<std::is_fundamental<Type>::value>());
-#endif
+                                       hipcub::Int2Type<std::is_fundamental<Type>::value>());
     }
 }
 
@@ -366,7 +361,6 @@ TYPED_TEST(HipcubThreadOperationTests, Store)
         );
 
         thread_store_kernel<T><<<grid_size, block_size>>>(device_input, device_output);
-        HIP_CHECK(hipGetLastError());
 
         // Reading results back
         HIP_CHECK(
@@ -397,13 +391,14 @@ void iterate_thread_kernel(Type* const device_input, Type* device_output)
 
     if(id % 2 == 0)
     {
-        hipcub::detail::iterate_thread_store<0, ItemsPerThread>::Dereference(device_output + index,
-                                                                             device_input + index);
+        hipcub::IterateThreadStore<0, ItemsPerThread>::Dereference(device_output + index,
+                                                                   device_input + index);
     }
     else
     {
-        hipcub::detail::iterate_thread_store<0, ItemsPerThread>::template Store<
-            hipcub::STORE_DEFAULT>(device_output + index, device_input + index);
+        hipcub::IterateThreadStore<0, ItemsPerThread>::template Store<hipcub::STORE_DEFAULT>(
+            device_output + index,
+            device_input + index);
     }
 }
 
@@ -452,7 +447,6 @@ TYPED_TEST(HipcubThreadOperationTests, IterateStore)
             hipMemcpy(device_input, input.data(), input.size() * sizeof(T), hipMemcpyHostToDevice));
 
         iterate_thread_kernel<T, ipt><<<grid_size, block_size>>>(device_input, device_output);
-        HIP_CHECK(hipGetLastError());
 
         // Reading results back
         HIP_CHECK(hipMemcpy(output.data(),
@@ -484,8 +478,7 @@ void thread_reduce_kernel(Type* const device_input, Type* device_output)
 {
     size_t input_index = (hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x) * Length;
     size_t output_index = (hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x) * Length;
-    device_output[output_index]
-        = hipcub::ThreadReduce<Length>(&device_input[input_index], sum_op());
+    device_output[output_index] = hipcub::internal::ThreadReduce<Length>(&device_input[input_index], sum_op());
 }
 
 TYPED_TEST(HipcubThreadOperationTests, Reduction)
@@ -551,7 +544,6 @@ TYPED_TEST(HipcubThreadOperationTests, Reduction)
         );
 
         thread_reduce_kernel<T, length><<<grid_size, block_size>>>(device_input, device_output);
-        HIP_CHECK(hipGetLastError());
 
         // Reading results back
         HIP_CHECK(
@@ -649,7 +641,6 @@ TYPED_TEST(HipcubThreadOperationTests, Scan)
         );
 
         thread_scan_kernel<T, length><<<grid_size, block_size>>>(device_input, device_output);
-        HIP_CHECK(hipGetLastError());
 
         // Reading results back
         HIP_CHECK(
@@ -791,7 +782,6 @@ TYPED_TEST(HipcubThreadOperationTests, Bounds)
         thread_search_kernel<T>
             <<<grid_size, block_size>>>
                 (device_input, device_lower_bound_output, device_upper_bound_output, val, num_items);
-            HIP_CHECK(hipGetLastError());
 
         // Reading results back
         HIP_CHECK(

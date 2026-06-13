@@ -26,16 +26,8 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/preprocessor.h>
 #include <thrust/detail/type_traits.h>
+#include <thrust/detail/preprocessor.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -45,15 +37,18 @@ namespace detail
 template <typename, bool x>
 struct depend_on_instantiation
 {
-  static constexpr bool value = x;
+  THRUST_INLINE_INTEGRAL_MEMBER_CONSTANT bool value = x;
 };
 
-#if THRUST_CPP_DIALECT >= 2017
-#  define THRUST_STATIC_ASSERT(B) static_assert(B)
-#else
-#  define THRUST_STATIC_ASSERT(B) static_assert(B, "static assertion failed")
-#endif
-#define THRUST_STATIC_ASSERT_MSG(B, msg) static_assert(B, msg)
+
+#  if THRUST_CPP_DIALECT >= 2017
+#    define THRUST_STATIC_ASSERT(B)        static_assert(B)
+#  else
+#    define THRUST_STATIC_ASSERT(B)        static_assert(B, "static assertion failed")
+#  endif
+#  define THRUST_STATIC_ASSERT_MSG(B, msg) static_assert(B, msg)
+
+
 
 } // namespace detail
 

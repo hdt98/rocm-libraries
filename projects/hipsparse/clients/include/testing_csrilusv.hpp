@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2019 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,11 +41,10 @@ using namespace hipsparse;
 using namespace hipsparse_test;
 
 template <typename T>
-void testing_csrilusv(Arguments argus)
+hipsparseStatus_t testing_csrilusv(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
     hipsparseIndexBase_t idx_base = argus.baseA;
-    std::string          filename = argus.filename;
 
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
@@ -68,8 +67,14 @@ void testing_csrilusv(Arguments argus)
     int m;
     int n;
     int nnz;
-    CHECK_GENERATE_MATRIX_ERROR(
-        generate_csr_matrix(filename, m, n, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base));
+
+    if(read_bin_matrix(
+           argus.filename.c_str(), m, n, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base)
+       != 0)
+    {
+        fprintf(stderr, "Cannot open [read] %s\n", argus.filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
 
     // Allocate memory on device
     auto dptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * (m + 1)), device_free};
@@ -140,14 +145,14 @@ void testing_csrilusv(Arguments argus)
     CHECK_HIP_ERROR(hipMemcpy(&hposition_2, d_position, sizeof(int), hipMemcpyDeviceToHost));
 
     // Compute host reference csrilu0
-    int position_gold = host_csrilu0(m,
-                                     hcsr_row_ptr.data(),
-                                     hcsr_col_ind.data(),
-                                     hcsr_val.data(),
-                                     idx_base,
-                                     false,
-                                     0.0,
-                                     make_DataType<T>(0.0, 0.0));
+    int position_gold = csrilu0(m,
+                                hcsr_row_ptr.data(),
+                                hcsr_col_ind.data(),
+                                hcsr_val.data(),
+                                idx_base,
+                                false,
+                                0.0,
+                                make_DataType<T>(0.0, 0.0));
 
     // Check zero pivot results
     unit_check_general(1, 1, 1, &position_gold, &hposition_1);
@@ -157,13 +162,13 @@ void testing_csrilusv(Arguments argus)
     if(hposition_1 != -1)
     {
         verify_hipsparse_status_zero_pivot(pivot_status_1, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
     if(hposition_2 != -1)
     {
         verify_hipsparse_status_zero_pivot(pivot_status_2, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
 // Check csrilu0 factorization
@@ -343,13 +348,13 @@ void testing_csrilusv(Arguments argus)
     if(hposition_1 != -1)
     {
         verify_hipsparse_status_zero_pivot(pivot_status_1, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
     if(hposition_2 != -1)
     {
         verify_hipsparse_status_zero_pivot(pivot_status_2, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
     // Copy output from device to CPU
@@ -431,13 +436,13 @@ void testing_csrilusv(Arguments argus)
     if(hposition_1 != -1)
     {
         verify_hipsparse_status_zero_pivot(pivot_status_1, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
     if(hposition_2 != -1)
     {
         verify_hipsparse_status_zero_pivot(pivot_status_2, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
     // Copy output from device to CPU
@@ -451,6 +456,8 @@ void testing_csrilusv(Arguments argus)
     unit_check_near(1, m, 1, hy_gold.data(), hy_1.data());
     unit_check_near(1, m, 1, hy_gold.data(), hy_2.data());
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_CSRILUSOLVE_HPP

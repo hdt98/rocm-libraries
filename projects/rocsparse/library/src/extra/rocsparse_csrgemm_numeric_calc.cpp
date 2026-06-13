@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,8 @@
 
 #include "csrgemm_numeric_device.h"
 
-#include "rocsparse_control.hpp"
-#include "rocsparse_utility.hpp"
+#include "control.h"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -348,8 +348,8 @@ namespace rocsparse
             if(mul)
             {
                 // Allocate additional buffer for C = alpha * A * B
-                RETURN_IF_HIP_ERROR(
-                    rocsparse_hipMallocAsync(&workspace_B, sizeof(I) * nnz_A, handle->stream));
+                RETURN_IF_HIP_ERROR(rocsparse_hipMallocAsync(
+                    (void**)&workspace_B, sizeof(I) * nnz_A, handle->stream));
             }
 
             if(handle->wavefront_size == 32)
@@ -437,7 +437,7 @@ namespace rocsparse
 #undef CSRGEMM_DIM
         }
 
-        return rocsparse_status_success;
+        ROCSPARSE_RETURN_STATUS(success);
     }
 }
 
@@ -824,7 +824,7 @@ rocsparse_status rocsparse::csrgemm_numeric_calc_template(rocsparse_handle    ha
         {
             // Allocate additional buffer for C = alpha * A * B
             RETURN_IF_HIP_ERROR(
-                rocsparse_hipMallocAsync(&workspace_B, sizeof(I) * nnz_A, handle->stream));
+                rocsparse_hipMallocAsync((void**)&workspace_B, sizeof(I) * nnz_A, handle->stream));
         }
 
         if(handle->wavefront_size == 32)
@@ -914,7 +914,7 @@ rocsparse_status rocsparse::csrgemm_numeric_calc_template(rocsparse_handle    ha
 #undef CSRGEMM_NUMERIC_LAUNCHER
     }
 
-    return rocsparse_status_success;
+    ROCSPARSE_RETURN_STATUS(success);
 }
 
 #define INSTANTIATE(I, J, T)                                            \
@@ -954,21 +954,15 @@ INSTANTIATE(int32_t, int32_t, float);
 INSTANTIATE(int32_t, int32_t, double);
 INSTANTIATE(int32_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, int32_t, rocsparse_double_complex);
-INSTANTIATE(int32_t, int32_t, _Float16);
-INSTANTIATE(int32_t, int32_t, rocsparse_bfloat16);
 
 INSTANTIATE(int64_t, int64_t, float);
 INSTANTIATE(int64_t, int64_t, double);
 INSTANTIATE(int64_t, int64_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int64_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, int64_t, _Float16);
-INSTANTIATE(int64_t, int64_t, rocsparse_bfloat16);
 
 INSTANTIATE(int64_t, int32_t, float);
 INSTANTIATE(int64_t, int32_t, double);
 INSTANTIATE(int64_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int32_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, int32_t, _Float16);
-INSTANTIATE(int64_t, int32_t, rocsparse_bfloat16);
 
 #undef INSTANTIATE

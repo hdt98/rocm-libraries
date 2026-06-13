@@ -1,6 +1,6 @@
 .. meta::
-  :description: hipSPARSE sparse extra functions API documentation
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, extra functions
+  :description: hipSPARSE documentation and API reference library
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
 
 .. _hipsparse_extra_functions:
 
@@ -8,7 +8,7 @@
 Sparse extra functions
 ********************************************************************
 
-This module contains all sparse extra routines.
+This module holds all sparse extra routines.
 
 The sparse extra routines describe operations that manipulate sparse matrices.
 
@@ -27,33 +27,6 @@ hipsparseXcsrgeam()
 .. doxygenfunction:: hipsparseCcsrgeam
   :outline:
 .. doxygenfunction:: hipsparseZcsrgeam
-
-.. tabs::
-
-   .. tab:: C++
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgeam_cpp.cpp
-         :language: cpp
-         :start-after: //! [doc example start]
-         :end-before: //! [doc example end]
-         :linenos:
-
-   .. tab:: C
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgeam_c.c
-         :language: c
-         :start-after: /*! [doc example start] */
-         :end-before: /*! [doc example end] */
-         :linenos:
-
-
-   .. tab:: Fortran
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgeam_fortran.f90
-         :language: fortran
-         :start-after: ! [doc example start]
-         :end-before: ! [doc example end]
-         :linenos:
 
 hipsparseXcsrgeam2_bufferSizeExt()
 ==================================
@@ -82,33 +55,6 @@ hipsparseXcsrgeam2()
   :outline:
 .. doxygenfunction:: hipsparseZcsrgeam2
 
-.. tabs::
-
-   .. tab:: C++
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgeam2_cpp.cpp
-         :language: cpp
-         :start-after: //! [doc example start]
-         :end-before: //! [doc example end]
-         :linenos:
-
-   .. tab:: C
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgeam2_c.c
-         :language: c
-         :start-after: /*! [doc example start] */
-         :end-before: /*! [doc example end] */
-         :linenos:
-
-
-   .. tab:: Fortran
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgeam2_fortran.f90
-         :language: fortran
-         :start-after: ! [doc example start]
-         :end-before: ! [doc example end]
-         :linenos:
-
 hipsparseXcsrgemmNnz()
 ======================
 
@@ -125,33 +71,6 @@ hipsparseXcsrgemm()
   :outline:
 .. doxygenfunction:: hipsparseZcsrgemm
 
-.. tabs::
-
-   .. tab:: C++
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgemm_cpp.cpp
-         :language: cpp
-         :start-after: //! [doc example start]
-         :end-before: //! [doc example end]
-         :linenos:
-
-   .. tab:: C
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgemm_c.c
-         :language: c
-         :start-after: /*! [doc example start] */
-         :end-before: /*! [doc example end] */
-         :linenos:
-
-
-   .. tab:: Fortran
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgemm_fortran.f90
-         :language: fortran
-         :start-after: ! [doc example start]
-         :end-before: ! [doc example end]
-         :linenos:
-         
 hipsparseXcsrgemm2_bufferSizeExt()
 ==================================
 
@@ -178,29 +97,3 @@ hipsparseXcsrgemm2()
 .. doxygenfunction:: hipsparseCcsrgemm2
   :outline:
 .. doxygenfunction:: hipsparseZcsrgemm2
-
-.. tabs::
-
-   .. tab:: C++
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgemm2_cpp.cpp
-         :language: cpp
-         :start-after: //! [doc example start]
-         :end-before: //! [doc example end]
-         :linenos:
-
-   .. tab:: C
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgemm2_c.c
-         :language: c
-         :start-after: /*! [doc example start] */
-         :end-before: /*! [doc example end] */
-         :linenos:
-
-   .. tab:: Fortran
-
-      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_hipsparse_csrgemm2_fortran.f90
-         :language: fortran
-         :start-after: ! [doc example start]
-         :end-before: ! [doc example end]
-         :linenos:

@@ -55,3 +55,4 @@ template<typename ForwardIterator, typename UnaryOperation>
 
 
 THRUST_NAMESPACE_END
+

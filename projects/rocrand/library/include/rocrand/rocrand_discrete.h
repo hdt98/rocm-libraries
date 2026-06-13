@@ -21,7 +21,8 @@
 #ifndef ROCRAND_DISCRETE_H_
 #define ROCRAND_DISCRETE_H_
 
-#include "rocrand/rocrand_common.h"
+#include <math.h>
+
 #include "rocrand/rocrand_lfsr113.h"
 #include "rocrand/rocrand_mrg31k3p.h"
 #include "rocrand/rocrand_mrg32k3a.h"
@@ -37,9 +38,7 @@
 #include "rocrand/rocrand_threefry4x64_20.h"
 #include "rocrand/rocrand_xorwow.h"
 
-#include <hip/hip_runtime.h>
-
-#include <math.h>
+#include "rocrand/rocrand_discrete_types.h"
 
 // On certain architectures such as NAVI2 and NAVI3, double arithmetic is significantly slower.
 // In such cases we want to prefer the CDF method over the alias method.

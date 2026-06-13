@@ -23,8 +23,8 @@
  * ************************************************************************ */
 #include "internal/util/rocsparse_check_matrix_coo.h"
 #include "rocsparse_check_matrix_coo.hpp"
-#include "rocsparse_enum_utils.hpp"
-#include "rocsparse_utility.hpp"
+#include "to_string.hpp"
+#include "utility.h"
 
 #include "check_matrix_coo_device.h"
 
@@ -53,7 +53,8 @@ rocsparse_status rocsparse::check_matrix_coo_core(rocsparse_handle       handle,
     rocsparse_data_status* d_data_status = reinterpret_cast<rocsparse_data_status*>(ptr);
     ptr += ((sizeof(rocsparse_data_status) - 1) / 256 + 1) * 256;
 
-    RETURN_IF_HIP_ERROR(hipMemsetAsync(d_data_status, 0, sizeof(int), handle->stream));
+    RETURN_IF_HIP_ERROR(hipMemsetAsync(d_data_status, 0, sizeof(int)));
+    RETURN_IF_HIP_ERROR(hipStreamSynchronize(handle->stream));
 
     RETURN_IF_HIPLAUNCHKERNELGGL_ERROR((rocsparse::check_matrix_coo_device<256>),
                                        dim3((nnz - 1) / 256 + 1),
@@ -81,7 +82,7 @@ rocsparse_status rocsparse::check_matrix_coo_core(rocsparse_handle       handle,
 
     if(*data_status != rocsparse_data_status_success)
     {
-        rocsparse::log_debug(handle, rocsparse::enum_utils::to_string(*data_status));
+        rocsparse::log_debug(handle, rocsparse::to_string(*data_status));
     }
 
     return rocsparse_status_success;
@@ -154,7 +155,7 @@ rocsparse_status rocsparse::check_matrix_coo_checkarg(rocsparse_handle       han
         {
             rocsparse::log_debug(handle,
                                  ("Matrix was specified to be "
-                                  + std::string(rocsparse::enum_utils::to_string(matrix_type))
+                                  + std::string(rocsparse::to_string(matrix_type))
                                   + " but m != n"));
         }
     }

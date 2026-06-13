@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <typename T, typename S>
 void latrd_checkBadArgs(const rocblas_handle handle,
@@ -256,7 +255,7 @@ void latrd_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -272,11 +271,11 @@ void latrd_getPerfData(const rocblas_handle handle,
     {
         latrd_initData<false, true, T>(handle, n, dA, lda, hA);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_latrd(handle, uplo, n, k, dA.data(), lda, dE.data(), dTau.data(), dW.data(), ldw);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <typename T>
@@ -333,7 +332,7 @@ void testing_latrd(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         CHECK_ALLOC_QUERY(rocsolver_latrd(handle, uplo, n, k, (T*)nullptr, lda, (S*)nullptr,
@@ -341,9 +340,13 @@ void testing_latrd(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // memory allocations

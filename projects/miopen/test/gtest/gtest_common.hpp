@@ -34,7 +34,6 @@
 #include <tuple>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "../driver.hpp"
@@ -44,27 +43,17 @@ template <typename T>
 class ScopedEnvironment
 {
 public:
-    explicit ScopedEnvironment(lib_env::LibEnvVar ename, T val) : env_name(ename)
-    {
-        restore = SetValue(val);
-    }
-    explicit ScopedEnvironment(lib_env::LibEnvVar ename) : env_name(ename)
-    {
-        restore = ClearValue();
-    }
+    explicit ScopedEnvironment(lib_env::LibEnvVar ename, T val) : env_name(ename) { SetValue(val); }
 
-    ScopedEnvironment()                                    = delete;
-    ScopedEnvironment(const ScopedEnvironment&)            = delete;
-    ScopedEnvironment(ScopedEnvironment&&)                 = delete;
+    ScopedEnvironment()                         = delete;
+    ScopedEnvironment(const ScopedEnvironment&) = delete;
+    ScopedEnvironment(ScopedEnvironment&&)      = delete;
     ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
-    ScopedEnvironment& operator=(ScopedEnvironment&&)      = delete;
+    ScopedEnvironment& operator=(ScopedEnvironment&&) = delete;
 
     ~ScopedEnvironment()
     {
-        if(!restore)
-            return;
-
-        if(prev_env)
+        if(restore)
         {
             lib_env::update(env_name, prev_val);
         }
@@ -76,39 +65,22 @@ public:
 
 private:
     lib_env::LibEnvVar env_name;
-    std::optional<std::string> prev_env;
     T prev_val;
     bool restore = false;
 
-    bool ClearValue()
+    void SetValue(T value)
     {
-        prev_env = miopen::debug::env::GetEnvVariable(env_name.name);
-
-        if(prev_env)
+        const auto val = miopen::debug::env::GetEnvVariable(env_name.name);
+        if(val)
         {
-            lib_env::clear(env_name);
-        }
-
-        return prev_env.has_value();
-    }
-
-    bool SetValue(T value)
-    {
-        prev_env = miopen::debug::env::GetEnvVariable(env_name.name);
-
-        if(prev_env)
-        {
+            restore  = true;
             prev_val = lib_env::value<T>(env_name);
-
             if(prev_val == value)
             {
-                return false;
+                return;
             }
         }
-
         lib_env::update(env_name, value);
-
-        return true;
     }
 };
 
@@ -118,14 +90,6 @@ inline void tuning_check(const std::string& err)
 {
     // TEST_TUNING - the test should fail if output contains "Error" or "failed".
     EXPECT_FALSE(err.find("Error") != std::string::npos || err.find("failed") != std::string::npos);
-    default_check(err);
-}
-
-inline void compiler_check(const std::string& err)
-{
-    // the test should fail if kernel build failed.
-    EXPECT_FALSE(err.find("Error") != std::string::npos ||
-                 err.find("Code object build failed") != std::string::npos);
     default_check(err);
 }
 
@@ -147,8 +111,7 @@ enum class Gpu : int
     gfx950  = 1 << 5,
     gfx103X = 1 << 6,
     gfx110X = 1 << 7,
-    gfx115X = 1 << 8,
-    gfx120X = 1 << 9,
+    gfx120X = 1 << 8,
     gfxLast = Gpu::gfx120X, // \note Change the value when adding a new device
     All     = -1
 };
@@ -190,8 +153,7 @@ struct disabled
 struct DevDescription
 {
     std::string_view name;
-    unsigned cu_cnt;         // CU for gfx9, WGP for gfx10, 11, ...
-    unsigned wavefront_size; // Default wavefront size
+    unsigned cu_cnt; // CU for gfx9, WGP for gfx10, 11, ...
 
     friend std::ostream& operator<<(std::ostream& os, const DevDescription& dd);
 };
@@ -205,7 +167,7 @@ public:
 
     // Add additional methods here if needed
     const std::string& Name() const override;
-    bool isXnackEnabled() const override;
+    boost::optional<bool> Xnack() const override;
 
 private:
     std::string name;
@@ -220,9 +182,7 @@ public:
     // Add additional methods here if needed
     const miopen::TargetProperties& GetTargetProperties() const override;
     std::size_t GetMaxComputeUnits() const override;
-    std::size_t GetWavefrontWidth() const override;
     std::size_t GetMaxMemoryAllocSize() const override;
-
     bool CooperativeLaunchSupported() const override;
 
 private:
@@ -231,8 +191,6 @@ private:
 };
 
 Gpu GetDevGpuType();
-std::string_view GetBaseDeviceName(std::string_view dev_name);
-Gpu GetGpuType(const std::string& dev_name);
 const std::multimap<Gpu, DevDescription>& GetAllKnownDevices();
 bool IsTestSupportedByDevice(Gpu supported_devs);
 
@@ -328,37 +286,11 @@ MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_DIRECT)
 MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_GEMM)
 MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM)
 MIOPEN_LIB_ENV_VAR(MIOPEN_LOG_LEVEL)
-MIOPEN_LIB_ENV_VAR(MIOPEN_LOG_BUFFER_SIZE)
 MIOPEN_LIB_ENV_VAR(MIOPEN_FIND_ENFORCE)
-MIOPEN_LIB_ENV_VAR(MIOPEN_SKIP_ASAN_DISABLED_TESTS)
-
-// TODO: GTests using test_drive<> disabled until gtest-aware version of test/driver.hpp is built
-#define MIOPEN_ENABLE_TEST_DRIVE_WITH_GTEST 0
-
-#if MIOPEN_ENABLE_TEST_DRIVE_WITH_GTEST
-#define MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE()
-#else
-#define MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE()                                                \
-protected:                                                                                    \
-    void SetUp() override                                                                     \
-    {                                                                                         \
-        GTEST_SKIP() << "-> GTests using test_drive<> disabled until gtest-aware version of " \
-                        "test/driver.hpp is built ";                                          \
-    }
-#endif
-
-// Returns true if the current build has ASAN enabled and the user has NOT
-// opted in to running ASAN-disabled tests via MIOPEN_SKIP_ASAN_DISABLED_TESTS=0.
-inline bool ShouldSkipForAsan()
-{
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-    if(!MIOPEN_SKIP_ASAN_DISABLED_TESTS)
-        return true; // Default to skipping if not set
-    return lib_env::value<bool>(MIOPEN_SKIP_ASAN_DISABLED_TESTS);
-#else
-    return false;
-#endif
-}
+MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V1R1_XDLOPS)
+MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1)
+MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_FWD_V4R1)
+MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1_XDLOPS)
 
 /// \todo Remove workarounds
 namespace wa {

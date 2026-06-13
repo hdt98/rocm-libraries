@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -93,8 +93,7 @@ void Arguments::init()
 
     batch_count = 1;
 
-    scan   = c_scan_value; // member used to set multiple args set with scan_value
-    scan_2 = c_scan_value_2; // 2d scanning support
+    scan = c_scan_value; // default value disables scanning
 
     // 32bit
 
@@ -116,7 +115,7 @@ void Arguments::init()
 
     initialization = rocblas_initialization::hpl;
 
-    atomics_mode = rocblas_atomics_not_allowed;
+    atomics_mode = rocblas_atomics_allowed;
 
     math_mode = rocblas_default_math;
 
@@ -152,7 +151,6 @@ void Arguments::init()
     HMM                 = false;
     graph_test          = false;
     repeatability_check = false;
-    alpha_beta_stride   = false;
 
     use_hipblaslt = -1;
 
@@ -162,11 +160,9 @@ void Arguments::init()
 bool Arguments::validate()
 {
 // c_scan_value must matching value in rocblas_common.yaml definition
-#define SCAN_VALUE_CHECK(arg_)      \
-    if(arg_ == c_scan_value)        \
-        arg_ = scan;                \
-    else if(arg_ == c_scan_value_2) \
-    arg_ = scan_2
+#define SCAN_VALUE_CHECK(arg_) \
+    if(arg_ == c_scan_value)   \
+    arg_ = scan
 
     if(scan != c_scan_value)
     {
@@ -211,15 +207,6 @@ static Arguments& getDefaultArgs()
 }
 static Arguments& gDefArgs = getDefaultArgs();
 
-template <typename T>
-bool member_different(const T& a, T& b)
-{
-    if constexpr(std::is_same_v<T, char[4]> || std::is_same_v<T, char[64]>)
-        return true;
-    else
-        return a != b;
-}
-
 // Function to print Arguments out to stream in YAML format
 rocblas_internal_ostream& operator<<(rocblas_internal_ostream& os, const Arguments& arg)
 {
@@ -230,8 +217,8 @@ rocblas_internal_ostream& operator<<(rocblas_internal_ostream& os, const Argumen
     };
 
     // Print each (name, value) tuple pair if not default value
-#define NAME_VALUE_PAIR(NAME)                     \
-    if(member_different(arg.NAME, gDefArgs.NAME)) \
+#define NAME_VALUE_PAIR(NAME)     \
+    if(arg.NAME != gDefArgs.NAME) \
     print_pair(#NAME, arg.NAME)
 
     // cppcheck-suppress unknownMacro

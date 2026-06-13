@@ -87,7 +87,7 @@ class SYEV_HEEV : public ::TestWithParam<syev_heev_tuple>
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <bool BATCHED, bool STRIDED, typename T>

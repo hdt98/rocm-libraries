@@ -1,9 +1,8 @@
 TestParameters:
-  marks: [skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201, skip-gfx1250] # not supported yet
+  marks: [skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201] # not supported yet
 
 GlobalParameters:
-  SyncsPerBenchmark: 0
-  MinimumRequiredVersion: 5.0.0
+  MinimumRequiredVersion: 4.14.0
   SleepPercent: 50
   NumElementsToValidate: 128
   DataInitTypeBeta: 0
@@ -24,8 +23,8 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       UseBias: 1
       Batched: True
@@ -230,8 +229,8 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       UseBias: 1
       Batched: True
@@ -362,7 +361,7 @@ BenchmarkProblems:
         - GlobalSplitU: [1]
         - GlobalSplitUAlgorithm: [MultipleBuffer]
         - 1LDSBuffer: [-1]
-        - WorkGroupMapping: [1]
+        - WorkGroupMapping: [0]
         - StoreVectorWidth: [-1]
         #- AssertFree0ElementMultiple: [8]
         #- AssertFree1ElementMultiple: [8]

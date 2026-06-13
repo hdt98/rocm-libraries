@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
+ * Modifications Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,7 +34,7 @@
 
 #include <hip/hip_runtime.h>
 
-#include <cub/agent/single_pass_scan_operators.cuh> // IWYU pragma: export
+#include <cub/agent/single_pass_scan_operators.cuh>
 
 BEGIN_HIPCUB_NAMESPACE
 
@@ -53,11 +53,10 @@ using TilePrefixCallbackOp
 
 template<typename ValueT,
          typename KeyT,
-         bool SINGLE_WORD
-         = (cub::detail::is_primitive<ValueT>::value) && (sizeof(ValueT) + sizeof(KeyT) < 16)>
+         bool SINGLE_WORD = (Traits<ValueT>::PRIMITIVE) && (sizeof(ValueT) + sizeof(KeyT) < 16)>
 using ReduceByKeyScanTileState = cub::ReduceByKeyScanTileState<ValueT, KeyT, SINGLE_WORD>;
 
-template<typename T, bool SINGLE_WORD = cub::detail::is_primitive<T>::value>
+template<typename T, bool SINGLE_WORD = Traits<T>::PRIMITIVE>
 struct ScanTileState : cub::ScanTileState<T, SINGLE_WORD>
 {
     HIPCUB_HOST_DEVICE

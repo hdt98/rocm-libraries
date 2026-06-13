@@ -28,7 +28,6 @@
 
 #include "../config.hpp"
 #include "../types/key_value_pair.hpp"
-#include "detail/common.hpp"
 
 /// \addtogroup iteratormodule
 /// @{
@@ -67,7 +66,7 @@ public:
     using reference = const value_type&;
     /// \brief A pointer type of the type iterated over (\p value_type).
     /// It's `const` since arg_index_iterator is a read-only iterator.
-    using pointer = const detail::proxy_pointer<InputValueType>;
+    using pointer = const value_type*;
     /// A type used for identify distance between iterators.
     using difference_type = Difference;
     /// The category of the iterator.
@@ -123,7 +122,7 @@ public:
     ROCPRIM_HOST_DEVICE inline
     pointer operator->() const
     {
-        return pointer(*iterator_);
+        return &(*(*this));
     }
 
     ROCPRIM_HOST_DEVICE inline
@@ -182,31 +181,37 @@ public:
     ROCPRIM_HOST_DEVICE inline
     bool operator<(arg_index_iterator other) const
     {
-        return (iterator_ - other.iterator_) < 0;
+        return (iterator_ - other.iterator_) > 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     bool operator<=(arg_index_iterator other) const
     {
-        return (iterator_ - other.iterator_) <= 0;
+        return (iterator_ - other.iterator_) >= 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     bool operator>(arg_index_iterator other) const
     {
-        return (iterator_ - other.iterator_) > 0;
+        return (iterator_ - other.iterator_) < 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     bool operator>=(arg_index_iterator other) const
     {
-        return (iterator_ - other.iterator_) >= 0;
+        return (iterator_ - other.iterator_) <= 0;
     }
 
     ROCPRIM_HOST_DEVICE inline
     void normalize()
     {
         offset_ = 0;
+    }
+
+    [[deprecated]] friend std::ostream& operator<<(std::ostream& os,
+                                                   const arg_index_iterator& /* iter */)
+    {
+        return os;
     }
     #endif // DOXYGEN_SHOULD_SKIP_THIS
 

@@ -38,6 +38,7 @@
 #include <rocprim/config.hpp>
 #include <rocprim/intrinsics/thread.hpp>
 #include <rocprim/type_traits.hpp>
+#include <rocprim/type_traits_interface.hpp>
 #include <rocprim/types.hpp>
 
 #include <type_traits>
@@ -181,7 +182,7 @@ void test_block_histogram_input_arrays()
         // Reading results back
         output_bin = device_output_bin.load();
 
-        ASSERT_NO_FATAL_FAILURE(test_utils::assert_eq(output_bin, expected_bin));
+        test_utils::assert_eq(output_bin, expected_bin);
     }
 }
 

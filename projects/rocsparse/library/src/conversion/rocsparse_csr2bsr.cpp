@@ -23,10 +23,9 @@
  * ************************************************************************ */
 
 #include "internal/conversion/rocsparse_csr2bsr.h"
-#include "rocsparse_calculate_nnz.hpp"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_csr2bsr.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "csr2bsr_device.h"
 

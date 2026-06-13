@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file reduce.h
  *  \brief Sequential implementation of reduce algorithm.
  */
@@ -21,7 +22,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/function.h>
 #include <thrust/system/detail/sequential/execution_policy.h>
 
@@ -33,22 +33,29 @@ namespace detail
 namespace sequential
 {
 
+
 THRUST_EXEC_CHECK_DISABLE
-template <typename DerivedPolicy, typename InputIterator, typename OutputType, typename BinaryFunction>
-THRUST_HOST_DEVICE OutputType reduce(
-  sequential::execution_policy<DerivedPolicy>&,
-  InputIterator begin,
-  InputIterator end,
-  OutputType init,
-  BinaryFunction binary_op)
+template<typename DerivedPolicy,
+         typename InputIterator, 
+         typename OutputType,
+         typename BinaryFunction>
+THRUST_HOST_DEVICE
+  OutputType reduce(sequential::execution_policy<DerivedPolicy> &,
+                    InputIterator begin,
+                    InputIterator end,
+                    OutputType init,
+                    BinaryFunction binary_op)
 {
   // wrap binary_op
-  thrust::detail::wrapped_function<BinaryFunction, OutputType> wrapped_binary_op{binary_op};
+  thrust::detail::wrapped_function<
+    BinaryFunction,
+    OutputType
+  > wrapped_binary_op(binary_op);
 
   // initialize the result
   OutputType result = init;
 
-  while (begin != end)
+  while(begin != end)
   {
     result = wrapped_binary_op(result, *begin);
     ++begin;
@@ -57,7 +64,9 @@ THRUST_HOST_DEVICE OutputType reduce(
   return result;
 }
 
+
 } // end namespace sequential
 } // end namespace detail
 } // end namespace system
 THRUST_NAMESPACE_END
+

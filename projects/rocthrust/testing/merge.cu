@@ -15,17 +15,16 @@
  *  limitations under the License.
  */
 
-#include <thrust/extrema.h>
-#include <thrust/functional.h>
-#include <thrust/iterator/discard_iterator.h>
-#include <thrust/iterator/retag.h>
+#include <unittest/unittest.h>
 #include <thrust/merge.h>
+#include <thrust/functional.h>
 #include <thrust/sort.h>
 #include <thrust/unique.h>
+#include <thrust/extrema.h>
+#include <thrust/iterator/discard_iterator.h>
+#include <thrust/iterator/retag.h>
 
-#include <unittest/unittest.h>
-
-template <typename Vector>
+template<typename Vector>
 void TestMergeSimple(void)
 {
   const Vector a{0, 2, 4}, b{0, 3, 3, 4};
@@ -39,9 +38,16 @@ void TestMergeSimple(void)
 }
 DECLARE_VECTOR_UNITTEST(TestMergeSimple);
 
-template <typename InputIterator1, typename InputIterator2, typename OutputIterator>
-OutputIterator
-merge(my_system& system, InputIterator1, InputIterator1, InputIterator2, InputIterator2, OutputIterator result)
+
+template<typename InputIterator1,
+         typename InputIterator2,
+         typename OutputIterator>
+OutputIterator merge(my_system &system,
+                     InputIterator1,
+                     InputIterator1,
+                     InputIterator2,
+                     InputIterator2,
+                     OutputIterator result)
 {
   system.validate_dispatch();
   return result;
@@ -52,14 +58,27 @@ void TestMergeDispatchExplicit()
   thrust::device_vector<int> vec(1);
 
   my_system sys(0);
-  thrust::merge(sys, vec.begin(), vec.begin(), vec.begin(), vec.begin(), vec.begin());
+  thrust::merge(sys,
+                vec.begin(),
+                vec.begin(),
+                vec.begin(),
+                vec.begin(),
+                vec.begin());
 
   ASSERT_EQUAL(true, sys.is_valid());
 }
 DECLARE_UNITTEST(TestMergeDispatchExplicit);
 
-template <typename InputIterator1, typename InputIterator2, typename OutputIterator>
-OutputIterator merge(my_tag, InputIterator1, InputIterator1, InputIterator2, InputIterator2, OutputIterator result)
+
+template<typename InputIterator1,
+         typename InputIterator2,
+         typename OutputIterator>
+OutputIterator merge(my_tag,
+                     InputIterator1,
+                     InputIterator1,
+                     InputIterator2,
+                     InputIterator2,
+                     OutputIterator result)
 {
   *result = 13;
   return result;
@@ -79,8 +98,9 @@ void TestMergeDispatchImplicit()
 }
 DECLARE_UNITTEST(TestMergeDispatchImplicit);
 
-template <typename T>
-void TestMerge(size_t n)
+
+template<typename T>
+  void TestMerge(size_t n)
 {
   const size_t sizes[]   = {0, 1, n / 2, n, n + 1, 2 * n};
   const size_t num_sizes = sizeof(sizes) / sizeof(size_t);
@@ -115,8 +135,9 @@ void TestMerge(size_t n)
 }
 DECLARE_VARIABLE_UNITTEST(TestMerge);
 
-template <typename T>
-void TestMergeToDiscardIterator(size_t n)
+
+template<typename T>
+  void TestMergeToDiscardIterator(size_t n)
 {
   thrust::host_vector<T> h_a = unittest::random_integers<T>(n);
   thrust::host_vector<T> h_b = unittest::random_integers<T>(n);
@@ -137,8 +158,9 @@ void TestMergeToDiscardIterator(size_t n)
 }
 DECLARE_VARIABLE_UNITTEST(TestMergeToDiscardIterator);
 
-template <typename T>
-void TestMergeDescending(size_t n)
+
+template<typename T>
+  void TestMergeDescending(size_t n)
 {
   thrust::host_vector<T> h_a = unittest::random_integers<T>(n);
   thrust::host_vector<T> h_b = unittest::random_integers<T>(n);
@@ -162,3 +184,4 @@ void TestMergeDescending(size_t n)
   ASSERT_EQUAL(d_end == d_result.end(), true);
 }
 DECLARE_VARIABLE_UNITTEST(TestMergeDescending);
+

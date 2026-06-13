@@ -20,3 +20,4 @@
 
 // this system inherits logical
 #include <thrust/system/cpp/detail/logical.h>
+

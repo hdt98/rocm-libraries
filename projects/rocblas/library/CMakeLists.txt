@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -62,8 +62,6 @@ function( rocblas_library_settings lib_target_ )
 
   # Do not allow Variable Length Arrays (use unique_ptr instead)
   target_compile_options( ${lib_target_} PRIVATE -Werror=vla )
-  # We widely use extensions and AMD Clang in use
-  target_compile_options( ${lib_target_} PRIVATE -Wno-c++17-extensions )
 
   target_compile_definitions( ${lib_target_} PRIVATE ROCM_USE_FLOAT16 ROCBLAS_INTERNAL_API ROCBLAS_BETA_FEATURES_API )
 
@@ -82,52 +80,8 @@ function( rocblas_library_settings lib_target_ )
     target_link_libraries( ${lib_target_} PRIVATE hip::device )
   else()
     target_link_libraries( ${lib_target_} PRIVATE hip::device -lstdc++fs --rtlib=compiler-rt --unwindlib=libgcc)
-
-    if(BUILD_SHARED_LIBS)
-      set(ROCTX_PATH "" CACHE STRING "Path to the roctx library (directory containing libroctx64.so)")
-
-      find_path(ROCTRACER_INCLUDE_DIR
-        NAMES roctracer/roctx.h
-        HINTS
-        ${ROCTX_PATH}
-        ${ROCTX_PATH}/include
-        /opt/rocm/include
-        ${ROCTX_PATH}/../include
-        DOC "Path to the roctracer include directory containing roctx.h")
-
-      find_library(ROCTX_LIBRARY
-        NAMES roctx64
-        HINTS
-        ${ROCTX_PATH} # User-provided path
-        ${ROCTX_PATH}/lib
-        PATHS
-        /opt/rocm/lib # Default ROCm path
-        NO_DEFAULT_PATH
-      )
-
-      if(ROCTRACER_INCLUDE_DIR AND ROCTX_LIBRARY)
-        message(STATUS "Found roctracer include directory: ${ROCTRACER_INCLUDE_DIR}")
-        message(STATUS "Found roctx library: ${ROCTX_LIBRARY}")
-
-        # Add the include directory
-        target_include_directories(${lib_target_} PRIVATE ${ROCTRACER_INCLUDE_DIR})
-
-        # Link the rocTx lib
-        target_link_libraries(${lib_target_} PRIVATE ${ROCTX_LIBRARY})
-        message(STATUS "ROCTX tracing support enabled for target ${lib_target_}.")
-      else()
-        message(WARNING "ROCTX tracing will be disabled for target ${lib_target_}.")
-
-        if(NOT ROCTRACER_INCLUDE_DIR)
-          message(WARNING "Header 'roctracer/roctx.h' not found.")
-        endif()
-
-        if(NOT ROCTX_LIBRARY)
-          message(WARNING "Library 'roctx64' not found. ROCTX_PATH: '${ROCTX_PATH}' Default PATH: '/opt/rocm/lib'.")
-        endif()
-
-        target_compile_definitions(${lib_target_} PRIVATE "DISABLE_ROCTX")
-      endif()
+    if (BUILD_SHARED_LIBS)
+      target_link_libraries(${lib_target_} PRIVATE -lroctx64)
     endif()
   endif()
     target_link_libraries( ${lib_target_} PRIVATE Threads::Threads )
@@ -138,11 +92,6 @@ function( rocblas_library_settings lib_target_ )
   if( NOT BUILD_SHARED_LIBS )
     # Following Boost conventions of prefixing 'lib' on static built libraries, across all platforms
     set_target_properties( ${lib_target_} PROPERTIES PREFIX "lib" )
-  endif()
-
-  if(BUILD_CODE_COVERAGE)
-    target_compile_options(${lib_target_} PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(${lib_target_} PRIVATE -fprofile-instr-generate)
   endif()
 
   rocm_set_soversion( ${lib_target_} ${rocblas_SOVERSION} )
@@ -158,7 +107,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 # This is incremented when the ABI to the library changes
-set( rocblas_SOVERSION 5.5 )
+set( rocblas_SOVERSION 4.5 )
 
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 
@@ -201,11 +150,10 @@ find_package(Git REQUIRED)
 
 # Get the git hash of the rocBLAS branch
 execute_process(
-          COMMAND "${GIT_EXECUTABLE}" log -1 --format=%H . # was rev-parse HEAD
-          WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} # top rocBLAS directory
+          COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+          WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
           OUTPUT_VARIABLE GIT_HASH_ROCBLAS
-          OUTPUT_STRIP_TRAILING_WHITESPACE
-          )
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 #set the rocBLAS commit hash
 set(rocblas_VERSION_COMMIT_ID "${GIT_HASH_ROCBLAS}")
@@ -227,18 +175,12 @@ endif()
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/include/internal/rocblas-version.h.in"
 	"${PROJECT_BINARY_DIR}/include/rocblas/internal/rocblas-version.h" )
 
-# Configure Windows version resource file
-if(WIN32)
-  string(TIMESTAMP ROCBLAS_COPYRIGHT_YEAR "%Y")
-  configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/version.rc.in"
-    "${PROJECT_BINARY_DIR}/version.rc" @ONLY )
-endif()
-
 
 set( rocblas_headers_public
   include/rocblas.h
   include/internal/rocblas-types.h
   include/internal/rocblas_bfloat16.h
+  include/internal/rocblas_float8.h
   include/internal/rocblas-auxiliary.h
   include/internal/rocblas-functions.h
   include/internal/rocblas-macros.h
@@ -263,6 +205,40 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}
 rocm_install(FILES "include/rocblas_module.f90"
 	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/rocblas/"
 )
+
+if(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY AND NOT WIN32)
+  rocm_wrap_header_dir(
+    ${CMAKE_SOURCE_DIR}/library/include
+    PATTERNS "*.h"
+    GUARDS SYMLINK WRAPPER
+    WRAPPER_LOCATIONS ${CMAKE_INSTALL_INCLUDEDIR}
+  )
+  rocm_wrap_header_file(
+    internal/rocblas-version.h internal/rocblas-export.h internal/rocblas-exported-proto.hpp internal/rocblas_device_malloc.hpp
+    GUARDS SYMLINK WRAPPER
+    WRAPPER_LOCATIONS ${CMAKE_INSTALL_INCLUDEDIR} rocblas/${CMAKE_INSTALL_INCLUDEDIR}
+    ORIGINAL_FILES ${PROJECT_BINARY_DIR}/include/rocblas/internal/rocblas-version.h
+  )
+
+  rocm_install(
+    DIRECTORY
+       "${PROJECT_BINARY_DIR}/rocblas"
+        DESTINATION "." )
+
+    #Create SymLink for Fortran Object Module for backward compatibility
+    rocm_install(
+      CODE "
+        set(PREFIX \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX})
+        set(INPUT_FILE \${PREFIX}/include/rocblas/rocblas_module.f90)
+        set(SYMLINK_LOCATIONS \${PREFIX}/rocblas/include \${PREFIX}/include)
+        foreach(LOCATION IN LISTS SYMLINK_LOCATIONS)
+          file(MAKE_DIRECTORY \${LOCATION})
+          execute_process(COMMAND ln -sfr \${INPUT_FILE} \${LOCATION})
+          message(STATUS \"Created symlink in \${LOCATION} to \${INPUT_FILE}.\")
+        endforeach()
+        "
+    )
+endif()
 
 ############################################################
 # Packaging

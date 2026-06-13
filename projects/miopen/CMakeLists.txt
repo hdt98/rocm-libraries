@@ -1,10 +1,29 @@
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier:  MIT
-
+################################################################################
+#
+# MIT License
+#
+# Copyright (c) 2017 Advanced Micro Devices, Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+################################################################################
 cmake_minimum_required( VERSION 3.15 )
-
-#Add a name for the rocm-libraries location
-set(ROCM_LIBRARIES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../")
 
 if (POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
@@ -52,38 +71,17 @@ if(NOT WIN32)
     set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "")
 endif()
 
-# Default to a ROCm Clang toolchain when the user hasn't supplied one. When we
-# provide the default, treat this as a standalone build and pull third-party
-# deps via FetchContent (see cmake/ThirdParty.cmake).
-#
-# CMake limitation: the toolchain file is processed *before* this CMakeLists.txt
-# is evaluated, so this assignment only takes effect on subsequent `cmake`
-# invocations (the cache value is then picked up). On the very first configure
-# run the toolchain file is not applied. Re-running `cmake` from the same build
-# directory (or passing -DCMAKE_TOOLCHAIN_FILE=... explicitly) activates it.
-if(NOT CMAKE_TOOLCHAIN_FILE AND NOT DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
-    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ClangToolChain.cmake"
-        CACHE FILEPATH "Toolchain file")
-    set(_MIOPEN_STANDALONE_DEFAULT ON)
-else()
-    set(_MIOPEN_STANDALONE_DEFAULT OFF)
-endif()
-option(MIOPEN_STANDALONE_BUILD
-    "Fetch third-party dependencies via FetchContent for a standalone build"
-    ${_MIOPEN_STANDALONE_DEFAULT})
-unset(_MIOPEN_STANDALONE_DEFAULT)
+project ( MIOpen C CXX )
 
-project(MIOpen CXX)
-
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
 find_package(Threads REQUIRED)
+find_package(ROCM 0.7.3 REQUIRED PATHS /opt/rocm)
 
-find_package(ROCmCMakeBuildTools)
 include(ROCMInstallTargets)
 include(ROCMPackageConfigHelpers)
 include(ROCMSetupVersion)
@@ -91,9 +89,6 @@ include(ROCMInstallSymlinks)
 include(ROCMCreatePackage)
 include(CheckCXXCompilerFlag)
 include(ROCMHeaderWrapper)
-
-include(cmake/ClangCheck.cmake)
-include(cmake/CheckPreCommit.cmake)
 
 # Build library with Beta APIs
 add_definitions("-DMIOPEN_BETA_API=1")
@@ -106,12 +101,6 @@ set(MIOPEN_ENABLE_SQLITE_KERN_CACHE On CACHE BOOL "")
 
 # By default build shared libraries
 option(BUILD_SHARED_LIBS "Create shared libraries" ON)
-
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-
-if(MIOPEN_STANDALONE_BUILD)
-    include(cmake/ThirdParty.cmake)
-endif()
 
 if(MIOPEN_ENABLE_SQLITE)
     # MIOpen now depends on SQLite as well
@@ -129,12 +118,9 @@ option( BUILD_DEV "Build for development only" OFF)
 option(MIOPEN_ENABLE_FIN "Enable the fin driver for MIOpen"  OFF)
 option(MIOPEN_ENABLE_FIN_INTERFACE "Enable internal interface for the fin" ${MIOPEN_ENABLE_FIN})
 option(MIOPEN_STRIP_SYMBOLS "Strip symbols in release mode" ON)
-option(MIOPEN_CK_BUILDER_EXPERIMENTAL "Enable experimental support for CK Builder" OFF)
 
-option(MIOPEN_INCBIN "Include kernels using incbin" OFF)
-if(MIOPEN_INCBIN)
-    enable_language(ASM)
-endif()
+option(MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM "Workaround: Use boost::filesystem instead of std::filesystem" OFF)
+message(STATUS "MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM ${MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM}")
 
 # Strip symbols for release
 if(MIOPEN_STRIP_SYMBOLS AND NOT WIN32 AND NOT APPLE)
@@ -142,8 +128,9 @@ if(MIOPEN_STRIP_SYMBOLS AND NOT WIN32 AND NOT APPLE)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
 endif()
 
-rocm_setup_version(VERSION 3.5.2)
+rocm_setup_version(VERSION 3.4.0)
 
+list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 include(TargetFlags)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -163,7 +150,7 @@ else()
     set(MIOPEN_DEFAULT_BACKEND "OpenCL")
 endif()
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM)
     include(CheckCXXLinkerFlag)
     check_cxx_linker_flag(-lstdc++fs HAS_LIB_STD_FILESYSTEM)
 endif()
@@ -188,7 +175,6 @@ set(MIOPEN_BINCACHE_PATH "" CACHE STRING "URL or path containing binary cache fi
 option(MIOPEN_EMBED_BINCACHE "Embed Binary Cache or KDB" Off)
 option(MIOPEN_EMBED_BUILD "Build with the set of embed flags." Off)
 option(MIOPEN_DISABLE_USERDB "Disable user database access" ${MIOPEN_EMBED_BUILD})
-option(MIOPEN_BUILD_CK "Build own CK libs inline with MIOpen build" OFF)
 
 # MIOPEN_USE_HIP_KERNELS is a Workaround for COMgr issues
 if(MIOPEN_EMBED_BUILD)
@@ -277,11 +263,7 @@ option(MIOPEN_USE_COMPOSABLEKERNEL "Enable MIOpen to use composable kernels for 
 if(MIOPEN_BACKEND_OPENCL)
     set(MIOPEN_USE_COMPOSABLEKERNEL OFF)
 endif()
-option(MIOPEN_CK_UNBUNDLE_PER_ARCH
-    "Generate per-architecture CK static archives for MIOpenCKGroupedConv_<arch> shared libraries"
-    OFF)
 message(STATUS "Enable Composable Kernels: ${MIOPEN_USE_COMPOSABLEKERNEL}")
-message(STATUS "Enable per-arch CK unbundling: ${MIOPEN_CK_UNBUNDLE_PER_ARCH}")
 
 set_var_to_condition(MIOPEN_USE_COMGR_DEFAULT (NOT DEFINED MIOPEN_BACKEND_OPENCL) AND (NOT (MIOPEN_BACKEND STREQUAL "HIPNOGPU")))
 option(MIOPEN_USE_COMGR "Use comgr to build kernels instead of offline tools" ${MIOPEN_USE_COMGR_DEFAULT})
@@ -346,95 +328,8 @@ add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:HIP_COMPILER_FLAGS=${HIP_COMPI
 # HIP
 if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIPNOGPU")
     if(MIOPEN_USE_COMPOSABLEKERNEL)
-        if(MIOPEN_BUILD_CK)
-            include(cmake/Dependencies.cmake)
-
-            execute_process (
-                COMMAND bash -c "grep -P -o '^[ \t]*(?<!#)[ \t]*\.\./composablekernel' ${CMAKE_SOURCE_DIR}/requirements.txt"
-                OUTPUT_VARIABLE _match
-            )
-            if(_match)
-                message(STATUS "Found composablekernel in requirements.txt")
-            else()
-                message(FATAL_ERROR "Could not find composablekernel in requirements.txt")
-            endif()
-            miopen_add_dependency(composable_kernel options NO_LOCAL)
-        else()
-            find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
-        endif()
+        find_package(composable_kernel 1.0.0 COMPONENTS device_other_operations device_gemm_operations device_conv_operations device_reduction_operations device_mha_operations)
     endif()
-
-    # Arch name sanitization for CMake target names (used by ck_impl and unbundling)
-    function(miopen_sanitize_arch ARCH OUT_VAR)
-        string(REPLACE ":" "_" _r "${ARCH}")
-        string(REPLACE "+" "p" _r "${_r}")
-        string(REPLACE "-" "_" _r "${_r}")
-        set(${OUT_VAR} "${_r}" PARENT_SCOPE)
-    endfunction()
-
-    # --- Optional per-architecture CK archive unbundling ---
-    if(MIOPEN_USE_COMPOSABLEKERNEL AND MIOPEN_CK_UNBUNDLE_PER_ARCH)
-        # Unbundle the fat libdevice_conv_operations.a into per-arch .a files
-        # so each per-target MIOpen .so can link only the CK code it needs.
-
-        # Find unbundling tools
-        find_program(MIOPEN_OFFLOAD_BUNDLER clang-offload-bundler
-            HINTS ${CMAKE_HIP_COMPILER_TOOLKIT_ROOT}/bin
-                  ${ROCM_PATH}/llvm/bin
-                  /opt/rocm/llvm/bin)
-        find_program(MIOPEN_LLVM_OBJCOPY llvm-objcopy
-            HINTS ${CMAKE_HIP_COMPILER_TOOLKIT_ROOT}/bin
-                  ${ROCM_PATH}/llvm/bin
-                  /opt/rocm/llvm/bin)
-
-        if(NOT MIOPEN_OFFLOAD_BUNDLER OR NOT MIOPEN_LLVM_OBJCOPY)
-            message(FATAL_ERROR "Per-arch CK unbundling requires clang-offload-bundler and llvm-objcopy")
-        endif()
-
-        # Get the fat archive path
-        if(MIOPEN_BUILD_CK)
-            set(CK_FAT_ARCHIVE_TARGET device_conv_operations)
-            set(CK_FAT_ARCHIVE_PATH $<TARGET_FILE:device_conv_operations>)
-        else()
-            set(CK_FAT_ARCHIVE_PATH $<TARGET_FILE:composable_kernel::device_conv_operations>)
-            set(CK_FAT_ARCHIVE_TARGET composable_kernel::device_conv_operations)
-        endif()
-
-        set(CK_PER_ARCH_DIR "${CMAKE_CURRENT_BINARY_DIR}/lib")
-
-        foreach(arch IN LISTS GPU_TARGETS)
-            miopen_sanitize_arch("${arch}" arch_safe)
-            set(target_name "ck_conv_${arch_safe}")
-
-            # Skip if already created (GPU_TARGETS may contain duplicates)
-            if(TARGET ${target_name})
-                continue()
-            endif()
-
-            set(per_arch_lib "${CK_PER_ARCH_DIR}/libdevice_conv_operations_${arch_safe}.a")
-
-            add_custom_command(
-                OUTPUT "${per_arch_lib}"
-                DEPENDS ${CK_FAT_ARCHIVE_TARGET}
-                COMMAND ${CMAKE_COMMAND}
-                    -DFAT_ARCHIVE=${CK_FAT_ARCHIVE_PATH}
-                    -DARCH=${arch}
-                    -DOUTPUT=${per_arch_lib}
-                    -DBUNDLER=${MIOPEN_OFFLOAD_BUNDLER}
-                    -DAR=${CMAKE_AR}
-                    -DLLVM_OBJCOPY=${MIOPEN_LLVM_OBJCOPY}
-                    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/unbundle_archive.cmake
-                COMMENT "Unbundling CK conv operations for ${arch}"
-            )
-
-            add_custom_target(${target_name}_unbundle ALL DEPENDS "${per_arch_lib}")
-            add_library(${target_name} STATIC IMPORTED GLOBAL)
-            set_target_properties(${target_name} PROPERTIES IMPORTED_LOCATION "${per_arch_lib}")
-            add_dependencies(${target_name} ${target_name}_unbundle)
-
-        endforeach()
-    endif() # optional per-arch CK unbundling
-
     if( MIOPEN_BACKEND STREQUAL "HIPNOGPU")
         set(MIOPEN_MODE_NOGPU 1)
     endif()
@@ -472,15 +367,15 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
     set_var_to_condition(MIOPEN_USE_HIPBLASLT_DEFAULT NOT WIN32)
     option(MIOPEN_USE_HIPBLASLT "Use hipBlasLt" ${MIOPEN_USE_HIPBLASLT_DEFAULT})
     if(MIOPEN_USE_HIPBLASLT)
+        find_package(hipblas REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
+        message(STATUS "Build with hipbBLAS ${hipblas_VERSION} ${hipblas_DIR}")
         find_package(hipblaslt REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
-        message(STATUS "Build with hipBLASLt ${hipblaslt_VERSION} ${hipblaslt_DIR}")
-        find_package(hipblas-common REQUIRED PATHS /opt/rocm $ENV{HIP_PATH})
-        message(STATUS "Build with hipBLAS-common ${hipblas-common_VERSION} ${hipBLAS-common_DIR}")
+        message(STATUS "Build with hipbBLASLt ${hipblaslt_VERSION} ${hipblaslt_DIR}")
     else()
         message(STATUS "Build without hipbBLASLt")
     endif()
 else()
-    #CK is only enabled when HIP backend is selected
+    #CK is only enabled when HIP backend is selected   
     set(MIOPEN_USE_COMPOSABLEKERNEL Off)
     if(MIOPEN_USE_HIPRTC)
         message(FATAL_ERROR "HIPRTC cannot be used without HIP backend")
@@ -573,10 +468,24 @@ if(MIOPEN_USE_HIPRTC)
     message(STATUS "Build with hiprtc ${hiprtc_VERSION} ${hiprtc_DIR}")
 endif()
 
+option(Boost_USE_STATIC_LIBS "Use boost static libraries" ON)
+set(BOOST_COMPONENTS filesystem)
+if(MIOPEN_BUILD_DRIVER)
+    # boost core is a header only component that can't be found by find_package
+    # list(APPEND BOOST_COMPONENTS core)
+endif()
+
+# The FindBoost module has been removed since CMake 3.30. Use the Boost 1.83 configuration file instead.
+add_definitions(-DBOOST_ALL_NO_LIB=1)
+find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS} CONFIG)
+
 find_path(HALF_INCLUDE_DIR half/half.hpp)
 message(STATUS "HALF_INCLUDE_DIR: ${HALF_INCLUDE_DIR}")
 
 option( MIOPEN_DEBUG_FIND_DB_CACHING "Use system find-db caching" ON)
+
+# FOR HANDLING ENABLE/DISABLE OPTIONAL BACKWARD COMPATIBILITY for FILE/FOLDER REORG
+option(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY "Build with file/folder reorg with backward compatibility enabled" OFF)
 
 if(WIN32)
     set( DATA_INSTALL_DIR bin )
@@ -625,11 +534,9 @@ set(MIOPEN_SYSTEM_FIND_DB_SUFFIX "${MIOPEN_BACKEND}" CACHE PATH "Filename suffix
 # Enabled via the MIOPEN_ENABLE_LOGGING_ROCTX env var.
 set(MIOPEN_USE_ROCTRACER ON CACHE BOOL "")
 if(NOT WIN32 AND MIOPEN_USE_ROCTRACER)
-    find_path(ROCTRACER_INCLUDE_DIR "roctracer/roctx.h")
     find_library(rocTracer roctx64)
-    if(rocTracer AND ROCTRACER_INCLUDE_DIR)
+    if(rocTracer)
         MESSAGE(STATUS "Build with rocTracer: " ${rocTracer})
-        MESSAGE(STATUS "rocTracer include directory: " ${ROCTRACER_INCLUDE_DIR})
         set(MIOPEN_PACKAGE_REQS "${MIOPEN_PACKAGE_REQS}, roctracer")
     else()
         message(WARNING "rocTracer cannot be found! Build without rocTracer")
@@ -652,10 +559,12 @@ if(MIOPEN_OFFLINE_COMPILER_PATHS_V2)
     set(MIOPEN_PACKAGE_REQS "${MIOPEN_PACKAGE_REQS}, rocm-core")
 endif()
 
-# PR #2785 MIOpenDriver to use rocrand to init buffers
-find_package(rocrand REQUIRED)
-message(STATUS "Build with rocrand ${rocrand_VERSION} ${rocrand_DIR}")
-set(MIOPEN_PACKAGE_REQS "${MIOPEN_PACKAGE_REQS}, rocrand")
+if(MIOPEN_BUILD_DRIVER)
+    # PR #2785 MIOpenDriver to use rocrand to init buffers
+    find_package(rocrand REQUIRED)
+    message(STATUS "Build with rocrand ${rocrand_VERSION} ${rocrand_DIR}")
+    set(MIOPEN_PACKAGE_REQS "${MIOPEN_PACKAGE_REQS}, rocrand")
+endif()
 
 if(MIOPEN_BACKEND STREQUAL "HIP")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "${MIOPEN_PACKAGE_REQS}")
@@ -688,8 +597,6 @@ else()
     set(PERFDB_SUFFIX ".txt")
 endif()
 
-# Per-GPU database artifact installation (PDB's, FDB's KDB's)
-
 function(unpack_db db_bzip2_file)
     get_filename_component(__fname ${db_bzip2_file} NAME_WLE)
     add_custom_command(OUTPUT ${KERNELS_BINARY_DIR}/${__fname}
@@ -713,66 +620,65 @@ function(unpack_db db_bzip2_file)
     set(__fname ${__fname} PARENT_SCOPE)
 endfunction()
 
-function(install_kdb FILE_NAME COMPONENT_NAME)
-    if(EXISTS "${FILE_NAME}")
-        unpack_db(${FILE_NAME})
-        if( NOT ENABLE_ASAN_PACKAGING )
-            if( NOT MIOPEN_TEST_DBSYNC )
-                set(__component_name COMPONENT ${COMPONENT_NAME})
-            endif()
-            rocm_install(FILES ${KERNELS_BINARY_DIR}/${__fname}
-                        DESTINATION ${DATABASE_INSTALL_DIR}
-                        ${__component_name})
-        endif()
-    else()
-        list(APPEND DVC_MISSING_FILES ${FILE_NAME})
+file(GLOB PERF_DB_BZIP_FILES CONFIGURE_DEPENDS "${KERNELS_SOURCE_DIR}/*.db.bz2" "${KERNELS_SOURCE_DIR}/*.db.txt.bz2")
+file(GLOB FIND_DB_BZIP_FILES CONFIGURE_DEPENDS "${KERNELS_SOURCE_DIR}/*.fdb.txt.bz2")
+
+foreach(DB_BZIP_FILE ${PERF_DB_BZIP_FILES} ${FIND_DB_BZIP_FILES})
+    unpack_db(${DB_BZIP_FILE})
+    if(MIOPEN_EMBED_DB STREQUAL "" AND NOT MIOPEN_DISABLE_SYSDB AND NOT ENABLE_ASAN_PACKAGING)
+        install(FILES ${KERNELS_BINARY_DIR}/${__fname}
+                DESTINATION ${DATABASE_INSTALL_DIR})
     endif()
-    set(DVC_MISSING_FILES ${DVC_MISSING_FILES} PARENT_SCOPE)
-endfunction()
-
-function(install_gpu_databases gfx_target)
-    message(STATUS "Adding support for installing ${gfx_target} database artifacts")
-    get_property(_targets GLOBAL PROPERTY MIOPEN_INSTALL_GPU_DATABASES)
-    if("${gfx_target}" IN_LIST _targets)
-        message(FATAL_ERROR "AMDGPU target ${gfx_target} already defined")
-    endif()
-
-    set(KDB_FILENAME "${gfx_target}.kdb.bz2")
-    if(${KDB_FILENAME} IN_LIST KDB_BZ2_FILES)
-        set(KDB_COMPONENT_NAME "${gfx_target}kdb")
-        install_kdb(${KERNELS_SOURCE_DIR}/${KDB_FILENAME} ${KDB_COMPONENT_NAME})
-    endif()
-    set(DVC_MISSING_FILES ${DVC_MISSING_FILES} PARENT_SCOPE)
-
-    file(GLOB PERF_DB_BZIP_FILES CONFIGURE_DEPENDS "${KERNELS_SOURCE_DIR}/${gfx_target}*.db.bz2" "${KERNELS_SOURCE_DIR}/${gfx_target}*.db.txt.bz2")
-    file(GLOB FIND_DB_BZIP_FILES CONFIGURE_DEPENDS "${KERNELS_SOURCE_DIR}/${gfx_target}*.fdb.txt.bz2")
-
-    foreach(DB_BZIP_FILE ${PERF_DB_BZIP_FILES} ${FIND_DB_BZIP_FILES})
-        unpack_db(${DB_BZIP_FILE})
-        if(MIOPEN_EMBED_DB STREQUAL "" AND NOT MIOPEN_DISABLE_SYSDB AND NOT ENABLE_ASAN_PACKAGING)
-            install(FILES ${KERNELS_BINARY_DIR}/${__fname}
-                    DESTINATION ${DATABASE_INSTALL_DIR})
-        endif()
-    endforeach()
-endfunction()
-
-# The default behaviour when no list of AMDGPU targets is supplied should be to
-# install for all targets; this was the behaviour before MIOPEN_INSTALL_GPU_DATABASES
-# was added.
-set(ALL_GPU_DATABASES gfx803 gfx900 gfx906 gfx908 gfx90a gfx942 gfx1030)
-set(MIOPEN_INSTALL_GPU_DATABASES "${ALL_GPU_DATABASES}" CACHE LIST "List of AMDGPU targets for which to install databases")
-
-# This list should be updated when a new KDB file is added to the project
-set(KDB_BZ2_FILES gfx942.kdb.bz2 gfx90a.kdb.bz2 gfx1030.kdb.bz2 gfx908.kdb.bz2 gfx906.kdb.bz2 gfx900.kdb.bz2)
-
-foreach(_gfx_target ${MIOPEN_INSTALL_GPU_DATABASES})
-    install_gpu_databases(${_gfx_target})
 endforeach()
 
-if(DVC_MISSING_FILES)
-    string(REPLACE ";" ", " __dvc_missing_files "${DVC_MISSING_FILES}")
-    message(WARNING "DVC files not pulled down, skipped: ${__dvc_missing_files}")
-    set(MIOPEN_NO_DVC_PULLED TRUE CACHE INTERNAL "")
+# Begin KDB package creation
+
+function(install_kdb FILE_NAME COMPONENT_NAME)
+    if(EXISTS "${FILE_NAME}")
+        file(READ ${FILE_NAME} __contents LIMIT 7)
+        get_filename_component(__fname ${FILE_NAME} NAME_WLE)
+        if(__contents MATCHES "version")
+            list(APPEND LFS_MISSING_FILES ${__fname})
+        else()
+            unpack_db(${FILE_NAME})
+            if( NOT ENABLE_ASAN_PACKAGING )
+                if( NOT MIOPEN_TEST_DBSYNC )
+                    set(__component_name COMPONENT ${COMPONENT_NAME})
+                endif()
+                rocm_install(FILES ${KERNELS_BINARY_DIR}/${__fname}
+                            DESTINATION ${DATABASE_INSTALL_DIR}
+                            ${__component_name})
+            endif()
+        endif()
+    else()
+        list(APPEND LFS_MISSING_FILES ${FILE_NAME})
+    endif()
+    set(LFS_MISSING_FILES ${LFS_MISSING_FILES} PARENT_SCOPE)
+endfunction()
+
+# Both the lists below should be in sync always
+set(KDB_BZ2_FILES gfx942.kdb.bz2 gfx90a.kdb.bz2 gfx1030.kdb.bz2 gfx908.kdb.bz2 gfx906.kdb.bz2 gfx900.kdb.bz2)
+set(COMPONENT_LST gfx942kdb gfx90akdb gfx1030kdb gfx908kdb gfx906kdb gfx900kdb)
+
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
+    foreach(__file __component IN ZIP_LISTS KDB_BZ2_FILES COMPONENT_LST)
+        install_kdb(${KERNELS_SOURCE_DIR}/${__file} ${__component})
+    endforeach()
+else()
+    # TODO: Upgrade minimum CMake to version 3.17+ and use IN ZIP_LISTS instead
+    list(LENGTH KDB_BZ2_FILES __length)
+    math(EXPR __high "${__length} - 1")
+    foreach(__index RANGE ${__high})
+        list(GET COMPONENT_LST ${__index} __component)
+        list(GET KDB_BZ2_FILES ${__index} __file)
+        install_kdb(${KERNELS_SOURCE_DIR}/${__file} ${__component})
+    endforeach()
+endif()
+
+if(LFS_MISSING_FILES)
+    string(REPLACE ";" ", " __lfs_missing_files "${LFS_MISSING_FILES}")
+    message(WARNING "GIT LFS files not pulled down, skipped: ${__lfs_missing_files}")
+    set(MIOPEN_NO_LFS_PULLED TRUE CACHE INTERNAL "")
 else()
     set(CPACK_COMPONENTS_ALL ${COMPONENT_LST})
 endif()
@@ -801,7 +707,6 @@ elseif(MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPNOGPU")
 endif()
 
 include(ClangTidy)
-# TODO: Remove the -nogpulib workaround once clang-tidy version is bumped to clang-tidy-23+
 enable_clang_tidy(
     CHECKS
         ${MIOPEN_TIDY_CHECKS}
@@ -810,8 +715,6 @@ enable_clang_tidy(
         "\.hpp$"
     EXTRA_ARGS
         -DMIOPEN_USE_CLANG_TIDY
-        -D__builtin_elementwise_exp10=__builtin_elementwise_exp
-        -nogpulib
 )
 
 include(CppCheck)
@@ -828,8 +731,8 @@ enable_cppcheck(
         # but cppcheck doesn't understand that as it assumes everything
         # will be compiled together in one binary.
         ctuOneDefinitionRuleViolation:*test/*
-        ctuOneDefinitionRuleViolation:*src/legacy_composable_kernel/composable_kernel/*/*
-        ctuOneDefinitionRuleViolation:*src/legacy_composable_kernel/host/*/*
+        ctuOneDefinitionRuleViolation:*src/composable_kernel/composable_kernel/*/*
+        ctuOneDefinitionRuleViolation:*src/composable_kernel/host/*/*
         # There are many FPs with this, let's disable this (ditto in MIGraphX)
         ctuPointerArith:*test/*
         duplicateCondition
@@ -845,24 +748,18 @@ enable_cppcheck(
         *:*src/sqlite/*.cpp
         *:*.cl
         *:*src/kernels/*.h
-        # These are HIP kernel files compiled at runtime with -D defines; cppcheck
-        # evaluates undefined macros as 0, causing false array-size errors and
-        # division/modulo-by-zero in #if preprocessor conditions.
-        *:*src/kernels/MIOpenConvFwd_LxL_11.cpp
-        *:*src/kernels/MIOpenConvDirBatchNormActivHip.cpp
-        *:*src/kernels/MIOpenConvDirUniHip.cpp
         knownConditionTrueFalse:*src/kernels/static_composable_kernel/*/*
         redundantAssignment:*src/kernels/static_composable_kernel/*/*
         unreadVariable:*src/kernels/static_composable_kernel/*/*
         unusedScopedObject:*src/kernels/static_composable_kernel/*/*
         wrongPrintfScanfArgNum:*src/kernels/static_composable_kernel/*/*
-        knownConditionTrueFalse:*src/legacy_composable_kernel/composable_kernel/*/*
-        identicalConditionAfterEarlyExit:*src/legacy_composable_kernel/composable_kernel/*/*
-        duplicateExpression:*src/legacy_composable_kernel/composable_kernel/*/*
-        multiCondition:*src/legacy_composable_kernel/composable_kernel/*/*
-        unreadVariable:*src/legacy_composable_kernel/composable_kernel/*/*
-        unreadVariable:*src/legacy_composable_kernel/host/*/*
-        unreadVariable:*src/legacy_composable_kernel/external/*/*
+        knownConditionTrueFalse:*src/composable_kernel/composable_kernel/*/*
+        identicalConditionAfterEarlyExit:*src/composable_kernel/composable_kernel/*/*
+        duplicateExpression:*src/composable_kernel/composable_kernel/*/*
+        multiCondition:*src/composable_kernel/composable_kernel/*/*
+        unreadVariable:*src/composable_kernel/composable_kernel/*/*
+        unreadVariable:*src/composable_kernel/host/*/*
+        unreadVariable:*src/composable_kernel/external/*/*
         unmatchedSuppression
         ###################################################################
         # TODO Code Quality WORKAROUND ROCm 5.3 &&

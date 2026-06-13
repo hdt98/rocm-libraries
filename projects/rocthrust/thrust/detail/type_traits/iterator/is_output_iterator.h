@@ -17,36 +17,31 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
 #include <thrust/detail/type_traits.h>
 #include <thrust/detail/type_traits/is_metafunction_defined.h>
-#include <thrust/iterator/detail/any_assign.h>
 #include <thrust/iterator/iterator_traits.h>
-
-#if !_THRUST_HAS_DEVICE_SYSTEM_STD
-#  include <type_traits>
-#endif
+#include <thrust/iterator/detail/any_assign.h>
 
 THRUST_NAMESPACE_BEGIN
 
 namespace detail
 {
 
-template <typename T>
-struct is_void_like
-    : _THRUST_STD::disjunction<_THRUST_STD::is_void<T>, _THRUST_STD::is_same<T, thrust::detail::any_assign>>
+
+template<typename T>
+  struct is_void_like
+    : thrust::detail::or_<
+        thrust::detail::is_void<T>,
+        thrust::detail::is_same<T,thrust::detail::any_assign>
+      >
 {}; // end is_void_like
 
-template <typename T>
-struct lazy_is_void_like : is_void_like<typename T::type>
+
+template<typename T>
+  struct lazy_is_void_like
+    : is_void_like<typename T::type>
 {}; // end lazy_is_void_like
+
 
 // XXX this meta function should first check that T is actually an iterator
 //
@@ -54,13 +49,17 @@ struct lazy_is_void_like : is_void_like<typename T::type>
 //       return false
 //     else
 //       return true
-template <typename T>
-struct is_output_iterator
-    : eval_if<is_metafunction_defined<thrust::iterator_value<T>>::value,
-              lazy_is_void_like<thrust::iterator_value<T>>,
-              thrust::detail::true_type>::type
-{}; // end is_output_iterator
+template<typename T>
+  struct is_output_iterator
+    : eval_if<
+        is_metafunction_defined<thrust::iterator_value<T> >::value,
+        lazy_is_void_like<thrust::iterator_value<T> >,
+        thrust::detail::true_type
+      >::type
+{
+}; // end is_output_iterator
 
-} // namespace detail
+} // end detail
 
 THRUST_NAMESPACE_END
+

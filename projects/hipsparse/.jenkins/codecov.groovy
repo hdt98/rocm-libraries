@@ -50,10 +50,16 @@ def runCI =
 ci: {
     String urlJobName = auxiliary.getTopJobName(env.BUILD_URL)
 
-    def propertyList = [:]
+    def propertyList = ["compute-rocm-dkms-no-npi":[pipelineTriggers([cron('0 1 * * 0')])], 
+                        "compute-rocm-dkms-no-npi-hipclang":[pipelineTriggers([cron('0 1 * * 0')])],
+                        "rocm-docker":[]]
     propertyList = auxiliary.appendPropertyList(propertyList)
 
-    def jobNameList = [:]
+    Set standardJobNameSet = ["compute-rocm-dkms-no-npi", "compute-rocm-dkms-no-npi-hipclang", "rocm-docker"]
+
+    def jobNameList = ["compute-rocm-dkms-no-npi":([ubuntu18:['gfx900'],centos7:['gfx908'],sles15sp1:['gfx900']]), 
+                       "compute-rocm-dkms-no-npi-hipclang":([ubuntu18:['gfx900'],centos7:['gfx908'],sles15sp1:['gfx900']]), 
+                       "rocm-docker":([ubuntu18:['gfx900'],centos7:['gfx908'],sles15sp1:['gfx906']])]
     jobNameList = auxiliary.appendJobNameList(jobNameList)
 
     propertyList.each
@@ -63,20 +69,22 @@ ci: {
             properties(auxiliary.addCommonProperties(property))
     }
 
-    Set seenJobNames = []
     jobNameList.each
     {
         jobName, nodeDetails->
-        seenJobNames.add(jobName)
         if (urlJobName == jobName)
-            runCI(nodeDetails, jobName)
+            stage(jobName) {
+                runCI(nodeDetails, jobName)
+            }
     }
 
-    // Set standardJobNameSet = ["compute-rocm-dkms-no-npi", "compute-rocm-dkms-no-npi-hipclang", "rocm-docker"]
-    // For url job names that are outside of the standardJobNameSet i.e. compute-rocm-dkms-no-npi-1901
-    if(!seenJobNames.contains(urlJobName))
+    // For url job names that are not listed by the jobNameList i.e. compute-rocm-dkms-no-npi-1901
+    if(!jobNameList.keySet().contains(urlJobName))
     {
         properties(auxiliary.addCommonProperties([pipelineTriggers([cron('0 1 * * *')])]))
-        runCI([], urlJobName)
+        stage(urlJobName) {
+            runCI([ubuntu18:['gfx906']], urlJobName)
+        }
     }
 }
+

@@ -30,13 +30,11 @@
 #include <miopen/config.hpp>
 #include <miopen/target_properties.hpp>
 #include <miopen/filesystem.hpp>
-
 #include <string>
-#include <vector>
 
 namespace miopen {
 
-MIOPEN_INTERNALS_EXPORT bool IsCacheDisabled();
+bool IsCacheDisabled();
 
 MIOPEN_INTERNALS_EXPORT fs::path
 GetCacheFile(const std::string& device, const fs::path& name, const std::string& args);
@@ -44,34 +42,26 @@ GetCacheFile(const std::string& device, const fs::path& name, const std::string&
 MIOPEN_INTERNALS_EXPORT fs::path GetCachePath(bool is_system);
 
 #if !MIOPEN_ENABLE_SQLITE_KERN_CACHE
-MIOPEN_INTERNALS_EXPORT fs::path LoadBinary(const TargetProperties& target,
-                                            std::size_t num_cu,
-                                            const fs::path& name,
-                                            const std::string& args);
+fs::path LoadBinary(const TargetProperties& target,
+                    std::size_t num_cu,
+                    const fs::path& name,
+                    const std::string& args);
 
 fs::path SaveBinary(const fs::path& binary_path,
                     const TargetProperties& target,
                     const fs::path& name,
                     const std::string& args);
 #else
-MIOPEN_INTERNALS_EXPORT std::vector<char> LoadBinary(const TargetProperties& target,
-                                                     std::size_t num_cu,
-                                                     const fs::path& name,
-                                                     const std::string& args);
+std::vector<char> LoadBinary(const TargetProperties& target,
+                             std::size_t num_cu,
+                             const fs::path& name,
+                             const std::string& args);
 
-MIOPEN_INTERNALS_EXPORT void SaveBinary(const std::vector<char>& hsaco,
-                                        const TargetProperties& target,
-                                        std::size_t num_cu,
-                                        const fs::path& name,
-                                        const std::string& args);
-#endif
-
-#ifdef MIOPEN_BUILD_TESTING
-namespace testing {
-/// Reset cached paths for testing purposes
-/// This allows tests to reinitialize paths with different mocks/env vars
-MIOPEN_INTERNALS_EXPORT void ResetCachedPaths();
-} // namespace testing
+void SaveBinary(const std::vector<char>& hsaco,
+                const TargetProperties& target,
+                std::size_t num_cu,
+                const fs::path& name,
+                const std::string& args);
 #endif
 
 } // namespace miopen

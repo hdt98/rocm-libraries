@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,11 +24,10 @@
 #include <type_traits>
 
 #include "../config.hpp"
-#include "../detail/various.hpp"
 #include "../functional.hpp"
+#include "../detail/various.hpp"
 
 #include "detail/config/device_transform.hpp"
-#include "detail/config/device_transform_pointer.hpp"
 #include "detail/device_config_helper.hpp"
 
 /// \addtogroup primitivesmodule_deviceconfigs
@@ -39,32 +38,41 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<class Value, bool IsPointer>
-struct transform_config_selector
+template<typename TransformConfig, typename>
+struct wrapped_transform_config
 {
-    using targets    = std::conditional_t<IsPointer, transform_pointer_targets, transform_targets>;
-    using param_type = transform_config_params;
+    static_assert(std::is_base_of<transform_config_tag, typename TransformConfig::tag>::value,
+                  "Config must be a specialization of struct template transform_config");
 
-    param_type params;
-
-    template<class Target>
-    constexpr param_type picker_helper()
+    template<target_arch Arch>
+    struct architecture_config
     {
-        // Different configs if it is a pointer.
-        if constexpr(IsPointer)
-        {
-            return transform_pointer_config_picker<Target, Value>();
-        }
-        else
-        {
-            return transform_config_picker<Target, Value>();
-        }
-    }
-
-    template<class Target>
-    constexpr transform_config_selector(Target) : params(picker_helper<Target>())
-    {}
+        static constexpr transform_config_params params = TransformConfig{};
+    };
 };
+
+template<typename Value>
+struct wrapped_transform_config<default_config, Value>
+{
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr transform_config_params params
+            = default_transform_config<static_cast<unsigned int>(Arch), Value>{};
+    };
+};
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<typename TransformConfig, typename Value>
+template<target_arch Arch>
+constexpr transform_config_params
+    wrapped_transform_config<TransformConfig, Value>::architecture_config<Arch>::params;
+
+template<typename Value>
+template<target_arch Arch>
+constexpr transform_config_params
+    wrapped_transform_config<default_config, Value>::architecture_config<Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } // end namespace detail
 

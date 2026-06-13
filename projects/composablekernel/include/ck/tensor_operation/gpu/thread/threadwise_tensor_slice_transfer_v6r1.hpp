@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -7,8 +7,6 @@
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
 #include "ck/tensor_description/tensor_space_filling_curve.hpp"
-
-#include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer_util.hpp"
 
 namespace ck {
 
@@ -35,18 +33,17 @@ template <typename SrcData,
           index_t ScalarPerVector,
           InMemoryDataOperationEnum DstInMemOp,
           bool SrcResetCoordinateAfterRun,
-          bool DstResetCoordinateAfterRun,
-          typename IndexType = index_t>
+          bool DstResetCoordinateAfterRun>
 struct ThreadwiseTensorSliceTransfer_v6r1
 {
     static constexpr index_t nDim = SliceLengths::Size();
 
     using Index = MultiIndex<nDim>;
 
-    using SFCHelper = ThreadwiseTransferHelper_SFC;
-
     using SrcCoord = decltype(make_tensor_coordinate(SrcDesc{}, Index{}));
-    using DstCoord = decltype(make_tensor_coordinate<IndexType>(DstDesc{}, Index{}));
+    using DstCoord = decltype(make_tensor_coordinate(DstDesc{}, Index{}));
+
+    static constexpr auto I0 = Number<0>{};
 
     __device__ constexpr ThreadwiseTensorSliceTransfer_v6r1(const SrcDesc& src_desc,
                                                             const Index& src_slice_origin,
@@ -54,7 +51,7 @@ struct ThreadwiseTensorSliceTransfer_v6r1
                                                             const Index& dst_slice_origin,
                                                             const ElementwiseOperation& element_op)
         : src_coord_(make_tensor_coordinate(src_desc, src_slice_origin)),
-          dst_coord_(make_tensor_coordinate<IndexType>(dst_desc, dst_slice_origin)),
+          dst_coord_(make_tensor_coordinate(dst_desc, dst_slice_origin)),
           element_op_(element_op)
     {
         static_assert(SliceLengths::At(Number<VectorDim>{}) % ScalarPerVector == 0,
@@ -68,7 +65,7 @@ struct ThreadwiseTensorSliceTransfer_v6r1
 
     __device__ void SetDstSliceOrigin(const DstDesc& dst_desc, const Index& dst_slice_origin_idx)
     {
-        dst_coord_ = make_tensor_coordinate<IndexType>(dst_desc, dst_slice_origin_idx);
+        dst_coord_ = make_tensor_coordinate(dst_desc, dst_slice_origin_idx);
     }
 
     template <typename SrcBuffer, typename DstBuffer>
@@ -119,12 +116,11 @@ struct ThreadwiseTensorSliceTransfer_v6r1
             const bool is_dst_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc, dst_coord_);
 
-            const IndexType st_offset = dst_coord_.GetOffset();
             // copy data from dst_vector into dst_buf
             dst_buf.template Update<DstInMemOp, dst_vector_t>(
-                st_offset,
+                dst_coord_.GetOffset(),
                 is_dst_valid,
-                dst_vector_container.template AsType<dst_vector_t>()[SFCHelper::I0]);
+                dst_vector_container.template AsType<dst_vector_t>()[I0]);
 
             // move coordinate
             if constexpr(idx_1d.value != num_access - 1)
@@ -160,25 +156,52 @@ struct ThreadwiseTensorSliceTransfer_v6r1
         constexpr auto scalar_per_access = generate_sequence(
             detail::lambda_scalar_per_access<VectorDim, ScalarPerVector>{}, Number<nDim>{});
 
-        return SFCHelper::ComputeSFCCoordinateResetStep<SliceLengths,
-                                                        DimAccessOrder,
-                                                        decltype(scalar_per_access)>();
+        using SpaceFillingCurve = SpaceFillingCurve<SliceLengths,
+                                                    DimAccessOrder,
+                                                    remove_cv_t<decltype(scalar_per_access)>>;
+
+        constexpr auto num_access = SpaceFillingCurve::GetNumOfAccess();
+        if constexpr(num_access == 0)
+        {
+            return typename SpaceFillingCurve::Index{};
+        }
+        else
+        {
+            constexpr auto reset_step =
+                SpaceFillingCurve::GetStepBetween(Number<num_access - 1>{}, Number<0>{});
+
+            return reset_step;
+        }
     }
 
     // src_slice_origin_step_idx need to be known at compile-time, for performance reason
     __device__ void MoveSrcSliceWindow(const SrcDesc& src_desc,
                                        const Index& src_slice_origin_step_idx)
     {
-        SFCHelper::MoveSliceWindow<SrcDesc, SrcCoord, SrcResetCoordinateAfterRun>(
-            src_desc, src_coord_, src_slice_origin_step_idx, GetCoordinateResetStep);
+        // if src coord was not reset by RunRead(), then need to adjust the step here
+        const auto adjusted_step_idx = SrcResetCoordinateAfterRun
+                                           ? src_slice_origin_step_idx
+                                           : src_slice_origin_step_idx + GetCoordinateResetStep();
+
+        // is it OK to construct a new step every time?
+        const auto adjusted_step = make_tensor_coordinate_step(src_desc, adjusted_step_idx);
+
+        move_tensor_coordinate(src_desc, src_coord_, adjusted_step);
     }
 
     // dst_slice_origin_step_idx need to be known at compile-time, for performance reason
     __device__ void MoveDstSliceWindow(const DstDesc& dst_desc,
                                        const Index& dst_slice_origin_step_idx)
     {
-        SFCHelper::MoveSliceWindow<DstDesc, DstCoord, DstResetCoordinateAfterRun>(
-            dst_desc, dst_coord_, dst_slice_origin_step_idx, GetCoordinateResetStep);
+        // if dst coord was not reset by Run(), then need to adjust the step here
+        const auto adjusted_step_idx = DstResetCoordinateAfterRun
+                                           ? dst_slice_origin_step_idx
+                                           : dst_slice_origin_step_idx + GetCoordinateResetStep();
+
+        // is it OK to construct a new step every time?
+        const auto adjusted_step = make_tensor_coordinate_step(dst_desc, adjusted_step_idx);
+
+        move_tensor_coordinate(dst_desc, dst_coord_, adjusted_step);
     }
 
     private:

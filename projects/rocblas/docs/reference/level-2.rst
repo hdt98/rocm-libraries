@@ -10,10 +10,7 @@ rocBLAS Level-2 functions
 
 rocBLAS Level-2 functions perform matrix-vector operations. [Level2]_
 
-Level-2 functions support the ILP64 API.  For more information on these ``_64``
-functions, see the :ref:`ILP64 API` section.
-
-.. _rocblas_gbmv:
+Level-2 functions support the ILP64 API.  For more information on these ``_64`` functions, see the :ref:`ILP64 API` section.
 
 rocblas_Xgbmv + batched, strided_batched
 ========================================
@@ -51,8 +48,6 @@ See the :ref:`ILP64 API` section.
 ``gbmv_strided_batched`` functions support the ``_64`` interface.  Parameters ``m``, ``n``, ``kl``, and ``ku`` larger than ``int32_t`` max value are not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_gemv:
-
 rocblas_Xgemv + batched, strided_batched
 ========================================
 
@@ -85,8 +80,6 @@ The ``gemv`` functions support the ``_64`` interface. See the :ref:`ILP64 API` s
 
 ``gemv_batched`` functions have an implementation which uses atomic operations. See the :ref:`Atomic Operations` section for more information.
 The ``gemv_batched`` functions support the ``_64`` interface. See the :ref:`ILP64 API` section.
-The ``gemv_batched`` functions support ``rocblas_set_batch_alpha_stride`` and ``rocblas_set_batch_beta_stride`` when the ``rocblas_handle`` is
-in mode ``rocblas_pointer_mode_device``.
 
 .. doxygenfunction:: rocblas_sgemv_strided_batched
    :outline:
@@ -106,10 +99,6 @@ in mode ``rocblas_pointer_mode_device``.
 
 ``gemv_strided_batched`` functions have an implementation which uses atomic operations. See the :ref:`Atomic Operations` section for more information.
 The ``gemv_strided_batched`` functions support the ``_64`` interface. See the :ref:`ILP64 API` section.
-The ``gemv_strided_batched`` functions support ``rocblas_set_batch_alpha_stride`` and ``rocblas_set_batch_beta_stride`` when the ``rocblas_handle`` is
-in mode ``rocblas_pointer_mode_device``.
-
-.. _rocblas_ger:
 
 rocblas_Xger + batched, strided_batched
 ========================================
@@ -156,8 +145,6 @@ The ``ger``, ``geru``, and ``gerc_batched`` functions support the ``_64`` interf
 
 The ``ger``, ``geru``, and ``gerc_strided_batched`` functions support the ``_64`` interface. See the :ref:`ILP64 API` section.
 
-.. _rocblas_sbmv:
-
 rocblas_Xsbmv + batched, strided_batched
 ========================================
 
@@ -182,8 +169,6 @@ See the :ref:`ILP64 API` section.
 The ``sbmv_strided_batched`` functions support the ``_64`` interface. Parameters ``n`` and ``k`` larger than ``int32_t`` max value are not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_spmv:
-
 rocblas_Xspmv + batched, strided_batched
 ========================================
 
@@ -207,8 +192,6 @@ See the :ref:`ILP64 API` section.
 
 The ``spmv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_spr:
 
 rocblas_Xspr + batched, strided_batched
 ========================================
@@ -246,8 +229,6 @@ See the :ref:`ILP64 API` section.
 The ``spr_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_spr2:
-
 rocblas_Xspr2 + batched, strided_batched
 ========================================
 
@@ -271,8 +252,6 @@ See the :ref:`ILP64 API` section.
 
 The ``spr2_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_symv:
 
 rocblas_Xsymv + batched, strided_batched
 ========================================
@@ -310,8 +289,6 @@ See the :ref:`ILP64 API` section.
 The ``symv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_syr:
-
 rocblas_Xsyr + batched, strided_batched
 ========================================
 
@@ -347,8 +324,6 @@ See the :ref:`ILP64 API` section.
 
 The ``syr_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_syr2:
 
 rocblas_Xsyr2 + batched, strided_batched
 ========================================
@@ -386,8 +361,6 @@ See the :ref:`ILP64 API` section.
 The ``syr2_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_tbmv:
-
 rocblas_Xtbmv + batched, strided_batched
 ========================================
 
@@ -423,8 +396,6 @@ See the :ref:`ILP64 API` section.
 
 The ``tbmv_strided_batched`` functions support the ``_64`` interface. Parameters ``n`` and ``k`` larger than ``int32_t`` max value are not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_tbsv:
 
 rocblas_Xtbsv + batched, strided_batched
 ========================================
@@ -462,8 +433,6 @@ See the :ref:`ILP64 API` section.
 The ``tbsv_strided_batched`` functions support the ``_64`` interface. Parameters ``n`` and ``k`` larger than ``int32_t`` max value are not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_tpmv:
-
 rocblas_Xtpmv + batched, strided_batched
 ========================================
 
@@ -499,8 +468,6 @@ See the :ref:`ILP64 API` section.
 
 The ``tpmv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_tpsv:
 
 rocblas_Xtpsv + batched, strided_batched
 ========================================
@@ -539,8 +506,6 @@ See the :ref:`ILP64 API` section.
 The ``tpsv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_trmv:
-
 rocblas_Xtrmv + batched, strided_batched
 ========================================
 
@@ -577,8 +542,6 @@ See the :ref:`ILP64 API` section.
 
 The ``trmv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_trsv:
 
 rocblas_Xtrsv + batched, strided_batched
 ========================================
@@ -617,8 +580,6 @@ See the :ref:`ILP64 API` section.
 The ``trsv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_hemv:
-
 rocblas_Xhemv + batched, strided_batched
 ========================================
 
@@ -642,8 +603,6 @@ See the :ref:`ILP64 API` section.
 
 The ``hemv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_hbmv:
 
 rocblas_Xhbmv + batched, strided_batched
 ========================================
@@ -669,8 +628,6 @@ See the :ref:`ILP64 API` section.
 The ``hbmv_strided_batched`` functions support the ``_64`` interface. Parameters ``n`` and ``k`` larger than ``int32_t`` max value are not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_hpmv:
-
 rocblas_Xhpmv + batched, strided_batched
 ========================================
 
@@ -694,8 +651,6 @@ See the :ref:`ILP64 API` section.
 
 The ``hpmv_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_her:
 
 rocblas_Xher + batched, strided_batched
 ========================================
@@ -721,8 +676,6 @@ See the :ref:`ILP64 API` section.
 The ``her_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_her2:
-
 rocblas_Xher2 + batched, strided_batched
 ========================================
 
@@ -747,8 +700,6 @@ See the :ref:`ILP64 API` section.
 The ``her2_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
 
-.. _rocblas_hpr:
-
 rocblas_Xhpr + batched, strided_batched
 ========================================
 
@@ -772,8 +723,6 @@ See the :ref:`ILP64 API` section.
 
 The ``hpr_strided_batched`` functions support the ``_64`` interface. Parameter ``n`` larger than ``int32_t`` max value is not currently supported.
 See the :ref:`ILP64 API` section.
-
-.. _rocblas_hpr2:
 
 rocblas_Xhpr2 + batched, strided_batched
 ========================================

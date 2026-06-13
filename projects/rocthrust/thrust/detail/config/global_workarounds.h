@@ -24,3 +24,4 @@
 #    pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #  endif // nvcc & cuda 6+
 #endif // gcc 4.8
+

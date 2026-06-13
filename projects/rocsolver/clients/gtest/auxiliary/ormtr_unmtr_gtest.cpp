@@ -128,7 +128,7 @@ class ORMTR_UNMTR : public ::TestWithParam<ormtr_tuple>
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <typename T>

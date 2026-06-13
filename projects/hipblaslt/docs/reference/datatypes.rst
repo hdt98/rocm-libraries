@@ -16,8 +16,6 @@ hipblasLtPointerMode_t
 ----------------------
 .. doxygenenum:: hipblasLtPointerMode_t
 
-.. _hipblaslthandle_t_desc:
-
 hipblasLtHandle_t
 -------------------
 .. doxygentypedef:: hipblasLtHandle_t
@@ -49,10 +47,6 @@ hipblasLtMatmulPreference_t
 hipblasLtMatmulPreferenceAttributes_t
 -------------------------------------
 .. doxygenenum:: hipblasLtMatmulPreferenceAttributes_t
-
-hipblasLtMatmulMatrixScale_t
---------------------------------
-.. doxygenenum:: hipblasLtMatmulMatrixScale_t
 
 hipblasLtMatrixLayout_t
 -----------------------

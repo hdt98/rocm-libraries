@@ -1,6 +1,6 @@
 .. meta::
-  :description: hipSOLVER LAPACK-like functions API documentation
-  :keywords: hipSOLVER, rocSOLVER, ROCm, API, documentation, lapack-like
+  :description: hipSOLVER documentation and API reference library
+  :keywords: hipSOLVER, rocSOLVER, ROCm, API, documentation
 
 .. _lapacklike:
 
@@ -8,18 +8,19 @@
 hipSOLVER LAPACK-like functions
 ********************************
 
-LAPACK routines solve complex numerical linear algebra problems. These functions are organized
-into the following categories:
+Other Lapack-like routines provided by hipSOLVER are divided into the following subcategories:
 
-* :ref:`likeeigens`: Eigenproblems for symmetric matrices.
-* :ref:`likesvds`: Singular values and related problems for general matrices.
+* :ref:`likeeigens`. Eigenproblems for symmetric matrices.
+* :ref:`likesvds`. Singular values and related problems for general matrices.
+
+
 
 .. _likeeigens:
 
 Symmetric eigensolvers
 ================================
 
-.. contents:: List of LAPACK-like symmetric eigensolvers
+.. contents:: List of Lapack-like symmetric eigensolvers
    :local:
    :backlinks: top
 
@@ -190,7 +191,7 @@ hipsolver<type>hegvj()
 Singular value decomposition
 ================================
 
-.. contents:: List of LAPACK-like SVD-related functions
+.. contents:: List of Lapack-like SVD related functions
    :local:
    :backlinks: top
 

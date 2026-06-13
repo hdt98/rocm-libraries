@@ -102,7 +102,7 @@ struct Problem
 
     bool RegisterTensorDescriptor(miopenTensorArgumentId_t name, TensorDescriptor descriptor)
     {
-        return tensor_descriptors.try_emplace(name, std::move(descriptor)).second;
+        return tensor_descriptors.emplace(std::make_pair(name, std::move(descriptor))).second;
     }
 
     void SetDirection(miopenProblemDirection_t value) { direction = value; }
@@ -210,7 +210,7 @@ private:
     void LogDriverCommand(const BatchnormDescriptor& descriptor) const;
 };
 
-struct FusedProblem
+struct MIOPEN_INTERNALS_EXPORT FusedProblem
 {
     std::vector<Problem> problems;
 
@@ -219,10 +219,11 @@ struct FusedProblem
         // Not implemented, but silently
     }
 
-    [[nodiscard]] MIOPEN_INTERNALS_EXPORT std::vector<Solution> FindSolutions(
-        const Handle& handle, const FindOptions& options, std::size_t max_solutions) const;
+    [[nodiscard]] std::vector<Solution> FindSolutions(const Handle& handle,
+                                                      const FindOptions& options,
+                                                      std::size_t max_solutions) const;
 
-    MIOPEN_INTERNALS_EXPORT void PropagateDescriptors();
+    void PropagateDescriptors();
 
     [[nodiscard]] miopenTensorArgumentId_t GetInputId() const
     {
@@ -237,15 +238,14 @@ struct FusedProblem
     [[nodiscard]] const TensorDescriptor& GetInput() const { return problems.front().GetInput(); }
     [[nodiscard]] const TensorDescriptor& GetOutput() const { return problems.back().GetOutput(); }
 
-    [[nodiscard]] MIOPEN_INTERNALS_EXPORT FusionPlanDescriptor AsFusionPlan() const;
+    [[nodiscard]] FusionPlanDescriptor AsFusionPlan() const;
 
     friend void to_json(nlohmann::json& j, const FusedProblem& problem);
     friend void from_json(const nlohmann::json& j, FusedProblem& problem);
 
-    [[nodiscard]] MIOPEN_INTERNALS_EXPORT fusion::FusionInvokeParams
+    [[nodiscard]] fusion::FusionInvokeParams
     MakeInvokeParams(const std::function<Data_t(miopenTensorArgumentId_t, const TensorDescriptor&)>&
                          buffer_getter,
-                     const std::function<FindOptions::Workspace()>& workspace_getter,
                      OperatorArgs& operator_args) const;
 
 private:

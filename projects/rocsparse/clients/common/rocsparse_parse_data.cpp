@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,8 +33,13 @@
 
 #ifdef WIN32
 
+#ifdef __cpp_lib_filesystem
 #include <filesystem>
 namespace fs = std::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#endif
 
 #else
 #include <sys/wait.h>
@@ -59,12 +64,9 @@ static std::string rocsparse_parse_yaml(const std::string& yaml, const char* inc
 
     fs::path tmpname = fs::temp_directory_path() / uniquestr;
 
-    auto gentestpath = rocsparse_gentestpath();
-    auto datapath    = rocsparse_datapath();
-
+    auto        exepath       = rocsparse_exepath();
     const char* matrices_path = rocsparse_clients_matrices_dir_get(false);
-    auto        cmd           = "python " + gentestpath + "rocsparse_gentest.py ";
-
+    auto        cmd           = exepath + "rocsparse_gentest.py ";
     if(include_path != nullptr)
     {
         cmd += " -I ";
@@ -80,8 +82,7 @@ static std::string rocsparse_parse_yaml(const std::string& yaml, const char* inc
         cmd += " -m ";
         cmd += matrices_path;
     }
-    cmd += " --template " + datapath + "rocsparse_template.yaml -o " + tmpname.string() + " "
-           + yaml;
+    cmd += " --template " + exepath + "rocsparse_template.yaml -o " + tmpname.string() + " " + yaml;
 
     std::cerr << cmd << std::endl;
 
@@ -102,12 +103,9 @@ static std::string rocsparse_parse_yaml(const std::string& yaml, const char* inc
         perror("Cannot open temporary file");
         exit(EXIT_FAILURE);
     }
-
-    auto gentestpath = rocsparse_gentestpath();
-    auto datapath    = rocsparse_datapath();
-
+    auto        exepath       = rocsparse_exepath();
     const char* matrices_path = rocsparse_clients_matrices_dir_get(false);
-    auto        cmd           = gentestpath + "rocsparse_gentest.py ";
+    auto        cmd           = exepath + "rocsparse_gentest.py ";
     if(include_path != nullptr)
     {
         cmd += " -I ";
@@ -124,7 +122,7 @@ static std::string rocsparse_parse_yaml(const std::string& yaml, const char* inc
         cmd += matrices_path;
     }
 
-    cmd += " --template " + datapath + "rocsparse_template.yaml -o " + tmp + " " + yaml;
+    cmd += " --template " + exepath + "rocsparse_template.yaml -o " + tmp + " " + yaml;
 
     std::cerr << cmd << std::endl;
 
@@ -155,70 +153,14 @@ bool rocsparse_parse_data(int& argc, char** argv, const std::string& default_fil
     }
     const char* include_path = nullptr;
     rocsparse_reproducibility_t::instance().config().set_command(command);
-
-    //
-    // Disable debug argument verbose
-    //
-    {
-        static constexpr const char* option_force_debug_arguments_verbose
-            = "--force-debug-arguments-verbose";
-        bool enable_debug_arguments_verbose = false;
-        for(int iarg = 0; iarg < argc; ++iarg)
-        {
-            if(!strcmp(argv[iarg], option_force_debug_arguments_verbose))
-            {
-                enable_debug_arguments_verbose = true;
-                (void)memcpy(argv + iarg, argv + iarg + 1, (argc - iarg) * sizeof(char*));
-                argv[--argc] = nullptr;
-                break;
-            }
-        }
-
-        if(enable_debug_arguments_verbose == false)
-        {
-            rocsparse_disable_debug_arguments_verbose();
-            std::cout << "rocsparse-test: debug arguments verbose is disabled for testings (use "
-                      << option_force_debug_arguments_verbose << " to skip the disabling)"
-                      << std::endl;
-        }
-    }
-
-    //
-    // Disable debug warnings
-    //
-    {
-        static constexpr const char* option_force_warning  = "--force-warnings";
-        bool                         enable_debug_warnings = false;
-        for(int iarg = 0; iarg < argc; ++iarg)
-        {
-            if(!strcmp(argv[iarg], option_force_warning))
-            {
-                enable_debug_warnings = true;
-                (void)memcpy(argv + iarg, argv + iarg + 1, (argc - iarg) * sizeof(char*));
-                argv[--argc] = nullptr;
-                break;
-            }
-        }
-
-        if(enable_debug_warnings == false)
-        {
-            rocsparse_disable_debug_warnings();
-            std::cout << "rocsparse-test: warnings are disabled for testings (use "
-                      << option_force_warning << " to skip the disabling)" << std::endl;
-        }
-    }
-
     for(int i = 1; argv[i]; ++i)
     {
-
         if(!strcmp(argv[i], "-I"))
         {
             include_path = argv[++i];
         }
-        else if(!strcmp(argv[i], "--data") || !strcmp(argv[i], "--yaml"))
+        else if(!strcmp(argv[i], "--data") || (yaml |= !strcmp(argv[i], "--yaml")))
         {
-            yaml = true;
-
             if(filename != "")
             {
                 std::cerr << "Only one of the --yaml and --data options may be specified"
@@ -322,6 +264,48 @@ bool rocsparse_parse_data(int& argc, char** argv, const std::string& default_fil
             }
             rocsparse_reproducibility_t::instance().config().set_info_level(r_level);
         }
+        else if(!strcmp(argv[i], "--rocsparse-clients-enable-test-debug-arguments"))
+        {
+            rocsparse_clients_envariables::set(rocsparse_clients_envariables::TEST_DEBUG_ARGUMENTS,
+                                               true);
+        }
+        else if(!strcmp(argv[i], "--rocsparse-clients-disable-test-debug-arguments"))
+        {
+            rocsparse_clients_envariables::set(rocsparse_clients_envariables::TEST_DEBUG_ARGUMENTS,
+                                               false);
+        }
+        else if(!strcmp(argv[i], "--rocsparse-disable-debug"))
+        {
+            rocsparse_disable_debug();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-enable-debug"))
+        {
+            rocsparse_enable_debug();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-enable-debug-verbose"))
+        {
+            rocsparse_enable_debug_verbose();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-disable-debug-verbose"))
+        {
+            rocsparse_disable_debug_verbose();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-enable-debug-arguments"))
+        {
+            rocsparse_enable_debug_arguments();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-disable-debug-arguments"))
+        {
+            rocsparse_disable_debug_arguments();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-enable-debug-arguments-verbose"))
+        {
+            rocsparse_enable_debug_arguments_verbose();
+        }
+        else if(!strcmp(argv[i], "--rocsparse-disable-debug-arguments-verbose"))
+        {
+            rocsparse_disable_debug_arguments_verbose();
+        }
         else
         {
             *argv_p++ = argv[i];
@@ -345,11 +329,48 @@ bool rocsparse_parse_data(int& argc, char** argv, const std::string& default_fil
                              "json file."
                           << std::endl;
                 std::cout << "" << std::endl;
-                std::cout << "Skipped test output options:" << std::endl;
-                std::cout << "--show-skipped    Force showing skipped test output (overrides "
-                             "default --yaml behavior)"
+                std::cout << "Rocsparse clients debug options:" << std::endl;
+                std::cout << "--rocsparse-clients-enable-test-debug-arguments   enable rocsparse "
+                             "clients test debug arguments, it discards any environment variable "
+                             "definition of ROCSPARSE_CLIENTS_TEST_DEBUG_ARGUMENTS."
                           << std::endl;
-                std::cout << "--hide-skipped    Force hiding skipped test output" << std::endl;
+                std::cout << "--rocsparse-clients-disable-test-debug-arguments  disable rocsparse "
+                             "clients test debug arguments, it discards any environment variable "
+                             "definition of ROCSPARSE_CLIENTS_TEST_DEBUG_ARGUMENTS."
+                          << std::endl;
+                std::cout << "" << std::endl;
+                std::cout << "Rocsparse debug options:" << std::endl;
+                std::cout << "--rocsparse-enable-debug                     enable rocsparse debug, "
+                             "it discards any environment variable definition of ROCSPARSE_DEBUG."
+                          << std::endl;
+                std::cout
+                    << "--rocsparse-disable-debug                    disable rocsparse debug, it "
+                       "discards any environment variable definition of ROCSPARSE_DEBUG."
+                    << std::endl;
+                std::cout << "--rocsparse-enable-debug-verbose             enable rocsparse debug "
+                             "verbose, it discards any environment variable definition of "
+                             "ROCSPARSE_DEBUG_VERBOSE."
+                          << std::endl;
+                std::cout << "--rocsparse-disable-debug-verbose            disable rocsparse debug "
+                             "verbose, it discards any environment variable definition of "
+                             "ROCSPARSE_DEBUG_VERBOSE"
+                          << std::endl;
+                std::cout << "--rocsparse-enable-debug-arguments           enable rocsparse debug "
+                             "arguments, it discards any environment variable definition of "
+                             "ROCSPARSE_DEBUG_ARGUMENTS."
+                          << std::endl;
+                std::cout << "--rocsparse-disable-debug-arguments          disable rocsparse debug "
+                             "arguments, it discards any environment variable definition of "
+                             "ROCSPARSE_DEBUG_ARGUMENTS."
+                          << std::endl;
+                std::cout << "--rocsparse-enable-debug-arguments-verbose   enable rocsparse debug "
+                             "arguments verbose, it discards any environment variable definition "
+                             "of ROCSPARSE_DEBUG_ARGUMENTS_VERBOSE"
+                          << std::endl;
+                std::cout << "--rocsparse-disable-debug-arguments-verbose  disable rocsparse debug "
+                             "arguments verbose, it discards any environment variable definition "
+                             "of ROCSPARSE_DEBUG_ARGUMENTS_VERBOSE"
+                          << std::endl;
                 std::cout << "" << std::endl;
                 std::cout << "" << std::endl;
                 std::cout << "Specific environment variables:" << std::endl;
@@ -393,7 +414,6 @@ bool rocsparse_parse_data(int& argc, char** argv, const std::string& default_fil
     if(filename != "")
     {
         RocSPARSE_TestData::set_filename(filename, yaml);
-        RocSPARSE_TestData::set_yaml_filter_active(yaml);
         return true;
     }
 

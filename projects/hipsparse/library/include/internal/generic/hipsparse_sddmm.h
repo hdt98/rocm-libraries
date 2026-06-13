@@ -29,20 +29,18 @@ extern "C" {
 #endif
 
 /*! \ingroup generic_module
-*  \details
-*  \p hipsparseSDDMM_bufferSize returns the size of the buffer required when computing the sampled
-*  dense-dense matrix multiplication:
+*  \brief Calculate the buffer size required for the sampled dense dense matrix multiplication:
 *  \f[
 *    C := \alpha (op(A) \cdot op(B)) \circ spy(C) + \beta \cdot C,
 *  \f]
-*  where \f$C\f$ is a sparse matrix and \f$A\f$ and \f$B\f$ are dense matrices. This routine is used in
-*  conjunction with \ref hipsparseSDDMM_preprocess() and \ref hipsparseSDDMM().
+*  where \f$C\f$ is a sparse matrix and \f$A\f$ and \f$B\f$ are dense matrices.
 *
-*  \p hipsparseSDDMM_bufferSize supports multiple combinations of data types and compute types. See \ref hipsparseSDDMM
-*  for a complete listing of all the data type and compute type combinations available.
+*  \details
+*  \p hipsparseSDDMM_bufferSize computes the required user allocated buffer size needed when computing the 
+*  sampled dense dense matrix multiplication
 *
 *  @param[in]
-*  handle              handle to the hipSPARSE library context queue.
+*  handle              handle to the hipsparse library context queue.
 *  @param[in]
 *  opA                 dense matrix \f$A\f$ operation type.
 *  @param[in]
@@ -65,10 +63,10 @@ extern "C" {
 *  pBufferSizeInBytes  number of bytes of the temporary storage buffer.
 *
 *  \retval HIPSPARSE_STATUS_SUCCESS the operation completed successfully.
-*  \retval HIPSPARSE_STATUS_NOT_INITIALIZED \p handle is not initialized.
-*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p alpha, \p beta, \p A, \p B, \p C or
-*          \p pBufferSizeInBytes is nullptr, or \p opA or \p opB is invalid.
-*  \retval HIPSPARSE_STATUS_NOT_SUPPORTED \p opA == \ref HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE or
+*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p alpha, \p beta, \p A, \p B, \p D, \p C or 
+*          \p pBufferSizeInBytes pointer is invalid or the value of \p opA or \p opB is incorrect
+*  \retval HIPSPARSE_STATUS_NOT_SUPPORTED
+*          \p opA == \ref HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE or
 *          \p opB == \ref HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE.
 */
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 12000)
@@ -100,20 +98,18 @@ hipsparseStatus_t hipsparseSDDMM_bufferSize(hipsparseHandle_t           handle,
 #endif
 
 /*! \ingroup generic_module
-*  \details
-*  \p hipsparseSDDMM_preprocess performs the required preprocessing used when computing the
-*  sampled dense dense matrix multiplication:
+*  \brief Preprocess step of the sampled dense dense matrix multiplication:
 *  \f[
 *    C := \alpha (op(A) \cdot op(B)) \circ spy(C) + \beta \cdot C,
 *  \f]
-*  where \f$C\f$ is a sparse matrix and \f$A\f$ and \f$B\f$ are dense matrices. This routine is
-*  used in conjunction with \ref hipsparseSDDMM().
+*  where \f$C\f$ is a sparse matrix and \f$A\f$ and \f$B\f$ are dense matrices.
 *
-*  \p hipsparseSDDMM_preprocess supports multiple combinations of data types and compute types. See \ref hipsparseSDDMM
-*  for a complete listing of all the data type and compute type combinations available.
+*  \details
+*  \p hipsparseSDDMM_preprocess performs the required preprocessing used when computing the 
+*  sampled dense dense matrix multiplication
 *
 *  @param[in]
-*  handle       handle to the hipSPARSE library context queue.
+*  handle       handle to the hipsparse library context queue.
 *  @param[in]
 *  opA          dense matrix \f$A\f$ operation type.
 *  @param[in]
@@ -133,11 +129,11 @@ hipsparseStatus_t hipsparseSDDMM_bufferSize(hipsparseHandle_t           handle,
 *  @param[in]
 *  alg          specification of the algorithm to use.
 *  @param[in]
-*  tempBuffer   temporary storage buffer allocated by the user. The size must be greater or equal to
+*  tempBuffer   temporary storage buffer allocated by the user. The size must be greater or equal to 
 *               the size obtained with \ref hipsparseSDDMM_bufferSize.
 *
 *  \retval HIPSPARSE_STATUS_SUCCESS the operation completed successfully.
-*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p alpha, \p beta, \p A, \p B, \p C or
+*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p alpha, \p beta, \p A, \p B, \p C or 
 *          \p tempBuffer pointer is invalid or the value of \p opA or \p opB is incorrect.
 *  \retval HIPSPARSE_STATUS_NOT_SUPPORTED
 *          \p opA == \ref HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE or
@@ -172,12 +168,12 @@ hipsparseStatus_t hipsparseSDDMM_preprocess(hipsparseHandle_t           handle,
 #endif
 
 /*! \ingroup generic_module
-*  \brief Sampled dense-dense matrix multiplication.
+*  \brief Description: Sampled Dense-Dense Matrix Multiplication.
 *
 *  \details
-*  \p hipsparseSDDMM multiplies the scalar \f$\alpha\f$ with the dense
-*  \f$m \times k\f$ matrix \f$op(A)\f$, the dense \f$k \times n\f$ matrix \f$op(B)\f$, filtered by the sparsity pattern
-*  of the \f$m \times n\f$ sparse matrix \f$C\f$, and adds the result to \f$C\f$ scaled by
+*  \ref hipsparseSDDMM multiplies the scalar \f$\alpha\f$ with the dense
+*  \f$m \times k\f$ matrix \f$A\f$, the dense \f$k \times n\f$ matrix \f$B\f$, filtered by the sparsity pattern of the \f$m \times n\f$ sparse matrix \f$C\f$ and
+*  adds the result to \f$C\f$ scaled by
 *  \f$\beta\f$. The final result is stored in the sparse \f$m \times n\f$ matrix \f$C\f$,
 *  such that
 *  \f[
@@ -187,16 +183,16 @@ hipsparseStatus_t hipsparseSDDMM_preprocess(hipsparseHandle_t           handle,
 *  \f[
 *    op(A) = \left\{
 *    \begin{array}{ll}
-*        A,   & \text{if op(A) == HIPSPARSE_OPERATION_NON_TRANSPOSE} \\
-*        A^T, & \text{if op(A) == HIPSPARSE_OPERATION_TRANSPOSE} \\
+*        A,   & \text{if opA == HIPSPARSE_OPERATION_NON_TRANSPOSE} \\
+*        A^T,   & \text{if opA == HIPSPARSE_OPERATION_TRANSPOSE} \\
 *    \end{array}
 *    \right.
 *  \f],
 *  \f[
 *    op(B) = \left\{
 *    \begin{array}{ll}
-*        B,   & \text{if op(B) == HIPSPARSE_OPERATION_NON_TRANSPOSE} \\
-*        B^T, & \text{if op(B) == HIPSPARSE_OPERATION_TRANSPOSE} \\
+*        B,   & \text{if opB == HIPSPARSE_OPERATION_NON_TRANSPOSE} \\
+*        B^T,   & \text{if opB == HIPSPARSE_OPERATION_TRANSPOSE} \\
 *    \end{array}
 *    \right.
 *  \f]
@@ -204,52 +200,13 @@ hipsparseStatus_t hipsparseSDDMM_preprocess(hipsparseHandle_t           handle,
 *  \f[
 *    spy(C)_{ij} = \left\{
 *    \begin{array}{ll}
-*        1, & \text{ if C_{ij} != 0} \\
-*        0, & \text{ otherwise} \\
+*        1 \text{  if i == j},   & 0 \text{  if i != j} \\
 *    \end{array}
 *    \right.
 *  \f]
 *
-*  Computing the above sampled dense-dense multiplication requires three steps to complete. First, the user calls
-*  \ref hipsparseSDDMM_bufferSize to determine the size of the required temporary storage buffer. Next, the user
-*  allocates this buffer and calls \ref hipsparseSDDMM_preprocess, which performs any analysis of the input matrices
-*  that might be required. Finally, the user calls \p hipsparseSDDMM to complete the computation. After all calls to
-*  \p hipsparseSDDMM are complete, the temporary buffer can be deallocated.
-*
-*  \p hipsparseSDDMM supports different algorithms, which can provide better performance for different matrices.
-*
-*  <table>
-*  <caption id="sddmm_algorithms">Algorithms</caption>
-*  <tr><th>CSR/CSC Algorithms
-*  <tr><td>HIPSPARSE_SDDMM_ALG_DEFAULT</td>
-*  </table>
-*
-*  Currently, \p hipsparseSDDMM only supports the uniform precisions indicated in the table below. For the sparse matrix
-*  \f$C\f$, \p hipsparseSDDMM supports the index types \ref HIPSPARSE_INDEX_32I and \ref HIPSPARSE_INDEX_64I.
-*
-*  \par Uniform Precisions:
-*  <table>
-*  <caption id="sddmm_uniform">Uniform Precisions</caption>
-*  <tr><th>A / B / C / compute_type
-*  <tr><td>HIP_R_16F
-*  <tr><td>HIP_R_32F
-*  <tr><td>HIP_R_64F
-*  <tr><td>HIP_C_32F
-*  <tr><td>HIP_C_64F
-*  </table>
-*
-*  \par Mixed Precisions:
-*  <table>
-*  <caption id="sddmm_mixed">Mixed Precisions</caption>
-*  <tr><th>A / B     <th>C         <th>compute_type
-*  <tr><td>HIP_R_16F <td>HIP_R_32F <td>HIP_R_32F
-*  <tr><td>HIP_R_16F <td>HIP_R_16F <td>HIP_R_32F
-*  <tr><td>HIP_R_16BF <td>HIP_R_32F <td>HIP_R_32F
-*  <tr><td>HIP_R_16BF <td>HIP_R_16BF <td>HIP_R_32F
-*  </table>
-*
 *  @param[in]
-*  handle       handle to the hipSPARSE library context queue.
+*  handle       handle to the hipsparse library context queue.
 *  @param[in]
 *  opA          dense matrix \f$A\f$ operation type.
 *  @param[in]
@@ -269,11 +226,11 @@ hipsparseStatus_t hipsparseSDDMM_preprocess(hipsparseHandle_t           handle,
 *  @param[in]
 *  alg          specification of the algorithm to use.
 *  @param[in]
-*  tempBuffer   temporary storage buffer allocated by the user. The size must be greater or equal to
+*  tempBuffer   temporary storage buffer allocated by the user. The size must be greater or equal to 
 *               the size obtained with \ref hipsparseSDDMM_bufferSize.
 *
 *  \retval HIPSPARSE_STATUS_SUCCESS the operation completed successfully.
-*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p alpha, \p beta, \p A, \p B, \p C or
+*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p alpha, \p beta, \p A, \p B, \p C or 
 *          \p tempBuffer pointer is invalid or the value of \p opA or \p opB is incorrect.
 *  \retval HIPSPARSE_STATUS_NOT_SUPPORTED
 *          \p opA == \ref HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE or

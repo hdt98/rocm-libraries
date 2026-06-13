@@ -2389,6 +2389,17 @@ Definitions:
     - { transA: T, transB: N }
     - { transA: T, transB: T }
 
+  - &alpha_beta_range_f8
+    - { alpha:  1, beta:  0 }
+    - { alpha:  0, beta:  1 }
+    - { alpha:  1, beta:  1 }
+
+  - &alpha_beta_range_f8_nan1
+    - { alpha:  1, beta:  0 }
+    # - { alpha:  0, beta:  1 }
+    - { alpha:  1, beta:  1 }
+    # - { alpha:  1, beta:  1 }
+
 
 Tests:
 - name: gemm_bad_arg
@@ -2407,6 +2418,15 @@ Tests:
   transA: N
   transB: N
   api: [ C, FORTRAN, FORTRAN_64 ]
+
+- name: gemm_ex3_bad_arg
+  category: quick
+  function:
+    - gemm_ex3_bad_arg: *float8_float8_float8
+  transA: N
+  transB: N
+  api: [ C, FORTRAN ]
+  gpu_arch: '942'
 
 # Tests confirm no NaN propagation when alpha = 0, 2 and beta = 0. Value .NaN is converted into zero
 - {name: alpha_beta_zero_NaN, category: pre_checkin, precision: *single_precision,
@@ -3502,6 +3522,296 @@ Tests:
     - { M: 3840, N: 4096, K: 4096 }
   pointer_mode_host: false
 
+- name: F8SS_family
+  category: quick
+  function: gemm_ex3
+  precision: *F8SS_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: F8HS_family
+  category: quick
+  function: gemm_ex3
+  precision: *F8HS_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: F8F8S_family
+  category: quick
+  function: gemm_ex3
+  precision: *F8F8S_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  # flags: [0 , stochastic_rounding] TODO
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage1_unit
+  category: quick
+  function: gemm_ex3
+  precision: *stage1_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 224, ldc: 320, ldd: 320 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+  api: [ C, FORTRAN ]
+
+- name: stage1_small
+  category: quick
+  function: gemm_ex3
+  precision: *stage1_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  M: [ 1, 2, 3, 4]
+  N: [ 1, 2, 3, 4]
+  K: [ 1, 2, 3, 4, 16, 32]
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage1_unit_SR
+  category: quick
+  function: gemm_ex3
+  precision: *stage1_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  flags: [stochastic_rounding]
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage1_small_SR
+  category: quick
+  function: gemm_ex3
+  precision: *stage1_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  M: [ 1, 2, 3, 4]
+  N: [ 1, 2, 3, 4]
+  K: [ 1, 2, 3, 4, 16, 32]
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  flags: [stochastic_rounding]
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage1_res
+  category: quick
+  function: gemm_ex3
+  precision: *stage1_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 0
+  res_check: 1
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage1_res_SR
+  category: quick
+  function: gemm_ex3
+  precision: *stage1_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 0
+  res_check: 1
+  norm_check: 0
+  flags: [stochastic_rounding]
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage2_unit
+  category: quick
+  function: gemm_ex3
+  precision: *stage2_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+  api: [ C, FORTRAN ]
+
+- name: stage2_small
+  category: quick
+  function: gemm_ex3
+  precision: *stage2_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  M: [ 1, 2, 3, 4]
+  N: [ 1, 2, 3, 4]
+  K: [ 1, 2, 3, 4, 16, 32]
+  unit_check: 1
+  res_check: 0
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: stage2_res
+  category: quick
+  function: gemm_ex3
+  precision: *stage2_family
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha_beta: *alpha_beta_range_f8
+  matrix_size:
+    - { M:  32, N:  32, K:  32 }
+    - { M:  32, N:  64, K:  96 }
+    - { M:  32, N:  64, K:  96, lda: 128, ldb: 128, ldc: 128, ldd: 128 }
+    - { M:  111, N:  777, K:  111 }
+    - { M:  555, N:  777, K:  111 }
+  unit_check: 0
+  res_check: 1
+  norm_check: 0
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: gemm_f8_resnet50_NN
+  category: nightly
+  function: gemm_ex3
+  a_type: f16_r
+  b_type: f16_r
+  c_type: f16_r
+  d_type: f16_r
+  composite_compute_type: f8_f8_f32
+  transA: N
+  transB: N
+  alpha: 1
+  beta: 0
+  matrix_size:
+    - { M: 1000,    N: 192,         K: 2048,   lda: 1000,   ldb: 2048,  ldc: 1000,  ldd: 1000 }
+    - { M: 1024,    N: 37632,       K: 256,    lda: 1024,   ldb: 256,   ldc: 1024,  ldd: 1024 }
+    - { M: 128,     N: 150528,      K: 512,    lda: 128,    ldb: 512,   ldc: 128,   ldd: 128 }
+    - { M: 128,     N: 602112,      K: 256,    lda: 128,    ldb: 256,   ldc: 128,   ldd: 128 }
+    - { M: 2048,    N: 9408,        K: 512,    lda: 2048,   ldb: 512,   ldc: 2048,  ldd: 2048 }
+    - { M: 256,     N: 150528,      K: 512,    lda: 256,    ldb: 512,   ldc: 256,   ldd: 2048 }
+    - { M: 256,     N: 37632,       K: 1024,   lda: 256,    ldb: 1024,  ldc: 256,   ldd: 256 }
+    - { M: 256,     N: 602112,      K: 64,     lda: 256,    ldb: 64,    ldc: 256,   ldd: 256 }
+    - { M: 512,     N: 150528,      K: 128,    lda: 512,    ldb: 128,   ldc: 512,   ldd: 512 }
+    - { M: 512,     N: 37632,       K: 1024,   lda: 512,    ldb: 1024,  ldc: 512,   ldd: 512 }
+    - { M: 512,     N: 9408,        K: 2048,   lda: 512,    ldb: 2048,  ldc: 512,   ldd: 512 }
+    - { M: 64,      N: 602112,      K: 256,    lda: 64,     ldb: 256,   ldc: 64,    ldd: 64 }
+    - { M: 64,      N: 602112,      K: 64,     lda: 64,     ldb: 64,    ldc: 64,    ldd: 64 }
+  unit_check: 0
+  norm_check: 0
+  res_check: 1
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
+- name: gemm_f8_resnet50_NT
+  category: nightly
+  function: gemm_ex3
+  a_type: f16_r
+  b_type: f16_r
+  c_type: f16_r
+  d_type: f16_r
+  composite_compute_type: bf8_f8_f32
+  transA: N
+  transB: T
+  alpha: 1
+  beta: 0
+  matrix_size:
+    - { M : 1000,  N : 2048, K : 192,  lda : 1000, ldb : 2048, ldc : 1000, ldd : 1000 }
+    - { M : 1024,  N : 256,  K : 37632, lda : 1024, ldb : 256, ldc : 1024, ldd:  1024 }
+    - { M : 128,   N : 256,  K : 602112, lda : 128, ldb : 256, ldc : 128, ldd : 128 }
+    - { M : 128,   N : 512,  K : 150528, lda : 128,  ldb : 512, ldc : 128, ldd : 128 }
+    - { M : 2048,  N : 512,  K : 9408, lda : 2048, ldb : 512, ldc : 2048, ldd : 2048 }
+    - { M : 256,   N : 1024, K : 37632, lda : 256, ldb : 1024, ldc : 256, ldd: 256 }
+    - { M : 256,   N : 512,  K : 150528, lda : 256, ldb : 512, ldc :  256, ldd: 256 }
+    - { M : 256,   N : 64,   K : 602112, lda : 256, ldb : 64, ldc:  256, ldd: 256 }
+    - { M : 512,   N : 1024, K : 37632, lda : 512, ldb : 1024, ldc : 512, ldd : 512 }
+    - { M : 512,   N : 128,  K : 150528, lda : 512, ldb : 128, ldc : 512, ldd : 512 }
+    - { M : 512,   N : 2048, K : 9408, lda : 512, ldb : 2048, ldc : 512, ldd : 512 }
+    - { M : 64,    N : 256,  K : 602112, lda : 64, ldb : 256, ldc : 64, ldd: 64 }
+    - { M : 64,    N :  64,  K : 602112, lda : 64, ldb: 64, ldc : 64, ldd: 64 }
+  unit_check: 0
+  norm_check: 0
+  res_check: 1
+  initialization: rand_int_zero_one
+  gpu_arch: '942'
+
 - name: gemm_zerok
   category: quick
   function:
@@ -3569,10 +3879,10 @@ Tests:
   transB: [ N, T ]
   alpha: 2
   beta: 4
-  gpu_arch: ['90a','942','950']
+  gpu_arch: ['90a','942']
   os_flags: LINUX
 
-- name: gemm_ILP64
+- name: gemm_64_API
   category: pre_checkin
   function:
     - gemm: *single_precision
@@ -3588,7 +3898,7 @@ Tests:
   os_flags: LINUX
 
 - name: gemm_PyTorch_offset_overflow
-  category: nightly
+  category: known_bugs
   function:
     - gemm: *single_precision
   matrix_size:
@@ -3599,7 +3909,25 @@ Tests:
   alpha: 1
   beta: 1
 
-- name: gemm_ILP64
+- name: gemm_ex_64_API
+  category: pre_checkin
+  function:
+    - gemm_batched_ex: *nonint8_real_precisions
+    - gemm_batched_ex: *int8_precision
+    - gemm_strided_batched_ex: *nonint8_real_precisions
+    - gemm_strided_batched_ex: *int8_precision
+  matrix_size:
+    - { M: 64, N: 64, K: 64, lda: 64, ldb: 64, ldc: 64, batch_count: *c_grid_yz_require_passes }
+  pointer_mode_device: false
+  transA: [ N, T ]
+  transB: [ N, T ]
+  alpha: 1
+  beta: 1
+  api: [ C_64 ]
+  stride_scale: [ 1 ]
+  os_flags: LINUX
+
+- name: gemm_64_API
   category: stress
   function:
     - gemm: *half_precision
@@ -3620,7 +3948,7 @@ Tests:
   api: [ C_64 ]
   os_flags: LINUX
 
-- name: gemm_ex_ldd_ILP64
+- name: gemm_ex_ldd_64_API
   category: stress
   function:
     - gemm_ex: *hpa_half_precision
@@ -3685,22 +4013,6 @@ Tests:
   use_hipblaslt: 0
   os_flags: LINUX
 
-- name: gemm_ex_h2f #SWDEV-560127
-  category: pre_checkin
-  function: gemm_ex
-  matrix_size:
-    - { M:     1, N:     1, K:    32, lda:    32, ldb:     1, ldc:     1, ldd:     1 }
-    - { M:     1, N:     1, K:    64, lda:    64, ldb:     1, ldc:     1, ldd:     1 }
-  precision:
-    - *hpa_half_in_single_out_precision
-    - *hpa_bf16_in_single_out_precision
-  transA_transB:
-    - { transA: N, transB: N }
-    - { transA: T, transB: T }
-    - { transA: T, transB: N }
-  alpha_beta: *alpha_beta_range
-  initialization: hpl
-  os_flags: LINUX
 
 # Commented out as the category known_bug has currently no good purpose
 # This is category known_bug until the sizes are supported by Tensile,
@@ -3718,17 +4030,4 @@ Tests:
 #   beta:  [ 0.0, 0.5, 1.0 ]
 #   api: [ C, FORTRAN ]
 
-# ALMIOPEN-1609: Test k-chunking workaround for 32-bit element offset overflow.
-# With K=508 and lda=8454144, this requires 4 chunks (safe_k=127).
-# K=762 (6 chunks) fails exact BF16 comparison due to intermediate bf16 rounding.
-- name: gemm_ILP64_k_chunking
-  category: stress
-  function:
-    - gemm_ex: *hpa_bf16_precision
-  arguments:
-    - { transA: N, transB: N, M: 8454144, N: 3, K: 508, lda: 8454144, ldb: 508, ldc: 8454144, ldd: 8454144 }
-  alpha: 1
-  beta: 0
-  api: [ C_64 ]
-  os_flags: LINUX
 ...

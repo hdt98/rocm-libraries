@@ -29,10 +29,10 @@ extern "C" {
 #endif
 
 /*! \ingroup generic_module
-*  \brief Apply the Givens rotation to a dense and a sparse vector.
+*  \brief Apply Givens rotation to a dense and a sparse vector.
 *
 *  \details
-*  \p hipsparseRot applies the Givens rotation matrix \f$G\f$ to the sparse vector
+*  \ref hipsparseRot applies the Givens rotation matrix \f$G\f$ to the sparse vector
 *  \f$x\f$ and the dense vector \f$y\f$, where
 *  \f[
 *    G = \begin{pmatrix} c & s \\ -s & c \end{pmatrix}
@@ -41,46 +41,102 @@ extern "C" {
 *  \code{.c}
 *      for(i = 0; i < nnz; ++i)
 *      {
-*          x_tmp = x_val[i];
-*          y_tmp = y[x_ind[i]];
+*          x_tmp = xVal[i];
+*          y_tmp = y[xInd[i]];
 *
-*          x_val[i]    = c * x_tmp + s * y_tmp;
-*          y[x_ind[i]] = c * y_tmp - s * x_tmp;
+*          xVal[i]    = c * x_tmp + s * y_tmp;
+*          y[xInd[i]] = c * y_tmp - s * x_tmp;
 *      }
 *  \endcode
 *
-*  \p hipsparseRot supports the following uniform precision data types for the sparse and dense vectors \f$x\f$ and
-*  \f$y\f$ and compute types for the scalars \f$c\f$ and \f$s\f$.
-*
-*  \par Uniform Precisions:
-*  <table>
-*  <caption id="rot_uniform">Uniform Precisions</caption>
-*  <tr><th>X / Y / compute_type
-*  <tr><td>HIP_R_32F
-*  <tr><td>HIP_R_64F
-*  <tr><td>HIP_C_32F
-*  <tr><td>HIP_C_64F
-*  </table>
-*
-*  \deprecated
-*  This function is deprecated when using the CUDA backend (CUDA 12.0+) and will be 
-*  removed in CUDA 13.0. This deprecation does not apply to the ROCm backend.
-*
 *  @param[in]
-*  handle      handle to the hipSPARSE library context queue.
+*  handle      handle to the hipsparse library context queue.
 *  @param[in]
-*  c_coeff     pointer to the cosine element of \f$G\f$, which can be on the host or device.
+*  c_coeff     pointer to the cosine element of \f$G\f$, can be on host or device.
 *  @param[in]
-*  s_coeff     pointer to the sine element of \f$G\f$, which can be on the host or device.
+*  s_coeff     pointer to the sine element of \f$G\f$, can be on host or device.
 *  @param[inout]
 *  vecX        sparse vector descriptor \f$x\f$.
 *  @param[inout]
 *  vecY        dense vector descriptor \f$y\f$.
 *
-*  \retval HIPSPARSE_STATUS_SUCCESS the operation completed successfully.
-*  \retval HIPSPARSE_STATUS_NOT_INITIALIZED \p handle is not initialized.
-*  \retval HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p c_coeff, \p s_coeff, \p vecX, or \p vecY is nullptr,
-*          or the vector sizes or data types are incompatible.
+*  \retval     HIPSPARSE_STATUS_SUCCESS the operation completed successfully.
+*  \retval     HIPSPARSE_STATUS_INVALID_VALUE \p handle, \p c_coeff, \p s_coeff, \p vecX or \p vecY pointer is
+*              invalid.
+*
+*  \par Example
+*  \code{.c}
+*    // Number of non-zeros of the sparse vector
+*    int nnz = 3;
+*
+*    // Size of sparse and dense vector
+*    int size = 9;
+*
+*    // Sparse index vector
+*    std::vector<int> hxInd = {0, 3, 5};
+*
+*    // Sparse value vector
+*    std::vector<float> hxVal = {1.0f, 2.0f, 3.0f};
+*
+*    // Dense vector
+*    std::vector<float> hy = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
+*
+*    // Scalar c
+*    float c = 3.7f;
+*
+*    // Scalar s
+*    float s = 1.2f;
+*
+*    // Offload data to device
+*    int* dxInd;
+*    float* dxVal;
+*    float* dy;
+*    hipMalloc((void**)&dxInd, sizeof(int) * nnz);
+*    hipMalloc((void**)&dxVal, sizeof(float) * nnz);
+*    hipMalloc((void**)&dy, sizeof(float) * size);
+*
+*    hipMemcpy(dxInd, hxInd.data(), sizeof(int) * nnz, hipMemcpyHostToDevice);
+*    hipMemcpy(dxVal, hxVal.data(), sizeof(float) * nnz, hipMemcpyHostToDevice);
+*    hipMemcpy(dy, hy.data(), sizeof(float) * size, hipMemcpyHostToDevice);
+*
+*    hipsparseHandle_t handle;
+*    hipsparseCreate(&handle);
+*
+*    // Create sparse vector X
+*    hipsparseSpVecDescr_t vecX;
+*    hipsparseCreateSpVec(&vecX,
+*                                size,
+*                                nnz,
+*                                dxInd,
+*                                dxVal,
+*                                HIPSPARSE_INDEX_32I,
+*                                HIPSPARSE_INDEX_BASE_ZERO,
+*                                HIP_R_32F);
+*
+*    // Create dense vector Y
+*    hipsparseDnVecDescr_t vecY;
+*    hipsparseCreateDnVec(&vecY, size, dy, HIP_R_32F);
+*
+*    // Call rot
+*    hipsparseRot(handle, (void*)&c, (void*)&s, vecX, vecY);
+*
+*    hipsparseSpVecGetValues(vecX, (void**)&dxVal);
+*    hipsparseDnVecGetValues(vecY, (void**)&dy);
+*
+*    // Copy result back to host
+*    hipMemcpy(hxVal.data(), dxVal, sizeof(float) * nnz, hipMemcpyDeviceToHost);
+*    hipMemcpy(hy.data(), dy, sizeof(float) * size, hipMemcpyDeviceToHost);
+*
+*    // Clear hipSPARSE
+*    hipsparseDestroySpVec(vecX);
+*    hipsparseDestroyDnVec(vecY);
+*    hipsparseDestroy(handle);
+*
+*    // Clear device memory
+*    hipFree(dxInd);
+*    hipFree(dxVal);
+*    hipFree(dy);
+*  \endcode
 */
 #if(!defined(CUDART_VERSION) || (CUDART_VERSION >= 11000 && CUDART_VERSION < 13000))
 DEPRECATED_CUDA_12000("The routine will be removed in CUDA 13")

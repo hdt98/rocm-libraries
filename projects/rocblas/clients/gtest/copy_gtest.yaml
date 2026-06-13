@@ -47,7 +47,7 @@ Tests:
     pointer_mode_device: false
     function:
       - copy:  *single_precision
-    gpu_arch: ['90a','942','950']
+    gpu_arch: ['90a','942']
     os_flags: LINUX
 
   - name: blas1_large_batch
@@ -63,8 +63,8 @@ Tests:
 
 
   # quick tests will fallback to original kernels at launcher level
-  - name: copy_ILP64
-    category: pre_checkin
+  - name: copy_64
+    category: nightly
     N: [ 64 ]
     incx_incy: *incx_incy_range_small
     api: [ FORTRAN_64 ]
@@ -73,7 +73,7 @@ Tests:
       - copy_batched:  *single_double_precisions_complex_real
       - copy_strided_batched:  *single_double_precisions_complex_real
 
-  - name: copy_ILP64
+  - name: copy_64
     category: stress
     arguments:
       - { N: 2147483649, incx: 1, incy: 1,  batch_count: 1 }

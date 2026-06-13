@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,17 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#include "primbench.hpp"
+#ifndef ROCPRIM_BENCHMARK_DEVICE_NTH_ELEMENT_PARALLEL_HPP_
+#define ROCPRIM_BENCHMARK_DEVICE_NTH_ELEMENT_PARALLEL_HPP_
 
 #include "benchmark_utils.hpp"
 
 #include "../common/utils_data_generation.hpp"
-#include "../common/utils_device_ptr.hpp"
 
+// Google Benchmark
+#include <benchmark/benchmark.h>
+
+// HIP API
 #include <hip/hip_runtime.h>
 
+// rocPRIM
 #include <rocprim/device/config_types.hpp>
 #include <rocprim/device/device_nth_element.hpp>
 #include <rocprim/functional.hpp>
@@ -40,79 +43,133 @@
 #include <vector>
 
 template<typename Key = int, typename Config = rocprim::default_config>
-struct device_nth_element_benchmark : public primbench::benchmark_interface
+struct device_nth_element_benchmark : public config_autotune_interface
 {
-    device_nth_element_benchmark(bool small_n) : m_small_n(small_n) {}
+    bool small_n = false;
 
-    primbench::json meta() const override
+    device_nth_element_benchmark(bool SmallN)
     {
-        return primbench::json{}
-            .add("lvl", "device")
-            .add("algo", "device_nth_element")
-            .add("small_n", m_small_n)
-            .add("key_type", primbench::name<Key>())
-            .add("cfg", "default");
+        small_n = SmallN;
     }
 
-    void run(primbench::state& state) override
+    std::string name() const override
     {
-        const auto& stream = state.stream;
-        const auto& bytes  = state.size;
-        const auto& seed   = state.seed;
+        using namespace std::string_literals;
+        return bench_naming::format_name(
+            "{lvl:device,algo:nth_element,nth:" + (small_n ? "small"s : "large"s)
+            + ",key_type:" + std::string(Traits<Key>::name()) + ",cfg:default_config}");
+    }
 
+    static constexpr unsigned int batch_size  = 10;
+    static constexpr unsigned int warmup_size = 5;
+
+    void run(benchmark::State&   state,
+             size_t              bytes,
+             const managed_seed& seed,
+             hipStream_t         stream) const override
+    {
         using key_type = Key;
 
-        size_t items = bytes / sizeof(key_type);
-        size_t nth   = 10;
+        // Calculate the number of elements
+        size_t size = bytes / sizeof(key_type);
+        size_t nth  = 10;
 
-        if(!m_small_n)
+        if(!small_n)
         {
-            nth = items / 2;
+            nth = size / 2;
         }
 
         // Generate data
         std::vector<key_type> keys_input
-            = get_random_data<key_type>(items,
+            = get_random_data<key_type>(size,
                                         common::generate_limits<key_type>::min(),
                                         common::generate_limits<key_type>::max(),
-                                        seed);
+                                        seed.get_0());
 
-        common::device_ptr<key_type> d_keys_input(keys_input);
-        common::device_ptr<key_type> d_keys_output(items);
+        key_type* d_keys_input;
+        key_type* d_keys_output;
+        HIP_CHECK(hipMalloc(&d_keys_input, size * sizeof(*d_keys_input)));
+        HIP_CHECK(hipMalloc(&d_keys_output, size * sizeof(*d_keys_output)));
+
+        HIP_CHECK(hipMemcpy(d_keys_input,
+                            keys_input.data(),
+                            size * sizeof(*d_keys_input),
+                            hipMemcpyHostToDevice));
 
         ::rocprim::less<key_type> lesser_op;
 
+        void*  d_temporary_storage     = nullptr;
         size_t temporary_storage_bytes = 0;
-        HIP_CHECK(rocprim::nth_element(nullptr,
+        HIP_CHECK(rocprim::nth_element(d_temporary_storage,
                                        temporary_storage_bytes,
-                                       d_keys_input.get(),
-                                       d_keys_output.get(),
+                                       d_keys_input,
+                                       d_keys_output,
                                        nth,
-                                       items,
+                                       size,
                                        lesser_op,
                                        stream,
                                        false));
 
-        common::device_ptr<void> d_temporary_storage(temporary_storage_bytes);
+        HIP_CHECK(hipMalloc(&d_temporary_storage, temporary_storage_bytes));
 
-        state.set_items(items);
-        state.add_reads<key_type>(items);
+        // Warm-up
+        for(size_t i = 0; i < warmup_size; ++i)
+        {
+            HIP_CHECK(rocprim::nth_element(d_temporary_storage,
+                                           temporary_storage_bytes,
+                                           d_keys_input,
+                                           d_keys_output,
+                                           nth,
+                                           size,
+                                           lesser_op,
+                                           stream,
+                                           false));
+        }
+        HIP_CHECK(hipDeviceSynchronize());
 
-        state.run(
-            [&]
+        // HIP events creation
+        hipEvent_t start, stop;
+        HIP_CHECK(hipEventCreate(&start));
+        HIP_CHECK(hipEventCreate(&stop));
+
+        for(auto _ : state)
+        {
+            // Record start event
+            HIP_CHECK(hipEventRecord(start, stream));
+
+            for(size_t i = 0; i < batch_size; ++i)
             {
-                HIP_CHECK(rocprim::nth_element(d_temporary_storage.get(),
+                HIP_CHECK(rocprim::nth_element(d_temporary_storage,
                                                temporary_storage_bytes,
-                                               d_keys_input.get(),
-                                               d_keys_output.get(),
+                                               d_keys_input,
+                                               d_keys_output,
                                                nth,
-                                               items,
+                                               size,
                                                lesser_op,
                                                stream,
                                                false));
-            });
-    }
+            }
 
-private:
-    bool m_small_n = false;
+            // Record stop event and wait until it completes
+            HIP_CHECK(hipEventRecord(stop, stream));
+            HIP_CHECK(hipEventSynchronize(stop));
+
+            float elapsed_mseconds;
+            HIP_CHECK(hipEventElapsedTime(&elapsed_mseconds, start, stop));
+            state.SetIterationTime(elapsed_mseconds / 1000);
+        }
+
+        // Destroy HIP events
+        HIP_CHECK(hipEventDestroy(start));
+        HIP_CHECK(hipEventDestroy(stop));
+
+        state.SetBytesProcessed(state.iterations() * batch_size * size * sizeof(*d_keys_input));
+        state.SetItemsProcessed(state.iterations() * batch_size * size);
+
+        HIP_CHECK(hipFree(d_temporary_storage));
+        HIP_CHECK(hipFree(d_keys_input));
+        HIP_CHECK(hipFree(d_keys_output));
+    }
 };
+
+#endif // ROCPRIM_BENCHMARK_DEVICE_NTH_ELEMENT_PARALLEL_HPP_

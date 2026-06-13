@@ -39,8 +39,7 @@
 
 using namespace hipsparse_test;
 
-template <typename I, typename J, typename T>
-void testing_sparse_to_dense_csc_bad_arg(const Arguments& argus)
+void testing_sparse_to_dense_csc_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11020)
     int64_t safe_size = 100;
@@ -129,15 +128,16 @@ void testing_sparse_to_dense_csc_bad_arg(const Arguments& argus)
 }
 
 template <typename I, typename J, typename T>
-void testing_sparse_to_dense_csc(Arguments argus)
+hipsparseStatus_t testing_sparse_to_dense_csc(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11020)
     J                           m        = argus.M;
     J                           n        = argus.N;
     hipsparseOrder_t            order    = argus.orderA;
     hipsparseIndexBase_t        idx_base = argus.baseA;
-    hipsparseSparseToDenseAlg_t alg      = argus.sparse2dense_alg;
-    std::string                 filename = argus.filename;
+    hipsparseSparseToDenseAlg_t alg
+        = static_cast<hipsparseSparseToDenseAlg_t>(argus.sparse2dense_alg);
+    std::string filename = argus.filename;
 
     // Index and data type
     hipsparseIndexType_t typeI = getIndexType<I>();
@@ -157,8 +157,11 @@ void testing_sparse_to_dense_csc(Arguments argus)
     srand(12345ULL);
 
     I nnz;
-    CHECK_GENERATE_MATRIX_ERROR(
-        generate_csr_matrix(filename, m, n, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base));
+    if(!generate_csr_matrix(filename, m, n, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base))
+    {
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
 
     I ld = (order == HIPSPARSE_ORDER_COL) ? m : n;
 
@@ -341,6 +344,8 @@ void testing_sparse_to_dense_csc(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpMat(matA));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnMat(matB));
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_SPARSE_TO_DENSE_CSC_HPP

@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 template <typename BiasLay, typename ResidualLay>
 struct LayoutSetting
@@ -31,8 +31,6 @@ using BiasLayout = typename LayoutSettingSelector<NDimSpatial>::BiasLayout;
 
 template <ck::index_t NDimSpatial>
 using ResidualLayout = typename LayoutSettingSelector<NDimSpatial>::ResidualLayout;
-
-static constexpr auto KPerBlock = sizeof(InKernelDataType) == 1 ? 64 : 32;
 
 // instance for double rate mfma on gfx950 (vs gfx942)
 template <ck::index_t NDimSpatial>
@@ -107,13 +105,13 @@ using DeviceConvFwdInstance =
         256,         // BlockSize
         128,         // MPerBlock
         128,         // NPerBlock
-        KPerBlock,   // KPerBlock
+        32,          // KPerBlock
         4,           // AK1
         4,           // BK1
-        16,          // MPerXdl
-        16,          // NPerXdl
-        4,           // MXdlPerWave
-        4,           // NXdlPerWave
+        32,          // MPerXdl
+        32,          // NPerXdl
+        2,           // MXdlPerWave
+        2,           // NXdlPerWave
         S<4, 64, 1>, // ABlockTransferThreadClusterLengths_AK0_M_AK1
         S<1, 0, 2>,  // ABlockTransferThreadClusterArrangeOrder
         S<1, 0, 2>,  // ABlockTransferSrcAccessOrder
@@ -130,7 +128,7 @@ using DeviceConvFwdInstance =
         1,           // BBlockLdsExtraN
         1,
         1,
-        S<1, 32, 1, 8>,
+        S<1, 16, 1, 16>,
         4>;
 
 template <ck::index_t NDimSpatial>
@@ -335,17 +333,11 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
 #ifdef BUILD_INT4_EXAMPLE
         const Tensor<OutUserDataType> out_device_converted(out_device);
 
-        return ck::utils::check_err(out_device_converted,
-                                    out_host,
-                                    "Error: incorrect results!",
-                                    get_rtol<OutUserDataType>(),
-                                    get_atol<OutUserDataType>());
+        return ck::utils::check_err(
+            out_device_converted, out_host, "Error: incorrect results!", 1e-5f, 1e-4f);
 #else
-        return ck::utils::check_err(out_device,
-                                    out_host,
-                                    "Error: incorrect results!",
-                                    get_rtol<OutUserDataType>(),
-                                    get_atol<OutUserDataType>());
+        return ck::utils::check_err(
+            out_device, out_host, "Error: incorrect results!", 1e-5f, 1e-4f);
 #endif
     }
 

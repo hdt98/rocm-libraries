@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -51,30 +51,6 @@ typedef enum rocblas_check_nan_init_
 
 } rocblas_check_nan_init;
 
-// Initialize vector so adjacent entries have alternating zero and passed value.
-template <typename T>
-void rocblas_init_vector_alternating_zero(host_vector<T>& A, T value)
-{
-    auto M   = A.n();
-    auto inc = A.inc();
-    for(size_t i = 0; i < M; ++i)
-    {
-        A[i * inc] = (i & 1) ? T(0) : value;
-    }
-}
-
-// Initialize vector so adjacent entries have alternating sign for passed value.
-template <typename T>
-void rocblas_init_vector_alternating_sign(host_vector<T>& A, T value)
-{
-    auto M   = A.n();
-    auto inc = A.inc();
-    for(size_t i = 0; i < M; ++i)
-    {
-        A[i * inc] = (i & 1) ? -value : value;
-    }
-}
-
 // Initialize matrix so adjacent entries have alternating sign.
 // In gemm if either A or B are initialized with alternating
 // sign the reduction sum will be summing positive
@@ -121,11 +97,6 @@ void rocblas_init_matrix_alternating_sign(rocblas_check_matrix_type matrix_type,
                     A[i + j * lda + b * stride] = (i ^ j) & 1 ? T(value) : T(negate(value));
                 }
     }
-    else
-    {
-        throw std::invalid_argument(
-            "Invalid matrix_type for rocblas_init_matrix_alternating_sign function!");
-    }
 }
 
 template <typename U, typename T>
@@ -165,11 +136,6 @@ void rocblas_init_matrix_alternating_sign(rocblas_check_matrix_type matrix_type,
                         = uplo == 'U' ? (j >= i ? rand_gen() : T(0)) : (j <= i ? rand_gen() : T(0));
                     A[i + j * lda] = (i ^ j) & 1 ? T(value) : T(negate(value));
                 }
-        }
-        else
-        {
-            throw std::invalid_argument(
-                "Invalid matrix_type for rocblas_init_matrix_alternating_sign function!");
         }
     }
 }
@@ -358,10 +324,6 @@ void rocblas_init_matrix(rocblas_check_matrix_type matrix_type,
             }
         }
     }
-    else
-    {
-        throw std::invalid_argument("Invalid matrix_type for rocblas_init_matrix function!");
-    }
 }
 
 template <typename U, typename T>
@@ -523,10 +485,6 @@ void rocblas_init_matrix(rocblas_check_matrix_type matrix_type,
                 }
             }
         }
-        else
-        {
-            throw std::invalid_argument("Invalid matrix_type for rocblas_init_matrix function!");
-        }
     }
 }
 
@@ -651,10 +609,6 @@ void rocblas_init_matrix_trig(rocblas_check_matrix_type matrix_type,
                     A[i + j * lda + b * stride] = value;
                 }
     }
-    else
-    {
-        throw std::invalid_argument("Invalid matrix_type for rocblas_init_matrix_trig function!");
-    }
 }
 
 template <typename T, typename U>
@@ -750,11 +704,6 @@ void rocblas_init_matrix_trig(rocblas_check_matrix_type matrix_type,
                               : (j <= i ? T(seedReset ? cos(i + j * M) : sin(i + j * M)) : T(0));
                     A[i + j * lda] = value;
                 }
-        }
-        else
-        {
-            throw std::invalid_argument(
-                "Invalid matrix_type for rocblas_init_matrix_trig function!");
         }
     }
 }
@@ -1038,7 +987,9 @@ void rocblas_init_impl_one(
             }
 }
 
-template <typename T>
+template <
+    typename T,
+    std::enable_if_t<!std::is_same<T, rocblas_f8>{} && !std::is_same<T, rocblas_bf8>{}, int> = 0>
 void rocblas_init_alt_impl_big(
     host_vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
 {
@@ -1047,6 +998,28 @@ void rocblas_init_alt_impl_big(
         for(size_t i = 0; i < M; ++i)
             for(size_t j = 0; j < N; ++j)
                 A[i + j * lda + i_batch * stride] = T(ieee_half_large);
+}
+
+template <typename T, std::enable_if_t<std::is_same<T, rocblas_f8>{}, int> = 0>
+void rocblas_init_alt_impl_big(
+    std::vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
+{
+    const T ieee_f8_max(240.0f);
+    for(size_t i_batch = 0; i_batch < batch_count; i_batch++)
+        for(size_t i = 0; i < M; ++i)
+            for(size_t j = 0; j < N; ++j)
+                A[i + j * lda + i_batch * stride] = (ieee_f8_max);
+}
+
+template <typename T, std::enable_if_t<std::is_same<T, rocblas_bf8>{}, int> = 0>
+void rocblas_init_alt_impl_big(
+    std::vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
+{
+    const T ieee_f8_max(57344.0f);
+    for(size_t i_batch = 0; i_batch < batch_count; i_batch++)
+        for(size_t i = 0; i < M; ++i)
+            for(size_t j = 0; j < N; ++j)
+                A[i + j * lda + i_batch * stride] = (ieee_f8_max);
 }
 
 // Initialize vector with random values
@@ -1082,7 +1055,9 @@ void rocblas_init_alt_impl_small(U& hA)
     }
 }
 
-template <typename T>
+template <
+    typename T,
+    std::enable_if_t<!std::is_same<T, rocblas_f8>{} && !std::is_same<T, rocblas_bf8>{}, int> = 0>
 void rocblas_init_alt_impl_small(
     host_vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
 {
@@ -1092,6 +1067,36 @@ void rocblas_init_alt_impl_small(
         for(size_t i = 0; i < M; ++i)
             for(size_t j = 0; j < N; ++j)
                 A[i + j * lda + i_batch * stride] = T(ieee_half_small);
+}
+
+template <typename T, std::enable_if_t<std::is_same<T, rocblas_f8>{}, int> = 0>
+void rocblas_init_alt_impl_small(
+    std::vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
+{
+    const std::vector<uint8_t> f8_small_values = {0x1, 0x2, 0x3, 0x4, 0x6, 0x7};
+    // const T ieee_f8_small(f8_small_values[std::uniform_int_distribution<int>(
+    //         0, f8_small_values.size() - 1)(t_rocblas_rng)]);
+    for(size_t i_batch = 0; i_batch < batch_count; i_batch++)
+        for(size_t i = 0; i < M; ++i)
+            for(size_t j = 0; j < N; ++j)
+                A[i + j * lda + i_batch * stride]
+                    = (T)f8_small_values[std::uniform_int_distribution<int>(
+                        0, f8_small_values.size() - 1)(t_rocblas_rng)];
+}
+
+template <typename T, std::enable_if_t<std::is_same<T, rocblas_bf8>{}, int> = 0>
+void rocblas_init_alt_impl_small(
+    std::vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
+{
+    const std::vector<uint8_t> f8_small_values = {0x1, 0x2, 0x3};
+    // const T ieee_f8_small(f8_small_values[std::uniform_int_distribution<int>(
+    //         0, f8_small_values.size() - 1)(t_rocblas_rng)]);
+    for(size_t i_batch = 0; i_batch < batch_count; i_batch++)
+        for(size_t i = 0; i < M; ++i)
+            for(size_t j = 0; j < N; ++j)
+                A[i + j * lda + i_batch * stride]
+                    = (T)f8_small_values[std::uniform_int_distribution<int>(
+                        0, f8_small_values.size() - 1)(t_rocblas_rng)];
 }
 
 template <typename T>

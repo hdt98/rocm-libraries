@@ -70,16 +70,12 @@ std::vector<char> compress(const std::vector<char>& v, bool* compressed)
     if(compressed != nullptr and e == BZ_OUTBUFF_FULL)
     {
         *compressed = false;
-        result      = v;
+        return v;
     }
-    else
-    {
-        check_bz2_error(e, "BZ2_bzBuffToBuffCompress");
-        result.resize(len);
-        if(compressed != nullptr)
-            *compressed = true;
-    }
-
+    check_bz2_error(e, "BZ2_bzBuffToBuffCompress");
+    result.resize(len);
+    if(compressed != nullptr)
+        *compressed = true;
     return result;
 }
 

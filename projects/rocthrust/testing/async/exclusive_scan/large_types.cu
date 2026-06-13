@@ -17,13 +17,13 @@
 
 #include <thrust/detail/config.h>
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
+#if THRUST_CPP_DIALECT >= 2014
 
-#if THRUST_CPP_DIALECT >= 2017
+#include <async/test_policy_overloads.h>
 
-#  include <async/exclusive_scan/mixin.h>
-#  include <async/test_policy_overloads.h>
-#  include <unittest/special_types.h>
+#include <async/exclusive_scan/mixin.h>
+
+#include <unittest/special_types.h>
 
 // This test is an adaptation of TestScanWithLargeTypes from scan.cu.
 
@@ -45,8 +45,10 @@ template <typename value_type, typename alternate_binary_op = thrust::maximum<>>
 struct invoker
     : device_vector_fill<value_type>
     , testing::async::mixin::output::device_vector<value_type>
-    , testing::async::exclusive_scan::mixin::postfix_args::all_overloads<value_type, alternate_binary_op>
-    , testing::async::exclusive_scan::mixin::invoke_reference::host_synchronous<value_type>
+    , testing::async::exclusive_scan::mixin::postfix_args::
+        all_overloads<value_type, alternate_binary_op>
+    , testing::async::exclusive_scan::mixin::invoke_reference::host_synchronous<
+        value_type>
     , testing::async::exclusive_scan::mixin::invoke_async::simple
     , testing::async::mixin::compare_outputs::assert_almost_equal_if_fp_quiet
 {
@@ -70,9 +72,4 @@ struct test_large_types
 };
 DECLARE_UNITTEST(test_large_types);
 
-#endif // C++17
-
-// we need to leak the suppression on clang/MSVC to suppresses warnings from the cudafe1.stub.c file
-#if THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
-THRUST_SUPPRESS_DEPRECATED_POP
-#endif // THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
+#endif // C++14

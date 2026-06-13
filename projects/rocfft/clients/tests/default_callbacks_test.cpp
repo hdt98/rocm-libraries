@@ -28,7 +28,6 @@
 
 #include "../../shared/fftw_transform.h"
 #include "../../shared/hip_object_wrapper.h"
-#include "../../shared/params_gen.h"
 #include "../../shared/rocfft_params.h"
 #include "rocfft/rocfft.h"
 
@@ -410,15 +409,8 @@ struct Test_Callback
 // complex data inputs and having only a load callback set.
 // -------------------------------------------------------------------
 
-#ifndef _WIN32
-TEST(rocfft_UnitTest, DISABLED_default_load_callback_complex_single)
+TEST(rocfft_UnitTest, default_load_callback_complex_single)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(256,
                        1,
@@ -428,14 +420,8 @@ TEST(rocfft_UnitTest, DISABLED_default_load_callback_complex_single)
                        1);
 }
 
-TEST(rocfft_UnitTest, DISABLED_default_load_callback_complex_double)
+TEST(rocfft_UnitTest, default_load_callback_complex_double)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(512,
                        1,
@@ -445,14 +431,8 @@ TEST(rocfft_UnitTest, DISABLED_default_load_callback_complex_double)
                        2);
 }
 
-TEST(rocfft_UnitTest, DISABLED_default_load_callback_real_single)
+TEST(rocfft_UnitTest, default_load_callback_real_single)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(1024,
                        1,
@@ -462,14 +442,8 @@ TEST(rocfft_UnitTest, DISABLED_default_load_callback_real_single)
                        3);
 }
 
-TEST(rocfft_UnitTest, DISABLED_default_load_callback_real_double)
+TEST(rocfft_UnitTest, default_load_callback_real_double)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(2048,
                        1,
@@ -484,14 +458,8 @@ TEST(rocfft_UnitTest, DISABLED_default_load_callback_real_double)
 // complex data inputs and having only a store callback set.
 // -------------------------------------------------------------------
 
-TEST(rocfft_UnitTest, DISABLED_default_store_callback_complex_single)
+TEST(rocfft_UnitTest, default_store_callback_complex_single)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(256,
                        1,
@@ -501,14 +469,8 @@ TEST(rocfft_UnitTest, DISABLED_default_store_callback_complex_single)
                        5);
 }
 
-TEST(rocfft_UnitTest, DISABLED_default_store_callback_complex_double)
+TEST(rocfft_UnitTest, default_store_callback_complex_double)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(512,
                        1,
@@ -518,14 +480,8 @@ TEST(rocfft_UnitTest, DISABLED_default_store_callback_complex_double)
                        6);
 }
 
-TEST(rocfft_UnitTest, DISABLED_default_store_callback_real_single)
+TEST(rocfft_UnitTest, default_store_callback_real_single)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(1024,
                        1,
@@ -535,14 +491,8 @@ TEST(rocfft_UnitTest, DISABLED_default_store_callback_real_single)
                        7);
 }
 
-TEST(rocfft_UnitTest, DISABLED_default_store_callback_real_double)
+TEST(rocfft_UnitTest, default_store_callback_real_double)
 {
-    if(hash_prob(random_seed, ::testing::UnitTest::GetInstance()->current_test_info()->name())
-       > unittest_prob)
-    {
-        GTEST_SKIP();
-    }
-
     TEST_CALLBACK_CHECK_ASAN;
     Test_Callback test(2048,
                        1,
@@ -551,4 +501,3 @@ TEST(rocfft_UnitTest, DISABLED_default_store_callback_real_double)
                        DefaultCallbackType::STORE,
                        8);
 }
-#endif

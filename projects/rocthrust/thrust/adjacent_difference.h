@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file adjacent_difference.h
  *  \brief Compute difference between consecutive elements of a range
  */
@@ -21,7 +22,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/execution_policy.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -29,6 +29,7 @@ THRUST_NAMESPACE_BEGIN
 /*! \addtogroup transformations Transformations
  *  \{
  */
+
 
 /*! \p adjacent_difference calculates the differences of adjacent elements in the
  *  range <tt>[first, last)</tt>. That is, <tt>\*first</tt> is assigned to
@@ -48,11 +49,11 @@ THRUST_NAMESPACE_BEGIN
  *  \return The iterator <tt>result + (last - first)</tt>
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>, and \c x and \c y are objects of \p InputIterator's \c value_type, then \c x - \c is defined, and \p
- * InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of \c value_types, and the return
- * type of <tt>x - y</tt> is convertible to a type in \p OutputIterator's set of \c value_types. \tparam OutputIterator
- * is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>,
+ *          and \c x and \c y are objects of \p InputIterator's \c value_type, then \c x - \c is defined,
+ *          and \p InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of \c value_types,
+ *          and the return type of <tt>x - y</tt> is convertible to a type in \p OutputIterator's set of \c value_types.
+ *  \tparam OutputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
  *  \remark Note that \p result is permitted to be the same iterator as \p first. This is
  *          useful for computing differences "in place".
@@ -77,19 +78,18 @@ THRUST_NAMESPACE_BEGIN
  *  \see https://en.cppreference.com/w/cpp/algorithm/adjacent_difference
  *  \see inclusive_scan
  */
-template <typename DerivedPolicy, typename InputIterator, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator adjacent_difference(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  InputIterator first,
-  InputIterator last,
-  OutputIterator result);
+template<typename DerivedPolicy, typename InputIterator, typename OutputIterator>
+THRUST_HOST_DEVICE
+OutputIterator adjacent_difference(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                                   InputIterator first, InputIterator last, 
+                                   OutputIterator result);
 
 /*! \p adjacent_difference calculates the differences of adjacent elements in the
  *  range <tt>[first, last)</tt>. That is, <tt>*first</tt> is assigned to
  *  <tt>\*result</tt>, and, for each iterator \p i in the range
  *  <tt>[first + 1, last)</tt>, <tt>binary_op(\*i, \*(i - 1))</tt> is assigned to
  *  <tt>\*(result + (i - first))</tt>.
- *
+ *  
  *  This version of \p adjacent_difference uses the binary function \p binary_op to
  *  calculate differences.
  *
@@ -103,12 +103,11 @@ THRUST_HOST_DEVICE OutputIterator adjacent_difference(
  *  \return The iterator <tt>result + (last - first)</tt>
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>, and \p InputIterator's \c value_type is convertible to \p BinaryFunction's \c first_argument_type and
- * \c second_argument_type, and \p InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of
- * \c value_types. \tparam OutputIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>. \tparam BinaryFunction's \c
- * result_type is convertible to a type in \p OutputIterator's set of \c value_types.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>,
+ *          and \p InputIterator's \c value_type is convertible to \p BinaryFunction's \c first_argument_type and \c second_argument_type,
+ *          and \p InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of \c value_types.
+ *  \tparam OutputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam BinaryFunction's \c result_type is convertible to a type in \p OutputIterator's set of \c value_types.
  *
  *  \remark Note that \p result is permitted to be the same iterator as \p first. This is
  *          useful for computing differences "in place".
@@ -134,13 +133,12 @@ THRUST_HOST_DEVICE OutputIterator adjacent_difference(
  *  \see https://en.cppreference.com/w/cpp/algorithm/adjacent_difference
  *  \see inclusive_scan
  */
-template <typename DerivedPolicy, typename InputIterator, typename OutputIterator, typename BinaryFunction>
-THRUST_HOST_DEVICE OutputIterator adjacent_difference(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  InputIterator first,
-  InputIterator last,
-  OutputIterator result,
-  BinaryFunction binary_op);
+template<typename DerivedPolicy, typename InputIterator, typename OutputIterator, typename BinaryFunction>
+THRUST_HOST_DEVICE
+OutputIterator adjacent_difference(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                                   InputIterator first, InputIterator last,
+                                   OutputIterator result,
+                                   BinaryFunction binary_op);
 
 /*! \p adjacent_difference calculates the differences of adjacent elements in the
  *  range <tt>[first, last)</tt>. That is, <tt>\*first</tt> is assigned to
@@ -156,11 +154,11 @@ THRUST_HOST_DEVICE OutputIterator adjacent_difference(
  *  \param result The beginning of the output range.
  *  \return The iterator <tt>result + (last - first)</tt>
  *
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>, and \c x and \c y are objects of \p InputIterator's \c value_type, then \c x - \c is defined, and \p
- * InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of \c value_types, and the return
- * type of <tt>x - y</tt> is convertible to a type in \p OutputIterator's set of \c value_types. \tparam OutputIterator
- * is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>,
+ *          and \c x and \c y are objects of \p InputIterator's \c value_type, then \c x - \c is defined,
+ *          and \p InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of \c value_types,
+ *          and the return type of <tt>x - y</tt> is convertible to a type in \p OutputIterator's set of \c value_types.
+ *  \tparam OutputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
  *  \remark Note that \p result is permitted to be the same iterator as \p first. This is
  *          useful for computing differences "in place".
@@ -185,14 +183,15 @@ THRUST_HOST_DEVICE OutputIterator adjacent_difference(
  *  \see inclusive_scan
  */
 template <typename InputIterator, typename OutputIterator>
-OutputIterator adjacent_difference(InputIterator first, InputIterator last, OutputIterator result);
+OutputIterator adjacent_difference(InputIterator first, InputIterator last, 
+                                   OutputIterator result);
 
 /*! \p adjacent_difference calculates the differences of adjacent elements in the
  *  range <tt>[first, last)</tt>. That is, <tt>*first</tt> is assigned to
  *  <tt>\*result</tt>, and, for each iterator \p i in the range
  *  <tt>[first + 1, last)</tt>, <tt>binary_op(\*i, \*(i - 1))</tt> is assigned to
  *  <tt>\*(result + (i - first))</tt>.
- *
+ *  
  *  This version of \p adjacent_difference uses the binary function \p binary_op to
  *  calculate differences.
  *
@@ -202,12 +201,11 @@ OutputIterator adjacent_difference(InputIterator first, InputIterator last, Outp
  *  \param binary_op The binary function used to compute differences.
  *  \return The iterator <tt>result + (last - first)</tt>
  *
- *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a>, and \p InputIterator's \c value_type is convertible to \p BinaryFunction's \c first_argument_type and
- * \c second_argument_type, and \p InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of
- * \c value_types. \tparam OutputIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>. \tparam BinaryFunction's \c
- * result_type is convertible to a type in \p OutputIterator's set of \c value_types.
+ *  \tparam InputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a>,
+ *          and \p InputIterator's \c value_type is convertible to \p BinaryFunction's \c first_argument_type and \c second_argument_type,
+ *          and \p InputIterator's \c value_type is convertible to a type in \p OutputIterator's set of \c value_types.
+ *  \tparam OutputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam BinaryFunction's \c result_type is convertible to a type in \p OutputIterator's set of \c value_types.
  *
  *  \remark Note that \p result is permitted to be the same iterator as \p first. This is
  *          useful for computing differences "in place".
@@ -233,8 +231,9 @@ OutputIterator adjacent_difference(InputIterator first, InputIterator last, Outp
  *  \see inclusive_scan
  */
 template <typename InputIterator, typename OutputIterator, typename BinaryFunction>
-OutputIterator
-adjacent_difference(InputIterator first, InputIterator last, OutputIterator result, BinaryFunction binary_op);
+OutputIterator adjacent_difference(InputIterator first, InputIterator last,
+                                   OutputIterator result,
+                                   BinaryFunction binary_op);
 
 /*! \}
  */
@@ -242,3 +241,4 @@ adjacent_difference(InputIterator first, InputIterator last, OutputIterator resu
 THRUST_NAMESPACE_END
 
 #include <thrust/detail/adjacent_difference.inl>
+

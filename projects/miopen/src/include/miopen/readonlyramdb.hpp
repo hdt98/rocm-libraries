@@ -26,14 +26,14 @@
 #ifndef MIOPEN_GUARD_MLOPEN_READONLYRAMDB_HPP
 #define MIOPEN_GUARD_MLOPEN_READONLYRAMDB_HPP
 
-#include <miopen/config.hpp>
 #include <miopen/db_record.hpp>
 #include <miopen/filesystem.hpp>
 
-#include <optional>
+#include <boost/optional.hpp>
+
+#include <unordered_map>
 #include <string>
 #include <sstream>
-#include <unordered_map>
 
 namespace miopen {
 
@@ -41,21 +41,21 @@ namespace debug {
 MIOPEN_INTERNALS_EXPORT bool& rordb_embed_fs_override();
 } // namespace debug
 
-class ReadonlyRamDb
+class MIOPEN_INTERNALS_EXPORT ReadonlyRamDb
 {
 public:
     ReadonlyRamDb(DbKinds db_kind_, const fs::path& path) : db_kind(db_kind_), db_path(path) {}
 
-    MIOPEN_INTERNALS_EXPORT static ReadonlyRamDb&
+    static ReadonlyRamDb&
     GetCached(DbKinds db_kind_, const fs::path& path, bool warn_if_unreadable);
 
-    std::optional<DbRecord> FindRecord(const std::string& problem) const
+    boost::optional<DbRecord> FindRecord(const std::string& problem) const
     {
         MIOPEN_LOG_I2("Looking for key " << problem << " in file " << db_path);
         const auto it = cache.find(problem);
 
         if(it == cache.end())
-            return {};
+            return boost::none;
 
         auto record = DbRecord{problem};
 
@@ -67,14 +67,14 @@ public:
             MIOPEN_LOG_E("Error parsing payload under the key: "
                          << problem << " form file " << db_path << "#" << it->second.line);
             MIOPEN_LOG_E("Contents: " << it->second.content);
-            return {};
+            return boost::none;
         }
 
         return record;
     }
 
     template <class TProblem>
-    std::optional<DbRecord> FindRecord(const TProblem& problem) const
+    boost::optional<DbRecord> FindRecord(const TProblem& problem) const
     {
         const auto key = DbRecord::SerializeKey(db_kind, problem);
         return FindRecord(key);
@@ -102,10 +102,10 @@ private:
     fs::path db_path;
     std::unordered_map<std::string, CacheItem> cache;
 
-    ReadonlyRamDb(const ReadonlyRamDb&)            = default;
-    ReadonlyRamDb(ReadonlyRamDb&&)                 = default;
+    ReadonlyRamDb(const ReadonlyRamDb&) = default;
+    ReadonlyRamDb(ReadonlyRamDb&&)      = default;
     ReadonlyRamDb& operator=(const ReadonlyRamDb&) = default;
-    ReadonlyRamDb& operator=(ReadonlyRamDb&&)      = default;
+    ReadonlyRamDb& operator=(ReadonlyRamDb&&) = default;
 
     void Prefetch(bool warn_if_unreadable);
     void ParseAndLoadDb(std::istream& input_stream, bool warn_if_unreadable);

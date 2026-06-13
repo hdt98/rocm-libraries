@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,9 @@
  *
  * ************************************************************************ */
 
-#include "rocsparse_control.hpp"
-#include "rocsparse_primitives.hpp"
-#include "rocsparse_utility.hpp"
+#include "control.h"
+#include "rocsparse_primitives.h"
+#include "utility.h"
 
 #include <rocprim/rocprim.hpp>
 
@@ -41,6 +41,7 @@ rocsparse_status
 
     using config
         = rocprim::segmented_radix_sort_config<7,
+                                               4,
                                                rocprim::kernel_config<256, 16>,
                                                rocprim::WarpSortConfig<8, 8, 256, 5, 16, 16, 256>,
                                                1>;
@@ -79,6 +80,7 @@ rocsparse_status rocsparse::primitives::segmented_radix_sort_keys(rocsparse_hand
 
     using config
         = rocprim::segmented_radix_sort_config<7,
+                                               4,
                                                rocprim::kernel_config<256, 16>,
                                                rocprim::WarpSortConfig<8, 8, 256, 5, 16, 16, 256>,
                                                1>;
@@ -132,11 +134,8 @@ rocsparse_status rocsparse::primitives::sort_csr_column_indices(rocsparse_handle
     uint32_t startbit = 0;
     uint32_t endbit   = rocsparse::clz(n);
 
-    RETURN_IF_HIP_ERROR(hipMemcpyAsync(csr_col_ind_buffer1,
-                                       csr_col_ind,
-                                       sizeof(J) * nnz,
-                                       hipMemcpyDeviceToDevice,
-                                       handle->stream));
+    RETURN_IF_HIP_ERROR(
+        hipMemcpyAsync(csr_col_ind_buffer1, csr_col_ind, sizeof(J) * nnz, hipMemcpyDeviceToDevice));
 
     rocsparse::primitives::double_buffer<J> indices(csr_col_ind_buffer1, csr_col_ind_buffer2);
 

@@ -56,8 +56,7 @@ struct ConvWrwSolverTest
         const miopen::ExecutionContext ctx = [&] {
             auto tmp = miopen::ExecutionContext{&handle};
             problem.SetupFloats(tmp);
-            problem.SetupComputeType(tmp);
-            return std::move(tmp);
+            return tmp;
         }();
 
         if(!solv.IsApplicable(ctx, problem))

@@ -23,7 +23,7 @@
  * ************************************************************************ */
 
 #include "gebsrmm_device_general.h"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {

@@ -5,79 +5,30 @@
 .. _linux-install:
 
 ***********************************
-Install and build hipBLAS for Linux
+Installing and building for Linux
 ***********************************
-
-To build hipBLAS as part of the ROCm Core SDK, see `TheRock build
-instructions
-<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
-TheRock is the recommended way to build ROCm components from source.
-
-Alternatively, you can build hipBLAS standalone using the following
-instructions.
 
 This topic discusses how to install hipBLAS on Linux from a package and how to build and install it from the source code.
 For a list of installation prerequisites, see :doc:`hipBLAS prerequisites <prerequisites>`.
 
-Prerequisites for Linux
-=========================
+Installing prebuilt packages
+=============================
 
-The hipBLAS prerequisites are different than the :doc:`rocBLAS <rocblas:index>` and NVIDIA CUDA cuBLAS backend prerequisites. See the cuBLAS documentation for NVIDIA installation procedures.
+You can manually download the prebuilt hipBLAS packages from the :doc:`ROCm native package manager <rocm-install-on-linux:install/quick-start>`
+or by clicking the `GitHub releases tab <https://github.com/ROCm/hipBLAS/releases>`_.
+The versions on GitHub might be more recent. Release notes are available for each release on the releases tab.
 
-*  The prerequisites required to use the rocBLAS backend with AMD components are as follows:
+To download the prebuilt package, use this command:
 
-   * A ROCm-enabled platform. For more information, see :ref:`ROCm Core SDK components <rocm:release-components>`.
-   * A compatible version of `hipblas-common <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblas-common>`_.
-   * A compatible version of rocBLAS.
-   * For full functionality, optionally install a compatible version of :doc:`rocSOLVER <rocsolver:index>` and its dependencies.
+.. code-block:: shell
 
-*  The prerequisites required to use the cuBLAS backend with NVIDIA components are as follows:
-
-   * A HIP-enabled platform. For more information, see :doc:`HIP installation <hip:install/install>`.
-   * A working CUDA toolkit, including cuBLAS. For more information, see `CUDA toolkit <https://developer.nvidia.com/accelerated-computing-toolkit/>`_.
+   sudo apt update && sudo apt install hipblas
 
 Building hipBLAS from source
 ============================
 
 When building hipBLAS from source, you can choose to build only the library and its dependencies or include the client and its
 dependencies.
-
-Download hipBLAS
-----------------
-
-The hipBLAS source code is available from the `hipBLAS folder <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblas>`_
-of the `rocm-libraries GitHub <https://github.com/ROCm/rocm-libraries>`_.
-
-To download hipBLAS, including all projects in the rocm-libraries repository, use the following commands.
-
-.. code-block:: shell
-
-   git clone -b release/rocm-rel-x.y https://github.com/ROCm/rocm-libraries.git
-   cd  rocm-libraries/projects/hipblas
-
-To limit your local checkout to only the hipBLAS project, configure ``sparse-checkout`` before cloning.
-This uses the Git partial clone feature (``--filter=blob:none``) to reduce how much data is downloaded.
-Use the following commands for a sparse checkout:
-
-.. note::
-
-   To include the hipBLAS dependencies, set the projects for the sparse checkout using
-   ``git sparse-checkout set projects/hipblas projects/rocsolver projects/rocblas projects/hipblas-common``.
-
-.. code-block:: shell
-
-   git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libraries.git
-   cd rocm-libraries
-   git sparse-checkout init --cone
-   git sparse-checkout set projects/hipblas # add projects/rocsolver projects/rocblas projects/hipblas-common to include dependencies
-   git checkout develop # or use the branch you want to work with
-
-.. note::
-
-   To build ROCm 6.4.3 and older, use the hipBLAS repository at `<https://github.com/ROCm/hipBLAS>`_.
-   For more information, see the documentation associated with the release you want to build.
-
-The hipBLAS source code is found in the ``projects/hipblas`` directory.
 
 Building the library and library dependencies
 ---------------------------------------------
@@ -87,10 +38,6 @@ hipBLAS with a single command. It accepts several options but has a hard-coded c
 that you can override by invoking ``cmake`` directly. However, it's a great way to get started quickly and
 serves as an example of how to build and install hipBLAS.
 A few commands in the script require ``sudo`` access, which might prompt you for a password.
-
-.. note::
-
-   You can run the ``rmake.py`` script from the ``projects/hipblas`` directory.
 
 The install script determines the build platform by querying ``hipconfig --platform``. This value can be explicitly defined
 by setting the environment variable ``HIP_PLATFORM`` to ``HIP_PLATFORM=amd`` or ``HIP_PLATFORM=nvidia``.
@@ -182,7 +129,7 @@ Build the library, tests, benchmarks, and samples using individual commands
 ----------------------------------------------------------------------------
 
 The repository contains source code for clients that serve as samples, tests, and benchmarks. These source code files can be
-found in the `clients subdirectory <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblas/clients>`_ of the hipBLAS GitHub.
+found in the `clients subdirectory <https://github.com/ROCm/hipBLAS/tree/develop/clients>`_ of the hipBLAS GitHub.
 
 Dependencies (only necessary for hipBLAS clients)
 -------------------------------------------------

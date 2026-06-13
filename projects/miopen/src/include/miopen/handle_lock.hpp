@@ -1,18 +1,41 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2017 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 
 #ifndef GUARD_MIOPEN_HANDLE_LOCK_HPP
 #define GUARD_MIOPEN_HANDLE_LOCK_HPP
 
-#include <miopen/config.h>
-#include <miopen/filesystem.hpp>
-#include <miopen/file_lock.hpp>
-#include <miopen/logger.hpp>
-#include <miopen/unique_path.hpp>
-
-#include <chrono>
+#include <boost/interprocess/sync/file_lock.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <mutex>
+#include <miopen/filesystem.hpp>
+#include <miopen/config.h>
+#include <miopen/errors.hpp>
+#include <miopen/logger.hpp>
 
 namespace miopen {
 
@@ -33,10 +56,10 @@ MIOPEN_DECLARE_HANDLE_MUTEX(gpu_handle_mutex)
 
 inline fs::path get_handle_lock_path(const char* name)
 {
-    const auto p = fs::current_path() / name;
+    auto p = fs::current_path() / name;
     if(!fs::exists(p))
     {
-        const auto tmp = fs::current_path() / miopen::unique_path();
+        auto tmp = fs::current_path() / boost::filesystem::unique_path().string();
         std::ofstream{tmp}; // NOLINT(bugprone-unused-raii)
         fs::rename(tmp, p);
     }
@@ -46,9 +69,9 @@ inline fs::path get_handle_lock_path(const char* name)
 struct handle_mutex
 {
     std::recursive_timed_mutex m;
-    miopen::file_lock flock;
+    boost::interprocess::file_lock flock;
 
-    handle_mutex(const std::string& name) : flock(name) {}
+    handle_mutex(const char* name) : flock(name) {}
 
     bool try_lock() { return std::try_lock(m, flock) != 0; }
 
@@ -57,8 +80,11 @@ struct handle_mutex
     template <class Duration>
     bool try_lock_for(Duration d)
     {
-        return m.try_lock_for(d) && flock.timed_lock(std::chrono::steady_clock::now() +
-                                                     std::chrono::duration_cast<Duration>(d));
+        return m.try_lock_for(d) &&
+               flock.timed_lock(
+                   boost::posix_time::second_clock::universal_time() +
+                   boost::posix_time::milliseconds(
+                       std::chrono::duration_cast<std::chrono::milliseconds>(d).count()));
     }
 
     template <class Point>
@@ -78,7 +104,7 @@ template <class T>
 inline std::unique_lock<handle_mutex> get_handle_lock(T, int timeout = 120)
 {
     // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
-    static handle_mutex m{get_handle_lock_path(T::value())};
+    static handle_mutex m{get_handle_lock_path(T::value()).c_str()};
     return {m, std::chrono::seconds{timeout}};
 }
 

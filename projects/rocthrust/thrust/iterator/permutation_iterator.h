@@ -32,21 +32,13 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/attributes.h>
 #include <thrust/detail/type_traits.h>
 #include <thrust/iterator/detail/permutation_iterator_base.h>
 #include <thrust/iterator/iterator_facade.h>
 #include <thrust/iterator/iterator_traits.h>
 
 THRUST_NAMESPACE_BEGIN
+
 
 /*! \addtogroup iterators
  *  \{
@@ -122,79 +114,78 @@ THRUST_NAMESPACE_BEGIN
  *
  *  \see make_permutation_iterator
  */
-template <typename ElementIterator, typename IndexIterator>
-class THRUST_DECLSPEC_EMPTY_BASES permutation_iterator
-    : public thrust::detail::permutation_iterator_base<ElementIterator, IndexIterator>::type
+template <typename ElementIterator,
+          typename IndexIterator>
+  class permutation_iterator
+    : public thrust::detail::permutation_iterator_base<
+        ElementIterator,
+        IndexIterator
+      >::type
 {
   /*! \cond
    */
+  private:
+    using super_t =
+      typename detail::permutation_iterator_base<ElementIterator, IndexIterator>::type;
 
-private:
-  using super_t = typename detail::permutation_iterator_base<ElementIterator, IndexIterator>::type;
-
-  friend class iterator_core_access;
+    friend class thrust::iterator_core_access;
   /*! \endcond
    */
 
-public:
-  /*! Null constructor calls the null constructor of this \p permutation_iterator's
-   *  element iterator.
-   */
-  permutation_iterator() = default;
+  public:
+    /*! Null constructor calls the null constructor of this \p permutation_iterator's
+     *  element iterator.
+     */
+    permutation_iterator() = default;
 
-  /*! Constructor accepts an \c ElementIterator into a range of values and an
-   *  \c IndexIterator into a range of indices defining the indexing scheme on the
-   *  values.
-   *
-   *  \param x An \c ElementIterator pointing this \p permutation_iterator's range of values.
-   *  \param y An \c IndexIterator pointing to an indexing scheme to use on \p x.
-   */
-  THRUST_HOST_DEVICE explicit permutation_iterator(ElementIterator x, IndexIterator y)
-      : super_t(y)
-      , m_element_iterator(x)
-  {}
+    /*! Constructor accepts an \c ElementIterator into a range of values and an
+     *  \c IndexIterator into a range of indices defining the indexing scheme on the
+     *  values.
+     *
+     *  \param x An \c ElementIterator pointing this \p permutation_iterator's range of values.
+     *  \param y An \c IndexIterator pointing to an indexing scheme to use on \p x.
+     */
+    THRUST_HOST_DEVICE
+    explicit permutation_iterator(ElementIterator x, IndexIterator y)
+      : super_t(y), m_element_iterator(x) {}
 
-  /*! Copy constructor accepts a related \p permutation_iterator.
-   *  \param rhs A compatible \p permutation_iterator to copy from.
-   */
-  template <typename OtherElementIterator,
-            typename OtherIndexIterator,
-            detail::enable_if_convertible_t<OtherElementIterator, ElementIterator, int> = 0,
-            detail::enable_if_convertible_t<OtherIndexIterator, IndexIterator, int>     = 0>
-  THRUST_HOST_DEVICE permutation_iterator(permutation_iterator<OtherElementIterator, OtherIndexIterator> const& rhs)
-      : super_t(rhs.base())
-      , m_element_iterator(rhs.m_element_iterator)
-  {}
+    /*! Copy constructor accepts a related \p permutation_iterator.
+     *  \param rhs A compatible \p permutation_iterator to copy from.
+     */
+    template <typename OtherElementIterator,
+              typename OtherIndexIterator,
+              detail::enable_if_convertible_t<OtherElementIterator, ElementIterator, int> = 0,
+              detail::enable_if_convertible_t<OtherIndexIterator, IndexIterator, int>     = 0>
+    THRUST_HOST_DEVICE permutation_iterator(permutation_iterator<OtherElementIterator, OtherIndexIterator> const& rhs)
+        : super_t(rhs.base())
+        , m_element_iterator(rhs.m_element_iterator)
+    {}
 
-  /*! \cond
-   */
+    /*! \cond
+     */
+  private:
+    // MSVC 2013 and 2015 incorrectly warning about returning a reference to
+    // a local/temporary here.
+    // See goo.gl/LELTNp
+    THRUST_DISABLE_MSVC_WARNING_BEGIN(4172)
 
-private:
-  // MSVC incorrectly warning about returning a reference to a local/temporary here.
-  // NVHPC breaks with push / pop within a class
-#if THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC
-  THRUST_DIAG_PUSH
-  THRUST_DIAG_SUPPRESS_MSVC(4172)
-#endif // THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC
+    THRUST_EXEC_CHECK_DISABLE
+    THRUST_HOST_DEVICE
+    typename super_t::reference dereference() const
+    {
+      return *(m_element_iterator + *this->base());
+    }
 
-  THRUST_EXEC_CHECK_DISABLE
-  THRUST_HOST_DEVICE typename super_t::reference dereference() const
-  {
-    return *(m_element_iterator + *this->base());
-  }
+    THRUST_DISABLE_MSVC_WARNING_END(4172)
 
-#if (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC) && (THRUST_MSVC_VERSION < 1920)
-  THRUST_DIAG_POP
-#endif // (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC) && (THRUST_MSVC_VERSION < 1920)
+    // make friends for the copy constructor
+    template<typename,typename> friend class permutation_iterator;
 
-  // make friends for the copy constructor
-  template <typename, typename>
-  friend class permutation_iterator;
-
-  ElementIterator m_element_iterator;
+    ElementIterator m_element_iterator;
   /*! \endcond
    */
 }; // end permutation_iterator
+
 
 /*! \p make_permutation_iterator creates a \p permutation_iterator
  *  from an \c ElementIterator pointing to a range of elements to "permute"
@@ -206,11 +197,11 @@ private:
  *  \return A new \p permutation_iterator which permutes the range \p e by \p i.
  *  \see permutation_iterator
  */
-template <typename ElementIterator, typename IndexIterator>
-THRUST_HOST_DEVICE permutation_iterator<ElementIterator, IndexIterator>
-make_permutation_iterator(ElementIterator e, IndexIterator i)
+template<typename ElementIterator, typename IndexIterator>
+THRUST_HOST_DEVICE
+permutation_iterator<ElementIterator,IndexIterator> make_permutation_iterator(ElementIterator e, IndexIterator i)
 {
-  return permutation_iterator<ElementIterator, IndexIterator>(e, i);
+  return permutation_iterator<ElementIterator,IndexIterator>(e,i);
 }
 
 /*! \} // end fancyiterators
@@ -220,3 +211,4 @@ make_permutation_iterator(ElementIterator e, IndexIterator i)
  */
 
 THRUST_NAMESPACE_END
+

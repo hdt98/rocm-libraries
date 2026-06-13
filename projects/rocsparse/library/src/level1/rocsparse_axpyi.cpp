@@ -25,17 +25,17 @@
 #include "internal/level1/rocsparse_axpyi.h"
 #include "axpyi_device.h"
 #include "rocsparse_axpyi.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
-    template <uint32_t BLOCKSIZE, typename T, typename I, typename X, typename Y>
+    template <uint32_t BLOCKSIZE, typename I, typename T>
     ROCSPARSE_KERNEL(BLOCKSIZE)
     void axpyi_kernel(I nnz,
                       ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),
-                      const X* __restrict__ x_val,
+                      const T* __restrict__ x_val,
                       const I* __restrict__ x_ind,
-                      Y*                   y,
+                      T*                   y,
                       rocsparse_index_base idx_base,
                       bool                 is_host_mode)
     {
@@ -47,13 +47,13 @@ namespace rocsparse
     }
 }
 
-template <typename T, typename I, typename X, typename Y>
+template <typename I, typename T>
 rocsparse_status rocsparse::axpyi_template(rocsparse_handle     handle,
                                            I                    nnz,
                                            const T*             alpha,
-                                           const X*             x_val,
+                                           const T*             x_val,
                                            const I*             x_ind,
-                                           Y*                   y,
+                                           T*                   y,
                                            rocsparse_index_base idx_base)
 {
     ROCSPARSE_ROUTINE_TRACE;
@@ -117,28 +117,24 @@ rocsparse_status rocsparse::axpyi_template(rocsparse_handle     handle,
     return rocsparse_status_success;
 }
 
-#define INSTANTIATE(TTYPE, ITYPE, XTYPE, YTYPE)                                      \
-    template rocsparse_status rocsparse::axpyi_template<TTYPE, ITYPE, XTYPE, YTYPE>( \
-        rocsparse_handle     handle,                                                 \
-        ITYPE                nnz,                                                    \
-        const TTYPE*         alpha,                                                  \
-        const XTYPE*         x_val,                                                  \
-        const ITYPE*         x_ind,                                                  \
-        YTYPE*               y,                                                      \
+#define INSTANTIATE(ITYPE, TTYPE)                                      \
+    template rocsparse_status rocsparse::axpyi_template<ITYPE, TTYPE>( \
+        rocsparse_handle     handle,                                   \
+        ITYPE                nnz,                                      \
+        const TTYPE*         alpha,                                    \
+        const TTYPE*         x_val,                                    \
+        const ITYPE*         x_ind,                                    \
+        TTYPE*               y,                                        \
         rocsparse_index_base idx_base);
 
-INSTANTIATE(float, int32_t, rocsparse_bfloat16, rocsparse_bfloat16);
-INSTANTIATE(float, int32_t, _Float16, _Float16);
-INSTANTIATE(float, int32_t, float, float);
-INSTANTIATE(double, int32_t, double, double);
-INSTANTIATE(rocsparse_float_complex, int32_t, rocsparse_float_complex, rocsparse_float_complex);
-INSTANTIATE(rocsparse_double_complex, int32_t, rocsparse_double_complex, rocsparse_double_complex);
-INSTANTIATE(float, int64_t, rocsparse_bfloat16, rocsparse_bfloat16);
-INSTANTIATE(float, int64_t, _Float16, _Float16);
-INSTANTIATE(float, int64_t, float, float);
-INSTANTIATE(double, int64_t, double, double);
-INSTANTIATE(rocsparse_float_complex, int64_t, rocsparse_float_complex, rocsparse_float_complex);
-INSTANTIATE(rocsparse_double_complex, int64_t, rocsparse_double_complex, rocsparse_double_complex);
+INSTANTIATE(int32_t, float);
+INSTANTIATE(int32_t, double);
+INSTANTIATE(int32_t, rocsparse_float_complex);
+INSTANTIATE(int32_t, rocsparse_double_complex);
+INSTANTIATE(int64_t, float);
+INSTANTIATE(int64_t, double);
+INSTANTIATE(int64_t, rocsparse_float_complex);
+INSTANTIATE(int64_t, rocsparse_double_complex);
 #undef INSTANTIATE
 
 /*

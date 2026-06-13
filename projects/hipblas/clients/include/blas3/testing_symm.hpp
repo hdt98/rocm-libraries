@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,6 @@ inline void testname_symm(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_symm_bad_arg(const Arguments& arg)
 {
-    using Ts           = hipblas_internal_type<T>;
     auto hipblasSymmFn = arg.api == FORTRAN ? hipblasSymm<T, true> : hipblasSymm<T, false>;
     auto hipblasSymmFn_64
         = arg.api == FORTRAN_64 ? hipblasSymm_64<T, true> : hipblasSymm_64<T, false>;
@@ -64,14 +63,12 @@ void testing_symm_bad_arg(const Arguments& arg)
     device_matrix<T> dC(M, N, ldc);
 
     device_vector<T> d_alpha(1), d_beta(1), d_one(1), d_zero(1);
-    Ts               h_alpha{1}, h_beta{2}, h_one{1}, h_zero{0};
-    if constexpr(is_complex<T>)
-        h_one = {1, 0};
+    const T          h_alpha(1), h_beta(2), h_one(1), h_zero(0);
 
-    const Ts* alpha = &h_alpha;
-    const Ts* beta  = &h_beta;
-    const Ts* one   = &h_one;
-    const Ts* zero  = &h_zero;
+    const T* alpha = &h_alpha;
+    const T* beta  = &h_beta;
+    const T* one   = &h_one;
+    const T* zero  = &h_zero;
 
     for(auto pointer_mode : {HIPBLAS_POINTER_MODE_HOST, HIPBLAS_POINTER_MODE_DEVICE})
     {
@@ -198,7 +195,6 @@ void testing_symm_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_symm(const Arguments& arg)
 {
-    using Ts           = hipblas_internal_type<T>;
     auto hipblasSymmFn = arg.api == FORTRAN ? hipblasSymm<T, true> : hipblasSymm<T, false>;
     auto hipblasSymmFn_64
         = arg.api == FORTRAN_64 ? hipblasSymm_64<T, true> : hipblasSymm_64<T, false>;
@@ -253,7 +249,7 @@ void testing_symm(const Arguments& arg)
 
     hipblasStatus_t status = HIPBLAS_STATUS_SUCCESS;
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_matrix(hA, arg, hipblas_client_never_set_nan, hipblas_symmetric_matrix, true);
@@ -278,19 +274,7 @@ void testing_symm(const Arguments& arg)
         =================================================================== */
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
         DAPI_CHECK(hipblasSymmFn,
-                   (handle,
-                    side,
-                    uplo,
-                    M,
-                    N,
-                    reinterpret_cast<Ts*>(&h_alpha),
-                    dA,
-                    lda,
-                    dB,
-                    ldb,
-                    reinterpret_cast<Ts*>(&h_beta),
-                    dC,
-                    ldc));
+                   (handle, side, uplo, M, N, &h_alpha, dA, lda, dB, ldb, &h_beta, dC, ldc));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(hC_host.transfer_from(dC));

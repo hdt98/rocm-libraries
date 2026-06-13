@@ -33,16 +33,19 @@ TEST(spmm_bell_bad_arg, spmm_bell_float)
 
 TEST(spmm_bell, spmm_bell_i32_float)
 {
-    testing_spmm_bell<int32_t, float>();
+    hipsparseStatus_t status = testing_spmm_bell<int32_t, float>();
+    EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 
 TEST(spmm_bell, spmm_bell_i64_double)
 {
-    testing_spmm_bell<int32_t, double>();
+    hipsparseStatus_t status = testing_spmm_bell<int32_t, double>();
+    EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 
 TEST(spmm_bell, spmm_bell_i64_hipComplex)
 {
-    testing_spmm_bell<int32_t, hipComplex>();
+    hipsparseStatus_t status = testing_spmm_bell<int32_t, hipComplex>();
+    EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 #endif

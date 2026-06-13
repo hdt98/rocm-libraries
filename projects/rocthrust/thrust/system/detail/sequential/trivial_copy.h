@@ -22,11 +22,10 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#include <thrust/detail/nv_target.h>
+#include <cstring>
 #include <thrust/system/detail/sequential/general_copy.h>
 
-#include <cstring>
+#include <thrust/detail/nv_target.h>
 
 THRUST_NAMESPACE_BEGIN
 namespace system
@@ -36,10 +35,14 @@ namespace detail
 namespace sequential
 {
 
-template <typename T>
-THRUST_HOST_DEVICE T* trivial_copy_n(const T* first, std::ptrdiff_t n, T* result)
+
+template<typename T>
+THRUST_HOST_DEVICE
+  T *trivial_copy_n(const T *first,
+                    std::ptrdiff_t n,
+                    T *result)
 {
-  if (n == 0)
+  if(n == 0)
   {
     // If `first` or `result` is an invalid pointer,
     // the behavior of `std::memmove` is undefined, even if `n` is zero.
@@ -48,12 +51,15 @@ THRUST_HOST_DEVICE T* trivial_copy_n(const T* first, std::ptrdiff_t n, T* result
 
   T* return_value = nullptr;
 
-  NV_IF_TARGET(NV_IS_HOST,
-               (std::memmove(result, first, n * sizeof(T)); return_value = result + n;),
-               ( // NV_IS_DEVICE:
-                 return_value = thrust::system::detail::sequential::general_copy_n(first, n, result);));
+  NV_IF_TARGET(NV_IS_HOST, (
+    std::memmove(result, first, n * sizeof(T));
+    return_value = result + n;
+  ), ( // NV_IS_DEVICE:
+    return_value = thrust::system::detail::sequential::general_copy_n(first, n, result);
+  ));
   return return_value;
 } // end trivial_copy_n()
+
 
 } // end namespace sequential
 } // end namespace detail

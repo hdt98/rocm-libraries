@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,13 @@
 #include "rocsparse_bsrgemm_mult.hpp"
 #include "../conversion/rocsparse_identity.hpp"
 #include "bsrgemm_device.h"
+#include "control.h"
 #include "csrgemm_device.h"
 #include "internal/extra/rocsparse_bsrgemm.h"
 #include "rocsparse_bsrgemm.hpp"
 #include "rocsparse_bsrgemm_calc.hpp"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csrgemm.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 rocsparse_status rocsparse::bsrgemm_mult_quickreturn(rocsparse_handle          handle,
                                                      rocsparse_direction       dir,
@@ -162,21 +162,15 @@ INSTANTIATE(int32_t, int32_t, float);
 INSTANTIATE(int32_t, int32_t, double);
 INSTANTIATE(int32_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, int32_t, rocsparse_double_complex);
-INSTANTIATE(int32_t, int32_t, _Float16);
-INSTANTIATE(int32_t, int32_t, rocsparse_bfloat16);
 
 INSTANTIATE(int64_t, int32_t, float);
 INSTANTIATE(int64_t, int32_t, double);
 INSTANTIATE(int64_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int32_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, int32_t, _Float16);
-INSTANTIATE(int64_t, int32_t, rocsparse_bfloat16);
 
 INSTANTIATE(int64_t, int64_t, float);
 INSTANTIATE(int64_t, int64_t, double);
 INSTANTIATE(int64_t, int64_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int64_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, int64_t, _Float16);
-INSTANTIATE(int64_t, int64_t, rocsparse_bfloat16);
 
 #undef INSTANTIATE

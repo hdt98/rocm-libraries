@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,6 @@
 #include <rocsparse/rocsparse.h>
 
 #include "../utility.h"
-#include "hipsparse-bfloat16.h"
-#include "hipsparse-float16.h"
 
 struct hipsparseSpGEMMDescr
 {
@@ -96,23 +94,6 @@ namespace hipsparse
         return HIPSPARSE_STATUS_INVALID_VALUE;
     }
 
-    static float convert_to_float(const void* value, hipDataType dataType)
-    {
-        if(dataType == HIP_R_16F)
-        {
-            hipsparseFloat16 f16;
-            f16.data = *static_cast<const uint16_t*>(value);
-            return hipsparseFloat16::float16_to_float(f16);
-        }
-        else if(dataType == HIP_R_16BF)
-        {
-            hipsparseBfloat16 bf16;
-            bf16.data = *static_cast<const uint16_t*>(value);
-            return hipsparseBfloat16::bfloat16_to_float(bf16);
-        }
-        return 0.0f;
-    }
-
     static hipsparseStatus_t getDataTypeSize(hipDataType dataType, size_t& size)
     {
         switch(dataType)
@@ -135,16 +116,6 @@ namespace hipsparse
         case HIP_C_64F:
         {
             size = sizeof(hipDoubleComplex);
-            return HIPSPARSE_STATUS_SUCCESS;
-        }
-        case HIP_R_16F:
-        {
-            size = 2; // sizeof(float16)
-            return HIPSPARSE_STATUS_SUCCESS;
-        }
-        case HIP_R_16BF:
-        {
-            size = 2; // sizeof(bfloat16)
             return HIPSPARSE_STATUS_SUCCESS;
         }
         default:
@@ -212,11 +183,11 @@ hipsparseStatus_t hipsparseSpGEMM_workEstimation(hipsparseHandle_t          hand
                                                    hipsparse::hipOperationToHCCOperation(opA),
                                                    hipsparse::hipOperationToHCCOperation(opB),
                                                    alpha,
-                                                   to_rocsparse_const_spmat_descr(matA),
-                                                   to_rocsparse_const_spmat_descr(matB),
+                                                   (rocsparse_const_spmat_descr)matA,
+                                                   (rocsparse_const_spmat_descr)matB,
                                                    nullptr,
-                                                   to_rocsparse_const_spmat_descr(matC),
-                                                   to_rocsparse_spmat_descr(matC),
+                                                   (rocsparse_const_spmat_descr)matC,
+                                                   (rocsparse_spmat_descr)matC,
                                                    hipsparse::hipDataTypeToHCCDataType(computeType),
                                                    hipsparse::hipSpGEMMAlgToHCCSpGEMMAlg(alg),
                                                    rocsparse_spgemm_stage_buffer_size,
@@ -246,11 +217,11 @@ hipsparseStatus_t hipsparseSpGEMM_workEstimation(hipsparseHandle_t          hand
                              hipsparse::hipOperationToHCCOperation(opA),
                              hipsparse::hipOperationToHCCOperation(opB),
                              alpha,
-                             to_rocsparse_const_spmat_descr(matA),
-                             to_rocsparse_const_spmat_descr(matB),
+                             (rocsparse_const_spmat_descr)matA,
+                             (rocsparse_const_spmat_descr)matB,
                              nullptr,
-                             to_rocsparse_const_spmat_descr(matC),
-                             to_rocsparse_spmat_descr(matC),
+                             (rocsparse_const_spmat_descr)matC,
+                             (rocsparse_spmat_descr)matC,
                              hipsparse::hipDataTypeToHCCDataType(computeType),
                              hipsparse::hipSpGEMMAlgToHCCSpGEMMAlg(alg),
                              rocsparse_spgemm_stage_nnz,
@@ -356,11 +327,11 @@ hipsparseStatus_t hipsparseSpGEMM_compute(hipsparseHandle_t          handle,
                              hipsparse::hipOperationToHCCOperation(opA),
                              hipsparse::hipOperationToHCCOperation(opB),
                              alpha,
-                             to_rocsparse_const_spmat_descr(matA),
-                             to_rocsparse_const_spmat_descr(matB),
+                             (rocsparse_const_spmat_descr)matA,
+                             (rocsparse_const_spmat_descr)matB,
                              nullptr,
-                             to_rocsparse_const_spmat_descr(matC),
-                             to_rocsparse_spmat_descr(matC),
+                             (rocsparse_const_spmat_descr)matC,
+                             (rocsparse_spmat_descr)matC,
                              hipsparse::hipDataTypeToHCCDataType(computeType),
                              hipsparse::hipSpGEMMAlgToHCCSpGEMMAlg(alg),
                              rocsparse_spgemm_stage_compute,
@@ -444,18 +415,6 @@ hipsparseStatus_t hipsparseSpGEMM_copy(hipsparseHandle_t          handle,
     hipComplex       host_cone = make_hipComplex(1.0f, 0.0f);
     hipDoubleComplex host_zone = make_hipDoubleComplex(1.0, 0.0);
 
-    // For Axpby with float16/bfloat16 data, rocsparse expects float32 scalars.
-    // So for HIP_R_16F and HIP_R_16BF, we use host_sone (float) as the "one" scalar.
-    // We also need to convert beta from float16/bfloat16 to float.
-    float       host_beta_f32  = 0.0f;
-    const void* beta_for_axpby = beta;
-
-    if(computeType == HIP_R_16F || computeType == HIP_R_16BF)
-    {
-        host_beta_f32  = hipsparse::convert_to_float(beta, computeType);
-        beta_for_axpby = &host_beta_f32;
-    }
-
     void* one = nullptr;
     if(pointer_mode == HIPSPARSE_POINTER_MODE_HOST)
     {
@@ -467,9 +426,6 @@ hipsparseStatus_t hipsparseSpGEMM_copy(hipsparseHandle_t          handle,
             one = &host_cone;
         if(computeType == HIP_C_64F)
             one = &host_zone;
-        // For float16 and bfloat16, use float32 scalar (rocsparse_axpby requirement)
-        if(computeType == HIP_R_16F || computeType == HIP_R_16BF)
-            one = &host_sone;
     }
     else
     {
@@ -496,19 +452,6 @@ hipsparseStatus_t hipsparseSpGEMM_copy(hipsparseHandle_t          handle,
             RETURN_IF_HIP_ERROR(hipMemcpyAsync(
                 device_one, &host_zone, sizeof(hipDoubleComplex), hipMemcpyHostToDevice, stream));
             one = device_one;
-        }
-        // For float16 and bfloat16, use float32 scalar (rocsparse_axpby requirement)
-        if(computeType == HIP_R_16F || computeType == HIP_R_16BF)
-        {
-            RETURN_IF_HIP_ERROR(hipMemcpyAsync(
-                device_one, &host_sone, sizeof(float), hipMemcpyHostToDevice, stream));
-            one = device_one;
-            // Also copy beta to device as float
-            // Note: For device mode, we need to copy host_beta_f32 to device
-            void* device_beta = static_cast<char*>(device_one) + sizeof(float);
-            RETURN_IF_HIP_ERROR(hipMemcpyAsync(
-                device_beta, &host_beta_f32, sizeof(float), hipMemcpyHostToDevice, stream));
-            beta_for_axpby = device_beta;
         }
     }
 
@@ -562,8 +505,7 @@ hipsparseStatus_t hipsparseSpGEMM_copy(hipsparseHandle_t          handle,
 
     // Axpby computes: Y = alpha * X + beta * Y
     // What we want to compute: csrValuesC = 1.0 * csrValuesCFromBuffer2 + beta * csrValuesC
-    // Note: For float16/bfloat16, we use float32 scalars (rocsparse_axpby requirement)
-    RETURN_IF_HIPSPARSE_ERROR(hipsparseAxpby(handle, one, vecX, beta_for_axpby, vecY));
+    RETURN_IF_HIPSPARSE_ERROR(hipsparseAxpby(handle, one, vecX, beta, vecY));
 
     RETURN_IF_HIPSPARSE_ERROR(hipsparseDestroySpVec(vecX));
     RETURN_IF_HIPSPARSE_ERROR(hipsparseDestroyDnVec(vecY));

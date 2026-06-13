@@ -24,8 +24,6 @@
  *
  *******************************************************************************/
 
-#include <cstdio>
-#include <cstdlib>
 #include <stdexcept>
 #include <gtest/gtest.h>
 #include "platform.hpp"
@@ -123,17 +121,7 @@ DevMem::DevMem(const Device&, size_t size)
     }
 }
 
-DevMem::~DevMem()
-{
-    // ASSERT_* cannot be used in destructors (generates illegal return-void).
-    auto err = hipFree(ptr);
-    if(err != hipSuccess)
-    {
-        fprintf(
-            stderr, "hipFree failed: %s at %s:%d\n", hipGetErrorString(err), __FILE__, __LINE__);
-        abort();
-    }
-}
+DevMem::~DevMem() { EXPECT_EQ(hipFree(ptr), hipSuccess); }
 
 #endif // MIOPEN_BACKEND_HIP
 

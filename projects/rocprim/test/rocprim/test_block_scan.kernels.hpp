@@ -29,7 +29,6 @@
 #include "test_utils.hpp"
 #include "test_utils_assertions.hpp"
 #include "test_utils_data_generation.hpp"
-#include "test_utils_types.hpp"
 
 #include <rocprim/block/block_scan.hpp>
 #include <rocprim/functional.hpp>

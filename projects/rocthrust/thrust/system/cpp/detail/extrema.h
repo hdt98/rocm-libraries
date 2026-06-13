@@ -20,3 +20,4 @@
 
 // this system inherits extrema algorithms
 #include <thrust/system/detail/sequential/extrema.h>
+

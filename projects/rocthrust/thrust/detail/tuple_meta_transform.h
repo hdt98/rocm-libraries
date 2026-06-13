@@ -30,17 +30,22 @@ namespace detail
 // rather than directly specializing tuple_meta_transform with
 // default argument IndexSequence = thrust::make_index_sequence<thrust::tuple_size<Tuple>::value>
 // to workaround nvcc 11.0 compiler bug
-template <typename Tuple, template <typename> class UnaryMetaFunction, typename IndexSequence>
-struct tuple_meta_transform_WAR_NVCC;
+template<typename Tuple,
+         template<typename> class UnaryMetaFunction,
+         typename IndexSequence>
+  struct tuple_meta_transform_WAR_NVCC;
 
-template <typename Tuple, template <typename> class UnaryMetaFunction, size_t... Is>
-struct tuple_meta_transform_WAR_NVCC<Tuple, UnaryMetaFunction, thrust::index_sequence<Is...>>
+template<typename Tuple,
+         template<typename> class UnaryMetaFunction,
+         size_t... Is>
+  struct tuple_meta_transform_WAR_NVCC<Tuple, UnaryMetaFunction, thrust::index_sequence<Is...>>
 {
   using type = thrust::tuple<typename UnaryMetaFunction<typename thrust::tuple_element<Is, Tuple>::type>::type...>;
 };
 
-template <typename Tuple, template <typename> class UnaryMetaFunction>
-struct tuple_meta_transform
+template<typename Tuple,
+         template<typename> class UnaryMetaFunction>
+  struct tuple_meta_transform
 {
   using type =
     typename tuple_meta_transform_WAR_NVCC<Tuple,
@@ -48,6 +53,7 @@ struct tuple_meta_transform
                                            thrust::make_index_sequence<thrust::tuple_size<Tuple>::value>>::type;
 };
 
-} // namespace detail
+} // end detail
 
 THRUST_NAMESPACE_END
+

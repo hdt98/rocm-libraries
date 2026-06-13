@@ -24,12 +24,9 @@
 // At least C++11 required
 #if defined(__cplusplus) && __cplusplus >= 201103L
 
-    // IWYU pragma: begin_exports
     #include "rocrand/rocrand.h"
     #include "rocrand/rocrand_kernel.h"
-    // IWYU pragma: end_exports
 
-    #include <cassert>
     #include <exception>
     #include <limits>
     #include <random>
@@ -37,8 +34,9 @@
     #include <string>
     #include <type_traits>
 
-namespace rocrand_cpp
-{
+    #include <cassert>
+
+namespace rocrand_cpp {
 
 /// \rocrand_internal \addtogroup rocrandhostcpp
 /// @{

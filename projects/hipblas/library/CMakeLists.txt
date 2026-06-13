@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,7 +20,7 @@
 # ########################################################################
 
 # This is incremented when the ABI to the library changes
-set( hipblas_SOVERSION 3.5 )
+set( hipblas_SOVERSION 2.5 )
 
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 
@@ -59,13 +59,6 @@ message( STATUS "*** Building hipBLAS commit: ${hipblas_VERSION_COMMIT_ID}" )
 
 # configure a header file to pass the CMake version settings to the source, and package the header files in the output archive
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/include/hipblas-version.h.in" "${PROJECT_BINARY_DIR}/include/hipblas/hipblas-version.h" )
-
-# Configure Windows version resource file
-if(WIN32)
-  string(TIMESTAMP HIPBLAS_COPYRIGHT_YEAR "%Y")
-  configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/src/version.rc.in"
-    "${PROJECT_BINARY_DIR}/version.rc" @ONLY )
-endif()
 
 # Copy Public Headers to Build Dir
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/include/hipblas.h" "${PROJECT_BINARY_DIR}/include/hipblas/hipblas.h" COPYONLY)

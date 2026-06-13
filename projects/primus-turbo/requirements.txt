@@ -1,0 +1,13 @@
+pre-commit
+clang-format==18.1.6
+build
+scikit-build-core
+triton==3.7.0
+expecttest
+pytest
+pytest-xdist
+setuptools==69.5.1
+setuptools_scm[toml]>=8
+wheel
+pyyaml
+twine

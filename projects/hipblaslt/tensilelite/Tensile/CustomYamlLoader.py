@@ -1,6 +1,3 @@
-# Copyright © Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 import yaml
 from pathlib import Path
 
@@ -58,11 +55,9 @@ def parse_scalar(loader: yaml.Loader):
     value: str = evt.value
     value_lower: str = value.lower()
 
-    # Only accept true/false (case-insensitive), NOT yes/no or 0/1
-    # This matches StrictTypeLoader behavior to ensure type consistency
-    if value_lower == 'true':
+    if value_lower in ('true', 'yes',):
         return True
-    elif value_lower == 'false':
+    elif value_lower in ('false', 'no',):
         return False
     elif value_lower in ('null', '', '~'):
         if not evt.style:

@@ -80,12 +80,12 @@ char type2char<double>()
 }
 
 //  template<>
-//  char type2char<std::complex<float>>(){
+//  char type2char<hipblasComplex>(){
 //      return 'c';
 //  }
 
 //  template<>
-//  char type2char<std::complex<double>>(){
+//  char type2char<hipblasDoubleComplex>(){
 //      return 'z';
 //  }
 
@@ -102,13 +102,13 @@ int type2int<double>(double val)
 }
 
 template <>
-int type2int<std::complex<float>>(std::complex<float> val)
+int type2int<hipblasComplex>(hipblasComplex val)
 {
     return (int)val.real();
 }
 
 template <>
-int type2int<std::complex<double>>(std::complex<double> val)
+int type2int<hipblasDoubleComplex>(hipblasDoubleComplex val)
 {
     return (int)val.real();
 }
@@ -459,10 +459,6 @@ hipblasClientProcessor getArch()
     {
         return hipblasClientProcessor::gfx90a;
     }
-    else if(deviceString.find("gfx90c") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx90c;
-    }
     else if(deviceString.find("gfx942") != std::string::npos)
     {
         return hipblasClientProcessor::gfx942;
@@ -498,38 +494,6 @@ hipblasClientProcessor getArch()
     else if(deviceString.find("gfx1102") != std::string::npos)
     {
         return hipblasClientProcessor::gfx1102;
-    }
-    else if(deviceString.find("gfx1103") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1103;
-    }
-    else if(deviceString.find("gfx1150") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1150;
-    }
-    else if(deviceString.find("gfx1151") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1151;
-    }
-    else if(deviceString.find("gfx1152") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1152;
-    }
-    else if(deviceString.find("gfx1153") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1153;
-    }
-    else if(deviceString.find("gfx1200") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1200;
-    }
-    else if(deviceString.find("gfx1201") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1201;
-    }
-    else if(deviceString.find("gfx1250") != std::string::npos)
-    {
-        return hipblasClientProcessor::gfx1250;
     }
     return static_cast<hipblasClientProcessor>(0);
 }

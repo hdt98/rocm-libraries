@@ -40,12 +40,18 @@ prepend_path( ".." hipblas_headers_public relative_hipblas_headers_public )
 
 if(HIP_PLATFORM STREQUAL amd)
   set( hipblas_source "${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipblas.cpp" )
-
-  message(STATUS "** NOTE: amd_detail/hipblas.cpp is compiled with the verbose flag -v for QC purposes.")
-  SET_SOURCE_FILES_PROPERTIES( ${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipblas.cpp PROPERTIES COMPILE_FLAGS "-v" )
 else( )
   set( hipblas_source "${CMAKE_CURRENT_SOURCE_DIR}/nvidia_detail/hipblas.cpp" )
 endif( )
+
+set (hipblas_f90_source
+  hipblas_module.f90
+)
+
+# Create hipBLAS Fortran module
+if(NOT WIN32)
+    add_library(hipblas_fortran ${hipblas_f90_source})
+endif()
 
 if(BUILD_ADDRESS_SANITIZER)
     add_link_options(-fuse-ld=lld)
@@ -58,15 +64,10 @@ add_library( hipblas
 )
 add_library( roc::hipblas ALIAS hipblas )
 
-# Add Windows version resource to library
-if(WIN32 AND BUILD_SHARED_LIBS)
-  target_sources(hipblas PRIVATE "${PROJECT_BINARY_DIR}/version.rc")
-endif()
-
 set(static_depends)
 
 find_package( hipblas-common REQUIRED CONFIG PATHS ${ROCM_PATH})
-target_link_libraries( hipblas PUBLIC roc::hipblas-common )
+target_link_libraries( hipblas INTERFACE roc::hipblas-common )
 
 # Build hipblas from source on AMD platform
 if(HIP_PLATFORM STREQUAL amd)
@@ -154,15 +155,19 @@ if (WIN32)
   endif()
 endif()
 
-if(BUILD_CODE_COVERAGE)
-  target_compile_options(hipblas PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-  target_link_options(hipblas PUBLIC -fprofile-instr-generate)
-endif()
-
 # Package that helps me set visibility for function names exported from shared library
 include( GenerateExportHeader )
 set_target_properties( hipblas PROPERTIES CXX_VISIBILITY_PRESET "hidden" VISIBILITY_INLINES_HIDDEN ON )
 generate_export_header( hipblas EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/hipblas/hipblas-export.h )
+
+if (BUILD_FILE_REORG_BACKWARD_COMPATIBILITY AND NOT WIN32)
+  rocm_wrap_header_file(
+    hipblas-version.h hipblas-export.h
+    GUARDS SYMLINK WRAPPER
+    WRAPPER_LOCATIONS ${CMAKE_INSTALL_INCLUDEDIR} hipblas/${CMAKE_INSTALL_INCLUDEDIR}
+  )
+endif( )
+
 
 # Following Boost conventions of prefixing 'lib' on static built libraries, across all platforms
 if( NOT BUILD_SHARED_LIBS )
@@ -199,3 +204,29 @@ endif( )
 # Force installation of .f90 module files
 rocm_install(FILES "hipblas_module.f90"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hipblas")
+
+if(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY AND NOT WIN32)
+  rocm_install(
+    DIRECTORY
+       "${PROJECT_BINARY_DIR}/hipblas"
+        DESTINATION "." )
+
+  if ( NOT WIN32 )
+
+    #Create SymLink for Fortran Object Module for backward compatibility
+    rocm_install(
+      CODE "
+        set(PREFIX \$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX})
+	set(INPUT_FILE \${PREFIX}/include/hipblas/hipblas_module.f90)
+        set(SYMLINK_LOCATIONS \${PREFIX}/hipblas/include \${PREFIX}/include)
+        foreach(LOCATION IN LISTS SYMLINK_LOCATIONS)
+          file(MAKE_DIRECTORY \${LOCATION})
+          execute_process(COMMAND ln -sfr \${INPUT_FILE} \${LOCATION})
+          message(STATUS \"Created symlink in \${LOCATION} to \${INPUT_FILE}.\")
+        endforeach()
+        "
+    )
+  endif() #NOT WIN32
+  message( STATUS "Backward Compatible Sym Link Created for include directories" )
+endif()
+

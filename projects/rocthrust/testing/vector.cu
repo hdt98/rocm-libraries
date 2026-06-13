@@ -15,708 +15,712 @@
  *  limitations under the License.
  */
 
-#include <thrust/detail/config.h>
-
-#include <thrust/device_malloc_allocator.h>
-#include <thrust/sequence.h>
-
-#include <initializer_list>
-#include <limits>
-#include <list>
-#include <utility>
-#include <vector>
-
 #include <unittest/unittest.h>
 
+#include <thrust/detail/config.h>
+#include <thrust/sequence.h>
+#include <thrust/device_malloc_allocator.h>
+
+#include <initializer_list>
+#include <vector>
+#include <list>
+#include <limits>
+#include <utility>
+
 template <class Vector>
-void TestVectorZeroSize()
+void TestVectorZeroSize(void)
 {
-  Vector v;
-  ASSERT_EQUAL(v.size(), 0lu);
-  ASSERT_EQUAL((v.begin() == v.end()), true);
+    Vector v;
+    ASSERT_EQUAL(v.size(), 0lu);
+    ASSERT_EQUAL((v.begin() == v.end()), true);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorZeroSize);
 
-void TestVectorBool()
-{
-  thrust::host_vector<bool> h{true, false, true};
-  thrust::device_vector<bool> d{true, false, true};
 
-  thrust::host_vector<bool> h_ref{true, false, true};
-  thrust::device_vector<bool> d_ref{true, false, true};
-  ASSERT_EQUAL(h, h_ref);
-  ASSERT_EQUAL(d, d_ref);
+void TestVectorBool(void)
+{
+    thrust::host_vector<bool> h(3);
+    thrust::device_vector<bool> d(3);
+
+    h[0] = true; h[1] = false; h[2] = true;
+    d[0] = true; d[1] = false; d[2] = true;
+
+    ASSERT_EQUAL(h[0], true);
+    ASSERT_EQUAL(h[1], false);
+    ASSERT_EQUAL(h[2], true);
+
+    ASSERT_EQUAL(d[0], true);
+    ASSERT_EQUAL(d[1], false);
+    ASSERT_EQUAL(d[2], true);
 }
 DECLARE_UNITTEST(TestVectorBool);
 
 template <class Vector>
-void TestVectorInitializerList()
+void TestVectorInitializerList(void)
 {
-  Vector v{1, 2, 3};
-  ASSERT_EQUAL(v.size(), 3lu);
-  Vector ref{1, 2, 3};
-  ASSERT_EQUAL(v, ref);
+    Vector v{1, 2, 3};
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 1);
+    ASSERT_EQUAL(v[1], 2);
+    ASSERT_EQUAL(v[2], 3);
 
-  v = {1, 2, 3, 4};
-  ASSERT_EQUAL(v.size(), 4lu);
-  Vector v_ref = {1, 2, 3, 4};
-  ASSERT_EQUAL(v, v_ref);
-
-  const auto alloc = v.get_allocator();
-  Vector v2{{1, 2, 3}, alloc};
-  ASSERT_EQUAL(v2.size(), 3lu);
-  Vector v2_ref = {1, 2, 3};
-  ASSERT_EQUAL(v2, v2_ref);
+    v = {1, 2, 3, 4};
+    ASSERT_EQUAL(v.size(), 4lu);
+    ASSERT_EQUAL(v[0], 1);
+    ASSERT_EQUAL(v[1], 2);
+    ASSERT_EQUAL(v[2], 3);
+    ASSERT_EQUAL(v[3], 4);
+    
+    const auto alloc = v.get_allocator();
+    Vector v2{{1, 2, 3}, alloc};
+    ASSERT_EQUAL(v2.size(), 3lu);
+    ASSERT_EQUAL(v2[0], 1);
+    ASSERT_EQUAL(v2[1], 2);
+    ASSERT_EQUAL(v2[2], 3);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorInitializerList);
 
 template <class Vector>
-void TestVectorFrontBack()
+void TestVectorFrontBack(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  Vector v{0, 1, 2};
+    Vector v(3);
+    v[0] = 0; v[1] = 1; v[2] = 2;
 
-  ASSERT_EQUAL(v.front(), T(0));
-  ASSERT_EQUAL(v.back(), T(2));
+    ASSERT_EQUAL(v.front(), T(0));
+    ASSERT_EQUAL(v.back(),  T(2));
 }
 DECLARE_VECTOR_UNITTEST(TestVectorFrontBack);
 
+
 template <class Vector>
-void TestVectorData()
+void TestVectorData(void)
 {
-  using PointerT      = typename Vector::pointer;
-  using PointerConstT = typename Vector::const_pointer;
+    using PointerT = typename Vector::pointer;
+    using PointerConstT = typename Vector::const_pointer;
 
-  Vector v{0, 1, 2};
+    Vector v(3);
+    v[0] = 0; v[1] = 1; v[2] = 2;
 
-  ASSERT_EQUAL(0, *v.data());
-  ASSERT_EQUAL(1, *(v.data() + 1));
-  ASSERT_EQUAL(2, *(v.data() + 2));
-  ASSERT_EQUAL(PointerT(&v.front()), v.data());
-  ASSERT_EQUAL(PointerT(&*v.begin()), v.data());
-  ASSERT_EQUAL(PointerT(&v[0]), v.data());
+    ASSERT_EQUAL(0,          *v.data());
+    ASSERT_EQUAL(1,          *(v.data() + 1));
+    ASSERT_EQUAL(2,          *(v.data() + 2));
+    ASSERT_EQUAL(PointerT(&v.front()),  v.data());
+    ASSERT_EQUAL(PointerT(&*v.begin()), v.data());
+    ASSERT_EQUAL(PointerT(&v[0]),       v.data());
 
-  const Vector& c_v = v;
+    const Vector &c_v = v;
 
-  ASSERT_EQUAL(0, *c_v.data());
-  ASSERT_EQUAL(1, *(c_v.data() + 1));
-  ASSERT_EQUAL(2, *(c_v.data() + 2));
-  ASSERT_EQUAL(PointerConstT(&c_v.front()), c_v.data());
-  ASSERT_EQUAL(PointerConstT(&*c_v.begin()), c_v.data());
-  ASSERT_EQUAL(PointerConstT(&c_v[0]), c_v.data());
+    ASSERT_EQUAL(0,            *c_v.data());
+    ASSERT_EQUAL(1,            *(c_v.data() + 1));
+    ASSERT_EQUAL(2,            *(c_v.data() + 2));
+    ASSERT_EQUAL(PointerConstT(&c_v.front()),  c_v.data());
+    ASSERT_EQUAL(PointerConstT(&*c_v.begin()), c_v.data());
+    ASSERT_EQUAL(PointerConstT(&c_v[0]),       c_v.data());
 }
 DECLARE_VECTOR_UNITTEST(TestVectorData);
 
+
 template <class Vector>
-void TestVectorElementAssignment()
+void TestVectorElementAssignment(void)
 {
-  Vector v{0, 1, 2};
+    Vector v(3);
 
-  Vector ref{0, 1, 2};
-  ASSERT_EQUAL(v, ref);
+    v[0] = 0; v[1] = 1; v[2] = 2;
 
-  v   = {10, 11, 12};
-  ref = {10, 11, 12};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 
-  Vector w = v;
-  ASSERT_EQUAL(v, w);
+    v[0] = 10; v[1] = 11; v[2] = 12;
+
+    ASSERT_EQUAL(v[0], 10);
+    ASSERT_EQUAL(v[1], 11);
+    ASSERT_EQUAL(v[2], 12);
+
+    Vector w(3);
+    w[0] = v[0];
+    w[1] = v[1];
+    w[2] = v[2];
+
+    ASSERT_EQUAL(v, w);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorElementAssignment);
 
+
 template <class Vector>
-void TestVectorFromSTLVector()
+void TestVectorFromSTLVector(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  std::vector<T> stl_vector{0, 1, 2};
+    std::vector<T> stl_vector(3);
+    stl_vector[0] = 0;
+    stl_vector[1] = 1;
+    stl_vector[2] = 2;
 
-  thrust::host_vector<T> v(stl_vector);
+    thrust::host_vector<T> v(stl_vector);
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  thrust::host_vector<T> ref{0, 1, 2};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 
-  v = stl_vector;
+    v = stl_vector;
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorFromSTLVector);
 
+
 template <class Vector>
-void TestVectorFillAssign()
+void TestVectorFillAssign(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  thrust::host_vector<T> v;
-  v.assign(3, 13);
+    thrust::host_vector<T> v;
+    v.assign(3, 13);
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  thrust::host_vector<T> ref{13, 13, 13};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 13);
+    ASSERT_EQUAL(v[1], 13);
+    ASSERT_EQUAL(v[2], 13);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorFillAssign);
 
+
 template <class Vector>
-void TestVectorAssignFromSTLVector()
+void TestVectorAssignFromSTLVector(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  std::vector<T> stl_vector{0, 1, 2};
+    std::vector<T> stl_vector(3);
+    stl_vector[0] = 0;
+    stl_vector[1] = 1;
+    stl_vector[2] = 2;
 
-  thrust::host_vector<T> v;
-  v.assign(stl_vector.begin(), stl_vector.end());
+    thrust::host_vector<T> v;
+    v.assign(stl_vector.begin(), stl_vector.end());
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  thrust::host_vector<T> ref{0, 1, 2};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorAssignFromSTLVector);
 
+
 template <class Vector>
-void TestVectorFromBiDirectionalIterator()
+void TestVectorFromBiDirectionalIterator(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  std::list<T> stl_list;
-  stl_list.push_back(0);
-  stl_list.push_back(1);
-  stl_list.push_back(2);
+    std::list<T> stl_list;
+    stl_list.push_back(0);
+    stl_list.push_back(1);
+    stl_list.push_back(2);
 
-  Vector v(stl_list.begin(), stl_list.end());
+    Vector v(stl_list.begin(), stl_list.end());
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  Vector ref{0, 1, 2};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorFromBiDirectionalIterator);
 
+
 template <class Vector>
-void TestVectorAssignFromBiDirectionalIterator()
+void TestVectorAssignFromBiDirectionalIterator(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  std::list<T> stl_list;
-  stl_list.push_back(0);
-  stl_list.push_back(1);
-  stl_list.push_back(2);
+    std::list<T> stl_list;
+    stl_list.push_back(0);
+    stl_list.push_back(1);
+    stl_list.push_back(2);
 
-  Vector v;
-  v.assign(stl_list.begin(), stl_list.end());
+    Vector v;
+    v.assign(stl_list.begin(), stl_list.end());
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  Vector ref{0, 1, 2};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorAssignFromBiDirectionalIterator);
 
+
 template <class Vector>
-void TestVectorAssignFromHostVector()
+void TestVectorAssignFromHostVector(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  thrust::host_vector<T> h{0, 1, 2};
+    thrust::host_vector<T> h(3);
+    h[0] = 0;
+    h[1] = 1;
+    h[2] = 2;
 
-  Vector v;
-  v.assign(h.begin(), h.end());
+    Vector v;
+    v.assign(h.begin(), h.end());
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorAssignFromHostVector);
 
-THRUST_DIAG_PUSH
-THRUST_DIAG_SUPPRESS_CLANG("-Wself-assign")
 
 template <class Vector>
-void TestVectorToAndFromHostVector()
+void TestVectorToAndFromHostVector(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  thrust::host_vector<T> h{0, 1, 2};
+    thrust::host_vector<T> h(3);
+    h[0] = 0;
+    h[1] = 1;
+    h[2] = 2;
 
-  Vector v(h);
+    Vector v(h);
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 
-  v = v;
+    THRUST_DISABLE_CLANG_SELF_ASSIGNMENT_WARNING(v = v);
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 
-  v = {10, 11, 12};
-  Vector v_ref{10, 11, 12};
-  ASSERT_EQUAL(v, v_ref);
+    v[0] = 10;
+    v[1] = 11;
+    v[2] = 12;
 
-  Vector h_ref{0, 1, 2};
-  ASSERT_EQUAL(h, h_ref);
+    ASSERT_EQUAL(h[0], 0);  ASSERT_EQUAL(v[0], 10);
+    ASSERT_EQUAL(h[1], 1);  ASSERT_EQUAL(v[1], 11);
+    ASSERT_EQUAL(h[2], 2);  ASSERT_EQUAL(v[2], 12);
 
-  h = v;
+    h = v;
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 
-  h[1] = 11;
+    h[1] = 11;
 
-  v = h;
+    v = h;
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorToAndFromHostVector);
 
-THRUST_DIAG_POP
 
 template <class Vector>
-void TestVectorAssignFromDeviceVector()
+void TestVectorAssignFromDeviceVector(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  thrust::device_vector<T> d{0, 1, 2};
+    thrust::device_vector<T> d(3);
+    d[0] = 0;
+    d[1] = 1;
+    d[2] = 2;
 
-  Vector v;
-  v.assign(d.begin(), d.end());
+    Vector v;
+    v.assign(d.begin(), d.end());
 
-  ASSERT_EQUAL(v, d);
+    ASSERT_EQUAL(v, d);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorAssignFromDeviceVector);
 
-THRUST_DIAG_PUSH
-THRUST_DIAG_SUPPRESS_CLANG("-Wself-assign")
 
 template <class Vector>
-void TestVectorToAndFromDeviceVector()
+void TestVectorToAndFromDeviceVector(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  thrust::device_vector<T> h{0, 1, 2};
+    thrust::device_vector<T> h(3);
+    h[0] = 0;
+    h[1] = 1;
+    h[2] = 2;
 
-  Vector v(h);
+    Vector v(h);
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 
-  v = v;
+    THRUST_DISABLE_CLANG_SELF_ASSIGNMENT_WARNING(v = v);
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 
-  v = {10, 11, 12};
-  Vector v_ref{10, 11, 12};
-  ASSERT_EQUAL(v, v_ref);
+    v[0] = 10;
+    v[1] = 11;
+    v[2] = 12;
 
-  Vector h_ref{0, 1, 2};
-  ASSERT_EQUAL(h, h_ref);
+    ASSERT_EQUAL(h[0], 0);  ASSERT_EQUAL(v[0], 10);
+    ASSERT_EQUAL(h[1], 1);  ASSERT_EQUAL(v[1], 11);
+    ASSERT_EQUAL(h[2], 2);  ASSERT_EQUAL(v[2], 12);
 
-  h = v;
+    h = v;
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 
-  h[1] = 11;
+    h[1] = 11;
 
-  v = h;
+    v = h;
 
-  ASSERT_EQUAL(v, h);
+    ASSERT_EQUAL(v, h);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorToAndFromDeviceVector);
-THRUST_DIAG_POP
+
 
 template <class Vector>
-void TestVectorWithInitialValue()
+void TestVectorWithInitialValue(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  const T init = 17;
+    const T init = 17;
 
-  Vector v(3, init);
+    Vector v(3, init);
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  Vector ref(3, init);
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], init);
+    ASSERT_EQUAL(v[1], init);
+    ASSERT_EQUAL(v[2], init);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorWithInitialValue);
 
+
 template <class Vector>
-void TestVectorSwap()
+void TestVectorSwap(void)
 {
-  Vector v{0, 1, 2};
-  Vector u{10, 11, 12};
+    Vector v(3);
+    v[0] = 0; v[1] = 1; v[2] = 2;
 
-  v.swap(u);
+    Vector u(3);
+    u[0] = 10; u[1] = 11; u[2] = 12;
 
-  Vector u_ref{0, 1, 2};
-  ASSERT_EQUAL(u, u_ref);
+    v.swap(u);
 
-  Vector v_ref{10, 11, 12};
-  ASSERT_EQUAL(v, v_ref);
+    ASSERT_EQUAL(v[0], 10); ASSERT_EQUAL(u[0], 0);
+    ASSERT_EQUAL(v[1], 11); ASSERT_EQUAL(u[1], 1);
+    ASSERT_EQUAL(v[2], 12); ASSERT_EQUAL(u[2], 2);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorSwap);
 
+
 template <class Vector>
-void TestVectorErasePosition()
+void TestVectorErasePosition(void)
 {
-  Vector v{0, 1, 2, 3, 4};
+    Vector v(5);
+    v[0] = 0; v[1] = 1; v[2] = 2; v[3] = 3; v[4] = 4;
 
-  v.erase(v.begin() + 2);
+    v.erase(v.begin() + 2);
 
-  ASSERT_EQUAL(v.size(), 4lu);
-  Vector ref{0, 1, 3, 4};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 4lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 3);
+    ASSERT_EQUAL(v[3], 4);
 
-  v.erase(v.begin() + 0);
+    v.erase(v.begin() + 0);
 
-  ASSERT_EQUAL(v.size(), 3lu);
-  ref = {1, 3, 4};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v[0], 1);
+    ASSERT_EQUAL(v[1], 3);
+    ASSERT_EQUAL(v[2], 4);
 
-  v.erase(v.begin() + 2);
+    v.erase(v.begin() + 2);
 
-  ASSERT_EQUAL(v.size(), 2lu);
-  ref = {1, 3};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 2lu);
+    ASSERT_EQUAL(v[0], 1);
+    ASSERT_EQUAL(v[1], 3);
 
-  v.erase(v.begin() + 1);
+    v.erase(v.begin() + 1);
 
-  ASSERT_EQUAL(v.size(), 1lu);
-  ASSERT_EQUAL(v[0], 1);
+    ASSERT_EQUAL(v.size(), 1lu);
+    ASSERT_EQUAL(v[0], 1);
 
-  v.erase(v.begin() + 0);
+    v.erase(v.begin() + 0);
 
-  ASSERT_EQUAL(v.size(), 0lu);
+    ASSERT_EQUAL(v.size(), 0lu);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorErasePosition);
 
+
 template <class Vector>
-void TestVectorEraseRange()
+void TestVectorEraseRange(void)
 {
-  Vector v{0, 1, 2, 3, 4, 5};
+    Vector v(6);
+    v[0] = 0; v[1] = 1; v[2] = 2; v[3] = 3; v[4] = 4; v[5] = 5;
 
-  v.erase(v.begin() + 1, v.begin() + 3);
+    v.erase(v.begin() + 1, v.begin() + 3);
 
-  ASSERT_EQUAL(v.size(), 4lu);
-  Vector ref{0, 3, 4, 5};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 4lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 3);
+    ASSERT_EQUAL(v[2], 4);
+    ASSERT_EQUAL(v[3], 5);
 
-  v.erase(v.begin() + 2, v.end());
+    v.erase(v.begin() + 2, v.end());
 
-  ASSERT_EQUAL(v.size(), 2lu);
-  ref = {0, 3};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 2lu);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 3);
 
-  v.erase(v.begin() + 0, v.begin() + 1);
+    v.erase(v.begin() + 0, v.begin() + 1);
 
-  ASSERT_EQUAL(v.size(), 1lu);
-  ASSERT_EQUAL(v[0], 3);
+    ASSERT_EQUAL(v.size(), 1lu);
+    ASSERT_EQUAL(v[0], 3);
 
-  v.erase(v.begin(), v.end());
+    v.erase(v.begin(), v.end());
 
-  ASSERT_EQUAL(v.size(), 0lu);
+    ASSERT_EQUAL(v.size(), 0lu);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorEraseRange);
 
-void TestVectorEquality()
+
+void TestVectorEquality(void)
 {
-  thrust::host_vector<int> h_a{0, 1, 2};
-  thrust::host_vector<int> h_b{0, 1, 3};
-  thrust::host_vector<int> h_c(3);
+    thrust::host_vector<int> h_a(3);
+    thrust::host_vector<int> h_b(3);
+    thrust::host_vector<int> h_c(3);
+    h_a[0] = 0;    h_a[1] = 1;    h_a[2] = 2;
+    h_b[0] = 0;    h_b[1] = 1;    h_b[2] = 3;
+    h_b[0] = 0;    h_b[1] = 1;
 
-  thrust::device_vector<int> d_a{0, 1, 2};
-  thrust::device_vector<int> d_b{0, 1, 3};
-  thrust::device_vector<int> d_c(3);
+    thrust::device_vector<int> d_a(3);
+    thrust::device_vector<int> d_b(3);
+    thrust::device_vector<int> d_c(3);
+    d_a[0] = 0;    d_a[1] = 1;    d_a[2] = 2;
+    d_b[0] = 0;    d_b[1] = 1;    d_b[2] = 3;
+    d_b[0] = 0;    d_b[1] = 1;
 
-  std::vector<int> s_a{0, 1, 2};
-  std::vector<int> s_b{0, 1, 3};
-  std::vector<int> s_c(3);
+    std::vector<int> s_a(3);
+    std::vector<int> s_b(3);
+    std::vector<int> s_c(3);
+    s_a[0] = 0;    s_a[1] = 1;    s_a[2] = 2;
+    s_b[0] = 0;    s_b[1] = 1;    s_b[2] = 3;
+    s_b[0] = 0;    s_b[1] = 1;
 
-  ASSERT_EQUAL((h_a == h_a), true);
-  ASSERT_EQUAL((h_a == d_a), true);
-  ASSERT_EQUAL((d_a == h_a), true);
-  ASSERT_EQUAL((d_a == d_a), true);
-  ASSERT_EQUAL((h_b == h_b), true);
-  ASSERT_EQUAL((h_b == d_b), true);
-  ASSERT_EQUAL((d_b == h_b), true);
-  ASSERT_EQUAL((d_b == d_b), true);
-  ASSERT_EQUAL((h_c == h_c), true);
-  ASSERT_EQUAL((h_c == d_c), true);
-  ASSERT_EQUAL((d_c == h_c), true);
-  ASSERT_EQUAL((d_c == d_c), true);
+    ASSERT_EQUAL((h_a == h_a), true); ASSERT_EQUAL((h_a == d_a), true); ASSERT_EQUAL((d_a == h_a), true);  ASSERT_EQUAL((d_a == d_a), true);
+    ASSERT_EQUAL((h_b == h_b), true); ASSERT_EQUAL((h_b == d_b), true); ASSERT_EQUAL((d_b == h_b), true);  ASSERT_EQUAL((d_b == d_b), true);
+    ASSERT_EQUAL((h_c == h_c), true); ASSERT_EQUAL((h_c == d_c), true); ASSERT_EQUAL((d_c == h_c), true);  ASSERT_EQUAL((d_c == d_c), true);
 
-  // test vector vs device_vector
-  ASSERT_EQUAL((s_a == d_a), true);
-  ASSERT_EQUAL((d_a == s_a), true);
-  ASSERT_EQUAL((s_b == d_b), true);
-  ASSERT_EQUAL((d_b == s_b), true);
-  ASSERT_EQUAL((s_c == d_c), true);
-  ASSERT_EQUAL((d_c == s_c), true);
+    // test vector vs device_vector
+    ASSERT_EQUAL((s_a == d_a), true); ASSERT_EQUAL((d_a == s_a), true);
+    ASSERT_EQUAL((s_b == d_b), true); ASSERT_EQUAL((d_b == s_b), true);
+    ASSERT_EQUAL((s_c == d_c), true); ASSERT_EQUAL((d_c == s_c), true);
 
-  // test vector vs host_vector
-  ASSERT_EQUAL((s_a == h_a), true);
-  ASSERT_EQUAL((h_a == s_a), true);
-  ASSERT_EQUAL((s_b == h_b), true);
-  ASSERT_EQUAL((h_b == s_b), true);
-  ASSERT_EQUAL((s_c == h_c), true);
-  ASSERT_EQUAL((h_c == s_c), true);
+    // test vector vs host_vector
+    ASSERT_EQUAL((s_a == h_a), true); ASSERT_EQUAL((h_a == s_a), true);
+    ASSERT_EQUAL((s_b == h_b), true); ASSERT_EQUAL((h_b == s_b), true);
+    ASSERT_EQUAL((s_c == h_c), true); ASSERT_EQUAL((h_c == s_c), true);
 
-  ASSERT_EQUAL((h_a == h_b), false);
-  ASSERT_EQUAL((h_a == d_b), false);
-  ASSERT_EQUAL((d_a == h_b), false);
-  ASSERT_EQUAL((d_a == d_b), false);
-  ASSERT_EQUAL((h_b == h_a), false);
-  ASSERT_EQUAL((h_b == d_a), false);
-  ASSERT_EQUAL((d_b == h_a), false);
-  ASSERT_EQUAL((d_b == d_a), false);
-  ASSERT_EQUAL((h_a == h_c), false);
-  ASSERT_EQUAL((h_a == d_c), false);
-  ASSERT_EQUAL((d_a == h_c), false);
-  ASSERT_EQUAL((d_a == d_c), false);
-  ASSERT_EQUAL((h_c == h_a), false);
-  ASSERT_EQUAL((h_c == d_a), false);
-  ASSERT_EQUAL((d_c == h_a), false);
-  ASSERT_EQUAL((d_c == d_a), false);
-  ASSERT_EQUAL((h_b == h_c), false);
-  ASSERT_EQUAL((h_b == d_c), false);
-  ASSERT_EQUAL((d_b == h_c), false);
-  ASSERT_EQUAL((d_b == d_c), false);
-  ASSERT_EQUAL((h_c == h_b), false);
-  ASSERT_EQUAL((h_c == d_b), false);
-  ASSERT_EQUAL((d_c == h_b), false);
-  ASSERT_EQUAL((d_c == d_b), false);
+    ASSERT_EQUAL((h_a == h_b), false); ASSERT_EQUAL((h_a == d_b), false); ASSERT_EQUAL((d_a == h_b), false); ASSERT_EQUAL((d_a == d_b), false);
+    ASSERT_EQUAL((h_b == h_a), false); ASSERT_EQUAL((h_b == d_a), false); ASSERT_EQUAL((d_b == h_a), false); ASSERT_EQUAL((d_b == d_a), false);
+    ASSERT_EQUAL((h_a == h_c), false); ASSERT_EQUAL((h_a == d_c), false); ASSERT_EQUAL((d_a == h_c), false); ASSERT_EQUAL((d_a == d_c), false);
+    ASSERT_EQUAL((h_c == h_a), false); ASSERT_EQUAL((h_c == d_a), false); ASSERT_EQUAL((d_c == h_a), false); ASSERT_EQUAL((d_c == d_a), false);
+    ASSERT_EQUAL((h_b == h_c), false); ASSERT_EQUAL((h_b == d_c), false); ASSERT_EQUAL((d_b == h_c), false); ASSERT_EQUAL((d_b == d_c), false);
+    ASSERT_EQUAL((h_c == h_b), false); ASSERT_EQUAL((h_c == d_b), false); ASSERT_EQUAL((d_c == h_b), false); ASSERT_EQUAL((d_c == d_b), false);
 
-  // test vector vs device_vector
-  ASSERT_EQUAL((s_a == d_b), false);
-  ASSERT_EQUAL((d_a == s_b), false);
-  ASSERT_EQUAL((s_b == d_a), false);
-  ASSERT_EQUAL((d_b == s_a), false);
-  ASSERT_EQUAL((s_a == d_c), false);
-  ASSERT_EQUAL((d_a == s_c), false);
-  ASSERT_EQUAL((s_c == d_a), false);
-  ASSERT_EQUAL((d_c == s_a), false);
-  ASSERT_EQUAL((s_b == d_c), false);
-  ASSERT_EQUAL((d_b == s_c), false);
-  ASSERT_EQUAL((s_c == d_b), false);
-  ASSERT_EQUAL((d_c == s_b), false);
+    // test vector vs device_vector
+    ASSERT_EQUAL((s_a == d_b), false); ASSERT_EQUAL((d_a == s_b), false);
+    ASSERT_EQUAL((s_b == d_a), false); ASSERT_EQUAL((d_b == s_a), false);
+    ASSERT_EQUAL((s_a == d_c), false); ASSERT_EQUAL((d_a == s_c), false);
+    ASSERT_EQUAL((s_c == d_a), false); ASSERT_EQUAL((d_c == s_a), false);
+    ASSERT_EQUAL((s_b == d_c), false); ASSERT_EQUAL((d_b == s_c), false);
+    ASSERT_EQUAL((s_c == d_b), false); ASSERT_EQUAL((d_c == s_b), false);
 
-  // test vector vs host_vector
-  ASSERT_EQUAL((s_a == h_b), false);
-  ASSERT_EQUAL((h_a == s_b), false);
-  ASSERT_EQUAL((s_b == h_a), false);
-  ASSERT_EQUAL((h_b == s_a), false);
-  ASSERT_EQUAL((s_a == h_c), false);
-  ASSERT_EQUAL((h_a == s_c), false);
-  ASSERT_EQUAL((s_c == h_a), false);
-  ASSERT_EQUAL((h_c == s_a), false);
-  ASSERT_EQUAL((s_b == h_c), false);
-  ASSERT_EQUAL((h_b == s_c), false);
-  ASSERT_EQUAL((s_c == h_b), false);
-  ASSERT_EQUAL((h_c == s_b), false);
+    // test vector vs host_vector
+    ASSERT_EQUAL((s_a == h_b), false); ASSERT_EQUAL((h_a == s_b), false);
+    ASSERT_EQUAL((s_b == h_a), false); ASSERT_EQUAL((h_b == s_a), false);
+    ASSERT_EQUAL((s_a == h_c), false); ASSERT_EQUAL((h_a == s_c), false);
+    ASSERT_EQUAL((s_c == h_a), false); ASSERT_EQUAL((h_c == s_a), false);
+    ASSERT_EQUAL((s_b == h_c), false); ASSERT_EQUAL((h_b == s_c), false);
+    ASSERT_EQUAL((s_c == h_b), false); ASSERT_EQUAL((h_c == s_b), false);
 }
 DECLARE_UNITTEST(TestVectorEquality);
 
-void TestVectorInequality()
+void TestVectorInequality(void)
 {
-  thrust::host_vector<int> h_a{0, 1, 2};
-  thrust::host_vector<int> h_b{0, 1, 3};
-  thrust::host_vector<int> h_c(3);
+    thrust::host_vector<int> h_a(3);
+    thrust::host_vector<int> h_b(3);
+    thrust::host_vector<int> h_c(3);
+    h_a[0] = 0;    h_a[1] = 1;    h_a[2] = 2;
+    h_b[0] = 0;    h_b[1] = 1;    h_b[2] = 3;
+    h_b[0] = 0;    h_b[1] = 1;
 
-  thrust::device_vector<int> d_a{0, 1, 2};
-  thrust::device_vector<int> d_b{0, 1, 3};
-  thrust::device_vector<int> d_c(3);
+    thrust::device_vector<int> d_a(3);
+    thrust::device_vector<int> d_b(3);
+    thrust::device_vector<int> d_c(3);
+    d_a[0] = 0;    d_a[1] = 1;    d_a[2] = 2;
+    d_b[0] = 0;    d_b[1] = 1;    d_b[2] = 3;
+    d_b[0] = 0;    d_b[1] = 1;
 
-  std::vector<int> s_a{0, 1, 2};
-  std::vector<int> s_b{0, 1, 3};
-  std::vector<int> s_c(3);
+    std::vector<int> s_a(3);
+    std::vector<int> s_b(3);
+    std::vector<int> s_c(3);
+    s_a[0] = 0;    s_a[1] = 1;    s_a[2] = 2;
+    s_b[0] = 0;    s_b[1] = 1;    s_b[2] = 3;
+    s_b[0] = 0;    s_b[1] = 1;
 
-  ASSERT_EQUAL((h_a != h_a), false);
-  ASSERT_EQUAL((h_a != d_a), false);
-  ASSERT_EQUAL((d_a != h_a), false);
-  ASSERT_EQUAL((d_a != d_a), false);
-  ASSERT_EQUAL((h_b != h_b), false);
-  ASSERT_EQUAL((h_b != d_b), false);
-  ASSERT_EQUAL((d_b != h_b), false);
-  ASSERT_EQUAL((d_b != d_b), false);
-  ASSERT_EQUAL((h_c != h_c), false);
-  ASSERT_EQUAL((h_c != d_c), false);
-  ASSERT_EQUAL((d_c != h_c), false);
-  ASSERT_EQUAL((d_c != d_c), false);
+    ASSERT_EQUAL((h_a != h_a), false); ASSERT_EQUAL((h_a != d_a), false); ASSERT_EQUAL((d_a != h_a), false);  ASSERT_EQUAL((d_a != d_a), false);
+    ASSERT_EQUAL((h_b != h_b), false); ASSERT_EQUAL((h_b != d_b), false); ASSERT_EQUAL((d_b != h_b), false);  ASSERT_EQUAL((d_b != d_b), false);
+    ASSERT_EQUAL((h_c != h_c), false); ASSERT_EQUAL((h_c != d_c), false); ASSERT_EQUAL((d_c != h_c), false);  ASSERT_EQUAL((d_c != d_c), false);
 
-  // test vector vs device_vector
-  ASSERT_EQUAL((s_a != d_a), false);
-  ASSERT_EQUAL((d_a != s_a), false);
-  ASSERT_EQUAL((s_b != d_b), false);
-  ASSERT_EQUAL((d_b != s_b), false);
-  ASSERT_EQUAL((s_c != d_c), false);
-  ASSERT_EQUAL((d_c != s_c), false);
+    // test vector vs device_vector
+    ASSERT_EQUAL((s_a != d_a), false); ASSERT_EQUAL((d_a != s_a), false);
+    ASSERT_EQUAL((s_b != d_b), false); ASSERT_EQUAL((d_b != s_b), false);
+    ASSERT_EQUAL((s_c != d_c), false); ASSERT_EQUAL((d_c != s_c), false);
 
-  // test vector vs host_vector
-  ASSERT_EQUAL((s_a != h_a), false);
-  ASSERT_EQUAL((h_a != s_a), false);
-  ASSERT_EQUAL((s_b != h_b), false);
-  ASSERT_EQUAL((h_b != s_b), false);
-  ASSERT_EQUAL((s_c != h_c), false);
-  ASSERT_EQUAL((h_c != s_c), false);
+    // test vector vs host_vector
+    ASSERT_EQUAL((s_a != h_a), false); ASSERT_EQUAL((h_a != s_a), false);
+    ASSERT_EQUAL((s_b != h_b), false); ASSERT_EQUAL((h_b != s_b), false);
+    ASSERT_EQUAL((s_c != h_c), false); ASSERT_EQUAL((h_c != s_c), false);
 
-  ASSERT_EQUAL((h_a != h_b), true);
-  ASSERT_EQUAL((h_a != d_b), true);
-  ASSERT_EQUAL((d_a != h_b), true);
-  ASSERT_EQUAL((d_a != d_b), true);
-  ASSERT_EQUAL((h_b != h_a), true);
-  ASSERT_EQUAL((h_b != d_a), true);
-  ASSERT_EQUAL((d_b != h_a), true);
-  ASSERT_EQUAL((d_b != d_a), true);
-  ASSERT_EQUAL((h_a != h_c), true);
-  ASSERT_EQUAL((h_a != d_c), true);
-  ASSERT_EQUAL((d_a != h_c), true);
-  ASSERT_EQUAL((d_a != d_c), true);
-  ASSERT_EQUAL((h_c != h_a), true);
-  ASSERT_EQUAL((h_c != d_a), true);
-  ASSERT_EQUAL((d_c != h_a), true);
-  ASSERT_EQUAL((d_c != d_a), true);
-  ASSERT_EQUAL((h_b != h_c), true);
-  ASSERT_EQUAL((h_b != d_c), true);
-  ASSERT_EQUAL((d_b != h_c), true);
-  ASSERT_EQUAL((d_b != d_c), true);
-  ASSERT_EQUAL((h_c != h_b), true);
-  ASSERT_EQUAL((h_c != d_b), true);
-  ASSERT_EQUAL((d_c != h_b), true);
-  ASSERT_EQUAL((d_c != d_b), true);
+    ASSERT_EQUAL((h_a != h_b), true); ASSERT_EQUAL((h_a != d_b), true); ASSERT_EQUAL((d_a != h_b), true); ASSERT_EQUAL((d_a != d_b), true);
+    ASSERT_EQUAL((h_b != h_a), true); ASSERT_EQUAL((h_b != d_a), true); ASSERT_EQUAL((d_b != h_a), true); ASSERT_EQUAL((d_b != d_a), true);
+    ASSERT_EQUAL((h_a != h_c), true); ASSERT_EQUAL((h_a != d_c), true); ASSERT_EQUAL((d_a != h_c), true); ASSERT_EQUAL((d_a != d_c), true);
+    ASSERT_EQUAL((h_c != h_a), true); ASSERT_EQUAL((h_c != d_a), true); ASSERT_EQUAL((d_c != h_a), true); ASSERT_EQUAL((d_c != d_a), true);
+    ASSERT_EQUAL((h_b != h_c), true); ASSERT_EQUAL((h_b != d_c), true); ASSERT_EQUAL((d_b != h_c), true); ASSERT_EQUAL((d_b != d_c), true);
+    ASSERT_EQUAL((h_c != h_b), true); ASSERT_EQUAL((h_c != d_b), true); ASSERT_EQUAL((d_c != h_b), true); ASSERT_EQUAL((d_c != d_b), true);
 
-  // test vector vs device_vector
-  ASSERT_EQUAL((s_a != d_b), true);
-  ASSERT_EQUAL((d_a != s_b), true);
-  ASSERT_EQUAL((s_b != d_a), true);
-  ASSERT_EQUAL((d_b != s_a), true);
-  ASSERT_EQUAL((s_a != d_c), true);
-  ASSERT_EQUAL((d_a != s_c), true);
-  ASSERT_EQUAL((s_c != d_a), true);
-  ASSERT_EQUAL((d_c != s_a), true);
-  ASSERT_EQUAL((s_b != d_c), true);
-  ASSERT_EQUAL((d_b != s_c), true);
-  ASSERT_EQUAL((s_c != d_b), true);
-  ASSERT_EQUAL((d_c != s_b), true);
+    // test vector vs device_vector
+    ASSERT_EQUAL((s_a != d_b), true); ASSERT_EQUAL((d_a != s_b), true);
+    ASSERT_EQUAL((s_b != d_a), true); ASSERT_EQUAL((d_b != s_a), true);
+    ASSERT_EQUAL((s_a != d_c), true); ASSERT_EQUAL((d_a != s_c), true);
+    ASSERT_EQUAL((s_c != d_a), true); ASSERT_EQUAL((d_c != s_a), true);
+    ASSERT_EQUAL((s_b != d_c), true); ASSERT_EQUAL((d_b != s_c), true);
+    ASSERT_EQUAL((s_c != d_b), true); ASSERT_EQUAL((d_c != s_b), true);
 
-  // test vector vs host_vector
-  ASSERT_EQUAL((s_a != h_b), true);
-  ASSERT_EQUAL((h_a != s_b), true);
-  ASSERT_EQUAL((s_b != h_a), true);
-  ASSERT_EQUAL((h_b != s_a), true);
-  ASSERT_EQUAL((s_a != h_c), true);
-  ASSERT_EQUAL((h_a != s_c), true);
-  ASSERT_EQUAL((s_c != h_a), true);
-  ASSERT_EQUAL((h_c != s_a), true);
-  ASSERT_EQUAL((s_b != h_c), true);
-  ASSERT_EQUAL((h_b != s_c), true);
-  ASSERT_EQUAL((s_c != h_b), true);
-  ASSERT_EQUAL((h_c != s_b), true);
+    // test vector vs host_vector
+    ASSERT_EQUAL((s_a != h_b), true); ASSERT_EQUAL((h_a != s_b), true);
+    ASSERT_EQUAL((s_b != h_a), true); ASSERT_EQUAL((h_b != s_a), true);
+    ASSERT_EQUAL((s_a != h_c), true); ASSERT_EQUAL((h_a != s_c), true);
+    ASSERT_EQUAL((s_c != h_a), true); ASSERT_EQUAL((h_c != s_a), true);
+    ASSERT_EQUAL((s_b != h_c), true); ASSERT_EQUAL((h_b != s_c), true);
+    ASSERT_EQUAL((s_c != h_b), true); ASSERT_EQUAL((h_c != s_b), true);
 }
 DECLARE_UNITTEST(TestVectorInequality);
 
+
 template <class Vector>
-void TestVectorResizing()
+void TestVectorResizing(void)
 {
-  Vector v;
+    Vector v;
 
-  v.resize(3);
+    v.resize(3);
 
-  ASSERT_EQUAL(v.size(), 3lu);
+    ASSERT_EQUAL(v.size(), 3lu);
 
-  v = {0, 1, 2};
-  v.resize(5);
+    v[0] = 0; v[1] = 1; v[2] = 2;
 
-  ASSERT_EQUAL(v.size(), 5lu);
+    v.resize(5);
 
-  Vector ref{0, 1, 2, v[3], v[4]};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 5lu);
 
-  v[3] = 3;
-  v[4] = 4;
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
 
-  v.resize(4);
+    v[3] = 3; v[4] = 4;
 
-  ASSERT_EQUAL(v.size(), 4lu);
+    v.resize(4);
 
-  ref = {0, 1, 2, 3};
-  ASSERT_EQUAL(v, ref);
+    ASSERT_EQUAL(v.size(), 4lu);
 
-  v.resize(0);
+    ASSERT_EQUAL(v[0], 0);
+    ASSERT_EQUAL(v[1], 1);
+    ASSERT_EQUAL(v[2], 2);
+    ASSERT_EQUAL(v[3], 3);
 
-  ASSERT_EQUAL(v.size(), 0lu);
+    v.resize(0);
 
-  // depending on sizeof(T), we will receive one
-  // of two possible exceptions
-  try
-  {
-    v.resize(std::numeric_limits<size_t>::max());
-  }
-  catch (std::length_error e)
-  {}
-  catch (std::bad_alloc e)
-  {
-    // reset the HIP error
-    (void) hipGetLastError();
-  } // end catch
+    ASSERT_EQUAL(v.size(), 0lu);
 
-  ASSERT_EQUAL(v.size(), 0lu);
+// TODO remove this WAR
+#if defined(__CUDACC__) && CUDART_VERSION==3000
+    // depending on sizeof(T), we will receive one
+    // of two possible exceptions
+    try
+    {
+      v.resize(std::numeric_limits<size_t>::max());
+    }
+    catch(std::length_error e) {}
+    catch(std::bad_alloc e)
+    {
+      // reset the CUDA error
+      cudaGetLastError();
+    } // end catch
+#endif // defined(__CUDACC__) && CUDART_VERSION==3000
+
+    ASSERT_EQUAL(v.size(), 0lu);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorResizing);
 
+
+
 template <class Vector>
-void TestVectorReserving()
+void TestVectorReserving(void)
 {
-  Vector v;
+    Vector v;
 
-  v.reserve(3);
+    v.reserve(3);
 
-  ASSERT_GEQUAL(v.capacity(), 3lu);
+    ASSERT_GEQUAL(v.capacity(), 3lu);
 
-  size_t old_capacity = v.capacity();
+    size_t old_capacity = v.capacity();
 
-  v.reserve(0);
+    v.reserve(0);
 
-  ASSERT_EQUAL(v.capacity(), old_capacity);
+    ASSERT_EQUAL(v.capacity(), old_capacity);
 
-  try
-  {
-    v.reserve(std::numeric_limits<size_t>::max());
-  }
-  catch (std::length_error e)
-  {}
-  catch (std::bad_alloc e)
-  {}
+// TODO remove this WAR
+#if defined(__CUDACC__) && CUDART_VERSION==3000
+    try
+    {
+      v.reserve(std::numeric_limits<size_t>::max());
+    }
+    catch(std::length_error e) {}
+    catch(std::bad_alloc e) {}
+#endif // defined(__CUDACC__) && CUDART_VERSION==3000
 
-  ASSERT_EQUAL(v.capacity(), old_capacity);
+    ASSERT_EQUAL(v.capacity(), old_capacity);
 }
 DECLARE_VECTOR_UNITTEST(TestVectorReserving)
 
+
+
 template <class Vector>
-void TestVectorUninitialisedCopy()
+void TestVectorUninitialisedCopy(void)
 {
-  thrust::device_vector<int> v;
-  std::vector<int> std_vector;
+    thrust::device_vector<int> v;
+    std::vector<int> std_vector;
 
-  v = std_vector;
+    v = std_vector;
 
-  ASSERT_EQUAL(v.size(), static_cast<size_t>(0));
+    ASSERT_EQUAL(v.size(), static_cast<size_t>(0));
 }
 DECLARE_VECTOR_UNITTEST(TestVectorUninitialisedCopy);
 
+
 template <class Vector>
-void TestVectorShrinkToFit()
+void TestVectorShrinkToFit(void)
 {
-  using T = typename Vector::value_type;
+    using T = typename Vector::value_type;
 
-  Vector v;
+    Vector v;
 
-  v.reserve(200);
+    v.reserve(200);
 
-  ASSERT_GEQUAL(v.capacity(), 200lu);
+    ASSERT_GEQUAL(v.capacity(), 200lu);
 
-  v.push_back(1);
-  v.push_back(2);
-  v.push_back(3);
+    v.push_back(1);
+    v.push_back(2);
+    v.push_back(3);
 
-  v.shrink_to_fit();
+    v.shrink_to_fit();
 
-  ASSERT_EQUAL(T(1), v[0]);
-  ASSERT_EQUAL(T(2), v[1]);
-  ASSERT_EQUAL(T(3), v[2]);
-  ASSERT_EQUAL(3lu, v.size());
-  ASSERT_EQUAL(3lu, v.capacity());
+    ASSERT_EQUAL(T(1), v[0]);
+    ASSERT_EQUAL(T(2), v[1]);
+    ASSERT_EQUAL(T(3), v[2]);
+    ASSERT_EQUAL(3lu, v.size());
+    ASSERT_EQUAL(3lu, v.capacity());
 }
 DECLARE_VECTOR_UNITTEST(TestVectorShrinkToFit)
 
@@ -725,63 +729,60 @@ struct LargeStruct
 {
   int data[N];
 
-  THRUST_HOST_DEVICE bool operator==(const LargeStruct& ls) const
+  THRUST_HOST_DEVICE
+  bool operator==(const LargeStruct & ls) const
   {
     for (int i = 0; i < N; i++)
-    {
       if (data[i] != ls.data[i])
-      {
         return false;
-      }
-    }
     return true;
   }
 };
 
-void TestVectorContainingLargeType()
+void TestVectorContainingLargeType(void)
 {
-  // Thrust issue #5
-  // http://code.google.com/p/thrust/issues/detail?id=5
-  const static int N = 100;
-  using T            = LargeStruct<N>;
+    // Thrust issue #5
+    // http://code.google.com/p/thrust/issues/detail?id=5
+    const static int N = 100;
+    using T            = LargeStruct<N>;
 
-  thrust::device_vector<T> dv1;
-  thrust::host_vector<T> hv1;
+    thrust::device_vector<T> dv1;
+    thrust::host_vector<T>   hv1;
 
-  ASSERT_EQUAL_QUIET(dv1, hv1);
+    ASSERT_EQUAL_QUIET(dv1, hv1);
 
-  thrust::device_vector<T> dv2(20);
-  thrust::host_vector<T> hv2(20);
+    thrust::device_vector<T> dv2(20);
+    thrust::host_vector<T>   hv2(20);
 
-  ASSERT_EQUAL_QUIET(dv2, hv2);
+    ASSERT_EQUAL_QUIET(dv2, hv2);
 
-  // initialize tofirst element to something nonzero
-  T ls;
+    // initialize tofirst element to something nonzero
+    T ls;
 
-  for (int i = 0; i < N; i++)
-  {
-    ls.data[i] = i;
-  }
+    for (int i = 0; i < N; i++)
+      ls.data[i] = i;
 
-  thrust::device_vector<T> dv3(20, ls);
-  thrust::host_vector<T> hv3(20, ls);
+    thrust::device_vector<T> dv3(20, ls);
+    thrust::host_vector<T>   hv3(20, ls);
 
-  ASSERT_EQUAL_QUIET(dv3, hv3);
+    ASSERT_EQUAL_QUIET(dv3, hv3);
 
-  // change first element
-  ls.data[0] = -13;
+    // change first element
+    ls.data[0] = -13;
 
-  dv3[2] = ls;
-  hv3[2] = ls;
+    dv3[2] = ls;
+    hv3[2] = ls;
 
-  ASSERT_EQUAL_QUIET(dv3, hv3);
+    ASSERT_EQUAL_QUIET(dv3, hv3);
 }
 DECLARE_UNITTEST(TestVectorContainingLargeType);
 
+
 template <typename Vector>
-void TestVectorReversed()
+void TestVectorReversed(void)
 {
-  Vector v{0, 1, 2};
+  Vector v(3);
+  v[0] = 0; v[1] = 1; v[2] = 2;
 
   ASSERT_EQUAL(3, v.rend() - v.rbegin());
   ASSERT_EQUAL(3, static_cast<const Vector&>(v).rend() - static_cast<const Vector&>(v).rbegin());
@@ -799,49 +800,54 @@ void TestVectorReversed()
 }
 DECLARE_VECTOR_UNITTEST(TestVectorReversed);
 
-template <class Vector>
-void TestVectorMove()
-{
-  // test move construction
-  Vector v1{0, 1, 2};
+  template <class Vector>
+  void TestVectorMove(void)
+  {
+    //test move construction
+    Vector v1(3);
+    v1[0] = 0; v1[1] = 1; v1[2] = 2;
 
-  const auto ptr1  = v1.data();
-  const auto size1 = v1.size();
+    const auto ptr1 = v1.data();
+    const auto size1 = v1.size();
 
-  Vector v2(std::move(v1));
-  const auto ptr2  = v2.data();
-  const auto size2 = v2.size();
+    Vector v2(std::move(v1));
+    const auto ptr2 = v2.data();
+    const auto size2 = v2.size();
 
-  // ensure v1 was left empty
-  ASSERT_EQUAL(true, v1.empty());
+    // ensure v1 was left empty
+    ASSERT_EQUAL(true, v1.empty());
 
-  // ensure v2 received the data from before
-  Vector ref{0, 1, 2};
-  ASSERT_EQUAL(v2, ref);
-  ASSERT_EQUAL(size1, size2);
+    // ensure v2 received the data from before
+    ASSERT_EQUAL(v2[0], 0);
+    ASSERT_EQUAL(v2[1], 1);
+    ASSERT_EQUAL(v2[2], 2);
+    ASSERT_EQUAL(size1, size2);
 
-  // ensure v2 received the pointer from before
-  ASSERT_EQUAL(ptr1, ptr2);
+    // ensure v2 received the pointer from before
+    ASSERT_EQUAL(ptr1, ptr2);
 
-  // test move assignment
-  Vector v3{3, 4, 5};
+    //test move assignment
+    Vector v3(3);
+    v3[0] = 3; v3[1] = 4; v3[2] = 5;
 
-  const auto ptr3  = v3.data();
-  const auto size3 = v3.size();
+    const auto ptr3 = v3.data();
+    const auto size3 = v3.size();
 
-  v2               = std::move(v3);
-  const auto ptr4  = v2.data();
-  const auto size4 = v2.size();
+    v2 = std::move(v3);
+    const auto ptr4 = v2.data();
+    const auto size4 = v2.size();
 
-  // ensure v3 was left empty
-  ASSERT_EQUAL(true, v3.empty());
+    // ensure v3 was left empty
+    ASSERT_EQUAL(true, v3.empty());
 
-  // ensure v2 received the data from before
-  ref = {3, 4, 5};
-  ASSERT_EQUAL(v2, ref);
-  ASSERT_EQUAL(size3, size4);
+    // ensure v2 received the data from before
+    ASSERT_EQUAL(v2[0], 3);
+    ASSERT_EQUAL(v2[1], 4);
+    ASSERT_EQUAL(v2[2], 5);
+    ASSERT_EQUAL(size3, size4);
 
-  // ensure v2 received the pointer from before
-  ASSERT_EQUAL(ptr3, ptr4);
-}
-DECLARE_VECTOR_UNITTEST(TestVectorMove);
+    // ensure v2 received the pointer from before
+    ASSERT_EQUAL(ptr3, ptr4);
+  }
+  DECLARE_VECTOR_UNITTEST(TestVectorMove);
+

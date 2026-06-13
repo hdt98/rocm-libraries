@@ -20,3 +20,4 @@
 
 // this system inherits sequence
 #include <thrust/system/cpp/detail/sequence.h>
+

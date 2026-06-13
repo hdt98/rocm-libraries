@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 /*! \ingroup level2_module
-*  \brief Sparse matrix vector multiplication using the ELL storage format.
+*  \brief Sparse matrix vector multiplication using ELL storage format
 *
 *  \details
 *  \p rocsparse_ellmv multiplies the scalar \f$\alpha\f$ with a sparse \f$m \times n\f$
@@ -75,14 +75,14 @@ extern "C" {
 *  This function does not produce deterministic results when A is transposed.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  trans       matrix operation type.
 *  @param[in]
@@ -113,16 +113,111 @@ extern "C" {
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, or \p ell_width is invalid.
+*  \retval     rocsparse_status_invalid_size \p m, \p n or \p ell_width is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p descr, \p alpha, \p ell_val,
-*              \p ell_col_ind, \p x, \p beta, or \p y pointer is invalid.
+*              \p ell_col_ind, \p x, \p beta or \p y pointer is invalid.
 *  \retval     rocsparse_status_not_implemented
 *              \ref rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 *
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in ELL format. It also shows how to convert
 *  from CSR to ELL format.
-*  \snippet example_rocsparse_ellmv.cpp doc example
+*  \code{.c}
+*      // rocSPARSE handle
+*      rocsparse_handle handle;
+*      rocsparse_create_handle(&handle);
+*
+*      // A sparse matrix
+*      // 1 0 3 4
+*      // 0 0 5 1
+*      // 0 2 0 0
+*      // 4 0 0 8
+*      rocsparse_int hAptr[5] = {0, 3, 5, 6, 8};
+*      rocsparse_int hAcol[8] = {0, 2, 3, 2, 3, 1, 0, 3};
+*      double        hAval[8] = {1.0, 3.0, 4.0, 5.0, 1.0, 2.0, 4.0, 8.0};
+*
+*      rocsparse_int m = 4;
+*      rocsparse_int n = 4;
+*      rocsparse_int nnz = 8;
+*
+*      double halpha = 1.0;
+*      double hbeta  = 0.0;
+*
+*      double  hx[4] = {1.0, 2.0, 3.0, 4.0};
+*      double  hy[4] = {4.0, 5.0, 6.0, 7.0};
+*
+*      // Matrix descriptors
+*      rocsparse_mat_descr descrA;
+*      rocsparse_create_mat_descr(&descrA);
+*
+*      rocsparse_mat_descr descrB;
+*      rocsparse_create_mat_descr(&descrB);
+*
+*      // Offload data to device
+*      rocsparse_int* dAptr = NULL;
+*      rocsparse_int* dAcol = NULL;
+*      double*        dAval = NULL;
+*      double*        dx    = NULL;
+*      double*        dy    = NULL;
+*
+*      hipMalloc((void**)&dAptr, sizeof(rocsparse_int) * (m + 1));
+*      hipMalloc((void**)&dAcol, sizeof(rocsparse_int) * nnz);
+*      hipMalloc((void**)&dAval, sizeof(double) * nnz);
+*      hipMalloc((void**)&dx, sizeof(double) * n);
+*      hipMalloc((void**)&dy, sizeof(double) * m);
+*
+*      hipMemcpy(dAptr, hAptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice);
+*      hipMemcpy(dAcol, hAcol, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice);
+*      hipMemcpy(dAval, hAval, sizeof(double) * nnz, hipMemcpyHostToDevice);
+*      hipMemcpy(dx, hx, sizeof(double) * n, hipMemcpyHostToDevice);
+*
+*      // Convert CSR matrix to ELL format
+*      rocsparse_int* dBcol = NULL;
+*      double*        dBval = NULL;
+*
+*      // Determine ELL width
+*      rocsparse_int ell_width;
+*      rocsparse_csr2ell_width(handle, m, descrA, dAptr, descrB, &ell_width);
+*
+*      // Allocate memory for ELL storage format
+*      hipMalloc((void**)&dBcol, sizeof(rocsparse_int) * ell_width * m);
+*      hipMalloc((void**)&dBval, sizeof(double) * ell_width * m);
+*
+*      // Convert matrix from CSR to ELL
+*      rocsparse_dcsr2ell(handle, m, descrA, dAval, dAptr, dAcol, descrB, ell_width, dBval, dBcol);
+*
+*      // Clean up CSR structures
+*      hipFree(dAptr);
+*      hipFree(dAcol);
+*      hipFree(dAval);
+*
+*      // Call rocsparse ellmv
+*      rocsparse_dellmv(handle,
+*                       rocsparse_operation_none,
+*                       m,
+*                       n,
+*                       &halpha,
+*                       descrB,
+*                       dBval,
+*                       dBcol,
+*                       ell_width,
+*                       dx,
+*                       &hbeta,
+*                       dy);
+*
+*      // Copy result back to host
+*      hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost);
+*
+*      // Clear up on device
+*      rocsparse_destroy_mat_descr(descrA);
+*      rocsparse_destroy_mat_descr(descrB);
+*      rocsparse_destroy_handle(handle);
+*
+*      hipFree(dBcol);
+*      hipFree(dBval);
+*      hipFree(dx);
+*      hipFree(dy);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

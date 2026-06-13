@@ -85,22 +85,16 @@ struct testing_matrix_type_traits<rocsparse_format_ell, I, I, T>
     using device_sparse_matrix = device_ell_matrix<U, I>;
 };
 
-template <rocsparse_format FORMAT,
-          typename I,
-          typename J,
-          typename A,
-          typename B,
-          typename C,
-          typename T>
+template <rocsparse_format FORMAT, typename I, typename J, typename T>
 struct testing_sddmm_dispatch_traits;
 
 //
 // TRAITS FOR CSR FORMAT.
 //
-template <typename I, typename J, typename A, typename B, typename C, typename T>
-struct testing_sddmm_dispatch_traits<rocsparse_format_csr, I, J, A, B, C, T>
+template <typename I, typename J, typename T>
+struct testing_sddmm_dispatch_traits<rocsparse_format_csr, I, J, T>
 {
-    using traits = testing_matrix_type_traits<rocsparse_format_csr, I, J, C>;
+    using traits = testing_matrix_type_traits<rocsparse_format_csr, I, J, T>;
 
     template <typename U>
     using host_sparse_matrix = typename traits::template host_sparse_matrix<U>;
@@ -108,50 +102,49 @@ struct testing_sddmm_dispatch_traits<rocsparse_format_csr, I, J, A, B, C, T>
     using device_sparse_matrix = typename traits::template device_sparse_matrix<U>;
 
     template <typename... Ts>
-    static void sparse_initialization(rocsparse_matrix_factory<C, I, J>& matrix_factory,
-                                      host_sparse_matrix<C>&             hC,
+    static void sparse_initialization(rocsparse_matrix_factory<T, I, J>& matrix_factory,
+                                      host_sparse_matrix<T>&             hA,
                                       Ts&&... ts)
     {
-        matrix_factory.init_csr(hC, ts...);
+        matrix_factory.init_csr(hA, ts...);
     }
 
     static void host_calculation(rocsparse_operation         trans_A,
                                  rocsparse_operation         trans_B,
                                  const T*                    h_alpha,
-                                 const host_dense_matrix<A>& hA,
-                                 const host_dense_matrix<B>& hB,
+                                 const host_dense_matrix<T>& hA,
+                                 const host_dense_matrix<T>& hB,
                                  const T*                    h_beta,
-                                 host_sparse_matrix<C>&      hC)
+                                 host_sparse_matrix<T>&      hC)
     {
-        rocsparse_host<T, I, J, A, B, C>::csrddmm(
-            trans_A,
-            trans_B,
-            hA.order,
-            hB.order,
-            hC.m,
-            hC.n,
-            ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
-            hC.nnz,
-            h_alpha,
-            hA,
-            hA.ld,
-            hB,
-            hB.ld,
-            h_beta,
-            hC.ptr,
-            hC.ind,
-            hC.val,
-            hC.base);
+        rocsparse_host<T, I, J>::csrddmm(trans_A,
+                                         trans_B,
+                                         hA.order,
+                                         hB.order,
+                                         hC.m,
+                                         hC.n,
+                                         ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
+                                         hC.nnz,
+                                         h_alpha,
+                                         hA,
+                                         hA.ld,
+                                         hB,
+                                         hB.ld,
+                                         h_beta,
+                                         hC.ptr,
+                                         hC.ind,
+                                         hC.val,
+                                         hC.base);
     }
 };
 
 //
 // TRAITS FOR CSC FORMAT.
 //
-template <typename I, typename J, typename A, typename B, typename C, typename T>
-struct testing_sddmm_dispatch_traits<rocsparse_format_csc, I, J, A, B, C, T>
+template <typename I, typename J, typename T>
+struct testing_sddmm_dispatch_traits<rocsparse_format_csc, I, J, T>
 {
-    using traits = testing_matrix_type_traits<rocsparse_format_csc, I, J, C>;
+    using traits = testing_matrix_type_traits<rocsparse_format_csc, I, J, T>;
 
     template <typename U>
     using host_sparse_matrix = typename traits::template host_sparse_matrix<U>;
@@ -159,50 +152,49 @@ struct testing_sddmm_dispatch_traits<rocsparse_format_csc, I, J, A, B, C, T>
     using device_sparse_matrix = typename traits::template device_sparse_matrix<U>;
 
     template <typename... Ts>
-    static void sparse_initialization(rocsparse_matrix_factory<C, I, J>& matrix_factory,
-                                      host_sparse_matrix<C>&             hC,
+    static void sparse_initialization(rocsparse_matrix_factory<T, I, J>& matrix_factory,
+                                      host_sparse_matrix<T>&             hA,
                                       Ts&&... ts)
     {
-        matrix_factory.init_csc(hC, ts...);
+        matrix_factory.init_csc(hA, ts...);
     }
 
     static void host_calculation(rocsparse_operation         trans_A,
                                  rocsparse_operation         trans_B,
                                  const T*                    h_alpha,
-                                 const host_dense_matrix<A>& hA,
-                                 const host_dense_matrix<B>& hB,
+                                 const host_dense_matrix<T>& hA,
+                                 const host_dense_matrix<T>& hB,
                                  const T*                    h_beta,
-                                 host_sparse_matrix<C>&      hC)
+                                 host_sparse_matrix<T>&      hC)
     {
-        rocsparse_host<T, I, J, A, B, C>::cscddmm(
-            trans_A,
-            trans_B,
-            hA.order,
-            hB.order,
-            hC.m,
-            hC.n,
-            ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
-            hC.nnz,
-            h_alpha,
-            hA,
-            hA.ld,
-            hB,
-            hB.ld,
-            h_beta,
-            hC.ptr,
-            hC.ind,
-            hC.val,
-            hC.base);
+        rocsparse_host<T, I, J>::cscddmm(trans_A,
+                                         trans_B,
+                                         hA.order,
+                                         hB.order,
+                                         hC.m,
+                                         hC.n,
+                                         ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
+                                         hC.nnz,
+                                         h_alpha,
+                                         hA,
+                                         hA.ld,
+                                         hB,
+                                         hB.ld,
+                                         h_beta,
+                                         hC.ptr,
+                                         hC.ind,
+                                         hC.val,
+                                         hC.base);
     }
 };
 
 //
 // TRAITS FOR COO FORMAT.
 //
-template <typename I, typename A, typename B, typename C, typename T>
-struct testing_sddmm_dispatch_traits<rocsparse_format_coo, I, I, A, B, C, T>
+template <typename I, typename T>
+struct testing_sddmm_dispatch_traits<rocsparse_format_coo, I, I, T>
 {
-    using traits = testing_matrix_type_traits<rocsparse_format_coo, I, I, C>;
+    using traits = testing_matrix_type_traits<rocsparse_format_coo, I, I, T>;
 
     template <typename U>
     using host_sparse_matrix = typename traits::template host_sparse_matrix<U>;
@@ -210,50 +202,49 @@ struct testing_sddmm_dispatch_traits<rocsparse_format_coo, I, I, A, B, C, T>
     using device_sparse_matrix = typename traits::template device_sparse_matrix<U>;
 
     template <typename... Ts>
-    static void sparse_initialization(rocsparse_matrix_factory<C, I, I>& matrix_factory,
-                                      host_sparse_matrix<C>&             hC,
+    static void sparse_initialization(rocsparse_matrix_factory<T, I, I>& matrix_factory,
+                                      host_sparse_matrix<T>&             hA,
                                       Ts&&... ts)
     {
-        matrix_factory.init_coo(hC, ts...);
+        matrix_factory.init_coo(hA, ts...);
     }
 
     static void host_calculation(rocsparse_operation         trans_A,
                                  rocsparse_operation         trans_B,
                                  const T*                    h_alpha,
-                                 const host_dense_matrix<A>& hA,
-                                 const host_dense_matrix<B>& hB,
+                                 const host_dense_matrix<T>& hA,
+                                 const host_dense_matrix<T>& hB,
                                  const T*                    h_beta,
-                                 host_sparse_matrix<C>&      hC)
+                                 host_sparse_matrix<T>&      hC)
     {
-        rocsparse_host<T, I, I, A, B, C>::cooddmm(
-            trans_A,
-            trans_B,
-            hA.order,
-            hB.order,
-            hC.m,
-            hC.n,
-            ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
-            hC.nnz,
-            h_alpha,
-            hA,
-            hA.ld,
-            hB,
-            hB.ld,
-            h_beta,
-            hC.row_ind,
-            hC.col_ind,
-            hC.val,
-            hC.base);
+        rocsparse_host<T, I, I>::cooddmm(trans_A,
+                                         trans_B,
+                                         hA.order,
+                                         hB.order,
+                                         hC.m,
+                                         hC.n,
+                                         ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
+                                         hC.nnz,
+                                         h_alpha,
+                                         hA,
+                                         hA.ld,
+                                         hB,
+                                         hB.ld,
+                                         h_beta,
+                                         hC.row_ind,
+                                         hC.col_ind,
+                                         hC.val,
+                                         hC.base);
     }
 };
 
 //
 // TRAITS FOR COO AOS FORMAT.
 //
-template <typename I, typename A, typename B, typename C, typename T>
-struct testing_sddmm_dispatch_traits<rocsparse_format_coo_aos, I, I, A, B, C, T>
+template <typename I, typename T>
+struct testing_sddmm_dispatch_traits<rocsparse_format_coo_aos, I, I, T>
 {
-    using traits = testing_matrix_type_traits<rocsparse_format_coo_aos, I, I, C>;
+    using traits = testing_matrix_type_traits<rocsparse_format_coo_aos, I, I, T>;
 
     template <typename U>
     using host_sparse_matrix = typename traits::template host_sparse_matrix<U>;
@@ -261,50 +252,49 @@ struct testing_sddmm_dispatch_traits<rocsparse_format_coo_aos, I, I, A, B, C, T>
     using device_sparse_matrix = typename traits::template device_sparse_matrix<U>;
 
     template <typename... Ts>
-    static void sparse_initialization(rocsparse_matrix_factory<C, I, I>& matrix_factory,
-                                      host_sparse_matrix<C>&             hC,
+    static void sparse_initialization(rocsparse_matrix_factory<T, I, I>& matrix_factory,
+                                      host_sparse_matrix<T>&             hA,
                                       Ts&&... ts)
     {
-        matrix_factory.init_coo_aos(hC, ts...);
+        matrix_factory.init_coo_aos(hA, ts...);
     }
 
     static void host_calculation(rocsparse_operation         trans_A,
                                  rocsparse_operation         trans_B,
                                  const T*                    h_alpha,
-                                 const host_dense_matrix<A>& hA,
-                                 const host_dense_matrix<B>& hB,
+                                 const host_dense_matrix<T>& hA,
+                                 const host_dense_matrix<T>& hB,
                                  const T*                    h_beta,
-                                 host_sparse_matrix<C>&      hC)
+                                 host_sparse_matrix<T>&      hC)
     {
-        rocsparse_host<T, I, I, A, B, C>::cooaosddmm(
-            trans_A,
-            trans_B,
-            hA.order,
-            hB.order,
-            hC.m,
-            hC.n,
-            ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
-            hC.nnz,
-            h_alpha,
-            hA,
-            hA.ld,
-            hB,
-            hB.ld,
-            h_beta,
-            hC.ind,
-            hC.ind + 1,
-            hC.val,
-            hC.base);
+        rocsparse_host<T, I, I>::cooaosddmm(trans_A,
+                                            trans_B,
+                                            hA.order,
+                                            hB.order,
+                                            hC.m,
+                                            hC.n,
+                                            ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
+                                            hC.nnz,
+                                            h_alpha,
+                                            hA,
+                                            hA.ld,
+                                            hB,
+                                            hB.ld,
+                                            h_beta,
+                                            hC.ind,
+                                            hC.ind + 1,
+                                            hC.val,
+                                            hC.base);
     }
 };
 
 //
 // TRAITS FOR ELL FORMAT.
 //
-template <typename I, typename A, typename B, typename C, typename T>
-struct testing_sddmm_dispatch_traits<rocsparse_format_ell, I, I, A, B, C, T>
+template <typename I, typename T>
+struct testing_sddmm_dispatch_traits<rocsparse_format_ell, I, I, T>
 {
-    using traits = testing_matrix_type_traits<rocsparse_format_ell, I, I, C>;
+    using traits = testing_matrix_type_traits<rocsparse_format_ell, I, I, T>;
 
     template <typename U>
     using host_sparse_matrix = typename traits::template host_sparse_matrix<U>;
@@ -312,54 +302,47 @@ struct testing_sddmm_dispatch_traits<rocsparse_format_ell, I, I, A, B, C, T>
     using device_sparse_matrix = typename traits::template device_sparse_matrix<U>;
 
     template <typename... Ts>
-    static void sparse_initialization(rocsparse_matrix_factory<C, I, I>& matrix_factory,
-                                      host_sparse_matrix<C>&             hC,
+    static void sparse_initialization(rocsparse_matrix_factory<T, I, I>& matrix_factory,
+                                      host_sparse_matrix<T>&             hA,
                                       Ts&&... ts)
     {
-        matrix_factory.init_ell(hC, ts...);
+        matrix_factory.init_ell(hA, ts...);
     }
 
     static void host_calculation(rocsparse_operation         trans_A,
                                  rocsparse_operation         trans_B,
                                  const T*                    h_alpha,
-                                 const host_dense_matrix<A>& hA,
-                                 const host_dense_matrix<B>& hB,
+                                 const host_dense_matrix<T>& hA,
+                                 const host_dense_matrix<T>& hB,
                                  const T*                    h_beta,
-                                 host_sparse_matrix<C>&      hC)
+                                 host_sparse_matrix<T>&      hC)
     {
-        rocsparse_host<T, I, I, A, B, C>::ellddmm(
-            trans_A,
-            trans_B,
-            hA.order,
-            hB.order,
-            hC.m,
-            hC.n,
-            ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
-            hC.nnz,
-            h_alpha,
-            hA,
-            hA.ld,
-            hB,
-            hB.ld,
-            h_beta,
-            hC.width,
-            hC.ind,
-            hC.val,
-            hC.base);
+        rocsparse_host<T, I, I>::ellddmm(trans_A,
+                                         trans_B,
+                                         hA.order,
+                                         hB.order,
+                                         hC.m,
+                                         hC.n,
+                                         ((trans_A == rocsparse_operation_none) ? hA.n : hA.m),
+                                         hC.nnz,
+                                         h_alpha,
+                                         hA,
+                                         hA.ld,
+                                         hB,
+                                         hB.ld,
+                                         h_beta,
+                                         hC.width,
+                                         hC.ind,
+                                         hC.val,
+                                         hC.base);
     }
 };
 
-template <rocsparse_format FORMAT,
-          typename I,
-          typename J,
-          typename A,
-          typename B,
-          typename C,
-          typename T>
+template <rocsparse_format FORMAT, typename I, typename J, typename T>
 struct testing_sddmm_dispatch
 {
 private:
-    using traits = testing_sddmm_dispatch_traits<FORMAT, I, J, A, B, C, T>;
+    using traits = testing_sddmm_dispatch_traits<FORMAT, I, J, T>;
     template <typename U>
     using host_sparse_matrix = typename traits::template host_sparse_matrix<U>;
     template <typename U>
@@ -385,24 +368,22 @@ public:
         rocsparse_datatype  compute_type = get_datatype<T>();
 
 #define PARAMS_BUFFER_SIZE \
-    handle, trans_A, trans_B, alpha, mat_A, mat_B, beta, mat_C, compute_type, alg, buffer_size
+    handle, trans_A, trans_B, alpha, A, B, beta, C, compute_type, alg, buffer_size
 
-#define PARAMS \
-    handle, trans_A, trans_B, alpha, mat_A, mat_B, beta, mat_C, compute_type, alg, temp_buffer
+#define PARAMS handle, trans_A, trans_B, alpha, A, B, beta, C, compute_type, alg, temp_buffer
 
         //
         // AUTOMATIC BAD ARGS.
         //
         {
-            device_dense_matrix<A>  dA;
-            device_dense_matrix<B>  dB;
+            device_dense_matrix<T>  dA, dB;
             rocsparse_local_dnmat   local_A(dA), local_B(dB);
-            device_sparse_matrix<C> dC;
+            device_sparse_matrix<T> dC;
             rocsparse_local_spmat   local_C(dC);
 
-            rocsparse_dnmat_descr mat_A = local_A;
-            rocsparse_dnmat_descr mat_B = local_B;
-            rocsparse_spmat_descr mat_C = local_C;
+            rocsparse_dnmat_descr A = local_A;
+            rocsparse_dnmat_descr B = local_B;
+            rocsparse_spmat_descr C = local_C;
 
             static constexpr int num_to_exclude             = 1;
             static constexpr int to_exclude[num_to_exclude] = {10};
@@ -413,16 +394,15 @@ public:
 
         // conjugate transpose
         {
-            device_dense_matrix<A> dA;
-            device_dense_matrix<B> dB;
+            device_dense_matrix<T> dA, dB;
             rocsparse_local_dnmat  local_A(dA), local_B(dB);
 
-            device_sparse_matrix<C> dC;
+            device_sparse_matrix<T> dC;
             rocsparse_local_spmat   local_C(dC);
 
-            rocsparse_dnmat_descr mat_A = local_A;
-            rocsparse_dnmat_descr mat_B = local_B;
-            rocsparse_spmat_descr mat_C = local_C;
+            rocsparse_dnmat_descr A = local_A;
+            rocsparse_dnmat_descr B = local_B;
+            rocsparse_spmat_descr C = local_C;
 
             trans_A = rocsparse_operation_conjugate_transpose;
             trans_B = rocsparse_operation_none;
@@ -452,16 +432,15 @@ public:
 
         // buffer size
         {
-            device_dense_matrix<A> dA;
-            device_dense_matrix<B> dB;
+            device_dense_matrix<T> dA, dB;
             rocsparse_local_dnmat  local_A(dA), local_B(dB);
 
-            device_sparse_matrix<C> dC(10, 10, 10, rocsparse_index_base_zero);
+            device_sparse_matrix<T> dC(10, 10, 10, rocsparse_index_base_zero);
             rocsparse_local_spmat   local_C(dC);
 
-            rocsparse_dnmat_descr mat_A = local_A;
-            rocsparse_dnmat_descr mat_B = local_B;
-            rocsparse_spmat_descr mat_C = local_C;
+            rocsparse_dnmat_descr A = local_A;
+            rocsparse_dnmat_descr B = local_B;
+            rocsparse_spmat_descr C = local_C;
 
             alg         = rocsparse_sddmm_alg_dense;
             temp_buffer = nullptr;
@@ -487,7 +466,7 @@ public:
         rocsparse_sddmm_alg  alg     = arg.sddmm_alg;
         rocsparse_datatype   ttype   = get_datatype<T>();
         rocsparse_order      order_A = arg.order;
-        rocsparse_order      order_B = arg.orderB;
+        rocsparse_order      order_B = arg.order;
         // Create rocsparse handle
         rocsparse_local_handle handle(arg);
 
@@ -530,25 +509,23 @@ public:
             {
                 CHECK_ROCSPARSE_ERROR(
                     rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
-                device_sparse_matrix<C> dC;
-                device_dense_matrix<A>  dA;
-                device_dense_matrix<B>  dB;
+                device_sparse_matrix<T> dC;
+                device_dense_matrix<T>  dA, dB;
 
-                rocsparse_local_spmat mat_C(dC);
-                rocsparse_local_dnmat mat_A(dA), mat_B(dB);
+                rocsparse_local_spmat C(dC);
+                rocsparse_local_dnmat A(dA), B(dB);
 
                 size_t buffer_size;
                 void*  dbuffer = nullptr;
-                EXPECT_ROCSPARSE_STATUS(rocsparse_sddmm_buffer_size(PARAMS_BUFFER_SIZE(
-                                            h_alpha, mat_A, mat_B, h_beta, mat_C)),
-                                        rocsparse_status_success);
+                EXPECT_ROCSPARSE_STATUS(
+                    rocsparse_sddmm_buffer_size(PARAMS_BUFFER_SIZE(h_alpha, A, B, h_beta, C)),
+                    rocsparse_status_success);
                 CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, 10));
                 EXPECT_ROCSPARSE_STATUS(
-                    rocsparse_sddmm_preprocess(PARAMS(h_alpha, mat_A, mat_B, h_beta, mat_C)),
+                    rocsparse_sddmm_preprocess(PARAMS(h_alpha, A, B, h_beta, C)),
                     rocsparse_status_success);
-                EXPECT_ROCSPARSE_STATUS(
-                    rocsparse_sddmm(PARAMS(h_alpha, mat_A, mat_B, h_beta, mat_C)),
-                    rocsparse_status_success);
+                EXPECT_ROCSPARSE_STATUS(rocsparse_sddmm(PARAMS(h_alpha, A, B, h_beta, C)),
+                                        rocsparse_status_success);
                 CHECK_HIP_ERROR(rocsparse_hipFree(dbuffer));
                 return;
             }
@@ -565,55 +542,51 @@ public:
         //
         // INITIALIZATE THE SPARSE MATRIX
         //
-        host_sparse_matrix<C> hC;
+        host_sparse_matrix<T> hC;
         {
             bool                              type      = (prop.warpSize == 32) ? true : false;
             static constexpr bool             full_rank = false;
-            rocsparse_matrix_factory<C, I, J> matrix_factory(
+            rocsparse_matrix_factory<T, I, J> matrix_factory(
                 arg, arg.timing ? false : type, full_rank);
             traits::sparse_initialization(matrix_factory, hC, M, N, base);
         }
 
-        device_sparse_matrix<C> dC(hC);
+        device_sparse_matrix<T> dC(hC);
 
         const J              hA_m = (trans_A == rocsparse_operation_none) ? M : K;
         const J              hA_n = (trans_A == rocsparse_operation_none) ? K : M;
-        host_dense_matrix<A> hA(hA_m, hA_n, order_A);
+        host_dense_matrix<T> hA(hA_m, hA_n, order_A);
         rocsparse_matrix_utils::init_exact(hA);
 
         const J              hB_m = (trans_B == rocsparse_operation_none) ? K : N;
         const J              hB_n = (trans_B == rocsparse_operation_none) ? N : K;
-        host_dense_matrix<B> hB(hB_m, hB_n, order_B);
+        host_dense_matrix<T> hB(hB_m, hB_n, order_B);
         rocsparse_matrix_utils::init_exact(hB);
 
-        device_dense_matrix<A> dA(hA);
-        device_dense_matrix<B> dB(hB);
+        device_dense_matrix<T> dA(hA), dB(hB);
 
-        rocsparse_local_spmat mat_C(dC);
-        rocsparse_local_dnmat mat_A(dA), mat_B(dB);
+        rocsparse_local_spmat C(dC);
+        rocsparse_local_dnmat A(dA), B(dB);
 
         size_t buffer_size;
         CHECK_ROCSPARSE_ERROR(
-            rocsparse_sddmm_buffer_size(PARAMS_BUFFER_SIZE(h_alpha, mat_A, mat_B, h_beta, mat_C)));
-
+            rocsparse_sddmm_buffer_size(PARAMS_BUFFER_SIZE(h_alpha, A, B, h_beta, C)));
         void* dbuffer = nullptr;
         CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, std::max(buffer_size, sizeof(I))));
         if(arg.unit_check)
         {
             // Pointer mode host
             CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
-            CHECK_ROCSPARSE_ERROR(
-                rocsparse_sddmm_preprocess(PARAMS(h_alpha, mat_A, mat_B, h_beta, mat_C)));
+            CHECK_ROCSPARSE_ERROR(rocsparse_sddmm_preprocess(PARAMS(h_alpha, A, B, h_beta, C)));
 
-            CHECK_ROCSPARSE_ERROR(
-                testing::rocsparse_sddmm(PARAMS(h_alpha, mat_A, mat_B, h_beta, mat_C)));
+            CHECK_ROCSPARSE_ERROR(testing::rocsparse_sddmm(PARAMS(h_alpha, A, B, h_beta, C)));
             if(ROCSPARSE_REPRODUCIBILITY)
             {
                 rocsparse_reproducibility::save("C pointer mode host", dC);
             }
 
             {
-                host_vector<C> hC_val_copy(hC.val);
+                host_vector<T> hC_val_copy(hC.val);
                 //
                 // HOST CALCULATION
                 //
@@ -634,10 +607,8 @@ public:
             {
                 CHECK_ROCSPARSE_ERROR(
                     rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_device));
-                CHECK_ROCSPARSE_ERROR(
-                    rocsparse_sddmm_preprocess(PARAMS(d_alpha, mat_A, mat_B, d_beta, mat_C)));
-                CHECK_ROCSPARSE_ERROR(
-                    testing::rocsparse_sddmm(PARAMS(d_alpha, mat_A, mat_B, d_beta, mat_C)));
+                CHECK_ROCSPARSE_ERROR(rocsparse_sddmm_preprocess(PARAMS(d_alpha, A, B, d_beta, C)));
+                CHECK_ROCSPARSE_ERROR(testing::rocsparse_sddmm(PARAMS(d_alpha, A, B, d_beta, C)));
             }
             if(ROCSPARSE_REPRODUCIBILITY)
             {
@@ -651,11 +622,10 @@ public:
         {
             CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
-            CHECK_ROCSPARSE_ERROR(
-                rocsparse_sddmm_preprocess(PARAMS(h_alpha, mat_A, mat_B, h_beta, mat_C)));
+            CHECK_ROCSPARSE_ERROR(rocsparse_sddmm_preprocess(PARAMS(h_alpha, A, B, h_beta, C)));
 
             const double gpu_time_used = rocsparse_clients::run_benchmark(
-                arg, rocsparse_sddmm, PARAMS(h_alpha, mat_A, mat_B, h_beta, mat_C));
+                arg, rocsparse_sddmm, PARAMS(h_alpha, A, B, h_beta, C));
 
             double gflop_count = rocsparse_gflop_count<FORMAT>::sddmm(
                 dC.m, dC.n, dC.nnz, K, *h_beta != static_cast<T>(0));

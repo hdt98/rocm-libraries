@@ -28,12 +28,29 @@
 #define TENSILETYPES_H
 #include "tensile_bfloat16.h"
 
+#if (HIP_VERSION_MAJOR == 6 && HIP_VERSION_MINOR == 2 && HIP_VERSION_PATCH > 42130) \
+	|| (HIP_VERSION_MAJOR == 6 && HIP_VERSION_MINOR >= 3)//tmp before gfx94 use hip f8 header
+
 // Using hip header for both NANOO and OCP data types
 #if defined(__HIPCC__)
 #include <hip/hip_fp8.h>
+#define TENSILELITE_FP8_TYPE_FNUZ HIP_FP8_TYPE_FNUZ
+#define TENSILELITE_FP8_TYPE_OCP HIP_FP8_TYPE_OCP
 #endif
 
 #include "tensile_float8_bfloat8.h"
+#else
+
+#if !defined(HIP_FP8_TYPE_FNUZ)
+#define TENSILELITE_FP8_TYPE_FNUZ 1
+#endif
+
+#if !defined(HIP_FP8_TYPE_OCP)
+#define TENSILELITE_FP8_TYPE_OCP 0
+#endif
+
+#include "tensile_float8_bfloat8_bc.h"
+#endif
 
 #include <algorithm>
 #include <iostream>
@@ -182,37 +199,12 @@ constexpr __host__ __device__ bool operator==(tensile_complex<T> const& a,
 {
     return (a.x == b.x) && (a.y == b.y);
 }
-template <typename T>
-constexpr __host__ __device__ bool operator!=(tensile_complex<T> const& a,
-                                              tensile_complex<T> const& b)
-{
-    return (a.x != b.x) || (a.y != b.y);
-}
 
 using tensile_float_complex  = tensile_complex<float>;
 using tensile_double_complex = tensile_complex<double>;
 
 #define TensileComplexFloat tensile_float_complex
 #define TensileComplexDouble tensile_double_complex
-
-template <typename t>
-struct tensile_complex2
-{
-    tensile_complex<t> x;
-    tensile_complex<t> y;
-
-    __host__ __device__ tensile_complex2() = default;
-
-    constexpr __host__ __device__ tensile_complex2(tensile_complex<t> x, tensile_complex<t> y)
-        : x{x}
-        , y{y}
-    {
-    }
-};
-
-using tensile_float_complex2 = tensile_complex2<float>;
-
-#define TensileComplexFloat2 tensile_float_complex2
 #endif // HIP
 
 #define TensileInt8x4 uint32_t

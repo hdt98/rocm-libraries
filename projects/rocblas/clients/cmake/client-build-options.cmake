@@ -51,10 +51,6 @@ if( NOT BUILD_CLIENTS_BENCHMARKS )
   option( BUILD_CLIENTS_BENCHMARKS "Build rocBLAS benchmarks" OFF )
 endif( )
 
-if( NOT CREATE_TEST_APP_LOCAL_DEPLOY )
-  option( CREATE_TEST_APP_LOCAL_DEPLOY "Create test sandbox for app local deployment" OFF )
-endif( )
-
 if( NOT LINK_BLIS )
   option( LINK_BLIS "rocBLAS clients link AOCL BLIS library for CPU reference BLAS" ON )
 endif( )

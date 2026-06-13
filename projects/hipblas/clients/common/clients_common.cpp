@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -208,7 +208,6 @@
 #include "blas_ex/testing_gemm_batched_ex.hpp"
 #include "blas_ex/testing_gemm_ex.hpp"
 #include "blas_ex/testing_gemm_strided_batched_ex.hpp"
-#include "blas_ex/testing_herk_ex.hpp"
 #include "blas_ex/testing_nrm2_batched_ex.hpp"
 #include "blas_ex/testing_nrm2_ex.hpp"
 #include "blas_ex/testing_nrm2_strided_batched_ex.hpp"
@@ -218,7 +217,6 @@
 #include "blas_ex/testing_scal_batched_ex.hpp"
 #include "blas_ex/testing_scal_ex.hpp"
 #include "blas_ex/testing_scal_strided_batched_ex.hpp"
-#include "blas_ex/testing_syrk_ex.hpp"
 #include "blas_ex/testing_trsm_batched_ex.hpp"
 #include "blas_ex/testing_trsm_ex.hpp"
 #include "blas_ex/testing_trsm_strided_batched_ex.hpp"
@@ -267,7 +265,7 @@ void run_function(const func_map& map, const Arguments& arg, const std::string& 
     auto match = map.find(arg.function);
     if(match == map.end())
         throw std::invalid_argument("Invalid combination --function "s + arg.function
-                                    + " --a_type "s + hip_datatype2string(arg.a_type) + msg);
+                                    + " --a_type "s + hipblas_datatype2string(arg.a_type) + msg);
     match->second(arg);
 }
 
@@ -436,7 +434,6 @@ void get_test_name(const Arguments& arg, std::string& name)
         {"herkx", testname_herkx},
         {"herkx_batched", testname_herkx_batched},
         {"herkx_strided_batched", testname_herkx_strided_batched},
-        {"herk_ex", testname_herk_ex},
         {"symm", testname_symm},
         {"symm_batched", testname_symm_batched},
         {"symm_strided_batched", testname_symm_strided_batched},
@@ -449,7 +446,6 @@ void get_test_name(const Arguments& arg, std::string& name)
         {"syrkx", testname_syrkx},
         {"syrkx_batched", testname_syrkx_batched},
         {"syrkx_strided_batched", testname_syrkx_strided_batched},
-        {"syrk_ex", testname_syrk_ex},
         {"trmm", testname_trmm},
         {"trmm_batched", testname_trmm_batched},
         {"trmm_strided_batched", testname_trmm_strided_batched},
@@ -541,54 +537,6 @@ struct perf_gemm_strided_batched_ex<
     {
         static const func_map map = {
             {"gemm_strided_batched_ex", testing_gemm_strided_batched_ex<Ti, To, Tc>},
-        };
-        run_function(map, arg);
-    }
-};
-
-// Template to dispatch testing_syrk_ex for performance tests
-// When Ti == void or Ti == To == Tc == bfloat16, the test is marked invalid
-template <typename Ti, typename To = Ti, typename Tc = To, typename = void>
-struct perf_syrk_ex : hipblas_test_invalid
-{
-};
-
-template <typename Ti, typename To, typename Tc>
-struct perf_syrk_ex<Ti,
-                    To,
-                    Tc,
-                    std::enable_if_t<!std::is_same<Ti, void>{}
-                                     && !(std::is_same<Ti, To>{} && std::is_same<Ti, Tc>{}
-                                          && std::is_same<Ti, hipblasBfloat16>{})>>
-    : hipblas_test_valid
-{
-    void operator()(const Arguments& arg)
-    {
-        static const func_map map = {
-            {"syrk_ex", testing_syrk_ex<Ti, To, Tc>},
-        };
-        run_function(map, arg);
-    }
-};
-
-// Template to dispatch testing_herk_ex for performance tests
-// When Ti == void or not complex in and out, the test is marked invalid
-template <typename Ti, typename To = Ti, typename Tc = To, typename = void>
-struct perf_herk_ex : hipblas_test_invalid
-{
-};
-template <typename Ti, typename To, typename Tc>
-struct perf_herk_ex<
-    Ti,
-    To,
-    Tc,
-    std::enable_if_t<!std::is_same<Ti, void>{} && (is_complex<To> && is_complex<Ti>)>>
-    : hipblas_test_valid
-{
-    void operator()(const Arguments& arg)
-    {
-        static const func_map map = {
-            {"herk_ex", testing_herk_ex<Ti, To, Tc>},
         };
         run_function(map, arg);
     }
@@ -795,10 +743,11 @@ struct perf_blas<T, U, std::enable_if_t<std::is_same<T, hipblasHalf>{}>> : hipbl
 };
 
 template <typename T, typename U>
-struct perf_blas<T,
-                 U,
-                 std::enable_if_t<std::is_same<T, std::complex<double>>{}
-                                  || std::is_same<T, std::complex<float>>{}>> : hipblas_test_valid
+struct perf_blas<
+    T,
+    U,
+    std::enable_if_t<std::is_same<T, hipblasDoubleComplex>{} || std::is_same<T, hipblasComplex>{}>>
+    : hipblas_test_valid
 {
     void operator()(const Arguments& arg)
     {
@@ -997,12 +946,10 @@ struct perf_blas_axpy_ex<
                 hipblasHalf> && std::is_same_v<Ta, Tx> && std::is_same_v<Tx, Ty> && std::is_same_v<Ty, Tex>)
         || (std::is_same_v<
                 Ta,
-                std::complex<
-                    float>> && std::is_same_v<Ta, Tx> && std::is_same_v<Tx, Ty> && std::is_same_v<Ty, Tex>)
+                hipblasComplex> && std::is_same_v<Ta, Tx> && std::is_same_v<Tx, Ty> && std::is_same_v<Ty, Tex>)
         || (std::is_same_v<
                 Ta,
-                std::complex<
-                    double>> && std::is_same_v<Ta, Tx> && std::is_same_v<Tx, Ty> && std::is_same_v<Ty, Tex>)
+                hipblasDoubleComplex> && std::is_same_v<Ta, Tx> && std::is_same_v<Tx, Ty> && std::is_same_v<Ty, Tex>)
         || (std::is_same_v<
                 Ta,
                 hipblasHalf> && std::is_same_v<Ta, Tx> && std::is_same_v<Tx, Ty> && std::is_same_v<Tex, float>)
@@ -1045,9 +992,9 @@ struct perf_blas_dot_ex<
                          && std::is_same<Ty, Tr>{} && std::is_same<Tr, Tex>{})
                      || (std::is_same<Tx, hipblasHalf>{} && std::is_same<Tx, Ty>{}
                          && std::is_same<Ty, Tr>{} && std::is_same<Tr, Tex>{})
-                     || (std::is_same<Tx, std::complex<float>>{} && std::is_same<Tx, Ty>{}
+                     || (std::is_same<Tx, hipblasComplex>{} && std::is_same<Tx, Ty>{}
                          && std::is_same<Ty, Tr>{} && std::is_same<Tr, Tex>{})
-                     || (std::is_same<Tx, std::complex<double>>{} && std::is_same<Tx, Ty>{}
+                     || (std::is_same<Tx, hipblasDoubleComplex>{} && std::is_same<Tx, Ty>{}
                          && std::is_same<Ty, Tr>{} && std::is_same<Tr, Tex>{})
                      || (std::is_same<Tx, hipblasHalf>{} && std::is_same<Tx, Ty>{}
                          && std::is_same<Ty, Tr>{} && std::is_same<Tex, float>{})
@@ -1082,9 +1029,9 @@ struct perf_blas_nrm2_ex<
     std::enable_if_t<
         (std::is_same<Tx, float>{} && std::is_same<Tx, Tr>{} && std::is_same<Tr, Tex>{})
         || (std::is_same<Tx, double>{} && std::is_same<Tx, Tr>{} && std::is_same<Tr, Tex>{})
-        || (std::is_same<Tx, std::complex<float>>{} && std::is_same<Tr, float>{}
+        || (std::is_same<Tx, hipblasComplex>{} && std::is_same<Tr, float>{}
             && std::is_same<Tr, Tex>{})
-        || (std::is_same<Tx, std::complex<double>>{} && std::is_same<Tr, double>{}
+        || (std::is_same<Tx, hipblasDoubleComplex>{} && std::is_same<Tr, double>{}
             && std::is_same<Tr, Tex>{})
         || (std::is_same<Tx, hipblasHalf>{} && std::is_same<Tr, Tx>{} && std::is_same<Tex, float>{})
         || (std::is_same<Tx, hipblasBfloat16>{} && std::is_same<Tr, Tx>{}
@@ -1116,15 +1063,15 @@ struct perf_blas_rot_ex<
                       && std::is_same<Tcs, Tex>{})
                      || (std::is_same<Tx, double>{} && std::is_same<Ty, Tx>{}
                          && std::is_same<Ty, Tcs>{} && std::is_same<Tex, Tcs>{})
-                     || (std::is_same<Tx, std::complex<float>>{} && std::is_same<Ty, Tx>{}
+                     || (std::is_same<Tx, hipblasComplex>{} && std::is_same<Ty, Tx>{}
                          && std::is_same<Tcs, Ty>{} && std::is_same<Tcs, Tex>{})
-                     || (std::is_same<Tx, std::complex<double>>{} && std::is_same<Tx, Ty>{}
+                     || (std::is_same<Tx, hipblasDoubleComplex>{} && std::is_same<Tx, Ty>{}
                          && std::is_same<Tcs, Ty>{} && std::is_same<Tex, Tcs>{})
-                     || (std::is_same<Tx, std::complex<float>>{} && std::is_same<Ty, Tx>{}
-                         && std::is_same<Tcs, float>{} && std::is_same<Tex, std::complex<float>>{})
-                     || (std::is_same<Tx, std::complex<double>>{} && std::is_same<Tx, Ty>{}
+                     || (std::is_same<Tx, hipblasComplex>{} && std::is_same<Ty, Tx>{}
+                         && std::is_same<Tcs, float>{} && std::is_same<Tex, hipblasComplex>{})
+                     || (std::is_same<Tx, hipblasDoubleComplex>{} && std::is_same<Tx, Ty>{}
                          && std::is_same<Tcs, double>{}
-                         && std::is_same<Tex, std::complex<double>>{})
+                         && std::is_same<Tex, hipblasDoubleComplex>{})
                      || (std::is_same<Tx, hipblasHalf>{} && std::is_same<Ty, Tx>{}
                          && std::is_same<Tcs, Ty>{} && std::is_same<Tex, float>{})
                      || (std::is_same<Tx, hipblasBfloat16>{} && std::is_same<Ty, Tx>{}
@@ -1155,13 +1102,13 @@ struct perf_blas_rot<
     std::enable_if_t<(std::is_same<Ti, float>{} && std::is_same<Ti, To>{} && std::is_same<To, Tc>{})
                      || (std::is_same<Ti, double>{} && std::is_same<Ti, To>{}
                          && std::is_same<To, Tc>{})
-                     || (std::is_same<Ti, std::complex<float>>{} && std::is_same<To, float>{}
-                         && std::is_same<Tc, std::complex<float>>{})
-                     || (std::is_same<Ti, std::complex<float>>{} && std::is_same<To, float>{}
+                     || (std::is_same<Ti, hipblasComplex>{} && std::is_same<To, float>{}
+                         && std::is_same<Tc, hipblasComplex>{})
+                     || (std::is_same<Ti, hipblasComplex>{} && std::is_same<To, float>{}
                          && std::is_same<Tc, float>{})
-                     || (std::is_same<Ti, std::complex<double>>{} && std::is_same<To, double>{}
-                         && std::is_same<Tc, std::complex<double>>{})
-                     || (std::is_same<Ti, std::complex<double>>{} && std::is_same<To, double>{}
+                     || (std::is_same<Ti, hipblasDoubleComplex>{} && std::is_same<To, double>{}
+                         && std::is_same<Tc, hipblasDoubleComplex>{})
+                     || (std::is_same<Ti, hipblasDoubleComplex>{} && std::is_same<To, double>{}
                          && std::is_same<Tc, double>{})>> : hipblas_test_valid
 {
     void operator()(const Arguments& arg)
@@ -1184,12 +1131,12 @@ template <typename Ta, typename Tb>
 struct perf_blas_scal<
     Ta,
     Tb,
-    std::enable_if_t<(std::is_same<Ta, double>{} && std::is_same<Tb, std::complex<double>>{})
-                     || (std::is_same<Ta, float>{} && std::is_same<Tb, std::complex<float>>{})
+    std::enable_if_t<(std::is_same<Ta, double>{} && std::is_same<Tb, hipblasDoubleComplex>{})
+                     || (std::is_same<Ta, float>{} && std::is_same<Tb, hipblasComplex>{})
                      || (std::is_same<Ta, Tb>{} && std::is_same<Ta, float>{})
                      || (std::is_same<Ta, Tb>{} && std::is_same<Ta, double>{})
-                     || (std::is_same<Ta, Tb>{} && std::is_same<Ta, std::complex<float>>{})
-                     || (std::is_same<Ta, Tb>{} && std::is_same<Ta, std::complex<double>>{})>>
+                     || (std::is_same<Ta, Tb>{} && std::is_same<Ta, hipblasComplex>{})
+                     || (std::is_same<Ta, Tb>{} && std::is_same<Ta, hipblasDoubleComplex>{})>>
     : hipblas_test_valid
 {
     void operator()(const Arguments& arg)
@@ -1217,15 +1164,14 @@ struct perf_blas_scal_ex<
         (std::is_same<Ta, float>{} && std::is_same<Ta, Tx>{} && std::is_same<Tx, Tex>{})
         || (std::is_same<Ta, double>{} && std::is_same<Ta, Tx>{} && std::is_same<Tx, Tex>{})
         || (std::is_same<Ta, hipblasHalf>{} && std::is_same<Ta, Tx>{} && std::is_same<Tx, Tex>{})
-        || (std::is_same<Ta, std::complex<float>>{} && std::is_same<Ta, Tx>{}
-            && std::is_same<Tx, Tex>{})
-        || (std::is_same<Ta, std::complex<double>>{} && std::is_same<Ta, Tx>{}
+        || (std::is_same<Ta, hipblasComplex>{} && std::is_same<Ta, Tx>{} && std::is_same<Tx, Tex>{})
+        || (std::is_same<Ta, hipblasDoubleComplex>{} && std::is_same<Ta, Tx>{}
             && std::is_same<Tx, Tex>{})
         || (std::is_same<Ta, hipblasHalf>{} && std::is_same<Ta, Tx>{} && std::is_same<Tex, float>{})
         || (std::is_same<Ta, float>{} && std::is_same<Tx, hipblasHalf>{} && std::is_same<Ta, Tex>{})
-        || (std::is_same<Ta, float>{} && std::is_same<Tx, std::complex<float>>{}
+        || (std::is_same<Ta, float>{} && std::is_same<Tx, hipblasComplex>{}
             && std::is_same<Tx, Tex>{})
-        || (std::is_same<Ta, double>{} && std::is_same<Tx, std::complex<double>>{}
+        || (std::is_same<Ta, double>{} && std::is_same<Tx, hipblasDoubleComplex>{}
             && std::is_same<Tx, Tex>{})
         || (std::is_same<Ta, hipblasBfloat16>{} && std::is_same<Ta, Tx>{}
             && std::is_same<Tex, float>{})
@@ -1402,14 +1348,6 @@ int run_bench_test(Arguments& arg, int unit_check, int timing)
         }
 
         hipblas_gemm_dispatch<perf_gemm_strided_batched_ex>(arg);
-    }
-    else if(!strcmp(function, "syrk_ex"))
-    {
-        hipblas_syrk_ex_dispatch<perf_syrk_ex>(arg);
-    }
-    else if(!strcmp(function, "herk_ex"))
-    {
-        hipblas_herk_ex_dispatch<perf_herk_ex>(arg);
     }
     else
     {

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -61,8 +61,6 @@ public:
         , m_inc{inc ? inc : 1}
         , m_data{this->device_vector_setup()}
     {
-        if(!m_data)
-            throw std::bad_alloc{};
     }
 
     //!
@@ -109,7 +107,7 @@ public:
     //!
     //! @brief Decay into pointer wherever pointer is expected.
     //!
-    operator hipblas_internal_type<T>*()
+    operator T*()
     {
         return m_data;
     }
@@ -117,7 +115,7 @@ public:
     //!
     //! @brief Decay into constant pointer wherever pointer is expected.
     //!
-    operator const hipblas_internal_type<T>*() const
+    operator const T*() const
     {
         return m_data;
     }
@@ -130,8 +128,8 @@ public:
     hipError_t transfer_from(const host_vector<T>& that)
     {
         return hipMemcpy(m_data,
-                         (const hipblas_internal_type<T>*)that.data(),
-                         this->nmemb() * sizeof(hipblas_internal_type<T>),
+                         (const T*)that,
+                         this->nmemb() * sizeof(T),
                          this->use_HMM ? hipMemcpyHostToHost : hipMemcpyHostToDevice);
     }
 
@@ -141,9 +139,9 @@ public:
     }
 
 private:
-    size_t                    m_n{};
-    int64_t                   m_inc{};
-    hipblas_internal_type<T>* m_data{};
+    size_t  m_n{};
+    int64_t m_inc{};
+    T*      m_data{};
 
     static size_t calculate_nmemb(size_t n, int64_t inc)
     {

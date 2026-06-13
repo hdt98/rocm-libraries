@@ -43,18 +43,18 @@ public:
     // network_config, solver_id
     using Key = std::pair<std::string, std::string>;
 
-    MIOPEN_INTERNALS_EXPORT std::optional<Invoker> operator[](const Key& key) const;
+    std::optional<Invoker> operator[](const Key& key) const;
     // For find 1.0
-    MIOPEN_INTERNALS_EXPORT std::optional<Invoker> GetFound1_0(const std::string& network_config,
-                                                               const std::string& algorithm) const;
+    std::optional<Invoker> GetFound1_0(const std::string& network_config,
+                                       const std::string& algorithm) const;
     std::optional<std::string> GetFound1_0SolverId(const std::string& network_config,
                                                    const std::string& algorithm) const;
 
-    MIOPEN_INTERNALS_EXPORT void Register(const Key& key, const Invoker& invoker);
+    void Register(const Key& key, const Invoker& invoker);
     // For find 1.0
-    MIOPEN_INTERNALS_EXPORT void SetAsFound1_0(const std::string& network_config,
-                                               const std::string& algorithm,
-                                               const std::string& solver_id);
+    void SetAsFound1_0(const std::string& network_config,
+                       const std::string& algorithm,
+                       const std::string& solver_id);
 
 private:
     struct Item

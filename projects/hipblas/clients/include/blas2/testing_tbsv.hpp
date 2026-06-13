@@ -166,7 +166,7 @@ void testing_tbsv(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dAb.memcheck());
     CHECK_DEVICE_ALLOCATION(dx_or_b.memcheck());
 
-    double hipblas_error{0};
+    double hipblas_error;
 
     // Initial Data on CPU
     hipblas_init_matrix(hA,
@@ -218,7 +218,7 @@ void testing_tbsv(const Arguments& arg)
 
     if(arg.timing)
     {
-        double      gpu_time_used{0};
+        double      gpu_time_used;
         hipStream_t stream;
         CHECK_HIPBLAS_ERROR(hipblasGetStream(handle, &stream));
 

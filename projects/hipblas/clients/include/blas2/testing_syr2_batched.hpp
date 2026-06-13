@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,6 @@ inline void testname_syr2_batched(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_syr2_batched_bad_arg(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasSyr2BatchedFn
         = arg.api == FORTRAN ? hipblasSyr2Batched<T, true> : hipblasSyr2Batched<T, false>;
     auto hipblasSyr2BatchedFn_64
@@ -61,9 +60,9 @@ void testing_syr2_batched_bad_arg(const Arguments& arg)
 
         device_vector<T> d_alpha(1), d_zero(1);
 
-        const Ts  h_alpha{1}, h_zero{0};
-        const Ts* alpha = &h_alpha;
-        const Ts* zero  = &h_zero;
+        const T  h_alpha(1), h_zero(0);
+        const T* alpha = &h_alpha;
+        const T* zero  = &h_zero;
 
         if(pointer_mode == HIPBLAS_POINTER_MODE_DEVICE)
         {
@@ -209,7 +208,6 @@ void testing_syr2_batched_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_syr2_batched(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasSyr2BatchedFn
         = arg.api == FORTRAN ? hipblasSyr2Batched<T, true> : hipblasSyr2Batched<T, false>;
     auto hipblasSyr2BatchedFn_64
@@ -242,7 +240,7 @@ void testing_syr2_batched(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Naming: `h` is in CPU (host) memory(eg hA), `d` is in GPU (device) memory (eg dA).
     // Allocate host memory
@@ -298,7 +296,7 @@ void testing_syr2_batched(const Arguments& arg)
                    (handle,
                     uplo,
                     N,
-                    reinterpret_cast<Ts*>(&h_alpha),
+                    &h_alpha,
                     dx.ptr_on_device(),
                     incx,
                     dy.ptr_on_device(),

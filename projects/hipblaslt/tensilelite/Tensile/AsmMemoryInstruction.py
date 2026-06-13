@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,14 +22,14 @@
 #
 ################################################################################
 
-from rocisa.instruction import DSStoreB8, DSStoreB8HID16, ReadWriteInstruction, \
+from .TensileInstructions import DSStoreB8, DSStoreB8HID16, ReadWriteInstruction, \
                         DSLoadD16HIU16, DSLoadD16HIU8, \
                         DSLoadU8, DSLoadU16, DSStoreD16HIB16, \
                         DSStoreB16
 from .Common import printExit
 
 from dataclasses import dataclass, field
-from typing import Type, Optional
+from typing import Type
 
 ################################################################################
 # Memory Instruction
@@ -44,7 +44,6 @@ class MemoryInstruction:
     numBlocks: int = field(init=False)
     totalWidth: float = field(init=False)
     issueLatency: int = field(init=False)
-    bpe: Optional[float] = field(kw_only=True, default=None)
 
     def __post_init__(self):
         self.numBlocks = 2 if self.numAddresses > 1 or self.numOffsets > 1 else 1

@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,46 +23,12 @@
  * ************************************************************************ */
 
 #include "internal/level2/rocsparse_hybmv.h"
+#include "control.h"
 #include "rocsparse_common.h"
-#include "rocsparse_control.hpp"
 #include "rocsparse_coomv.hpp"
 #include "rocsparse_ellmv.hpp"
 #include "rocsparse_hybmv.hpp"
-#include "rocsparse_one.hpp"
-#include "rocsparse_utility.hpp"
-
-// LCOV_EXCL_START
-template <>
-const char* rocsparse::enum_utils::to_string(rocsparse_hyb_partition value)
-{
-#define CASE(C) \
-    case C:     \
-        return #C
-    switch(value)
-    {
-        CASE(rocsparse_hyb_partition_auto);
-        CASE(rocsparse_hyb_partition_user);
-        CASE(rocsparse_hyb_partition_max);
-#undef CASE
-    }
-    THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-}
-// LCOV_EXCL_STOP
-
-template <>
-bool rocsparse::enum_utils::is_invalid(rocsparse_hyb_partition value)
-{
-    switch(value)
-    {
-    case rocsparse_hyb_partition_auto:
-    case rocsparse_hyb_partition_user:
-    case rocsparse_hyb_partition_max:
-    {
-        return false;
-    }
-    }
-    return true;
-}
+#include "utility.h"
 
 template <typename T>
 rocsparse_status rocsparse::hybmv_template(rocsparse_handle          handle,
@@ -166,19 +132,18 @@ rocsparse_status rocsparse::hybmv_template(rocsparse_handle          handle,
     // ELL part
     if(hyb->ell_nnz > 0)
     {
-        RETURN_IF_ROCSPARSE_ERROR(
-            (rocsparse::ellmv_template<T, rocsparse_int, T, T, T>(handle,
-                                                                  trans,
-                                                                  hyb->m,
-                                                                  hyb->n,
-                                                                  alpha_device_host,
-                                                                  descr,
-                                                                  (T*)hyb->ell_val,
-                                                                  hyb->ell_col_ind,
-                                                                  hyb->ell_width,
-                                                                  x,
-                                                                  beta_device_host,
-                                                                  y)));
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse::ellmv_template(handle,
+                                                            trans,
+                                                            hyb->m,
+                                                            hyb->n,
+                                                            alpha_device_host,
+                                                            descr,
+                                                            (T*)hyb->ell_val,
+                                                            hyb->ell_col_ind,
+                                                            hyb->ell_width,
+                                                            x,
+                                                            beta_device_host,
+                                                            y));
     }
 
     // COO part
@@ -192,66 +157,58 @@ rocsparse_status rocsparse::hybmv_template(rocsparse_handle          handle,
                 T* coo_beta = nullptr;
                 rocsparse::one(handle, &coo_beta);
 
-                static constexpr bool fallback_algorithm = true;
-                RETURN_IF_ROCSPARSE_ERROR((rocsparse::coomv_template<T, rocsparse_int, T, T, T>(
-                    handle,
-                    trans,
-                    rocsparse_coomv_alg_segmented,
-                    hyb->m,
-                    hyb->n,
-                    hyb->coo_nnz,
-                    alpha_device_host,
-                    descr,
-                    (T*)hyb->coo_val,
-                    hyb->coo_row_ind,
-                    hyb->coo_col_ind,
-                    x,
-                    coo_beta,
-                    y,
-                    fallback_algorithm)));
+                RETURN_IF_ROCSPARSE_ERROR(rocsparse::coomv_template(handle,
+                                                                    trans,
+                                                                    rocsparse_coomv_alg_segmented,
+                                                                    hyb->m,
+                                                                    hyb->n,
+                                                                    hyb->coo_nnz,
+                                                                    alpha_device_host,
+                                                                    descr,
+                                                                    (T*)hyb->coo_val,
+                                                                    hyb->coo_row_ind,
+                                                                    hyb->coo_col_ind,
+                                                                    x,
+                                                                    coo_beta,
+                                                                    y));
             }
             else
             {
-                static constexpr bool fallback_algorithm = true;
-                RETURN_IF_ROCSPARSE_ERROR((rocsparse::coomv_template<T, rocsparse_int, T, T, T>(
-                    handle,
-                    trans,
-                    rocsparse_coomv_alg_segmented,
-                    hyb->m,
-                    hyb->n,
-                    hyb->coo_nnz,
-                    alpha_device_host,
-                    descr,
-                    (T*)hyb->coo_val,
-                    hyb->coo_row_ind,
-                    hyb->coo_col_ind,
-                    x,
-                    beta_device_host,
-                    y,
-                    fallback_algorithm)));
+                RETURN_IF_ROCSPARSE_ERROR(rocsparse::coomv_template(handle,
+                                                                    trans,
+                                                                    rocsparse_coomv_alg_segmented,
+                                                                    hyb->m,
+                                                                    hyb->n,
+                                                                    hyb->coo_nnz,
+                                                                    alpha_device_host,
+                                                                    descr,
+                                                                    (T*)hyb->coo_val,
+                                                                    hyb->coo_row_ind,
+                                                                    hyb->coo_col_ind,
+                                                                    x,
+                                                                    beta_device_host,
+                                                                    y));
             }
         }
         else
         {
             // Beta is applied by ELL part, IF ell_nnz > 0
             T coo_beta = (hyb->ell_nnz > 0) ? static_cast<T>(1) : *beta_device_host;
-            static constexpr bool fallback_algorithm = true;
-            RETURN_IF_ROCSPARSE_ERROR(
-                (rocsparse::coomv_template<T, rocsparse_int, T, T, T>(handle,
-                                                                      trans,
-                                                                      rocsparse_coomv_alg_segmented,
-                                                                      hyb->m,
-                                                                      hyb->n,
-                                                                      hyb->coo_nnz,
-                                                                      alpha_device_host,
-                                                                      descr,
-                                                                      (T*)hyb->coo_val,
-                                                                      hyb->coo_row_ind,
-                                                                      hyb->coo_col_ind,
-                                                                      x,
-                                                                      &coo_beta,
-                                                                      y,
-                                                                      fallback_algorithm)));
+
+            RETURN_IF_ROCSPARSE_ERROR(rocsparse::coomv_template(handle,
+                                                                trans,
+                                                                rocsparse_coomv_alg_segmented,
+                                                                hyb->m,
+                                                                hyb->n,
+                                                                hyb->coo_nnz,
+                                                                alpha_device_host,
+                                                                descr,
+                                                                (T*)hyb->coo_val,
+                                                                hyb->coo_row_ind,
+                                                                hyb->coo_col_ind,
+                                                                x,
+                                                                &coo_beta,
+                                                                y));
         }
     }
 

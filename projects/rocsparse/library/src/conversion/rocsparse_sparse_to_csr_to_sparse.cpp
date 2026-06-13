@@ -23,7 +23,7 @@
 
 #include "rocsparse_sparse_to_csr_to_sparse.hpp"
 #include "rocsparse_internal_spmat_print.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 rocsparse_status rocsparse::sparse_to_csr_to_sparse(rocsparse_handle                 handle_,
                                                     rocsparse_sparse_to_sparse_descr descr_,
@@ -79,7 +79,6 @@ rocsparse_status rocsparse::sparse_to_csr_to_sparse(rocsparse_handle            
         switch(source_->format)
         {
         case rocsparse_format_bell:
-        case rocsparse_format_sell:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
@@ -256,7 +255,6 @@ rocsparse_status rocsparse::sparse_to_csr_to_sparse(rocsparse_handle            
             break;
         }
         case rocsparse_format_bell:
-        case rocsparse_format_sell:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }

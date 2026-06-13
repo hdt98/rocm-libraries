@@ -50,7 +50,7 @@ bool T5LayernormBackward::IsApplicable(const ExecutionContext&,
         return false;
     if(!problem.IsAllPacked())
         return false;
-    if(!(sizeof_local_memory(problem, LOCAL_SIZE) <= TargetProperties::GetMaxLocalMemorySize()))
+    if(!(sizeof_local_memory_t5(problem) <= TargetProperties::GetMaxLocalMemorySize()))
         return false;
     return true;
 }
@@ -64,12 +64,17 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
     auto dtype        = problem.GetDYDesc().GetType();
     auto input_dtype  = miopen::GetDataType(problem.GetDYDesc().GetType());
     auto output_dtype = miopen::GetDataType(problem.GetDXDesc().GetType());
+    auto dims         = problem.GetDYDesc().GetLengths();
 
-    auto reqd_work_item_cnt = get_reqd_work_item_cnt(context, LOCAL_SIZE);
+    auto outer_size =
+        std::accumulate(dims.begin(), dims.end() - 1, 1ULL, std::multiplies<size_t>());
+    auto inner_size = dims[dims.size() - 1];
+
+    auto reqd_work_item_cnt = get_reqd_work_item_cnt(context);
 
     {
         size_t xlocalsize = LOCAL_SIZE;
-        size_t xgridsize  = problem.outer_size * xlocalsize;
+        size_t xgridsize  = outer_size * xlocalsize;
         size_t ylocalsize = 1;
         size_t ygridsize  = 1;
         size_t zlocalsize = 1;
@@ -77,7 +82,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
 
         auto kernel = KernelInfo{};
 
-        kernel.kernel_file = "MIOpenT5LayerNorm.cpp";
+        kernel.kernel_file = "MIOpenLayerNorm.cpp";
         kernel.kernel_name = "T5LayernormBwdContiguous";
 
         const auto build_params = KernelBuildParameters{
@@ -87,6 +92,10 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
             {"INPUT_TYPE", input_dtype == "bfloat16" ? "ushort" : input_dtype},
             {"OUTPUT_TYPE", output_dtype == "bfloat16" ? "ushort" : output_dtype},
             {"LOCAL_SIZE", LOCAL_SIZE},
+            {"MIOPEN_ELEMENTWISE_AFFINE", 0},
+            {"MIOPEN_WEIGHT_BIAS", 1},
+            {"MIOPEN_ELEMENTWISE_AFFINE_FUSED_ADD", 2},
+            {"MIOPEN_WEIGHT_BIAS_FUSED_ADD", 3},
             {"MIOPEN_ELEMENTWISE_AFFINE_T5", 4},
             {"MIOPEN_WEIGHT_BIAS_T5", 5},
         };
@@ -104,14 +113,14 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
         result.construction_params.push_back(kernel);
     }
 
-    if(is_parallelism(reqd_work_item_cnt, problem.inner_size, problem.outer_size))
+    if(is_parallelism(reqd_work_item_cnt, inner_size, outer_size))
     {
         {
             auto parallelism_size =
-                get_parallelism_size(reqd_work_item_cnt, problem.inner_size, problem.outer_size);
+                get_parallelism_size(reqd_work_item_cnt, inner_size, outer_size);
 
             size_t xlocalsize = LOCAL_SIZE;
-            size_t xgridsize  = AlignUp(parallelism_size * problem.inner_size, xlocalsize);
+            size_t xgridsize  = AlignUp(parallelism_size * inner_size, xlocalsize);
             size_t ylocalsize = 1;
             size_t ygridsize  = 1;
             size_t zlocalsize = 1;
@@ -119,7 +128,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
 
             auto kernel = KernelInfo{};
 
-            kernel.kernel_file = "MIOpenT5LayerNorm.cpp";
+            kernel.kernel_file = "MIOpenLayerNorm.cpp";
             kernel.kernel_name = "T5LayernormBwdWeightContiguousParallel";
 
             const auto build_params = KernelBuildParameters{
@@ -152,7 +161,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
 
         {
             size_t xlocalsize = LOCAL_SIZE;
-            size_t xgridsize  = AlignUp(problem.inner_size, xlocalsize);
+            size_t xgridsize  = AlignUp(inner_size, LOCAL_SIZE);
             size_t ylocalsize = 1;
             size_t ygridsize  = 1;
             size_t zlocalsize = 1;
@@ -160,7 +169,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
 
             auto kernel = KernelInfo{};
 
-            kernel.kernel_file = "MIOpenT5LayerNorm.cpp";
+            kernel.kernel_file = "MIOpenLayerNorm.cpp";
             kernel.kernel_name = "T5LayernormBwdContiguousReduceSum";
 
             const auto build_params = KernelBuildParameters{
@@ -194,7 +203,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
     else
     {
         size_t xlocalsize = LOCAL_SIZE;
-        size_t xgridsize  = problem.inner_size;
+        size_t xgridsize  = inner_size;
         size_t ylocalsize = 1;
         size_t ygridsize  = 1;
         size_t zlocalsize = 1;
@@ -202,7 +211,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
 
         auto kernel = KernelInfo{};
 
-        kernel.kernel_file = "MIOpenT5LayerNorm.cpp";
+        kernel.kernel_file = "MIOpenLayerNorm.cpp";
         kernel.kernel_name = "T5LayernormBwdWeightContiguous";
 
         const auto build_params = KernelBuildParameters{
@@ -233,7 +242,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
         result.construction_params.push_back(kernel);
     }
 
-    if(is_parallelism(reqd_work_item_cnt, problem.inner_size, problem.outer_size))
+    if(is_parallelism(reqd_work_item_cnt, inner_size, outer_size))
     {
         result.invoker_factory = [](const std::vector<Kernel>& kernels) {
             return [=](const Handle& handle_, const AnyInvokeParams& raw_params) {
@@ -242,9 +251,16 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
                 decltype(auto) weight_kernel          = handle_.Run(kernels[2]);
                 decltype(auto) params = raw_params.CastTo<miopen::layernorm::T5BwdInvokeParams>();
 
-                auto reqd_work_item_count = get_reqd_work_item_cnt(handle_, LOCAL_SIZE);
-                auto parallelism_size     = get_parallelism_size(
-                    reqd_work_item_count, params.inner_size, params.outer_size);
+                auto dims = params.dyDesc->GetLengths();
+
+                auto outer_size =
+                    std::accumulate(dims.begin(), dims.end() - 1, 1ULL, std::multiplies<size_t>());
+
+                auto inner_size = dims[dims.size() - 1];
+
+                auto reqd_work_item_cnt = get_reqd_work_item_cnt(handle_);
+                auto parallelism_size =
+                    get_parallelism_size(reqd_work_item_cnt, inner_size, outer_size);
 
                 auto elapsed = 0.f;
                 HipEventPtr start;
@@ -254,7 +270,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
                 {
                     start = miopen::make_hip_event();
                     stop  = miopen::make_hip_event();
-                    (void)hipEventRecord(start.get(), handle_.GetStream());
+                    hipEventRecord(start.get(), handle_.GetStream());
                 }
 
                 kernel(params.dy,
@@ -262,24 +278,24 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
                        params.weight,
                        params.rstd,
                        params.dx,
-                       params.inner_size,
+                       inner_size,
                        static_cast<int32_t>(params.mode));
 
                 weight_parallel_kernel(params.dy,
                                        params.x,
                                        params.rstd,
                                        params.workspace,
-                                       params.outer_size,
-                                       params.inner_size,
+                                       outer_size,
+                                       inner_size,
                                        parallelism_size);
 
-                weight_kernel(params.workspace, params.dw, params.inner_size, parallelism_size);
+                weight_kernel(params.workspace, params.dw, inner_size, parallelism_size);
 
                 if(handle_.IsProfilingEnabled())
                 {
-                    (void)hipEventRecord(stop.get(), handle_.GetStream());
-                    (void)hipEventSynchronize(stop.get());
-                    (void)hipEventElapsedTime(&elapsed, start.get(), stop.get());
+                    hipEventRecord(stop.get(), handle_.GetStream());
+                    hipEventSynchronize(stop.get());
+                    hipEventElapsedTime(&elapsed, start.get(), stop.get());
                     handle_.ResetKernelTime();
                     handle_.AccumKernelTime(elapsed);
                 };
@@ -294,6 +310,13 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
                 decltype(auto) weight_kernel = handle_.Run(kernels[1]);
                 decltype(auto) params = raw_params.CastTo<miopen::layernorm::T5BwdInvokeParams>();
 
+                auto dims = params.dyDesc->GetLengths();
+
+                auto outer_size =
+                    std::accumulate(dims.begin(), dims.end() - 1, 1ULL, std::multiplies<size_t>());
+
+                auto inner_size = dims[dims.size() - 1];
+
                 auto elapsed = 0.f;
                 HipEventPtr start;
                 HipEventPtr stop;
@@ -302,7 +325,7 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
                 {
                     start = miopen::make_hip_event();
                     stop  = miopen::make_hip_event();
-                    (void)hipEventRecord(start.get(), handle_.GetStream());
+                    hipEventRecord(start.get(), handle_.GetStream());
                 }
 
                 kernel(params.dy,
@@ -310,21 +333,16 @@ T5LayernormBackward::GetSolution(const ExecutionContext& context,
                        params.weight,
                        params.rstd,
                        params.dx,
-                       params.inner_size,
+                       inner_size,
                        static_cast<int32_t>(params.mode));
 
-                weight_kernel(params.dy,
-                              params.x,
-                              params.rstd,
-                              params.dw,
-                              params.outer_size,
-                              params.inner_size);
+                weight_kernel(params.dy, params.x, params.rstd, params.dw, outer_size, inner_size);
 
                 if(handle_.IsProfilingEnabled())
                 {
-                    (void)hipEventRecord(stop.get(), handle_.GetStream());
-                    (void)hipEventSynchronize(stop.get());
-                    (void)hipEventElapsedTime(&elapsed, start.get(), stop.get());
+                    hipEventRecord(stop.get(), handle_.GetStream());
+                    hipEventSynchronize(stop.get());
+                    hipEventElapsedTime(&elapsed, start.get(), stop.get());
                     handle_.ResetKernelTime();
                     handle_.AccumKernelTime(elapsed);
                 };
@@ -339,14 +357,20 @@ std::size_t
 T5LayernormBackward::GetWorkspaceSize(const ExecutionContext& context,
                                       const miopen::layernorm::ProblemDescription& problem) const
 {
-    auto reqd_work_item_cnt = get_reqd_work_item_cnt(context, LOCAL_SIZE);
+    auto dims = problem.GetDYDesc().GetLengths();
 
-    if(is_parallelism(reqd_work_item_cnt, problem.inner_size, problem.outer_size))
+    auto outer_size =
+        std::accumulate(dims.begin(), dims.end() - 1, 1ULL, std::multiplies<size_t>());
+
+    auto inner_size = dims[dims.size() - 1];
+
+    auto reqd_work_item_cnt = get_reqd_work_item_cnt(context);
+
+    if(is_parallelism(reqd_work_item_cnt, inner_size, outer_size))
     {
-        auto parallelism_size =
-            get_parallelism_size(reqd_work_item_cnt, problem.inner_size, problem.outer_size);
+        auto parallelism_size = get_parallelism_size(reqd_work_item_cnt, inner_size, outer_size);
 
-        return parallelism_size * problem.inner_size * get_data_size(problem.GetXDesc().GetType());
+        return parallelism_size * inner_size * get_data_size(problem.GetXDesc().GetType());
     }
 
     return 0;

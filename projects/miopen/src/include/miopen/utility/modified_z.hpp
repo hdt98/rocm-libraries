@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <numeric>
 #include <miopen/errors.hpp>
-#include <miopen/float_equal.hpp>
 
 namespace miopen {
 
@@ -95,7 +94,7 @@ std::vector<T> modifiedZScores(const std::vector<T>& sortedData)
     T mad                             = median(absolute_deviation);
 
     // If MAD is 0, then we cannot calcualte the ModifiedZScore
-    if(miopen::float_equal_sentinel(mad, T{0}))
+    if(mad == T{0})
     {
         return std::vector<T>(sortedData.size(), 0);
     }

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -50,7 +50,6 @@ inline void testname_syr2k_batched(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_syr2k_batched_bad_arg(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasSyr2kBatchedFn
         = arg.api == FORTRAN ? hipblasSyr2kBatched<T, true> : hipblasSyr2kBatched<T, false>;
     auto hipblasSyr2kBatchedFn_64 = arg.api == FORTRAN_64 ? hipblasSyr2kBatched_64<T, true>
@@ -76,14 +75,12 @@ void testing_syr2k_batched_bad_arg(const Arguments& arg)
     device_batch_matrix<T> dC(N, N, ldc, batch_count);
 
     device_vector<T> d_alpha(1), d_zero(1), d_beta(1), d_one(1);
-    Ts               h_alpha{1}, h_zero{0}, h_beta{2}, h_one{1};
-    if constexpr(is_complex<T>)
-        h_one = {1, 0};
+    const T          h_alpha(1), h_zero(0), h_beta(2), h_one(1);
 
-    const Ts* alpha = &h_alpha;
-    const Ts* beta  = &h_beta;
-    const Ts* one   = &h_one;
-    const Ts* zero  = &h_zero;
+    const T* alpha = &h_alpha;
+    const T* beta  = &h_beta;
+    const T* one   = &h_one;
+    const T* zero  = &h_zero;
 
     for(auto pointer_mode : {HIPBLAS_POINTER_MODE_HOST, HIPBLAS_POINTER_MODE_DEVICE})
     {
@@ -345,7 +342,6 @@ void testing_syr2k_batched_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_syr2k_batched(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasSyr2kBatchedFn
         = arg.api == FORTRAN ? hipblasSyr2kBatched<T, true> : hipblasSyr2kBatched<T, false>;
     auto hipblasSyr2kBatchedFn_64 = arg.api == FORTRAN_64 ? hipblasSyr2kBatched_64<T, true>
@@ -392,7 +388,7 @@ void testing_syr2k_batched(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     size_t rows = (transA != HIPBLAS_OP_N ? std::max(K, int64_t(1)) : N);
     size_t cols = (transA == HIPBLAS_OP_N ? std::max(K, int64_t(1)) : N);
@@ -454,12 +450,12 @@ void testing_syr2k_batched(const Arguments& arg)
                     transA,
                     N,
                     K,
-                    reinterpret_cast<Ts*>(&h_alpha),
+                    &h_alpha,
                     dA.ptr_on_device(),
                     lda,
                     dB.ptr_on_device(),
                     ldb,
-                    reinterpret_cast<Ts*>(&h_beta),
+                    &h_beta,
                     dC.ptr_on_device(),
                     ldc,
                     batch_count));

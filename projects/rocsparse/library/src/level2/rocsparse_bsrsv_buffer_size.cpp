@@ -25,8 +25,8 @@
 #include "internal/level2/rocsparse_bsrsv.h"
 #include "rocsparse_bsrsv.hpp"
 #include "rocsparse_csrsv.hpp"
-#include "rocsparse_templates.hpp"
-#include "rocsparse_utility.hpp"
+#include "templates.h"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -86,34 +86,8 @@ namespace rocsparse
         ROCSPARSE_CHECKARG_POINTER(10, info);
         ROCSPARSE_CHECKARG_POINTER(11, buffer_size);
 
-        _rocsparse_spmat_descr csr(rocsparse_format_csr,
-                                   false,
-                                   static_cast<int64_t>(1),
-                                   mb,
-                                   mb,
-                                   nnzb,
-                                   rocsparse::get_datatype<T>(),
-                                   bsr_val,
-                                   nullptr,
-                                   static_cast<int64_t>(0),
-                                   rocsparse::get_indextype<rocsparse_int>(),
-                                   bsr_row_ptr,
-                                   nullptr,
-                                   static_cast<int64_t>(0),
-                                   rocsparse::get_indextype<rocsparse_int>(),
-                                   bsr_col_ind,
-                                   nullptr,
-                                   static_cast<int64_t>(0),
-                                   descr->base,
-                                   descr,
-                                   info);
-        RETURN_IF_ROCSPARSE_ERROR(
-            rocsparse::csrsv_analysis_buffer_size(handle, trans, &csr, buffer_size));
-        size_t buffer_size_solve;
-        RETURN_IF_ROCSPARSE_ERROR(
-            rocsparse::csrsv_solve_buffer_size(handle, trans, &csr, &buffer_size_solve));
-
-        buffer_size[0] = std::max(buffer_size[0], buffer_size_solve);
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrsv_buffer_size_template(
+            handle, trans, mb, nnzb, descr, bsr_val, bsr_row_ptr, bsr_col_ind, info, buffer_size));
 
         if(trans == rocsparse_operation_transpose)
         {

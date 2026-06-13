@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
  *
  *******************************************************************************/
 
-#include "hipblaslt/hipblaslt-ext-op.h"
+#include "hipblaslt-ext-op.h"
 #include "hipblaslt-ext-op-internal.hpp"
 #include <Tensile/hip/HipHardware.hpp>
 #include <Tensile/hip/HipSolutionAdapter.hpp>
@@ -32,12 +32,11 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <fstream>
 #include <hip/hip_ext.h>
 #include <hip/hip_runtime_api.h>
+#include <libgen.h>
 #include <memory>
-#include <optional>
 #include <rocblaslt-auxiliary.h>
 #include <sstream>
 #include <string>
@@ -100,6 +99,17 @@ hipblasStatus_t hipblasltAMaxRun(const hipDataType datatype,
                                  uint32_t          n,
                                  hipStream_t       stream);
 
+hipblasStatus_t hipblasltAMaxWithScaleRun(const hipDataType datatype,
+                                          const hipDataType outDatatype,
+                                          const hipDataType scaleDatatype,
+                                          void*             output,
+                                          void*             outputD,
+                                          void*             input,
+                                          void*             inputScale,
+                                          uint32_t          m,
+                                          uint32_t          n,
+                                          hipStream_t       stream);
+
 hipblasStatus_t hipblasltExtAMax(const hipDataType datatype,
                                  const hipDataType outDatatype,
                                  void*             output,
@@ -111,8 +121,25 @@ hipblasStatus_t hipblasltExtAMax(const hipDataType datatype,
     return hipblasltAMaxRun(datatype, outDatatype, output, input, m, n, stream);
 }
 
+hipblasStatus_t hipblasltExtAMaxWithScale(const hipDataType datatype,
+                                          const hipDataType outDatatype,
+                                          const hipDataType scaleDatatype,
+                                          void*             output,
+                                          void*             outputD,
+                                          void*             input,
+                                          void*             inputScale,
+                                          uint32_t          m,
+                                          uint32_t          n,
+                                          hipStream_t       stream)
+{
+    return hipblasltAMaxWithScaleRun(
+        datatype, outDatatype, scaleDatatype, output, outputD, input, inputScale, m, n, stream);
+}
+
 namespace
 {
+    constexpr char DEFAULT_EXT_OP_LIBRARY_PATH[]
+        = "/opt/rocm/lib/hipblaslt/library/hipblasltExtOpLibrary.dat";
     constexpr uint32_t SUPPORTED_MAX_N = 256;
     constexpr uint32_t WORKGROUP_SIZE  = 256;
 
@@ -128,12 +155,6 @@ namespace
         return archName;
     }
 
-    // Strict per-base layout: every ExtOp .dat lives at
-    //   <library_root>/<base-arch>/hipblasltExtOpLibrary_<base-arch>.dat
-    // The HIPBLASLT_EXT_OP_LIBRARY_PATH env override is still honored verbatim
-    // for explicit user-supplied paths. There is no flat fallback and no
-    // hard-coded /opt/rocm path — a missing file logs an error and yields an
-    // empty path, which surfaces as a clean ExtOpMasterLibrary load failure.
     std::string getExtOpLibraryPath()
     {
         if(auto libPath = std::getenv("HIPBLASLT_EXT_OP_LIBRARY_PATH"))
@@ -141,27 +162,24 @@ namespace
             return libPath;
         }
 
-        int              deviceId{};
-        hipDeviceProp_t  props{};
-        if(hipGetDevice(&deviceId) != hipSuccess
-           || hipGetDeviceProperties(&props, deviceId) != hipSuccess)
+        auto        soPath = rocblaslt_internal_get_so_path("hipblaslt");
+        std::string libPath(dirname(&soPath[0]));
+
+        if(rocblaslt_internal_test_path(libPath + "/../Tensile/library"))
+            libPath += "/../Tensile/library";
+        else if(rocblaslt_internal_test_path(libPath + "library"))
+            libPath += "/library";
+        else
+            libPath += "/hipblaslt/library";
+
+        libPath += "/hipblasltExtOpLibrary.dat";
+
+        if(rocblaslt_internal_test_path(libPath))
         {
-            rocblaslt_log_error("getExtOpLibraryPath",
-                                "hipGetDevice/hipGetDeviceProperties",
-                                "failed to query device for ExtOp arch lookup");
-            return {};
+            return libPath;
         }
 
-        const std::string archName = trimArchName(props.gcnArchName);
-        auto              relpath  = std::filesystem::path(archName)
-                       / ("hipblasltExtOpLibrary_" + archName + ".dat");
-        if(auto perArchPath = rocblaslt_find_library_relative_path(relpath))
-            return perArchPath->string();
-
-        rocblaslt_log_error("getExtOpLibraryPath",
-                            "rocblaslt_find_library_relative_path",
-                            relpath.string().c_str());
-        return {};
+        return DEFAULT_EXT_OP_LIBRARY_PATH;
     }
 
     std::string hipDataTypeo_char(hipDataType type)
@@ -235,7 +253,8 @@ namespace
 
             for(auto& adapter : adapters)
             {
-                adapter->codeObjectDir(lib.getLibraryFolder());
+                //setup code object root only, ignore the error
+                err = adapter->initializeLazyLoading("", lib.getLibraryFolder());
             }
         }
         catch(const std::runtime_error& e)
@@ -297,7 +316,6 @@ hipblasStatus_t hipblasltSoftmaxRun(hipDataType datatype,
     TensileLite::KernelInvocation invocation{kernelName,
                                              sol->getCodeObjectPath(),
                                              false,
-                                             {1, 1, 1},
                                              {WORKGROUP_SIZE, 1, 1},
                                              {numWorkgroups, 1, 1},
                                              {numWorkgroups * WORKGROUP_SIZE, 1, 1},
@@ -425,9 +443,6 @@ hipblasStatus_t hipblasltAMaxRun(const hipDataType datatype,
     TensileLite::KernelInvocation invocation;
     invocation.kernelName      = kernelName;
     invocation.codeObjectFile  = sol->getCodeObjectPath();
-    invocation.clusterDim.x    = 1;
-    invocation.clusterDim.y    = 1;
-    invocation.clusterDim.z    = 1;
     invocation.workGroupSize.x = sol->getNumWorkitems();
     invocation.workGroupSize.y = 1;
     invocation.workGroupSize.z = 1;
@@ -442,6 +457,92 @@ hipblasStatus_t hipblasltAMaxRun(const hipDataType datatype,
     invocation.args.reserve(20, 3);
     invocation.args.append("output", output);
     invocation.args.append("input", input);
+    invocation.args.append("length", len);
+
+    err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
+
+    if(err)
+    {
+        return HIPBLAS_STATUS_INTERNAL_ERROR;
+    }
+
+    return HIPBLAS_STATUS_SUCCESS;
+}
+
+hipblasStatus_t hipblasltAMaxWithScaleRun(const hipDataType datatype,
+                                          const hipDataType outDatatype,
+                                          const hipDataType scaleDatatype,
+                                          void*             output,
+                                          void*             outputD,
+                                          void*             input,
+                                          void*             inputScale,
+                                          uint32_t          m,
+                                          uint32_t          n,
+                                          hipStream_t       stream)
+{
+    if(datatype != HIP_R_32F
+       || scaleDatatype != HIP_R_8F_E4M3_FNUZ && scaleDatatype != HIP_R_8F_E5M2_FNUZ
+#ifdef ROCM_USE_FLOAT8
+          && scaleDatatype != HIP_R_8F_E4M3 && scaleDatatype != HIP_R_8F_E5M2
+#endif
+      )
+    {
+        return HIPBLAS_STATUS_NOT_SUPPORTED;
+    }
+
+    if(!output || !outputD || !input || !inputScale || !m || !n)
+    {
+        return HIPBLAS_STATUS_INVALID_VALUE;
+    }
+
+    uint32_t    len = m * n;
+    int         currentDeviceId{};
+    auto        err       = hipGetDevice(&currentDeviceId);
+    auto&       adapter   = extOpLibraries().at(currentDeviceId);
+    auto        gpu       = TensileLite::hip::GetCurrentDevice();
+    const auto  archName  = trimArchName(gpu->archName());
+    auto&       masterLib = getExtOpMasterLibrary();
+    const auto& lib       = masterLib
+                          .getLibrary(archName,
+                                      hipblaslt_ext::AMaxSolutionLibrary::opName,
+                                      hipDataTypeo_char(datatype))
+                          ->as<hipblaslt_ext::AMaxSolutionLibrary>();
+    auto sol = lib.findBestSolution(
+        hipblaslt_ext::AMaxProblem(len,
+                                   hipDataType_to_tensile_type(datatype),
+                                   hipDataType_to_tensile_type(outDatatype),
+                                   hipDataType_to_tensile_type(scaleDatatype),
+                                   true),
+        *gpu);
+
+    if(!sol)
+    {
+        std::cerr << "AMaxWithScale: No valid solution found!" << std::endl;
+        return HIPBLAS_STATUS_SUCCESS;
+    }
+
+    const auto kernelName = sol->name();
+    err                   = adapter->initKernel(kernelName);
+
+    TensileLite::KernelInvocation invocation;
+    invocation.kernelName      = kernelName;
+    invocation.codeObjectFile  = sol->getCodeObjectPath();
+    invocation.workGroupSize.x = sol->getNumWorkitems();
+    invocation.workGroupSize.y = 1;
+    invocation.workGroupSize.z = 1;
+    invocation.numWorkGroups.x = 1;
+    invocation.numWorkGroups.y = 1;
+    invocation.numWorkGroups.z = 1;
+    invocation.numWorkItems.x  = sol->getNumWorkitems();
+    invocation.numWorkItems.y  = 1;
+    invocation.numWorkItems.z  = 1;
+    invocation.sharedMemBytes  = 32 * sizeof(float);
+    invocation.args            = TensileLite::KernelArguments(false);
+    invocation.args.reserve(20, 3);
+    invocation.args.append("output", output);
+    invocation.args.append("outputD", outputD);
+    invocation.args.append("input", input);
+    invocation.args.append("inputScae", inputScale);
     invocation.args.append("length", len);
 
     err = adapter->launchKernel(invocation, stream, nullptr, nullptr);
@@ -477,44 +578,4 @@ void hipblasltSetHotIterationsValue(int newHotIterations)
 {
     UserClientArguments clientArguments;
     clientArguments.SetHotIterationsValue(newHotIterations);
-}
-
-// Get hipblaslt client performance args, For internal use only.
-double hipblasltGetTotalGranularityValue()
-{
-    return hipblasltClientPerformanceArgs::totalGranularity;
-}
-
-double hipblasltGetTilesPerCuValue()
-{
-    return hipblasltClientPerformanceArgs::tilesPerCu;
-}
-
-double hipblasltGetTile0Granularity()
-{
-    return hipblasltClientPerformanceArgs::tile0Granularity;
-}
-double hipblasltGetTile1Granularity()
-{
-    return hipblasltClientPerformanceArgs::tile1Granularity;
-}
-double hipblasltGetCuGranularity()
-{
-    return hipblasltClientPerformanceArgs::cuGranularity;
-}
-double hipblasltGetWaveGranularity()
-{
-    return hipblasltClientPerformanceArgs::waveGranularity;
-}
-int hipblasltGetCUs()
-{
-    return hipblasltClientPerformanceArgs::CUs;
-}
-size_t hipblasltGetMemWriteBytesD()
-{
-    return hipblasltClientPerformanceArgs::memWriteBytesD;
-}
-size_t hipblasltGetMemReadBytes()
-{
-    return hipblasltClientPerformanceArgs::memReadBytes;
 }

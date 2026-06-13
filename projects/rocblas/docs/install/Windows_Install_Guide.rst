@@ -4,27 +4,75 @@
 
 .. _windows-install:
 
-****************************
-Build and install on Windows
-****************************
+********************************************************************
+Installing and building on Microsoft Windows
+********************************************************************
 
-To build rocBLAS as part of the ROCm Core SDK, see `TheRock build
-instructions
-<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
-TheRock is the recommended way to build ROCm components from source.
+This topic discusses how to install rocBLAS on Microsoft Windows from a prebuilt package or from source.
 
-Alternatively, you can build rocBLAS standalone using the following
-instructions.
-
+=====================================
 Prerequisites
-=============
+=====================================
 
-rocBLAS requires a ROCm-enabled platform. For more information,
-see :ref:`ROCm Core SDK components <rocm:release-components>`.
+rocBLAS requires an AMD HIP SDK-enabled platform. For more information,
+see :doc:`System requirements for Windows <rocm-install-on-windows:reference/system-requirements>`.
+rocBLAS is supported on the same Windows versions and toolchains that HIP SDK supports.
 
+.. note::
+
+   The :doc:`AMD HIP SDK documentation <rocm-install-on-windows:index>` contains more up-to-date Windows install information.
+
+============================
+Installing prebuilt packages
+============================
+
+rocBLAS can be installed on Windows 10 or 11 using the AMD HIP SDK installer.
+
+The simplest way to use rocBLAS in your code is to use CMake. To install rocBLAS on Windows, follow these steps:
+
+#. Add the SDK installation location to ``CMAKE_PREFIX_PATH`` in the CMake configuration command.
+
+   .. code-block:: shell
+
+      -DCMAKE_PREFIX_PATH="C:\Program Files\AMD\ROCm\5.5"
+
+   .. note::
+
+      You must use quotes around the path because it contains a space.
+
+#. Add the following lines to ``CMakeLists.txt``:
+
+   .. code-block:: shell
+
+      find_package(rocblas)
+      target_link_libraries( your_exe PRIVATE roc::rocblas )
+
+Examples demonstrating how to build rocBLAS on Windows with CMake can be found at the
+`rocBLAS-Examples GitHub page <https://github.com/ROCm/rocBLAS-Examples>`_.
+
+After installation, use rocBLAS like any other library with a C API.
+The ``rocblas.h`` header file must be included in the user code to make calls
+into rocBLAS, while the rocBLAS shared library is link-time and run-time
+dependent for the user application.
+
+.. note::
+
+   Run-time dependencies include the dynamic link library (``.dll``) file and the entire ``rocblas/``
+   subdirectory, which is found in the HIP SDK ``bin`` folder. This folder
+   can either reside in the same directory as ``rocblas.dll``
+   or be moved elsewhere provided that the environment variable ``ROCBLAS_TENSILE_LIBPATH`` is set to the
+   new location. The contents are read at execution time much like additional DLL files.
+
+After installation, you can find ``rocblas.h`` in the HIP SDK ``\include\rocblas``
+directory. Only use these two installed files when needed in user code.
+You can find the other rocBLAS included files included in the HIP SDK in ``\include\rocblas\internal`` but
+do not include these files directly into source code.
+
+===============================
 Building and installing rocBLAS
 ===============================
 
+Most users do not need to build rocBLAS from source because it can be used after installing the prebuilt packages as described above.
 If necessary, follow these instructions to build rocBLAS from source.
 The rocBLAS codebase for the HIP SDK is the same as the one used for the Linux ROCm distribution.
 However, because these two distributions have different stacks, the code and build process have subtle variations.
@@ -40,9 +88,7 @@ you build rocBLAS with a different Tensile logic target. See the ``--logic`` com
 Download rocBLAS
 ----------------
 
-The rocBLAS source code, which is the same as the ROCm Linux version, is available from the
-`rocBLAS folder <https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocblas>`_
-of the `rocm-libraries GitHub <https://github.com/ROCm/rocm-libraries>`_.
+The rocBLAS source code, which is the same as the ROCm Linux version, is available from the `rocBLAS GitHub page <https://github.com/ROCm/rocBLAS>`_.
 The ROCm HIP SDK version might appear in the default installation path,
 but you can run the HIP SDK compiler to display the version from the ``bin/`` folder:
 
@@ -55,47 +101,20 @@ For example, the HIP version might be ``5.4.22880-135e1ab4``.
 This corresponds to major release = ``5``, minor release = ``4``, patch = ``22880``, and build identifier ``135e1ab4``.
 The GitHub branches at the rocBLAS site have names like ``release/rocm-rel-major.minor``,
 where the major and minor releases have the same meaning as in the ROCm version.
-
-
-To download rocBLAS, including all projects in the rocm-libraries repository, use the following commands.
+To download rocBLAS, use the following command:
 
 ::
 
-   git clone -b release/rocm-rel-x.y https://github.com/ROCm/rocm-libraries.git
-   cd rocm-libraries/projects/rocblas
+   git clone -b release/rocm-rel-x.y https://github.com/ROCm/rocBLAS.git
+   cd rocBLAS
 
 Replace ``x.y`` in the above command with the version of HIP SDK installed on your machine.
-For example, if you have HIP 7.0 installed, use ``-b release/rocm-rel-7.0``.
+For example, if you have HIP 5.5 installed, then use ``-b release/rocm-rel-5.5``.
 You can add the SDK tools to your path using an entry like this:
 
 ::
 
    %HIP_PATH%\bin
-
-To limit your local checkout to only the rocBLAS and Tensile projects, configure ``sparse-checkout`` before cloning.
-This uses the Git partial clone feature (``--filter=blob:none``) to reduce how much data is downloaded.
-Use the following commands for a sparse checkout:
-
-::
-
-   git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libraries.git
-   cd rocm-libraries
-   git sparse-checkout init --cone
-   git sparse-checkout set projects/rocblas shared/tensile
-   git checkout develop # or use the branch you want to work with
-
-The checkout above omits other top-level trees (for example ``shared/ctest``). If you build the test
-client (``BUILD_CLIENTS_TESTS=ON``) and want YAML-based CTest labels and the installed
-``CTestTestfile.cmake`` from the shared categorization helpers, add ``shared/ctest`` to the
-``git sparse-checkout set`` list (or use a full clone). Without ``shared/ctest`` present under
-``ROCM_LIBRARIES_ROOT``, ``ROCBLAS_ENABLE_CTEST`` defaults to OFF. If you turn
-``ROCBLAS_ENABLE_CTEST`` ON explicitly, configuration requires both ``clients/gtest/test_categories.yaml``
-and ``shared/ctest/TestCategories.cmake`` to exist.
-
-.. note::
-
-   To build ROCm 6.4 and older, use the rocBLAS repository at `<https://github.com/ROCm/rocBLAS>`_.
-   For more information, see the documentation associated with the release you want to build.
 
 Building rocBLAS
 ----------------
@@ -150,9 +169,6 @@ Building the library dependencies and library
 Common examples of how to use ``rmake.py`` to build the library dependencies and library are
 shown in the table below:
 
-.. note::
-
-   You can run ``rmake.py`` from the ``projects\rocblas`` directory.
 
 .. csv-table::
    :header: "Command","Description"
@@ -188,7 +204,6 @@ listed in this table.
    "``./rmake.py -c``", "Build the library and client in your local directory. It is assumed the dependencies have been installed."
    "``./rmake.py -idc``", "Build the library dependencies, client dependencies, library, and client, then build and install the rocBLAS package. To keep rocBLAS in your local directory, do not use the ``-i`` flag."
    "``./rmake.py -ic``", "Build and install the rocBLAS package and build the client. To keep rocBLAS in your local directory, do not use the ``-i`` flag."
-   "``./rmake.py -t /path/to/Tensile``", "``tensile_tag.txt`` has been deprecated so use this option to build a folder that has a different Tensile commit than the rocBLAS commit."
 
 Building the clients without the library
 ----------------------------------------

@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2021-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2021-2024, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,8 +31,10 @@
 #define ROCPRIM_THREAD_THREAD_REDUCE_HPP_
 
 #include "../config.hpp"
+#include "../functional.hpp"
+#include "../type_traits.hpp"
 
-#include <variant>
+#include <type_traits>
 
 BEGIN_ROCPRIM_NAMESPACE
 
@@ -43,21 +45,21 @@ BEGIN_ROCPRIM_NAMESPACE
 /// @{
 
 /// \brief Carry out a reduction on an array of elements in one thread
-/// \tparam Length Length of the array to be reduced
+/// \tparam LENGTH Length of the array to be reduced
 /// \tparam T the input/output type
 /// \tparam ReductionOp Binary Operation that used to carry out the reduction
+/// \tparam NoPrefix Boolean, determining whether to have a initialization value for the reduction accumulator
 /// \param input [in] Pointer to the first element of the array to be reduced
 /// \param reduction_op [in] Instance of the reduction operator functor
-/// \param prefix [in] Optional value to be used as prefix
+/// \param prefix [in] Value to be used as prefix, if NoPrefix is false
 /// \return Value obtained from reduction of input array
-template<int Length, typename T, typename ReductionOp, typename Prefix = std::monostate>
+template<int LENGTH, typename T, typename ReductionOp, bool NoPrefix = false>
 ROCPRIM_DEVICE ROCPRIM_INLINE
-auto thread_reduce(T* input, ReductionOp reduction_op, Prefix prefix = {})
+auto thread_reduce(T* input, ReductionOp reduction_op, T prefix = T(0))
+    -> std::enable_if_t<!rocprim::detail::is_tuple<T>::value, T>
 {
-    constexpr bool no_prefix = std::is_same_v<Prefix, std::monostate>;
-
     T retval;
-    if constexpr(no_prefix)
+    if(NoPrefix)
     {
         retval = input[0];
     }
@@ -67,7 +69,7 @@ auto thread_reduce(T* input, ReductionOp reduction_op, Prefix prefix = {})
     }
 
     ROCPRIM_UNROLL
-    for(int i = 0 + no_prefix; i < Length; ++i)
+    for(int i = 0 + NoPrefix; i < LENGTH; ++i)
     {
         retval = reduction_op(retval, input[i]);
     }
@@ -75,19 +77,68 @@ auto thread_reduce(T* input, ReductionOp reduction_op, Prefix prefix = {})
     return retval;
 }
 
+/// \cond thread_reduce_specialization
+template<int LENGTH, typename T, typename ReductionOp, bool NoPrefix = false>
+ROCPRIM_DEVICE ROCPRIM_INLINE
+auto thread_reduce(T* input, ReductionOp reduction_op, T prefix = T{})
+    -> std::enable_if_t<rocprim::detail::is_tuple<T>::value, T>
+{
+    T retval;
+    if(NoPrefix)
+    {
+        retval = input[0];
+    }
+    else
+    {
+        retval = prefix;
+    }
+
+    ROCPRIM_UNROLL
+    for(int i = 0 + NoPrefix; i < LENGTH; ++i)
+    {
+        retval = reduction_op(retval, input[i]);
+    }
+
+    return retval;
+}
+/// \endcond
+
 /// \brief Carry out a reduction on an array of elements in one thread
-/// \tparam Length Length of the array to be reduced
+/// \tparam LENGTH Length of the array to be reduced
 /// \tparam T the input/output type
 /// \tparam ReductionOp Binary Operation that used to carry out the reduction
 /// \param input [in] Pointer to the first element of the array to be reduced
 /// \param reduction_op [in] Instance of the reduction operator functor
-/// \param prefix [in] Optional value to be used as prefix
+/// \param prefix [in] Value to be used as prefix
 /// \return Value obtained from reduction of input array
-template<int Length, typename T, typename ReductionOp, typename Prefix = std::monostate>
-ROCPRIM_DEVICE ROCPRIM_INLINE
-T thread_reduce(T (&input)[Length], ReductionOp reduction_op, Prefix prefix = {})
+template <
+    int         LENGTH,
+    typename    T,
+    typename    ReductionOp>
+ROCPRIM_DEVICE ROCPRIM_INLINE T thread_reduce(
+    T           (&input)[LENGTH],
+    ReductionOp reduction_op,
+    T           prefix)
 {
-    return thread_reduce<Length>(static_cast<T*>(input), reduction_op, prefix);
+    return thread_reduce<LENGTH, false>((T*)input, reduction_op, prefix);
+}
+
+/// \brief Carry out a reduction on an array of elements in one thread
+/// \tparam LENGTH Length of the array to be reduced
+/// \tparam T the input/output type
+/// \tparam ReductionOp Binary Operation that used to carry out the reduction
+/// \param input [in] Pointer to the first element of the array to be reduced
+/// \param reduction_op [in] Instance of the reduction operator functor
+/// \return Value obtained from reduction of input array
+template <
+    int         LENGTH,
+    typename    T,
+    typename    ReductionOp>
+ROCPRIM_DEVICE ROCPRIM_INLINE T thread_reduce(
+    T           (&input)[LENGTH],
+    ReductionOp reduction_op)
+{
+    return thread_reduce<LENGTH, true>((T*)input, reduction_op);
 }
 
 /// @}

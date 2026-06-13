@@ -4,44 +4,45 @@
 
 .. _windows-install:
 
-*****************************************
-Install and build for hipBLAS for Windows
-*****************************************
-
-To build hipBLAS as part of the ROCm Core SDK, see `TheRock build
-instructions
-<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
-TheRock is the recommended way to build ROCm components from source.
-
-Alternatively, you can build hipBLAS standalone using the following
-instructions.
+*********************************************
+Installing and building for Microsoft Windows
+*********************************************
 
 This topic covers how to install hipBLAS on Microsoft Windows from a package and how to build and install it from the source code.
 For a list of installation prerequisites, see :doc:`hipBLAS prerequisites <prerequisites>`.
 
-Prerequisites for Microsoft Windows
-===================================
+Installing prebuilt packages
+=============================
 
-*  Here are the prerequisites required to use the rocBLAS backend with AMD components:
+hipBLAS can be installed on Windows 10 or 11 using the :doc:`AMD HIP SDK installer <rocm-install-on-windows:index>`.
 
-   * A ROCm-enabled platform. For more information, see :ref:`ROCm Core SDK components <rocm:release-components>`.
-   * A compatible version of `hipblas-common <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblas-common>`_.
-   * A compatible version of :doc:`rocBLAS <rocblas:index>`.
-   * For full functionality, a compatible version of :doc:`rocSOLVER <rocsolver:index>` and its dependencies.
-   * hipBLAS is supported on the same Windows versions and toolchains that HIP SDK supports.
+The simplest way to use hipBLAS in your code is to use CMake. To install hipBLAS on Windows, follow these steps:
 
-* hipBLAS does not support the cuBLAS backend on Windows.
+#. Add the SDK installation location to ``CMAKE_PREFIX_PATH`` in the CMake configuration command:
+
+   ::
+
+      -DCMAKE_PREFIX_PATH="C:\hipSDK"
+
+
+#. Add the following lines to ``CMakeLists.txt``:
+
+   ::
+
+      find_package(hipblas)
+      target_link_libraries( your_exe PRIVATE roc::hipblas )
 
 Building and installing hipBLAS
 ===============================
 
-Follow these instructions to build hipBLAS from source.
+Most users do not need to build hipBLAS from source because it can be used after installing the prebuilt packages as described above.
+If necessary, users can follow these instructions to build hipBLAS from source.
 
 Download the hipBLAS source code
 --------------------------------
 
-The hipBLAS source code is available from the `hipBLAS folder <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblas>`_
-of the `rocm-libraries GitHub <https://github.com/ROCm/rocm-libraries>`_.The ROCm HIP SDK version might be shown in the default installation path,
+The hipBLAS source code is available on the `hipBLAS GitHub <https://github.com/ROCm/hipBLAS>`_.
+The ROCm HIP SDK version might be shown in the default installation path,
 but you can run the HIP SDK compiler to display the version from the ``bin/`` folder:
 
 ::
@@ -51,46 +52,21 @@ but you can run the HIP SDK compiler to display the version from the ``bin/`` fo
 The HIP version includes the major, minor, and patch fields, and possibly a build-specific identifier.
 As an example, the HIP version might be ``5.4.22880-135e1ab4``.
 This corresponds to major release = ``5``, minor release = ``4``, patch = ``22880``, and the build identifier ``135e1ab4``.
-The rocm-libraries GitHub contains branches with names like ``release/rocm-rel-major.minor``. Select the branch where the major and minor
+The hipBLAS GitHub contains branches with names like ``release/rocm-rel-major.minor``. Select the branch where the major and minor
 fields correspond to the HIP version.
-
-To download hipBLAS, including all projects in the rocm-libraries repository, use the following commands.
+For example, use the following command format to download hipBLAS:
 
 ::
 
-   git clone -b release/rocm-rel-x.y https://github.com/ROCm/rocm-libraries.git
-   cd  rocm-libraries/projects/hipblas
+    git clone -b release/rocm-rel-x.y https://github.com/ROCm/hipBLAS.git
 
 Replace ``x.y`` in this command with the version of the HIP SDK installed on your machine.
-For example, if you have HIP 7.0 installed, then use ``-b release/rocm-rel-7.0``.
+For example, if you have HIP 6.2 installed, then use ``-b release/rocm-rel-6.2``.
 You can add the SDK tools to your path with an entry such as:
 
 ::
 
     %HIP_PATH%\bin
-
-
-To limit your local checkout to only the hipBLAS project, configure ``sparse-checkout`` before cloning.
-This uses the Git partial clone feature (``--filter=blob:none``) to reduce how much data is downloaded.
-Use the following commands for a sparse checkout:
-
-.. note::
-
-   To include the hipBLAS dependencies, set the projects for the sparse checkout using
-   ``git sparse-checkout set projects/hipblas projects/rocsolver projects/rocblas projects/hipblas-common``.
-
-.. code-block:: shell
-
-   git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libraries.git
-   cd rocm-libraries
-   git sparse-checkout init --cone
-   git sparse-checkout set projects/hipblas # add projects/rocsolver projects/rocblas, projects/hipblas-common to include dependencies
-   git checkout develop # or use the branch you want to work with
-
-.. note::
-
-   To build ROCm 6.4.3 and older, use the hipBLAS repository at `<https://github.com/ROCm/hipBLAS>`_.
-   For more information, see the documentation associated with the release you want to build.
 
 Building the library and library dependencies
 ---------------------------------------------
@@ -100,10 +76,6 @@ with a single command. It accepts several options but has a hard-coded configura
 that you can override by invoking ``cmake`` directly. However, it's a great way to get started quickly and serves
 as an example of how to build and install hipBLAS.
 A few commands in the script require administrator access, so you might be prompted for a password.
-
-.. note::
-
-   You can run the ``rmake.py`` script from the ``projects/hipblas`` directory.
 
 Common examples showing how to use ``rmake.py`` to build the library dependencies and library are listed
 in this table:

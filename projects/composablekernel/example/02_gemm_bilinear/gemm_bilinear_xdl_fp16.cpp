@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -17,10 +17,6 @@
 #include "ck/library/utility/literals.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_gemm.hpp"
 #include "ck/library/utility/check_err.hpp"
-
-using ::ck::DeviceMem;
-using ::ck::HostTensorDescriptor;
-using ::ck::Tensor;
 
 struct AlphaBetaAdd
 {
@@ -46,9 +42,8 @@ using S = ck::Sequence<Is...>;
 using F16 = ck::half_t;
 using F32 = float;
 
-using Row    = ck::tensor_layout::gemm::RowMajor;
-using Col    = ck::tensor_layout::gemm::ColumnMajor;
-using Bypass = ck::tensor_layout::BypassLayoutVerification;
+using Row = ck::tensor_layout::gemm::RowMajor;
+using Col = ck::tensor_layout::gemm::ColumnMajor;
 
 using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
@@ -92,10 +87,10 @@ using DeviceOpInstance =
                                                                    32,
                                                                    8,
                                                                    8,
-                                                                   16,
-                                                                   16,
-                                                                   8,
+                                                                   32,
+                                                                   32,
                                                                    4,
+                                                                   2,
                                                                    S<4, 64, 1>,
                                                                    S<1, 0, 2>,
                                                                    S<1, 0, 2>,
@@ -113,7 +108,7 @@ using DeviceOpInstance =
                                                                    1,
                                                                    1,
                                                                    S<1, 32, 1, 8>,
-                                                                   4>;
+                                                                   8>;
 
 int main(int argc, char* argv[])
 {
@@ -178,7 +173,7 @@ int main(int argc, char* argv[])
         printf("arg3: time kernel (0=no, 1=yes)\n");
         printf("arg4 to 9: M (256x), N(128x), K(32x), StrideA, StrideB, StrideD, StrideE, alpha, "
                "beta\n");
-        exit(1);
+        exit(0);
     }
 
     auto f_host_tensor_descriptor =
@@ -187,11 +182,11 @@ int main(int argc, char* argv[])
 
             if(std::is_same<decltype(layout), ck::tensor_layout::gemm::RowMajor>::value)
             {
-                return HostTensorDescriptor({row, col}, {stride, 1_uz}, Bypass{});
+                return HostTensorDescriptor({row, col}, {stride, 1_uz});
             }
             else
             {
-                return HostTensorDescriptor({row, col}, {1_uz, stride}, Bypass{});
+                return HostTensorDescriptor({row, col}, {1_uz, stride});
             }
         };
 

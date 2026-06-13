@@ -22,7 +22,7 @@
  * ************************************************************************ */
 
 #include "rocsparse_sparse_to_sparse.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {

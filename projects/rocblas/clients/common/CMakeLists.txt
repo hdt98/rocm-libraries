@@ -47,6 +47,7 @@ function( rocblas_client_library_settings lib_target_ )
     $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${BLAS_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${BLIS_INCLUDE_DIR}> # may be blank if not used
+    $<BUILD_INTERFACE:${GTEST_INCLUDE_DIRS}>
   )
 
   target_include_directories( ${lib_target_}
@@ -61,13 +62,6 @@ function( rocblas_client_library_settings lib_target_ )
     target_compile_definitions( ${lib_target_} PRIVATE CLIENTS_NO_FORTRAN )
   endif()
 
-  # We widely use extensions and AMD Clang warnings are too noisy
-  target_compile_options( ${lib_target_} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-c++17-extensions> )
-  target_compile_options( ${lib_target_} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_CXX_OPTIONS}> )
-
-  if(BUILD_ADDRESS_SANITIZER)
-    target_compile_definitions( ${lib_target_} PRIVATE ASAN_BUILD )
-  endif()
 endfunction()
 
 set(rocblas_common_source
@@ -145,9 +139,13 @@ set(rocblas_testing_common_source
     blas3/common_geam.cpp
     blas_ex/common_gemmt.cpp
     blas_ex/common_geam_ex.cpp
-    blas_ex/common_syrk_ex.cpp
-    blas_ex/common_herk_ex.cpp
 )
+
+if( BUILD_WITH_TENSILE )
+  set( rocblas_testing_common_tensile_source
+       blas_ex/common_gemm_ex3.cpp
+  )
+endif()
 
 add_library(rocblas_clients_common OBJECT ${rocblas_testing_common_tensile_source} ${rocblas_common_source})
 
@@ -160,16 +158,11 @@ rocblas_client_library_settings( rocblas_clients_testing_common )
 if ( WARN_NOT_ILP64_PREFERRED )
   target_compile_definitions( rocblas_clients_common PRIVATE ROCBLAS_REFERENCE_LIB_WARN )
 endif()
-if ( ROCBLAS_REFERENCE_BLAS_DEFINES )
-  target_compile_definitions( rocblas_clients_common PRIVATE ${ROCBLAS_REFERENCE_BLAS_DEFINES} )
-  target_compile_definitions( rocblas_clients_testing_common PRIVATE ${ROCBLAS_REFERENCE_BLAS_DEFINES} )
-endif()
-target_compile_definitions( rocblas_clients_common PRIVATE ROCBLAS_REFERENCE_LIB=${ROCBLAS_REFERENCE_LIB_LABEL} )
+target_compile_definitions( rocblas_clients_common PRIVATE ROCBLAS_REFERENCE_LIB=${BLAS_LIBRARY} )
 
 
-# target is not linked as OBJECT library but we want any interface flags from dependencies, e.g. COMMON_LINK_LIBS may bring OpenMP
-target_link_libraries( rocblas_clients_common PUBLIC roc::rocblas hip::host hip::device $<IF:$<TARGET_EXISTS:GTest::gtest>,GTest::gtest,GTest::GTest> $<IF:$<TARGET_EXISTS:GTest::gtest_main>,GTest::gtest_main,GTest::Main> ${COMMON_LINK_LIBS} )
-if(BUILD_WITH_HIPBLASLT)
-    target_link_libraries( rocblas_clients_common PRIVATE roc::hipblaslt )
-endif()
-target_link_libraries( rocblas_clients_testing_common roc::rocblas hip::host hip::device ${BLAS_LIBRARY} $<IF:$<TARGET_EXISTS:GTest::gtest>,GTest::gtest,GTest::GTest> $<IF:$<TARGET_EXISTS:GTest::gtest_main>,GTest::gtest_main,GTest::Main> ${COMMON_LINK_LIBS} )
+# target is not linked as OBJECT library but we want any interface flags from dependencies
+target_link_libraries( rocblas_clients_common roc::rocblas hip::host hip::device ${GTEST_BOTH_LIBRARIES} ${COMMON_LINK_LIBS} )
+target_link_libraries( rocblas_clients_testing_common roc::rocblas hip::host hip::device ${BLAS_LIBRARY} ${GTEST_BOTH_LIBRARIES} ${COMMON_LINK_LIBS} )
+
+

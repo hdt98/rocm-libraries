@@ -63,13 +63,13 @@ void cpu_extreme_forward(tensor<T> input,
     auto inner_size = std::accumulate(
         input_dims.begin() + dim + 1, input_dims.end(), 1ULL, std::multiplies<uint64_t>());
 
-    miopen::par_ford(output_numel)([&](size_t o) {
+    par_ford(output_numel)([&](size_t o) {
         size_t input_idx = (o / inner_size) * inner_size * reduce_size + o % inner_size;
 
         int32_t extreme_idx = 0;
         T extreme           = input[input_idx];
 
-        miopen::ford(reduce_size)([&](size_t i) {
+        ford(reduce_size)([&](size_t i) {
             T val = input[input_idx];
             reduce_func<T, int32_t, op>{}.calculate(extreme, val, extreme_idx, i);
             input_idx += inner_size;

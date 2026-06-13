@@ -35,7 +35,7 @@ extern "C" {
 /*! \ingroup extra_module
 *  \details
 *  \p rocsparse_bsrgeam_nnzb computes the total BSR non-zero elements and the BSR row
-*  offsets that point to the start of every row of the sparse BSR matrix of the
+*  offsets, that point to the start of every row of the sparse BSR matrix, of the
 *  resulting matrix C. It is assumed that \p bsr_row_ptr_C has been allocated with
 *  size \p mb+1.
 *
@@ -49,9 +49,9 @@ extern "C" {
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
-*  dir             direction that specifies whether to count non-zero elements by \ref rocsparse_direction_row or by
+*  dir             direction that specifies whether to count nonzero elements by \ref rocsparse_direction_row or by
 *                  \ref rocsparse_direction_column in the BSR matrices \f$A\f$, \f$B\f$, and \f$C\f$.
 *  @param[in]
 *  mb              number of block rows in the sparse BSR matrix \f$op(A)\f$ and \f$C\f$.
@@ -94,10 +94,10 @@ extern "C" {
 *
 *  \retval rocsparse_status_success the operation completed successfully.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval rocsparse_status_invalid_size \p mb, \p nb, \p kb, \p nnzb_A, or \p nnzb_B is invalid.
+*  \retval rocsparse_status_invalid_size \p mb, \p nb, \p kb, \p nnzb_A or \p nnzb_B is invalid.
 *  \retval rocsparse_status_invalid_pointer \p descr_A, \p bsr_row_ptr_A,
 *          \p bsr_col_ind_A, \p descr_B, \p bsr_row_ptr_B, \p bsr_col_ind_B,
-*          \p descr_C, \p bsr_row_ptr_C, or \p nnzb_C is invalid.
+*          \p descr_C, \p bsr_row_ptr_C or \p nnzb_C is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 */
@@ -120,7 +120,7 @@ rocsparse_status rocsparse_bsrgeam_nnzb(rocsparse_handle          handle,
                                         rocsparse_int*            nnzb_C);
 
 /*! \ingroup extra_module
-*  \brief Sparse matrix sparse matrix addition using the BSR storage format.
+*  \brief Sparse matrix sparse matrix addition using BSR storage format
 *
 *  \details
 *  \p rocsparse_bsrgeam multiplies the scalar \f$\alpha\f$ with the sparse
@@ -133,7 +133,7 @@ rocsparse_status rocsparse_bsrgeam_nnzb(rocsparse_handle          handle,
 *  \f]
 *
 *  It is assumed that \p bsr_row_ptr_C has already been filled and that \p bsr_val_C and
-*  \p bsr_col_ind_C are allocated by the user. \p bsr_row_ptr_C and the allocation size of
+*  \p bsr_col_ind_C are allocated by the user. \p bsr_row_ptr_C and allocation size of
 *  \p bsr_col_ind_C and \p bsr_val_C is defined by the number of non-zero block elements of
 *  the sparse BSR matrix C. Both can be obtained by \ref rocsparse_bsrgeam_nnzb().
 *
@@ -148,14 +148,14 @@ rocsparse_status rocsparse_bsrgeam_nnzb(rocsparse_handle          handle,
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
-*  dir             direction that specifies whether to count non-zero elements by \ref rocsparse_direction_row or by
+*  dir             direction that specifies whether to count nonzero elements by \ref rocsparse_direction_row or by
 *                  \ref rocsparse_direction_column in the BSR matrices \f$A\f$, \f$B\f$, and \f$C\f$.
 *  @param[in]
-*  mb               number of rows of the sparse BSR matrix \f$A\f$, \f$B\f$, and \f$C\f$.
+*  mb               number of rows of the sparse BSR matrix \f$A\f$, \f$B\f$ and \f$C\f$.
 *  @param[in]
-*  nb               number of columns of the sparse BSR matrix \f$A\f$, \f$B\f$, and \f$C\f$.
+*  nb               number of columns of the sparse BSR matrix \f$A\f$, \f$B\f$ and \f$C\f$.
 *  @param[in]
 *  block_dim       the block dimension of the BSR matrix \f$A\f$. Between 1 and m where \p m=mb*block_dim.
 *  @param[in]
@@ -202,17 +202,80 @@ rocsparse_status rocsparse_bsrgeam_nnzb(rocsparse_handle          handle,
 *
 *  \retval rocsparse_status_success the operation completed successfully.
 *  \retval rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval rocsparse_status_invalid_size \p mb, \p nb, \p nnzb_A, or \p nnzb_B is invalid.
+*  \retval rocsparse_status_invalid_size \p mb, \p nb, \p nnzb_A or \p nnzb_B is invalid.
 *  \retval rocsparse_status_invalid_pointer \p alpha, \p descr_A, \p bsr_val_A,
 *          \p bsr_row_ptr_A, \p bsr_col_ind_A, \p beta, \p descr_B, \p bsr_val_B,
 *          \p bsr_row_ptr_B, \p bsr_col_ind_B, \p descr_C, \p csr_val_C,
-*          \p bsr_row_ptr_C, or \p bsr_col_ind_C is invalid.
+*          \p bsr_row_ptr_C or \p bsr_col_ind_C is invalid.
 *  \retval rocsparse_status_not_implemented
 *          \p rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 *
 *  \par Example
 *  This example adds two CSR matrices.
-*  \snippet example_rocsparse_bsrgeam.cpp doc example
+*  \code{.c}
+*  // Initialize scalar multipliers
+*  float alpha = 1.0f;
+*  float beta  = 1.0f;
+*
+*  // Create matrix descriptors
+*  rocsparse_mat_descr descr_A;
+*  rocsparse_mat_descr descr_B;
+*  rocsparse_mat_descr descr_C;
+*
+*  rocsparse_create_mat_descr(&descr_A);
+*  rocsparse_create_mat_descr(&descr_B);
+*  rocsparse_create_mat_descr(&descr_C);
+*
+*  // Set pointer mode
+*  rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host);
+*
+*  // Obtain number of total non-zero block entries in C and block row pointers of C
+*  rocsparse_int nnzb_C;
+*  hipMalloc((void**)&bsr_row_ptr_C, sizeof(rocsparse_int) * (mb + 1));
+*
+*  rocsparse_bsrgeam_nnzb(handle,
+*                        dir,
+*                        mb,
+*                        nb,
+*                        block_dim,
+*                        descr_A,
+*                        nnzb_A,
+*                        bsr_row_ptr_A,
+*                        bsr_col_ind_A,
+*                        descr_B,
+*                        nnzb_B,
+*                        bsr_row_ptr_B,
+*                        bsr_col_ind_B,
+*                        descr_C,
+*                        bsr_row_ptr_C,
+*                        &nnzb_C);
+*
+*  // Compute block column indices and block values of C
+*  hipMalloc((void**)&bsr_col_ind_C, sizeof(rocsparse_int) * nnzb_C);
+*  hipMalloc((void**)&bsr_val_C, sizeof(float) * nnzb_C * block_dim * block_dim);
+*
+*  rocsparse_sbsrgeam(handle,
+*                     dir,
+*                     mb,
+*                     nb,
+*                     block_dim,
+*                     &alpha,
+*                     descr_A,
+*                     nnzb_A,
+*                     bsr_val_A,
+*                     bsr_row_ptr_A,
+*                     bsr_col_ind_A,
+*                     &beta,
+*                     descr_B,
+*                     nnzb_B,
+*                     bsr_val_B,
+*                     bsr_row_ptr_B,
+*                     bsr_col_ind_B,
+*                     descr_C,
+*                     bsr_val_C,
+*                     bsr_row_ptr_C,
+*                     bsr_col_ind_C);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

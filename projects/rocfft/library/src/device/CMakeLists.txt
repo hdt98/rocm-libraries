@@ -58,12 +58,6 @@ endif()
 # Make it possible to let install.sh control this ?
 set( kgen ${CMAKE_SOURCE_DIR}/library/src/device/kernel-generator.py )
 set( kgendeps ${CMAKE_SOURCE_DIR}/library/src/device/kernel-generator.py
-              ${CMAKE_SOURCE_DIR}/library/src/device/kernels/configs/config_sbrr.py
-              ${CMAKE_SOURCE_DIR}/library/src/device/kernels/configs/config_sbcc.py
-              ${CMAKE_SOURCE_DIR}/library/src/device/kernels/configs/config_sbcr.py
-              ${CMAKE_SOURCE_DIR}/library/src/device/kernels/configs/config_sbrc.py
-              ${CMAKE_SOURCE_DIR}/library/src/device/kernels/configs/config_2d_single.py
-              ${CMAKE_SOURCE_DIR}/library/src/device/kernels/configs/config_pp_3d.py
               ${CMAKE_SOURCE_DIR}/library/src/device/generator.py )
 
 # create list of all N files that will initialize function pool
@@ -104,11 +98,6 @@ add_library( rocfft-function-pool OBJECT
   ${FUNCTION_POOLS}
   function_pool.cpp
 )
-# Don't add function pool to coverage as it's just generated code
-# that sets up kernel config data structures, and isn't interesting
-# to cover.
-#rocfft_add_coverage_flags( rocfft-function-pool )
-
 target_include_directories( rocfft-function-pool
   PRIVATE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/device>
@@ -118,7 +107,7 @@ target_include_directories( rocfft-function-pool
 set_target_properties( rocfft-function-pool PROPERTIES
   CXX_VISIBILITY_PRESET "hidden"
   VISIBILITY_INLINES_HIDDEN ON
-  CXX_STANDARD 20
+  CXX_STANDARD 17
   CXX_STANDARD_REQUIRED ON
   POSITION_INDEPENDENT_CODE ON
   )

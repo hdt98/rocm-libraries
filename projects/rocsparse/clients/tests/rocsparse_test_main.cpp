@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,17 +22,13 @@
  *
  * ************************************************************************ */
 
-#include "rocsparse_clients_envariables.hpp"
-#include "rocsparse_data.hpp"
 #include "rocsparse_parse_data.hpp"
 #include "rocsparse_reproducibility.hpp"
-#include "rocsparse_test_listeners.hpp"
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
 
 #include "test_check.hpp"
-
 bool test_check::s_auto_testing_bad_arg;
 
 bool display_timing_info_is_stdout_disabled()
@@ -55,78 +51,142 @@ rocsparse_status rocsparse_record_timing(double msec, double gflops, double gbs)
     return rocsparse_status_success;
 }
 
+class ConfigurableEventListener : public testing::TestEventListener
+{
+    testing::TestEventListener* eventListener;
+
+public:
+    bool showTestCases; // Show the names of each test case.
+    bool showTestNames; // Show the names of each test.
+    bool showSuccesses; // Show each success.
+    bool showInlineFailures; // Show each failure as it occurs.
+    bool showEnvironment; // Show the setup of the global environment.
+
+    explicit ConfigurableEventListener(testing::TestEventListener* theEventListener)
+        : eventListener(theEventListener)
+        , showTestCases(true)
+        , showTestNames(true)
+        , showSuccesses(true)
+        , showInlineFailures(true)
+        , showEnvironment(true)
+    {
+    }
+
+    ~ConfigurableEventListener() override
+    {
+        delete eventListener;
+    }
+
+    void OnTestProgramStart(const testing::UnitTest& unit_test) override
+    {
+        eventListener->OnTestProgramStart(unit_test);
+    }
+
+    void OnTestIterationStart(const testing::UnitTest& unit_test, int iteration) override
+    {
+        eventListener->OnTestIterationStart(unit_test, iteration);
+    }
+
+    void OnEnvironmentsSetUpStart(const testing::UnitTest& unit_test) override
+    {
+        if(showEnvironment)
+        {
+            eventListener->OnEnvironmentsSetUpStart(unit_test);
+        }
+    }
+
+    void OnEnvironmentsSetUpEnd(const testing::UnitTest& unit_test) override
+    {
+        if(showEnvironment)
+        {
+            eventListener->OnEnvironmentsSetUpEnd(unit_test);
+        }
+    }
+
+    void OnTestCaseStart(const testing::TestCase& test_case) override
+    {
+        if(showTestCases)
+        {
+            eventListener->OnTestCaseStart(test_case);
+        }
+    }
+
+    void OnTestStart(const testing::TestInfo& test_info) override
+    {
+        if(showTestNames)
+        {
+            eventListener->OnTestStart(test_info);
+        }
+    }
+
+    void OnTestPartResult(const testing::TestPartResult& result) override
+    {
+        eventListener->OnTestPartResult(result);
+    }
+
+    void OnTestEnd(const testing::TestInfo& test_info) override
+    {
+        if(test_info.result()->Failed() ? showInlineFailures : showSuccesses)
+        {
+            eventListener->OnTestEnd(test_info);
+        }
+    }
+
+    void OnTestCaseEnd(const testing::TestCase& test_case) override
+    {
+        if(showTestCases)
+        {
+            eventListener->OnTestCaseEnd(test_case);
+        }
+    }
+
+    void OnEnvironmentsTearDownStart(const testing::UnitTest& unit_test) override
+    {
+        if(showEnvironment)
+        {
+            eventListener->OnEnvironmentsTearDownStart(unit_test);
+        }
+    }
+
+    void OnEnvironmentsTearDownEnd(const testing::UnitTest& unit_test) override
+    {
+        if(showEnvironment)
+        {
+            eventListener->OnEnvironmentsTearDownEnd(unit_test);
+        }
+    }
+
+    void OnTestIterationEnd(const testing::UnitTest& unit_test, int iteration) override
+    {
+        eventListener->OnTestIterationEnd(unit_test, iteration);
+    }
+
+    void OnTestProgramEnd(const testing::UnitTest& unit_test) override
+    {
+        eventListener->OnTestProgramEnd(unit_test);
+    }
+};
+
 /* =====================================================================
       Main function:
 =================================================================== */
 
 int main(int argc, char** argv)
 {
-    //
-    // Enable debug mode for testing.
-    //
-    rocsparse_enable_debug();
-
-    //
-    // Add additional debug check for kernel launches.
-    //
-    rocsparse_enable_debug_kernel_launch();
-
-    //
-    // Enable test debug arguments.
-    //
-    if(rocsparse_clients_envariables::is_defined(
-           rocsparse_clients_envariables::TEST_DEBUG_ARGUMENTS)
-       == false)
-    {
-        rocsparse_clients_envariables::set(rocsparse_clients_envariables::TEST_DEBUG_ARGUMENTS,
-                                           true);
-    }
-
     // Get version
     rocsparse_handle handle;
-    rocsparse_status status = rocsparse_create_handle(&handle);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "The creation of the rocsparse_handle failed." << std::endl;
-        if(0 == rocsparse_state_debug())
-        {
-            std::cerr << "To get more information, please export the ROCSPARSE_DEBUG environment "
-                         "variable:"
-                      << std::endl;
-            std::cerr << "export ROCSPARSE_DEBUG=1" << std::endl;
-        }
-        return status;
-    }
+    rocsparse_create_handle(&handle);
 
     int  ver;
     char rev[64];
 
-    status = rocsparse_get_version(handle, &ver);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "rocsparse_get_version failed." << std::endl;
-        return status;
-    }
+    rocsparse_get_version(handle, &ver);
+    rocsparse_get_git_rev(handle, rev);
 
-    status = rocsparse_get_git_rev(handle, rev);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "rocsparse_get_git_rev failed." << std::endl;
-        return status;
-    }
-
-    status = rocsparse_destroy_handle(handle);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "rocsparse_destroy_handle failed." << std::endl;
-        return status;
-    }
+    rocsparse_destroy_handle(handle);
 
     // Get user device id from command line
     int dev = 0;
-
-    // Override for showSkipped: -1 = auto, 0 = hide, 1 = show
-    int showSkippedOverride = -1;
 
     for(int i = 1; i < argc; ++i)
     {
@@ -141,14 +201,6 @@ int main(int argc, char** argv)
                       << ver % 100 << "-" << rev << std::endl;
 
             return 0;
-        }
-        else if(strcmp(argv[i], "--show-skipped") == 0)
-        {
-            showSkippedOverride = 1;
-        }
-        else if(strcmp(argv[i], "--hide-skipped") == 0)
-        {
-            showSkippedOverride = 0;
         }
     }
 
@@ -234,52 +286,15 @@ int main(int argc, char** argv)
     // [==========] 149 tests from 53 test cases ran. (1 ms total)
     // [  PASSED  ] 149 tests.
     //
+    auto listener       = new ConfigurableEventListener(default_printer);
     auto gtest_listener = getenv("GTEST_LISTENER");
 
-    if(!gtest_listener || strcmp(gtest_listener, "VERBOSE_PASS_IN_LOG") != 0)
+    if(gtest_listener && !strcmp(gtest_listener, "NO_PASS_LINE_IN_LOG"))
     {
-        // If the GTEST_LISTENER environment variable is not set to "VERBOSE_PASS_IN_LOG",
-        // we use the configurable_event_listener to capture output.
-        // This listener will redirect the output to a stringstream and print it only if a test fails.
-        // listeners.Append(new rocsparse_clients::configurable_event_listener(default_printer));
-        auto listener = new rocsparse_clients::configurable_event_listener(default_printer);
-        if(gtest_listener && !strcmp(gtest_listener, "NO_PASS_LINE_IN_LOG"))
-        {
-            listener->showTestNames = listener->showSuccesses = listener->showInlineFailures
-                = false;
-        }
-
-        // Suppress skipped test output when using yaml filter (unless overridden)
-        if(showSkippedOverride == 0
-           || (showSkippedOverride == -1 && RocSPARSE_TestData::is_yaml_filter_active()))
-        {
-            listener->showSkipped = false;
-        }
-        else if(showSkippedOverride == 1)
-        {
-            listener->showSkipped = true;
-        }
-
-        listeners.Append(listener);
+        listener->showTestNames = listener->showSuccesses = listener->showInlineFailures = false;
     }
-    else
-    {
-        auto listener = new rocsparse_clients::configurable_event_listener(default_printer);
-        listener->redirectOutput = false;
 
-        // Suppress skipped test output when using yaml filter (unless overridden)
-        if(showSkippedOverride == 0
-           || (showSkippedOverride == -1 && RocSPARSE_TestData::is_yaml_filter_active()))
-        {
-            listener->showSkipped = false;
-        }
-        else if(showSkippedOverride == 1)
-        {
-            listener->showSkipped = true;
-        }
-
-        listeners.Append(listener);
-    }
+    listeners.Append(listener);
 
     // Run all tests
     int ret = RUN_ALL_TESTS();
@@ -299,6 +314,13 @@ int main(int argc, char** argv)
         }
         reproducibility.config().set_gpu_name(prop.gcnArchName);
         rocsparse_reproducibility_write_report(reproducibility);
+    }
+
+    // Reset HIP device
+    if(hipDeviceReset() != hipSuccess)
+    {
+        std::cerr << "Error: cannot reset HIP device" << std::endl;
+        return rocsparse_status_internal_error;
     }
 
     return ret;

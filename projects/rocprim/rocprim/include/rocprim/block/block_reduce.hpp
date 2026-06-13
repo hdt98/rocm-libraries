@@ -62,35 +62,22 @@ struct select_block_reduce_impl;
 template<>
 struct select_block_reduce_impl<block_reduce_algorithm::using_warp_reduce>
 {
-    template<class T,
-             unsigned int            BlockSizeX,
-             unsigned int            BlockSizeY,
-             unsigned int            BlockSizeZ,
-             arch::wavefront::target TargetWaveSize>
-    using type = block_reduce_warp_reduce<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>;
+    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
+    using type = block_reduce_warp_reduce<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
 };
 
 template<>
 struct select_block_reduce_impl<block_reduce_algorithm::raking_reduce>
 {
-    template<class T,
-             unsigned int            BlockSizeX,
-             unsigned int            BlockSizeY,
-             unsigned int            BlockSizeZ,
-             arch::wavefront::target TargetWaveSize>
-    using type = block_reduce_raking_reduce<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>;
+    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
+    using type = block_reduce_raking_reduce<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
 };
 
 template<>
 struct select_block_reduce_impl<block_reduce_algorithm::raking_reduce_commutative_only>
 {
-    template<class T,
-             unsigned int            BlockSizeX,
-             unsigned int            BlockSizeY,
-             unsigned int            BlockSizeZ,
-             arch::wavefront::target TargetWaveSize>
-    using type
-        = block_reduce_raking_reduce<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize, true>;
+    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
+    using type = block_reduce_raking_reduce<T, BlockSizeX, BlockSizeY, BlockSizeZ, true>;
 };
 
 
@@ -123,8 +110,6 @@ struct select_block_reduce_impl<block_reduce_algorithm::raking_reduce_commutativ
 /// In the examples reduce operation is performed on block of 192 threads, each provides
 /// one \p int value, result is returned using the same variable as for input.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/block/example_block_reduce.cpp).
-///
 /// \code{.cpp}
 /// __global__ void example_kernel(...)
 /// {
@@ -144,21 +129,19 @@ struct select_block_reduce_impl<block_reduce_algorithm::raking_reduce_commutativ
 /// }
 /// \endcode
 /// \endparblock
-template<class T,
-         unsigned int            BlockSizeX,
-         block_reduce_algorithm  Algorithm      = block_reduce_algorithm::default_algorithm,
-         unsigned int            BlockSizeY     = 1,
-         unsigned int            BlockSizeZ     = 1,
-         arch::wavefront::target TargetWaveSize = arch::wavefront::get_target()>
+template<
+    class T,
+    unsigned int BlockSizeX,
+    block_reduce_algorithm Algorithm = block_reduce_algorithm::default_algorithm,
+    unsigned int BlockSizeY = 1,
+    unsigned int BlockSizeZ = 1
+>
 class block_reduce
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-    : private detail::select_block_reduce_impl<
-          Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>
+    : private detail::select_block_reduce_impl<Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ>
 #endif
 {
-    using base_type = typename detail::select_block_reduce_impl<
-        Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>;
-
+    using base_type = typename detail::select_block_reduce_impl<Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
 public:
     /// \brief Struct used to allocate a temporary memory that is required for thread
     /// communication during operations provided by related parallel primitive.
@@ -422,46 +405,6 @@ public:
         base_type::reduce(input, output, valid_items, reduce_op);
     }
 };
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-template<class T,
-         unsigned int           BlockSizeX,
-         block_reduce_algorithm Algorithm,
-         unsigned int           BlockSizeY,
-         unsigned int           BlockSizeZ>
-class block_reduce<T,
-                   BlockSizeX,
-                   Algorithm,
-                   BlockSizeY,
-                   BlockSizeZ,
-                   arch::wavefront::target::dynamic>
-{
-private:
-    using block_reduce_wave32 = block_reduce<T,
-                                             BlockSizeX,
-                                             Algorithm,
-                                             BlockSizeY,
-                                             BlockSizeZ,
-                                             arch::wavefront::target::size32>;
-    using block_reduce_wave64 = block_reduce<T,
-                                             BlockSizeX,
-                                             Algorithm,
-                                             BlockSizeY,
-                                             BlockSizeZ,
-                                             arch::wavefront::target::size64>;
-    using dispatch = detail::dispatch_wave_size<block_reduce_wave32, block_reduce_wave64>;
-
-public:
-    using storage_type = typename dispatch::storage_type;
-
-    template<typename... Args>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    auto reduce(Args&&... args)
-    {
-        dispatch{}([](auto impl, auto&&... args) { impl.reduce(args...); }, args...);
-    }
-};
-#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 END_ROCPRIM_NAMESPACE
 

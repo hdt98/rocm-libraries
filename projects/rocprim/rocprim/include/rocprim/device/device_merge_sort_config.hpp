@@ -86,55 +86,77 @@ namespace detail
 {
 
 // Sub algorithm block_merge:
-template<class Config, class Selector, class Target>
-struct merge_oddeven_config_static_selector
+
+template<typename MergeSortBlockMergeConfig, typename, typename>
+struct wrapped_merge_sort_block_merge_config
 {
-    static constexpr auto block_size
-        = target_config<Config, Selector, Target>::params.merge_oddeven_config.block_size;
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr merge_sort_block_merge_config_params params = MergeSortBlockMergeConfig();
+    };
 };
 
-template<class Config, class Selector, class Target>
-struct merge_mergepath_partition_config_static_selector
+template<typename Key, typename Value>
+struct wrapped_merge_sort_block_merge_config<default_config, Key, Value>
 {
-    static constexpr auto block_size = target_config<Config, Selector, Target>::params
-                                           .merge_mergepath_partition_config.block_size;
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr merge_sort_block_merge_config_params params
+            = default_merge_sort_block_merge_config<static_cast<unsigned int>(Arch), Key, Value>();
+    };
 };
 
-template<class Config, class Selector, class Target>
-struct merge_mergepath_config_static_selector
-{
-    static constexpr auto block_size
-        = target_config<Config, Selector, Target>::params.merge_mergepath_config.block_size;
-};
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<typename MergeSortBlockMergeConfig, typename Key, typename Value>
+template<target_arch Arch>
+constexpr merge_sort_block_merge_config_params
+    wrapped_merge_sort_block_merge_config<MergeSortBlockMergeConfig, Key, Value>::
+        architecture_config<Arch>::params;
 
-template<class Key, class Value>
-struct merge_sort_block_merge_config_selector
-{
-    using targets    = merge_sort_block_merge_targets;
-    using param_type = merge_sort_block_merge_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr merge_sort_block_merge_config_selector(Target)
-        : params(merge_sort_block_merge_config_picker<Target, Key, Value>())
-    {}
-};
+template<typename Key, typename Value>
+template<target_arch Arch>
+constexpr merge_sort_block_merge_config_params
+    wrapped_merge_sort_block_merge_config<default_config, Key, Value>::architecture_config<
+        Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 // Sub-algorithm block_sort:
-template<class Key, class Value>
-struct merge_sort_block_sort_config_selector
+template<typename MergeSortBlockSortConfig, typename, typename>
+struct wrapped_merge_sort_block_sort_config
 {
-    using targets    = merge_sort_block_sort_targets;
-    using param_type = merge_sort_block_sort_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr merge_sort_block_sort_config_selector(Target)
-        : params(merge_sort_block_sort_config_picker<Target, Key, Value>())
-    {}
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr merge_sort_block_sort_config_params params = MergeSortBlockSortConfig();
+    };
 };
+
+template<typename Key, typename Value>
+struct wrapped_merge_sort_block_sort_config<default_config, Key, Value>
+{
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr merge_sort_block_sort_config_params params
+            = default_merge_sort_block_sort_config<static_cast<unsigned int>(Arch), Key, Value>();
+    };
+};
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<typename MergeSortBlockSortConfig, typename Key, typename Value>
+template<target_arch Arch>
+constexpr merge_sort_block_sort_config_params
+    wrapped_merge_sort_block_sort_config<MergeSortBlockSortConfig, Key, Value>::architecture_config<
+        Arch>::params;
+
+template<typename Key, typename Value>
+template<target_arch Arch>
+constexpr merge_sort_block_sort_config_params
+    wrapped_merge_sort_block_sort_config<default_config, Key, Value>::architecture_config<
+        Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } // namespace detail
 

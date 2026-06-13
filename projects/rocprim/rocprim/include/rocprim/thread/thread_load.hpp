@@ -58,7 +58,8 @@ enum cache_load_modifier : int
     load_cv          = 4, ///< Cache as volatile (including cached system lines)
     load_ldg         = 5, ///< Cache as texture
     load_volatile    = 6, ///< Volatile (any memory space)
-    load_count       = 7
+    load_cs          = load_nontemporal, ///< Alias for load_nontemporal (will be deprecated in 7.0)
+    load_count       = 8
 };
 
 /// @}
@@ -72,7 +73,7 @@ ROCPRIM_DEVICE ROCPRIM_INLINE
 T asm_thread_load(void* ptr)
 {
     T retval{};
-    __builtin_memcpy(static_cast<void*>(&retval), ptr, sizeof(T));
+    __builtin_memcpy(&retval, ptr, sizeof(T));
     return retval;
 }
 
@@ -80,49 +81,45 @@ T asm_thread_load(void* ptr)
 
     // Important for syncing. Check section 9.2.2 or 7.3 in the following document
     // http://developer.amd.com/wordpress/media/2013/12/AMD_GCN3_Instruction_Set_Architecture_rev1.1.pdf
-    #define ROCPRIM_ASM_THREAD_LOAD(cache_modifier, type, interim_type, asm_operator)       \
-        template<>                                                                          \
-        ROCPRIM_DEVICE ROCPRIM_INLINE type asm_thread_load<cache_modifier, type>(void* ptr) \
-        {                                                                                   \
-            interim_type retval;                                                            \
-            if ROCPRIM_AMDGCN_CONSTEXPR(ROCPRIM_IS_RDNA4())                                 \
-            {                                                                               \
-                asm volatile(#asm_operator " %0, %1 th:TH_DEFAULT scope:SCOPE_DEV\n\t"      \
-                                           "s_wait_loadcnt_dscnt(%2)"                       \
-                             : "=&v"(retval)                                                \
-                             : "v"(ptr), "I"(0x00));                                        \
-            }                                                                               \
-            else if ROCPRIM_AMDGCN_CONSTEXPR(ROCPRIM_IS_CDNA3())                            \
-            {                                                                               \
-                asm volatile(#asm_operator " %0, %1 sc0 nt\n\t"                             \
-                                           "s_waitcnt(%2)"                                  \
-                             : "=&v"(retval)                                                \
-                             : "v"(ptr), "I"(0x00));                                        \
-            }                                                                               \
-            else                                                                            \
-            {                                                                               \
-                asm volatile(#asm_operator " %0, %1 glc slc\n\t"                            \
-                                           "s_waitcnt(%2)"                                  \
-                             : "=v"(retval)                                                 \
-                             : "v"(ptr), "I"(0x00));                                        \
-            }                                                                               \
-            return *bit_cast<type*>(&retval);                                               \
+    #define ROCPRIM_ASM_THREAD_LOAD(cache_modifier,                                             \
+                                    llvm_cache_modifier,                                        \
+                                    type,                                                       \
+                                    interim_type,                                               \
+                                    asm_operator,                                               \
+                                    output_modifier,                                            \
+                                    wait_inst,                                                  \
+                                    wait_cmd)                                                   \
+        template<>                                                                              \
+        ROCPRIM_DEVICE ROCPRIM_INLINE type asm_thread_load<cache_modifier, type>(void* ptr)     \
+        {                                                                                       \
+            interim_type retval;                                                                \
+            asm volatile(#asm_operator " %0, %1 " llvm_cache_modifier "\n\t" wait_inst wait_cmd \
+                                       "(%2)"                                                   \
+                         : "=" #output_modifier(retval)                                         \
+                         : "v"(ptr), "I"(0x00));                                                \
+            return *bit_cast<type*>(&retval);                                                   \
         }
 
     // TODO Add specialization for custom larger data types
     // clang-format off
-#define ROCPRIM_ASM_THREAD_LOAD_GROUP(cache_modifier)                                   \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, int8_t,   int32_t,  flat_load_sbyte);       \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, int16_t,  int32_t,  flat_load_sshort);      \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, uint8_t,  uint32_t, flat_load_ubyte);       \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, uint16_t, uint32_t, flat_load_ushort);      \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, uint32_t, uint32_t, flat_load_dword);       \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, float,    uint32_t, flat_load_dword);       \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, uint64_t, uint64_t, flat_load_dwordx2);     \
-    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, double,   uint64_t, flat_load_dwordx2)
-// clang-format on
+#define ROCPRIM_ASM_THREAD_LOAD_GROUP(cache_modifier, llvm_cache_modifier, wait_inst, wait_cmd)                                  \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, int8_t, int16_t, flat_load_sbyte, v, wait_inst, wait_cmd);      \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, int16_t, int16_t, flat_load_sshort, v, wait_inst, wait_cmd);    \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, uint8_t, uint16_t, flat_load_ubyte, v, wait_inst, wait_cmd);    \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, uint16_t, uint16_t, flat_load_ushort, v, wait_inst, wait_cmd);  \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, uint32_t, uint32_t, flat_load_dword, v, wait_inst, wait_cmd);   \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, float, uint32_t, flat_load_dword, v, wait_inst, wait_cmd);      \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, uint64_t, uint64_t, flat_load_dwordx2, v, wait_inst, wait_cmd); \
+    ROCPRIM_ASM_THREAD_LOAD(cache_modifier, llvm_cache_modifier, double, uint64_t, flat_load_dwordx2, v, wait_inst, wait_cmd);
+    // clang-format on
 
-ROCPRIM_ASM_THREAD_LOAD_GROUP(load_cg);
+    #if defined(__gfx942__) || defined(__gfx950__)
+ROCPRIM_ASM_THREAD_LOAD_GROUP(load_cg, "sc0 nt", "s_waitcnt", "");
+    #elif defined(__gfx1200__) || defined(__gfx1201__)
+ROCPRIM_ASM_THREAD_LOAD_GROUP(load_cg, "th:TH_DEFAULT scope:SCOPE_DEV", "s_wait_loadcnt_dscnt", "");
+    #else
+ROCPRIM_ASM_THREAD_LOAD_GROUP(load_cg, "glc slc", "s_waitcnt", "");
+    #endif
 
 #endif
 
@@ -158,12 +155,10 @@ std::enable_if_t<CacheLoadModifier == load_ca || CacheLoadModifier == load_defau
                      || CacheLoadModifier == load_ldg,
                  T> thread_load(T* ptr)
 {
-    using decay_type = typename std::remove_const_t<T>;
-    alignas(Alignment) decay_type result;
-    detail::thread_fused_copy<decay_type, T, Alignment>(&result,
-                                                        ptr,
-                                                        [](auto& dst, const auto& src)
-                                                        { dst = src; });
+    alignas(Alignment) T result;
+    detail::thread_fused_copy<T, T, Alignment>(&result,
+                                               ptr,
+                                               [](auto& dst, const auto& src) { dst = src; });
     return result;
 }
 
@@ -193,16 +188,14 @@ ROCPRIM_DEVICE ROCPRIM_INLINE
 std::enable_if_t<CacheLoadModifier == load_volatile || CacheLoadModifier == load_cv, T>
     thread_load(T* ptr)
 {
-    using decay_type = typename std::remove_const_t<T>;
-    alignas(Alignment) decay_type result;
-    detail::thread_fused_copy<decay_type, T, Alignment>(
-        &result,
-        ptr,
-        [](auto& dst, const auto& src)
-        {
-            using U = std::remove_reference_t<decltype(src)>;
-            dst     = *static_cast<const volatile U*>(&src);
-        });
+    alignas(Alignment) T result;
+    detail::thread_fused_copy<T, T, Alignment>(&result,
+                                               ptr,
+                                               [](auto& dst, const auto& src)
+                                               {
+                                                   using U = std::remove_reference_t<decltype(src)>;
+                                                   dst     = *static_cast<const volatile U*>(&src);
+                                               });
     return result;
 }
 
@@ -222,12 +215,11 @@ ROCPRIM_DEVICE ROCPRIM_INLINE
 std::enable_if_t<CacheLoadModifier == load_nontemporal, T> thread_load(T* ptr)
 {
 #if __has_builtin(__builtin_nontemporal_load)
-    using decay_type = typename std::remove_const_t<T>;
-    alignas(Alignment) decay_type result;
-    detail::thread_fused_copy<decay_type, T, Alignment>(
-        &result,
-        ptr,
-        [](auto& dst, const auto& src) { dst = __builtin_nontemporal_load(&src); });
+    alignas(Alignment) T result;
+    detail::thread_fused_copy<T, T, Alignment>(&result,
+                                               ptr,
+                                               [](auto& dst, const auto& src)
+                                               { dst = __builtin_nontemporal_load(&src); });
     return result;
 #else
     return thread_load(ptr);

@@ -838,7 +838,7 @@ void testing_spmat_descr_bad_arg(void)
 #endif
 }
 
-void testing_spmat_descr(void)
+hipsparseStatus_t testing_spmat_descr(void)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11000)
     int m    = 2;
@@ -1072,6 +1072,8 @@ void testing_spmat_descr(void)
     CHECK_HIP_ERROR(hipFree(dcsr_col_indC));
     CHECK_HIP_ERROR(hipFree(dcsr_valC));
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_SPMAT_DESCR_HPP

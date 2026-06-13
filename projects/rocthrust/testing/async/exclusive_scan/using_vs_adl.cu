@@ -17,14 +17,11 @@
 
 #include <thrust/detail/config.h>
 
-#include <thrust/detail/type_traits.h>
+#if THRUST_CPP_DIALECT >= 2014
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
+#include <async/test_policy_overloads.h>
 
-#if THRUST_CPP_DIALECT >= 2017
-
-#  include <async/exclusive_scan/mixin.h>
-#  include <async/test_policy_overloads.h>
+#include <async/exclusive_scan/mixin.h>
 
 // Verify what happens when calling the algorithm without any namespace
 // qualifiers:
@@ -36,30 +33,34 @@ THRUST_SUPPRESS_DEPRECATED_PUSH
 namespace invoke_reference
 {
 
-template <typename input_value_type, typename output_value_type = input_value_type>
+template <typename input_value_type,
+          typename output_value_type = input_value_type>
 struct adl_host_synchronous
 {
-  template <typename InputType, typename OutputType, typename PostfixArgTuple, std::size_t... PostfixArgIndices>
-  static void invoke_reference(
-    InputType const& input,
-    OutputType& output,
-    PostfixArgTuple&& postfix_tuple,
-    std::index_sequence<PostfixArgIndices...>)
+  template <typename InputType,
+            typename OutputType,
+            typename PostfixArgTuple,
+            std::size_t... PostfixArgIndices>
+  static void invoke_reference(InputType const& input,
+                               OutputType& output,
+                               PostfixArgTuple&& postfix_tuple,
+                               std::index_sequence<PostfixArgIndices...>)
   {
     // Create host versions of the input/output:
-    thrust::host_vector<input_value_type> host_input(input.cbegin(), input.cend());
+    thrust::host_vector<input_value_type> host_input(input.cbegin(),
+                                                     input.cend());
     thrust::host_vector<output_value_type> host_output(host_input.size());
 
-    using OutIter = ::internal::remove_cvref_t<decltype(host_output.begin())>;
+    using OutIter = thrust::remove_cvref_t<decltype(host_output.begin())>;
 
     // ADL should resolve this to the synchronous `thrust::` algorithm.
     // This is checked by ensuring that the call returns an output iterator.
-    OutIter result = exclusive_scan(
-      host_input.cbegin(),
-      host_input.cend(),
-      host_output.begin(),
-      std::get<PostfixArgIndices>(THRUST_FWD(postfix_tuple))...);
-    (void) result;
+    OutIter result =
+      exclusive_scan(host_input.cbegin(),
+                     host_input.cend(),
+                     host_output.begin(),
+                     std::get<PostfixArgIndices>(THRUST_FWD(postfix_tuple))...);
+    (void)result;
 
     // Copy back to device.
     output = host_output;
@@ -79,26 +80,23 @@ struct using_namespace
             typename OutputType,
             typename PostfixArgTuple,
             std::size_t... PostfixArgIndices>
-  static auto invoke_async(
-    PrefixArgTuple&& prefix_tuple,
-    std::index_sequence<PrefixArgIndices...>,
-    InputType const& input,
-    OutputType& output,
-    PostfixArgTuple&& postfix_tuple,
-    std::index_sequence<PostfixArgIndices...>)
+  static auto invoke_async(PrefixArgTuple&& prefix_tuple,
+                           std::index_sequence<PrefixArgIndices...>,
+                           InputType const& input,
+                           OutputType& output,
+                           PostfixArgTuple&& postfix_tuple,
+                           std::index_sequence<PostfixArgIndices...>)
   {
     // Importing the CPO into the current namespace should unambiguously resolve
     // this call to the CPO, as opposed to resolving to the thrust:: algorithm
     // via ADL. This is verified by checking that an event is returned.
-    THRUST_SUPPRESS_DEPRECATED_PUSH
     using namespace thrust::async;
-    thrust::device_event e = exclusive_scan(
-      std::get<PrefixArgIndices>(THRUST_FWD(prefix_tuple))...,
-      input.cbegin(),
-      input.cend(),
-      output.begin(),
-      std::get<PostfixArgIndices>(THRUST_FWD(postfix_tuple))...);
-    THRUST_SUPPRESS_DEPRECATED_POP
+    thrust::device_event e =
+      exclusive_scan(std::get<PrefixArgIndices>(THRUST_FWD(prefix_tuple))...,
+                     input.cbegin(),
+                     input.cend(),
+                     output.begin(),
+                     std::get<PostfixArgIndices>(THRUST_FWD(postfix_tuple))...);
     return e;
   }
 };
@@ -111,26 +109,23 @@ struct using_cpo
             typename OutputType,
             typename PostfixArgTuple,
             std::size_t... PostfixArgIndices>
-  static auto invoke_async(
-    PrefixArgTuple&& prefix_tuple,
-    std::index_sequence<PrefixArgIndices...>,
-    InputType const& input,
-    OutputType& output,
-    PostfixArgTuple&& postfix_tuple,
-    std::index_sequence<PostfixArgIndices...>)
+  static auto invoke_async(PrefixArgTuple&& prefix_tuple,
+                           std::index_sequence<PrefixArgIndices...>,
+                           InputType const& input,
+                           OutputType& output,
+                           PostfixArgTuple&& postfix_tuple,
+                           std::index_sequence<PostfixArgIndices...>)
   {
     // Importing the CPO into the current namespace should unambiguously resolve
     // this call to the CPO, as opposed to resolving to the thrust:: algorithm
     // via ADL. This is verified by checking that an event is returned.
     using thrust::async::exclusive_scan;
-    THRUST_SUPPRESS_DEPRECATED_PUSH
-    thrust::device_event e = exclusive_scan(
-      std::get<PrefixArgIndices>(THRUST_FWD(prefix_tuple))...,
-      input.cbegin(),
-      input.cend(),
-      output.begin(),
-      std::get<PostfixArgIndices>(THRUST_FWD(postfix_tuple))...);
-    THRUST_SUPPRESS_DEPRECATED_POP
+    thrust::device_event e =
+      exclusive_scan(std::get<PrefixArgIndices>(THRUST_FWD(prefix_tuple))...,
+                     input.cbegin(),
+                     input.cend(),
+                     output.begin(),
+                     std::get<PostfixArgIndices>(THRUST_FWD(postfix_tuple))...);
     return e;
   }
 };
@@ -144,7 +139,8 @@ template <typename input_value_type,
 struct using_namespace_invoker
     : testing::async::mixin::input::device_vector<input_value_type>
     , testing::async::mixin::output::device_vector<output_value_type>
-    , testing::async::exclusive_scan::mixin::postfix_args::all_overloads<initial_value_type, alternate_binary_op>
+    , testing::async::exclusive_scan::mixin::postfix_args::
+        all_overloads<initial_value_type, alternate_binary_op>
     , invoke_reference::adl_host_synchronous<input_value_type, output_value_type>
     , invoke_async::using_namespace
     , testing::async::mixin::compare_outputs::assert_almost_equal_if_fp_quiet
@@ -169,7 +165,8 @@ template <typename input_value_type,
 struct using_cpo_invoker
     : testing::async::mixin::input::device_vector<input_value_type>
     , testing::async::mixin::output::device_vector<output_value_type>
-    , testing::async::exclusive_scan::mixin::postfix_args::all_overloads<initial_value_type, alternate_binary_op>
+    , testing::async::exclusive_scan::mixin::postfix_args::
+        all_overloads<initial_value_type, alternate_binary_op>
     , invoke_reference::adl_host_synchronous<input_value_type, output_value_type>
     , invoke_async::using_cpo
     , testing::async::mixin::compare_outputs::assert_almost_equal_if_fp_quiet
@@ -188,9 +185,4 @@ void test_using_cpo()
 }
 DECLARE_UNITTEST(test_using_cpo);
 
-#endif // C++17
-
-// we need to leak the suppression on clang/MSVC to suppresses warnings from the cudafe1.stub.c file
-#if THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
-THRUST_SUPPRESS_DEPRECATED_POP
-#endif // THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
+#endif // C++14

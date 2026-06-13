@@ -34,8 +34,11 @@
 #include <miopen/bz2.hpp>
 #include <miopen/md5.hpp>
 
+#include <boost/core/explicit_operator_bool.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include <functional>
-#include <optional>
 #include <string>
 
 namespace miopen {
@@ -53,18 +56,23 @@ struct KernelConfig
     {
         std::ostringstream ss;
         ss << "CREATE TABLE IF NOT EXISTS `" << KernelConfig::table_name() << "` ("
-           << "`id` INTEGER PRIMARY KEY ASC" << ",`kernel_name` TEXT NOT NULL"
-           << ",`kernel_args` TEXT NOT NULL" << ",`kernel_blob` BLOB NOT NULL"
-           << ",`kernel_hash` TEXT NOT NULL" << ",`uncompressed_size` INT NOT NULL" << ");"
-           << "CREATE UNIQUE INDEX IF NOT EXISTS " << "`idx_" << KernelConfig::table_name() << "` "
+           << "`id` INTEGER PRIMARY KEY ASC"
+           << ",`kernel_name` TEXT NOT NULL"
+           << ",`kernel_args` TEXT NOT NULL"
+           << ",`kernel_blob` BLOB NOT NULL"
+           << ",`kernel_hash` TEXT NOT NULL"
+           << ",`uncompressed_size` INT NOT NULL"
+           << ");"
+           << "CREATE UNIQUE INDEX IF NOT EXISTS "
+           << "`idx_" << KernelConfig::table_name() << "` "
            << "ON " << KernelConfig::table_name() << "(kernel_name, kernel_args);";
         return ss.str();
     }
     std::string Where() const
     {
         std::ostringstream ss;
-        ss << "(kernel_name = '" << kernel_name.string() << "')" << " AND (kernel_args = '"
-           << kernel_args << "')";
+        ss << "(kernel_name = '" << kernel_name.string() << "')"
+           << " AND (kernel_args = '" << kernel_args << "')";
         return ss.str();
     }
 };
@@ -104,10 +112,10 @@ public:
     }
 
     template <typename T>
-    std::optional<std::vector<char>> FindRecordUnsafe(const T& problem_config)
+    boost::optional<std::vector<char>> FindRecordUnsafe(const T& problem_config)
     {
         if(filename.empty())
-            return {};
+            return boost::none;
         // Where clause with inserted values defeats the purpose of a prepraed statement
         auto select_query = "SELECT kernel_blob, kernel_hash, uncompressed_size FROM " +
                             T::table_name() + " WHERE " + problem_config.Where() + ";";
@@ -132,13 +140,13 @@ public:
         }
         else if(rc == SQLITE_DONE)
         {
-            return {};
+            return boost::none;
         }
         else
         {
             MIOPEN_THROW(miopenStatusInternalError, sql.ErrorMessage());
         }
-        return {};
+        return boost::none;
     }
 
     template <typename T>

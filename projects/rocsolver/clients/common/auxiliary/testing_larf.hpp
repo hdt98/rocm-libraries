@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <typename T, typename I>
 void larf_checkBadArgs(const rocblas_handle handle,
@@ -224,7 +223,7 @@ void larf_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -240,11 +239,11 @@ void larf_getPerfData(const rocblas_handle handle,
     {
         larf_initData<false, true, T>(handle, side, m, n, dx, inc, dt, dA, lda, xx, hx, ht, hA);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_larf(handle, side, m, n, dx.data(), inc, dt.data(), dA.data(), lda);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <typename T, typename I>
@@ -298,7 +297,7 @@ void testing_larf(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         CHECK_ALLOC_QUERY(
@@ -306,9 +305,13 @@ void testing_larf(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // memory allocations
@@ -344,7 +347,7 @@ void testing_larf(Arguments& argus)
         larf_getError<T>(handle, side, m, n, dx, inc, dt, dA, lda, xx, hx, ht, hA, hAr, &max_error);
 
     // collect performance data
-    if(argus.timing && hot_calls > 0)
+    if(argus.timing)
         larf_getPerfData<T>(handle, side, m, n, dx, inc, dt, dA, lda, xx, hx, ht, hA,
                             &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
                             argus.profile_kernels, argus.perf);

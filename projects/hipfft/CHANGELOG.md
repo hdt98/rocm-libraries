@@ -3,75 +3,13 @@
 Documentation for hipFFT is available at
 [https://rocm.docs.amd.com/projects/hipFFT/en/latest/](https://rocm.docs.amd.com/projects/hipFFT/en/latest/).
 
-## Since last release (ROCm 7.13)
+## hipFFT 1.0.20 (unreleased)
 
-### Added
+### Removed
 
-* Support for the gfx1250 architecture.
+* Removed hipfft-rider legacy compatibility from clients
 
-## hipFFT 1.0.23 for ROCm 7.13
-
-### Added
-
-* hipFFTW plan creation functions for advanced and general plans:
-
-  * fftw_plan_many_dft
-  * fftwf_plan_many_dft
-  * fftw_plan_many_dft_r2c
-  * fftwf_plan_many_dft_r2c
-  * fftw_plan_many_dft_c2r
-  * fftwf_plan_many_dft_c2r
-  * fftw_plan_guru_dft
-  * fftwf_plan_guru_dft
-  * fftw_plan_guru_dft_r2c
-  * fftwf_plan_guru_dft_r2c
-  * fftw_plan_guru_dft_c2r
-  * fftwf_plan_guru_dft_c2r
-  * fftw_plan_guru64_dft
-  * fftwf_plan_guru64_dft
-  * fftw_plan_guru64_dft_r2c
-  * fftwf_plan_guru64_dft_r2c
-  * fftw_plan_guru64_dft_c2r
-  * fftwf_plan_guru64_dft_c2r
-
-### Changed
-
-* Moved library to C++20 standard.
-* Removed Boost as a dependency for clients and samples.
-* Callback functions specified as function pointers to hipfftXtSetCallback will be deprecated in a future release.
-
-### Added
-* Support for gfx1150 architecture.
-
-### Resolved issues
-
-* Fixed potential launch failure of data generation kernels in test and benchmark programs.
-
-## hipFFT 1.0.22 for ROCm 7.2.0
-
-### Added
-
-* hipFFTW execution functions, where input and output data buffers differ from the
-  buffers specified at plan creation:
-
-  * fftw_execute_dft
-  * fftwf_execute_dft
-  * fftw_execute_dft_r2c
-  * fftwf_execute_dft_r2c
-  * fftw_execute_dft_c2r
-  * fftwf_execute_dft_c2r
-
-## hipFFT 1.0.21 for ROCm 7.1.0
-
-### Added
-
-* Improved test coverage of multi-stream plans.
-* Improved test coverage of user-specified work areas.
-* Improved test coverage of default stride calculation.
-* **[Experimental]** Introduced the hipFFTW library, interfacing rocFFT on AMD platforms using the same symbols as FFTW3 (with partial support).
-* Support for the gfx1152 and gfx1153 architectures
-
-## hipFFT 1.0.20 for ROCm 7.0.0
+## hipFFT 1.0.19 for ROCm 6.5.0
 
 ### Added
 
@@ -79,7 +17,6 @@ Documentation for hipFFT is available at
 
 ### Removed
 
-* Removed hipfft-rider legacy compatibility from clients
 * Remove support for the gfx940 and gfx941 targets from the client programs.
 
 ## hipFFT 1.0.18 for ROCm 6.4.0

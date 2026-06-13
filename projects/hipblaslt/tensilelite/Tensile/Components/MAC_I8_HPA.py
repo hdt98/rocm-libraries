@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,7 @@
 #
 ################################################################################
 
-from rocisa.code import Module
-from rocisa.enum import DataTypeEnum
-from ..Common.DataType import DataType
+from ..TensileInstructions import DataType, Module
 from ..Component import Component, MAC
 
 class FMA_I8_HPA(MAC):
@@ -33,15 +31,13 @@ class FMA_I8_HPA(MAC):
         return True
 
     kernel = {
-        "ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Int8),
-                        "MacDataTypeB": DataType(DataTypeEnum.Int8),
-                        "HighPrecisionAccumulate": True},
+        "ProblemType": {"DataType": DataType(DataType.int8), "HighPrecisionAccumulate": True},
     }
 
     def __call__(self, writer, m, innerUnroll):
         kernel      = writer.states.kernel
         priority    = Component.Priority.find(writer)
-        spacePerReg = writer.states.bpr
+        spacePerReg = writer.states.bpr // writer.states.bpeAB
         elemPerReg  = min(kernel['VectorWidth'], spacePerReg)
 
         module = Module("FMA_I8_HPA")

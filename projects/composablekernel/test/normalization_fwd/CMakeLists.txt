@@ -1,6 +1,3 @@
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 add_custom_target(test_normalization_fwd)
 add_gtest_executable(test_layernorm2d_fwd_fp32 test_layernorm2d_fwd_fp32.cpp)
 if(result EQUAL 0)

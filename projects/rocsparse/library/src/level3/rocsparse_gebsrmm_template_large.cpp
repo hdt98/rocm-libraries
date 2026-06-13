@@ -22,7 +22,7 @@
  *
  * ************************************************************************ */
 
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "gebsrmm_device_large.h"
 #include "rocsparse_csrmm.hpp"

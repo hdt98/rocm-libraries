@@ -21,15 +21,15 @@
 * THE SOFTWARE.
 *
 * ************************************************************************ */
-#include "rocsparse_control.hpp"
-#include "rocsparse_utility.hpp"
+#include "control.h"
+#include "utility.h"
 
 #include "internal/conversion/rocsparse_coo2dense.h"
 #include "rocsparse_common.h"
 #include "rocsparse_coo2dense.hpp"
 
+#include "common.h"
 #include "coo2dense_device.h"
-#include "rocsparse_common.hpp"
 
 template <typename I, typename T>
 rocsparse_status rocsparse::coo2dense_template(rocsparse_handle          handle, //0
@@ -133,14 +133,10 @@ rocsparse_status rocsparse::coo2dense_template(rocsparse_handle          handle,
         int64_t                   lda,                                     \
         rocsparse_order           order);
 
-INSTANTIATE(int32_t, _Float16);
-INSTANTIATE(int32_t, rocsparse_bfloat16);
 INSTANTIATE(int32_t, float);
 INSTANTIATE(int32_t, double);
 INSTANTIATE(int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, _Float16);
-INSTANTIATE(int64_t, rocsparse_bfloat16);
 INSTANTIATE(int64_t, float);
 INSTANTIATE(int64_t, double);
 INSTANTIATE(int64_t, rocsparse_float_complex);

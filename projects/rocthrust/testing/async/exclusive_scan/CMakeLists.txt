@@ -39,23 +39,11 @@ function(add_thrust_test_exclusive TEST)
         PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/testing/"
     )
-    if (AMDGPU_TEST_TARGETS)
-        foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
-            add_test(NAME "${AMDGPU_TARGET}-exclusive_${TEST}" COMMAND ${TEST_TARGET})
-            set_tests_properties("${AMDGPU_TARGET}-exclusive_${TEST}"
-                PROPERTIES
-                    RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
-                    LABELS "upstream;${AMDGPU_TARGET}"
-            )
-        endforeach()
-    else()
-        add_test(NAME "exclusive_${TEST}" COMMAND ${TEST_TARGET})
-        set_tests_properties("exclusive_${TEST}"
-            PROPERTIES
-                RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
-                LABELS upstream
-        )                
-    endif()
+    add_test(NAME ${TEST} COMMAND ${TEST_TARGET})
+    set_tests_properties(${TEST}
+        PROPERTIES
+            LABELS upstream
+    )
 endfunction()
 
 add_thrust_test_exclusive("counting_iterator")

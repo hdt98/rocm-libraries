@@ -24,7 +24,7 @@
 #include "internal/util/rocsparse_check_matrix_ell.h"
 
 #include "rocsparse_check_matrix_ell.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "check_matrix_ell_device.h"
 

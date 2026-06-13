@@ -28,8 +28,6 @@
 #include "blas1/rocblas_dot.hpp" // int32 API called
 #include "blas1/rocblas_dot_kernels.hpp"
 
-#include <cassert>
-
 // assume workspace has already been allocated, recommended for repeated calling of dot_strided_batched product
 // routine
 template <typename API_INT, int NB, bool CONJ, typename T, typename U, typename V>
@@ -325,7 +323,7 @@ rocblas_status rocblas_internal_dot_launcher_64(rocblas_handle __restrict__ hand
     if(handle->pointer_mode == rocblas_pointer_mode_host)
     {
         // sync here to match legacy BLAS
-        RETURN_IF_HIP_ERROR(hipStreamSynchronize(handle->get_stream()));
+        hipStreamSynchronize(handle->get_stream());
     }
 
     return rocblas_status_success;

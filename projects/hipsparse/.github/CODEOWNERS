@@ -1,4 +1,4 @@
-* @ntrost57 @YvanMokwinski @jsandham @kliegeois @amontoison
+* @ntrost57 @YvanMokwinski @jsandham
 # Documentation files
 docs/* @ROCm/rocm-documentation
 *.md @ROCm/rocm-documentation

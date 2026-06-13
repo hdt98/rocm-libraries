@@ -17,11 +17,10 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#include <thrust/detail/type_traits.h>
-#include <thrust/iterator/detail/any_system_tag.h>
 #include <thrust/system/cpp/detail/execution_policy.h>
 #include <thrust/system/tbb/detail/execution_policy.h>
+#include <thrust/iterator/detail/any_system_tag.h>
+#include <thrust/detail/type_traits.h>
 
 THRUST_NAMESPACE_BEGIN
 namespace system
@@ -42,29 +41,27 @@ namespace detail
 struct tag;
 
 // forward declaration of execution_policy
-template <typename>
-struct execution_policy;
+template<typename> struct execution_policy;
 
 // specialize execution_policy for tag
-template <>
-struct execution_policy<tag> : thrust::system::cpp::detail::execution_policy<tag>
+template<>
+  struct execution_policy<tag>
+    : thrust::system::cpp::detail::execution_policy<tag>
 {};
 
 // tag's definition comes before the
 // generic definition of execution_policy
-struct tag : execution_policy<tag>
-{};
+struct tag : execution_policy<tag> {};
 
 // allow conversion to tag when it is not a successor
-template <typename Derived>
-struct execution_policy : thrust::system::cpp::detail::execution_policy<Derived>
+template<typename Derived>
+  struct execution_policy
+    : thrust::system::cpp::detail::execution_policy<Derived>
 {
   using tag_type = tag;
-  operator tag() const
-  {
-    return tag();
-  }
+  operator tag() const { return tag(); }
 };
+
 
 // overloads of select_system
 
@@ -72,28 +69,30 @@ struct execution_policy : thrust::system::cpp::detail::execution_policy<Derived>
 //     because both convert to cpp without these overloads, which we
 //     arbitrarily define in the omp backend
 
-template <typename System1, typename System2>
-inline THRUST_HOST_DEVICE System1
-select_system(execution_policy<System1> s, thrust::system::tbb::detail::execution_policy<System2>)
+template<typename System1, typename System2>
+inline THRUST_HOST_DEVICE
+  System1 select_system(execution_policy<System1> s, thrust::system::tbb::detail::execution_policy<System2>)
 {
   return thrust::detail::derived_cast(s);
 } // end select_system()
 
-template <typename System1, typename System2>
-inline THRUST_HOST_DEVICE System2
-select_system(thrust::system::tbb::detail::execution_policy<System1>, execution_policy<System2> s)
+
+template<typename System1, typename System2>
+inline THRUST_HOST_DEVICE
+  System2 select_system(thrust::system::tbb::detail::execution_policy<System1>, execution_policy<System2> s)
 {
   return thrust::detail::derived_cast(s);
 } // end select_system()
 
-} // namespace detail
+
+} // end detail
 
 // alias execution_policy and tag here
 using thrust::system::omp::detail::execution_policy;
 using thrust::system::omp::detail::tag;
 
-} // namespace omp
-} // namespace system
+} // end omp
+} // end system
 
 // alias items at top-level
 namespace omp
@@ -102,5 +101,6 @@ namespace omp
 using thrust::system::omp::execution_policy;
 using thrust::system::omp::tag;
 
-} // namespace omp
+} // end omp
 THRUST_NAMESPACE_END
+

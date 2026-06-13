@@ -133,3 +133,4 @@ OutputIterator copy_n(execution_policy<DerivedPolicy> &exec,
 } // end namespace omp
 } // end namespace system
 THRUST_NAMESPACE_END
+

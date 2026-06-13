@@ -66,52 +66,22 @@ module hipblas_enums
     end enum
 
     enum, bind(c)
-        enumerator :: HIP_R_32F = 0
-        enumerator :: HIP_R_64F = 1
-        enumerator :: HIP_R_16F = 2
-        enumerator :: HIP_R_8I = 3
-        enumerator :: HIP_C_32F = 4
-        enumerator :: HIP_C_64F = 5
-        enumerator :: HIP_C_16F = 6
-        enumerator :: HIP_C_8I = 7
-        enumerator :: HIP_R_8U = 8
-        enumerator :: HIP_C_8U = 9
-        enumerator :: HIP_R_32I = 10
-        enumerator :: HIP_C_32I = 11
-        enumerator :: HIP_R_32U = 12
-        enumerator :: HIP_C_32U = 13
-        enumerator :: HIP_R_16BF = 14
-        enumerator :: HIP_C_16BF = 15
-        enumerator :: HIP_R_4I = 16
-        enumerator :: HIP_C_4I = 17
-        enumerator :: HIP_R_4U = 18
-        enumerator :: HIP_C_4U = 19
-        enumerator :: HIP_R_16I = 20
-        enumerator :: HIP_C_16I = 21
-        enumerator :: HIP_R_16U = 22
-        enumerator :: HIP_C_16U = 23
-        enumerator :: HIP_R_64I = 24
-        enumerator :: HIP_C_64I = 25
-        enumerator :: HIP_R_64U = 26
-        enumerator :: HIP_C_64U = 27
-    end enum
-
-    enum, bind(c)
-        enumerator :: HIPBLAS_COMPUTE_16F = 0
-        enumerator :: HIPBLAS_COMPUTE_16F_PEDANTIC = 1
-        enumerator :: HIPBLAS_COMPUTE_32F = 2
-        enumerator :: HIPBLAS_COMPUTE_32F_PEDANTIC = 3
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_16F = 4
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_16BF = 5
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_TF32 = 6
-        enumerator :: HIPBLAS_COMPUTE_64F = 7
-        enumerator :: HIPBLAS_COMPUTE_64F_PEDANTIC = 8
-        enumerator :: HIPBLAS_COMPUTE_32I = 9
-        enumerator :: HIPBLAS_COMPUTE_32I_PEDANTIC = 10
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_8F_FNUZ = 100
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_8BF_FNUZ = 101
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_8F8BF_FNUZ = 102
-        enumerator :: HIPBLAS_COMPUTE_32F_FAST_8BF8F_FNUZ = 103
+        enumerator :: HIPBLAS_R_16F = 150
+        enumerator :: HIPBLAS_R_32F = 151
+        enumerator :: HIPBLAS_R_64F = 152
+        enumerator :: HIPBLAS_C_16F = 153
+        enumerator :: HIPBLAS_C_32F = 154
+        enumerator :: HIPBLAS_C_64F = 155
+        enumerator :: HIPBLAS_R_8I = 160
+        enumerator :: HIPBLAS_R_8U = 161
+        enumerator :: HIPBLAS_R_32I = 162
+        enumerator :: HIPBLAS_R_32U = 163
+        enumerator :: HIPBLAS_C_8I = 164
+        enumerator :: HIPBLAS_C_8U = 165
+        enumerator :: HIPBLAS_C_32I = 166
+        enumerator :: HIPBLAS_C_32U = 167
+        enumerator :: HIPBLAS_R_16B = 168
+        enumerator :: HIPBLAS_C_16B = 169
     end enum
 
     enum, bind(c)
@@ -23504,16 +23474,16 @@ module hipblas
             integer(c_int), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int), value :: ldc
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
         end function hipblasGemmEx
     end interface
@@ -23535,16 +23505,16 @@ module hipblas
             integer(c_int), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int), value :: ldc
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
             integer(kind(HIPBLAS_GEMM_FLAGS_NONE)), value :: flags
         end function hipblasGemmExWithFlags
@@ -23567,17 +23537,17 @@ module hipblas
             integer(c_int), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int), value :: ldc
             integer(c_int), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
         end function hipblasGemmBatchedEx
     end interface
@@ -23599,17 +23569,17 @@ module hipblas
             integer(c_int), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int), value :: ldc
             integer(c_int), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
             integer(kind(HIPBLAS_GEMM_FLAGS_NONE)), value :: flags
         end function hipblasGemmBatchedExWithFlags
@@ -23632,20 +23602,20 @@ module hipblas
             integer(c_int), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int), value :: lda
             integer(c_int64_t), value :: stride_a
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int), value :: ldb
             integer(c_int64_t), value :: stride_b
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int), value :: ldc
             integer(c_int64_t), value :: stride_c
             integer(c_int), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
         end function hipblasGemmStridedBatchedEx
     end interface
@@ -23667,20 +23637,20 @@ module hipblas
             integer(c_int), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int), value :: lda
             integer(c_int64_t), value :: stride_a
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int), value :: ldb
             integer(c_int64_t), value :: stride_b
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int), value :: ldc
             integer(c_int64_t), value :: stride_c
             integer(c_int), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
             integer(kind(HIPBLAS_GEMM_FLAGS_NONE)), value :: flags
         end function hipblasGemmStridedBatchedExWithFlags
@@ -23704,16 +23674,16 @@ module hipblas
             integer(c_int64_t), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int64_t), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int64_t), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int64_t), value :: ldc
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
         end function hipblasGemmEx_64
     end interface
@@ -23735,16 +23705,16 @@ module hipblas
             integer(c_int64_t), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int64_t), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int64_t), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int64_t), value :: ldc
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
             integer(kind(HIPBLAS_GEMM_FLAGS_NONE)), value :: flags
         end function hipblasGemmExWithFlags_64
@@ -23767,17 +23737,17 @@ module hipblas
             integer(c_int64_t), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int64_t), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int64_t), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int64_t), value :: ldc
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
         end function hipblasGemmBatchedEx_64
     end interface
@@ -23799,17 +23769,17 @@ module hipblas
             integer(c_int64_t), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int64_t), value :: lda
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int64_t), value :: ldb
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int64_t), value :: ldc
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
             integer(kind(HIPBLAS_GEMM_FLAGS_NONE)), value :: flags
         end function hipblasGemmBatchedExWithFlags_64
@@ -23832,20 +23802,20 @@ module hipblas
             integer(c_int64_t), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int64_t), value :: lda
             integer(c_int64_t), value :: stride_a
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int64_t), value :: ldb
             integer(c_int64_t), value :: stride_b
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int64_t), value :: ldc
             integer(c_int64_t), value :: stride_c
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
         end function hipblasGemmStridedBatchedEx_64
     end interface
@@ -23867,74 +23837,23 @@ module hipblas
             integer(c_int64_t), value :: k
             type(c_ptr), value :: alpha
             type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
+            integer(kind(HIPBLAS_R_16F)), value :: a_type
             integer(c_int64_t), value :: lda
             integer(c_int64_t), value :: stride_a
             type(c_ptr), value :: b
-            integer(kind(HIP_R_16F)), value :: b_type
+            integer(kind(HIPBLAS_R_16F)), value :: b_type
             integer(c_int64_t), value :: ldb
             integer(c_int64_t), value :: stride_b
             type(c_ptr), value :: beta
             type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
+            integer(kind(HIPBLAS_R_16F)), value :: c_type
             integer(c_int64_t), value :: ldc
             integer(c_int64_t), value :: stride_c
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIPBLAS_COMPUTE_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
             integer(kind(HIPBLAS_GEMM_DEFAULT)), value :: algo
             integer(kind(HIPBLAS_GEMM_FLAGS_NONE)), value :: flags
         end function hipblasGemmStridedBatchedExWithFlags_64
-    end interface
-
-    ! syrkEx
-    interface
-        function hipblasSyrkEx(handle, uplo, transA, n, k, alpha, a, a_type, lda, &
-                               beta, c, c_type, ldc) &
-            bind(c, name='hipblasSyrkEx')
-            use iso_c_binding
-            use hipblas_enums
-            implicit none
-            integer(kind(HIPBLAS_STATUS_SUCCESS)) :: hipblasSyrkEx
-            type(c_ptr), value :: handle
-            integer(kind(HIPBLAS_FILL_MODE_UPPER)), value :: uplo
-            integer(kind(HIPBLAS_OP_N)), value :: transA
-            integer(c_int), value :: n
-            integer(c_int), value :: k
-            type(c_ptr), value :: alpha
-            type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
-            integer(c_int), value :: lda
-            type(c_ptr), value :: beta
-            type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
-            integer(c_int), value :: ldc
-        end function hipblasSyrkEx
-    end interface
-
-    ! herkEx
-    interface
-        function hipblasHerkEx(handle, uplo, transA, n, k, alpha, a, a_type, lda, &
-                               beta, c, c_type, ldc, compute_type) &
-            bind(c, name='hipblasHerkEx')
-            use iso_c_binding
-            use hipblas_enums
-            implicit none
-            integer(kind(HIPBLAS_STATUS_SUCCESS)) :: hipblasHerkEx
-            type(c_ptr), value :: handle
-            integer(kind(HIPBLAS_FILL_MODE_UPPER)), value :: uplo
-            integer(kind(HIPBLAS_OP_N)), value :: transA
-            integer(c_int), value :: n
-            integer(c_int), value :: k
-            type(c_ptr), value :: alpha
-            type(c_ptr), value :: a
-            integer(kind(HIP_R_16F)), value :: a_type
-            integer(c_int), value :: lda
-            type(c_ptr), value :: beta
-            type(c_ptr), value :: c
-            integer(kind(HIP_R_16F)), value :: c_type
-            integer(c_int), value :: ldc
-            integer(kind(HIP_R_16F)), value :: compute_type
-        end function hipblasHerkEx
     end interface
 
     ! trsmEx
@@ -23960,7 +23879,7 @@ module hipblas
             integer(c_int), value :: ldb
             type(c_ptr), value :: invA
             integer(c_int), value :: invA_size
-            integer(kind(HIP_R_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
         end function hipblasTrsmEx
     end interface
 
@@ -23987,7 +23906,7 @@ module hipblas
             integer(c_int), value :: batch_count
             type(c_ptr), value :: invA
             integer(c_int), value :: invA_size
-            integer(kind(HIP_R_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
         end function hipblasTrsmBatchedEx
     end interface
 
@@ -24017,7 +23936,7 @@ module hipblas
             type(c_ptr), value :: invA
             integer(c_int), value :: invA_size
             integer(c_int64_t), value :: stride_invA
-            integer(kind(HIP_R_16F)), value :: compute_type
+            integer(kind(HIPBLAS_R_16F)), value :: compute_type
         end function hipblasTrsmStridedBatchedEx
     end interface
 
@@ -24036,11 +23955,11 @@ module hipblas
     !         integer(c_int), value :: k
     !         type(c_ptr), value :: alpha
     !         type(c_ptr), value :: A
-    !         integer(kind(HIP_R_16F)), value :: Atype
+    !         integer(kind(HIPBLAS_R_16F)), value :: Atype
     !         integer(c_int), value :: lda
     !         type(c_ptr), value :: beta
     !         type(c_ptr), value:: C
-    !         integer(kind(HIP_R_16F)), value :: Ctype
+    !         integer(kind(HIPBLAS_R_16F)), value :: Ctype
     !         integer(c_int), value :: ldc
     !     end function hipblasCsyrkEx
     ! end interface
@@ -24060,11 +23979,11 @@ module hipblas
     !         integer(c_int), value :: k
     !         type(c_ptr), value :: alpha
     !         type(c_ptr), value :: A
-    !         integer(kind(HIP_R_16F)), value :: Atype
+    !         integer(kind(HIPBLAS_R_16F)), value :: Atype
     !         integer(c_int), value :: lda
     !         type(c_ptr), value :: beta
     !         type(c_ptr), value:: C
-    !         integer(kind(HIP_R_16F)), value :: Ctype
+    !         integer(kind(HIPBLAS_R_16F)), value :: Ctype
     !         integer(c_int), value :: ldc
     !     end function hipblasCherkEx
     ! end interface
@@ -24080,14 +23999,14 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasAxpyEx
     end interface
 
@@ -24102,15 +24021,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasAxpyBatchedEx
     end interface
 
@@ -24125,17 +24044,17 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int64_t), value :: stridey
             integer(c_int), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasAxpyStridedBatchedEx
     end interface
 
@@ -24150,14 +24069,14 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasAxpyEx_64
     end interface
 
@@ -24172,15 +24091,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasAxpyBatchedEx_64
     end interface
 
@@ -24195,17 +24114,17 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: stridey
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasAxpyStridedBatchedEx_64
     end interface
 
@@ -24220,14 +24139,14 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotEx
     end interface
 
@@ -24241,14 +24160,14 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotcEx
     end interface
 
@@ -24263,15 +24182,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotBatchedEx
     end interface
 
@@ -24286,15 +24205,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotcBatchedEx
     end interface
 
@@ -24309,17 +24228,17 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int64_t), value :: stridey
             integer(c_int), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotStridedBatchedEx
     end interface
 
@@ -24334,17 +24253,17 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int64_t), value :: stridey
             integer(c_int), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotcStridedBatchedEx
     end interface
 
@@ -24359,14 +24278,14 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotEx_64
     end interface
 
@@ -24380,14 +24299,14 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotcEx_64
     end interface
 
@@ -24402,15 +24321,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotBatchedEx_64
     end interface
 
@@ -24425,15 +24344,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotcBatchedEx_64
     end interface
 
@@ -24448,17 +24367,17 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: stridey
             integer(c_int64_t), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotStridedBatchedEx_64
     end interface
 
@@ -24473,17 +24392,17 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: stridey
             integer(c_int64_t), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasDotcStridedBatchedEx_64
     end interface
 
@@ -24498,11 +24417,11 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasNrm2Ex
     end interface
 
@@ -24517,12 +24436,12 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasNrm2BatchedEx
     end interface
 
@@ -24537,13 +24456,13 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int64_t), value :: stridex
             integer(c_int), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasNrm2StridedBatchedEx
     end interface
 
@@ -24558,11 +24477,11 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasNrm2Ex_64
     end interface
 
@@ -24577,12 +24496,12 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasNrm2BatchedEx_64
     end interface
 
@@ -24597,13 +24516,13 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: stridex
             integer(c_int64_t), value :: batch_count
             type(c_ptr), value :: result
-            integer(kind(HIP_R_16F)), value :: resultType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: resultType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasNrm2StridedBatchedEx_64
     end interface
 
@@ -24618,15 +24537,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             type(c_ptr), value :: c
             type(c_ptr), value :: s
-            integer(kind(HIP_R_16F)), value :: csType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: csType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasRotEx
     end interface
 
@@ -24641,16 +24560,16 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             type(c_ptr), value :: c
             type(c_ptr), value :: s
-            integer(kind(HIP_R_16F)), value :: csType
+            integer(kind(HIPBLAS_R_16F)), value :: csType
             integer(c_int), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasRotBatchedEx
     end interface
 
@@ -24665,18 +24584,18 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int), value :: incy
             integer(c_int64_t), value :: stridey
             type(c_ptr), value :: c
             type(c_ptr), value :: s
-            integer(kind(HIP_R_16F)), value :: csType
+            integer(kind(HIPBLAS_R_16F)), value :: csType
             integer(c_int), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasRotStridedBatchedEx
     end interface
 
@@ -24691,15 +24610,15 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             type(c_ptr), value :: c
             type(c_ptr), value :: s
-            integer(kind(HIP_R_16F)), value :: csType
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: csType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasRotEx_64
     end interface
 
@@ -24714,16 +24633,16 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             type(c_ptr), value :: c
             type(c_ptr), value :: s
-            integer(kind(HIP_R_16F)), value :: csType
+            integer(kind(HIPBLAS_R_16F)), value :: csType
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasRotBatchedEx_64
     end interface
 
@@ -24738,18 +24657,18 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: stridex
             type(c_ptr), value :: y
-            integer(kind(HIP_R_16F)), value :: yType
+            integer(kind(HIPBLAS_R_16F)), value :: yType
             integer(c_int64_t), value :: incy
             integer(c_int64_t), value :: stridey
             type(c_ptr), value :: c
             type(c_ptr), value :: s
-            integer(kind(HIP_R_16F)), value :: csType
+            integer(kind(HIPBLAS_R_16F)), value :: csType
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasRotStridedBatchedEx_64
     end interface
 
@@ -24764,11 +24683,11 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasScalEx
     end interface
 
@@ -24783,12 +24702,12 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasScalBatchedEx
     end interface
 
@@ -24803,13 +24722,13 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int), value :: incx
             integer(c_int64_t), value :: stridex
             integer(c_int), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasScalStridedBatchedEx
     end interface
 
@@ -24824,11 +24743,11 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasScalEx_64
     end interface
 
@@ -24843,12 +24762,12 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasScalBatchedEx_64
     end interface
 
@@ -24863,13 +24782,13 @@ module hipblas
             type(c_ptr), value :: handle
             integer(c_int64_t), value :: n
             type(c_ptr), value :: alpha
-            integer(kind(HIP_R_16F)), value :: alphaType
+            integer(kind(HIPBLAS_R_16F)), value :: alphaType
             type(c_ptr), value :: x
-            integer(kind(HIP_R_16F)), value :: xType
+            integer(kind(HIPBLAS_R_16F)), value :: xType
             integer(c_int64_t), value :: incx
             integer(c_int64_t), value :: stridex
             integer(c_int64_t), value :: batch_count
-            integer(kind(HIP_R_16F)), value :: executionType
+            integer(kind(HIPBLAS_R_16F)), value :: executionType
         end function hipblasScalStridedBatchedEx_64
     end interface
 

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <typename T>
 void csrrf_refactchol_checkBadArgs(rocblas_handle handle,
@@ -293,7 +292,7 @@ void csrrf_refactchol_getPerfData(rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -311,12 +310,12 @@ void csrrf_refactchol_getPerfData(rocblas_handle handle,
                                                   dindT, dvalT, dpivQ, hptrA, hindA, hvalA, hptrT,
                                                   hindT, hvalT, hpivQ, testcase);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_csrrf_refactchol(handle, n, nnzA, dptrA.data(), dindA.data(), dvalA.data(), nnzT,
                                    dptrT.data(), dindT.data(), dvalT.data(), dpivQ.data(), rfinfo);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <typename T>
@@ -401,7 +400,7 @@ void testing_csrrf_refactchol(Arguments& argus)
     }
 
     // memory size query if necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         CHECK_ALLOC_QUERY(rocsolver_csrrf_refactchol(handle, n, nnzA, (rocblas_int*)nullptr,
@@ -411,9 +410,13 @@ void testing_csrrf_refactchol(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // determine sizes
@@ -481,7 +484,7 @@ void testing_csrrf_refactchol(Arguments& argus)
                                      hpivQ, hvalTres, &max_error, testcase);
 
     // collect performance data
-    if(argus.timing && hot_calls > 0)
+    if(argus.timing)
         csrrf_refactchol_getPerfData<T>(handle, n, nnzA, dptrA, dindA, dvalA, nnzT, dptrT, dindT,
                                         dvalT, dpivQ, rfinfo, hptrA, hindA, hvalA, hptrT, hindT,
                                         hvalT, hpivQ, &gpu_time_used, &cpu_time_used, hot_calls,

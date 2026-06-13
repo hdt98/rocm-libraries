@@ -88,13 +88,14 @@ rocblas_reduction_kernel_part1(rocblas_int    n,
                                rocblas_int    batch_count,
                                To*            workspace)
 {
+    int64_t tid = blockIdx.x * NB + threadIdx.x;
+    To      sum = 0;
 
     uint32_t batch = blockIdx.z;
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
-        int64_t tid = blockIdx.x * NB + threadIdx.x;
-        To      sum = 0;
-
+#endif
         const auto* x = load_ptr_batch(xvec, batch, shiftx, stridex);
 
         // sum WIN elements per thread
@@ -102,14 +103,13 @@ rocblas_reduction_kernel_part1(rocblas_int    n,
         for(int j = 0; j < WIN && tid < n; j++, tid += inc)
             sum += FETCH{}(x[tid * incx]);
 
-        if(warpSize == WARP_32)
-            sum = rocblas_dot_block_reduce<WARP_32, NB, To>(sum); // sum reduction only
-        else
-            sum = rocblas_dot_block_reduce<WARP_64, NB, To>(sum);
+        sum = rocblas_dot_block_reduce<NB, To>(sum); // sum reduction only
 
         if(threadIdx.x == 0)
             workspace[batch * nblocks + blockIdx.x] = sum;
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 /*! \brief

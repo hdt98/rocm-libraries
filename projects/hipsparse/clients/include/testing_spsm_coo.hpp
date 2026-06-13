@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2021 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,8 +39,7 @@
 
 using namespace hipsparse_test;
 
-template <typename I, typename T>
-void testing_spsm_coo_bad_arg(const Arguments& argus)
+void testing_spsm_coo_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION))
     int64_t              m         = 100;
@@ -179,13 +178,13 @@ void testing_spsm_coo_bad_arg(const Arguments& argus)
 }
 
 template <typename I, typename T>
-void testing_spsm_coo(Arguments argus)
+hipsparseStatus_t testing_spsm_coo(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11031)
     I                    m        = argus.M;
     I                    n        = argus.N;
     I                    k        = argus.K;
-    T                    h_alpha  = argus.get_alpha<T>();
+    T                    h_alpha  = make_DataType<T>(argus.alpha);
     hipsparseOperation_t transA   = argus.transA;
     hipsparseOperation_t transB   = argus.transB;
     hipsparseOrder_t     orderB   = argus.orderB;
@@ -193,13 +192,13 @@ void testing_spsm_coo(Arguments argus)
     hipsparseIndexBase_t idx_base = argus.baseA;
     hipsparseDiagType_t  diag     = argus.diag_type;
     hipsparseFillMode_t  uplo     = argus.fill_mode;
-    hipsparseSpSMAlg_t   alg      = argus.spsm_alg;
+    hipsparseSpSMAlg_t   alg      = static_cast<hipsparseSpSMAlg_t>(argus.spsm_alg);
     std::string          filename = argus.filename;
 
 #if(defined(CUDART_VERSION))
     if(orderB != orderC)
     {
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 #endif
 
@@ -220,13 +219,16 @@ void testing_spsm_coo(Arguments argus)
     srand(12345ULL);
 
     I nnz;
-    CHECK_GENERATE_MATRIX_ERROR(
-        generate_csr_matrix(filename, m, n, nnz, hrow_ptr, hcol_ind, hval, idx_base));
+    if(!generate_csr_matrix(filename, m, n, nnz, hrow_ptr, hcol_ind, hval, idx_base))
+    {
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
 
     if(m != n)
     {
         // Skip non-square matrices
-        return;
+        return HIPSPARSE_STATUS_SUCCESS;
     }
 
     std::vector<I> hrow_ind(nnz);
@@ -449,6 +451,8 @@ void testing_spsm_coo(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnMat(C1));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnMat(C2));
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_SPSM_COO_HPP

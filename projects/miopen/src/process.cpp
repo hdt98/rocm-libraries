@@ -32,14 +32,12 @@ namespace miopen {
 
 #ifdef _WIN32
 
-#include <cstdio>
-
-// Windows equivalents for POSIX popen/pclose
-#define popen _popen
-#define pclose _pclose
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 struct ProcessImpl
 {
+public:
     ProcessImpl(std::string_view cmd) : path{cmd} {}
 
     void Create(std::string_view args,
@@ -47,66 +45,63 @@ struct ProcessImpl
                 std::ostream* out,
                 const ProcessEnvironmentMap& additionalEnvironmentVariables)
     {
-        outStream = out;
+        STARTUPINFOA info;
+        ZeroMemory(&info, sizeof(STARTUPINFO));
+        info.cb = sizeof(STARTUPINFO);
 
-        // Build command left-to-right using stringstream
-        std::stringstream cmdStream;
-
-        // 1. Change directory (if specified)
-        if(!cwd.empty())
-            cmdStream << "cd /d " << cwd << " && ";
-
-        // 2. Set environment variables (if any)
-        for(const auto& envVariable : additionalEnvironmentVariables)
+        if(out != nullptr)
         {
-            cmdStream << "set " << envVariable.first << "=" << envVariable.second << " && ";
+            MIOPEN_THROW("Capturing output not defined for Windows.");
         }
 
-        // 3. Command path
-        cmdStream << path.string();
+        if(!additionalEnvironmentVariables.empty())
+        {
+            MIOPEN_THROW("Overriding environment variables not defined for Windows.");
+        }
 
-        // 4. Arguments (if any)
+        std::string cmd{path.string()};
         if(!args.empty())
-            cmdStream << " " << args;
+            cmd += " " + std::string{args};
 
-        // 5. Redirect stderr to stdout (if capturing output)
-        if(out != nullptr)
-            cmdStream << " 2>&1";
+        // Refer to
+        // CreateProcessA function (processthreadsapi.h)
+        constexpr std::size_t BUFFER_CAPACITY = 32767;
 
-        std::string cmd = cmdStream.str();
+        if(cmd.size() < BUFFER_CAPACITY)
+            cmd.resize(BUFFER_CAPACITY, '\0');
 
-        const auto fileMode = outStream != nullptr ? "r" : "w";
-        pipe                = popen(cmd.c_str(), fileMode);
-        if(pipe == nullptr)
-            MIOPEN_THROW("Error: popen()");
+        if(CreateProcess(path.string().c_str(),
+                         cmd.data(),
+                         nullptr,
+                         nullptr,
+                         FALSE,
+                         0,
+                         nullptr,
+                         cwd.empty() ? nullptr : cwd.data(),
+                         &info,
+                         &processInfo) == FALSE)
+            MIOPEN_THROW("CreateProcess error: " + std::to_string(GetLastError()));
     }
 
     int Wait()
     {
-        if(outStream != nullptr)
-        {
-            // Buffer all output locally first to avoid unknown flush behavior of outStream
-            std::ostringstream localBuffer;
-            std::array<char, 1024> buffer{};
+        WaitForSingleObject(processInfo.hProcess, INFINITE);
 
-            while(feof(pipe) == 0)
-            {
-                if(fgets(buffer.data(), buffer.size(), pipe) != nullptr)
-                    localBuffer << buffer.data();
-            }
+        DWORD status;
+        const auto getExitCodeStatus = GetExitCodeProcess(processInfo.hProcess, &status);
 
-            // Single write to outStream for consistent behavior and performance
-            *outStream << localBuffer.str();
-        }
+        CloseHandle(processInfo.hProcess);
+        CloseHandle(processInfo.hThread);
 
-        auto status = pclose(pipe);
+        if(getExitCodeStatus == 0)
+            MIOPEN_THROW("GetExitCodeProcess error: " + std::to_string(GetLastError()));
+
         return status;
     }
 
 private:
-    std::ostream* outStream = nullptr;
     fs::path path;
-    FILE* pipe = nullptr;
+    PROCESS_INFORMATION processInfo{};
 };
 
 #else
@@ -133,9 +128,6 @@ struct ProcessImpl
         }
         if(!args.empty())
             cmd += " " + std::string{args};
-        // When capturing output, redirect stderr to stdout so we capture both
-        if(out != nullptr)
-            cmd += " 2>&1";
         if(!cwd.empty())
             cmd.insert(0, "cd " + std::string{cwd} + "; ");
 

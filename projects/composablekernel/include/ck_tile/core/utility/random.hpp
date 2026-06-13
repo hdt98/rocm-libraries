@@ -1,10 +1,9 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include "ck_tile/core/config.hpp"
-#include "ck_tile/core/numeric/bfloat16.hpp"
 #include "ck_tile/core/numeric/half.hpp"
 #include <stdint.h>
 #include <tuple>
@@ -12,8 +11,8 @@
 
 namespace ck_tile {
 
-// return 0 if data is not fp16, bf16, or fp32
-template <typename T, uint32_t seed_, typename Enable = void>
+// return 0 if data is not fp16 or fp32
+template <typename T, uint32_t seed_>
 struct prand_generator_t
 {
     CK_TILE_HOST_DEVICE uint32_t operator()(int, T, uint32_t = seed_) { return 0; }
@@ -21,11 +20,11 @@ struct prand_generator_t
 
 // version for fp32
 template <uint32_t seed_>
-struct prand_generator_t<float, seed_, void>
+struct prand_generator_t<float, seed_>
 {
     CK_TILE_HOST_DEVICE uint32_t operator()(int id, float val, uint32_t seed = seed_)
     {
-        uint32_t x         = bit_cast<uint32_t>(val);
+        uint32_t x         = *(reinterpret_cast<uint32_t*>(&val));
         uint32_t drop_bits = uint32_t(x) & 0xFFFFu;
         drop_bits ^= x >> 16;
         drop_bits = ((drop_bits & 31) << 11) | (drop_bits >> 5);
@@ -38,15 +37,13 @@ struct prand_generator_t<float, seed_, void>
     }
 };
 
-// version for fp16 and bf16
-template <typename T, uint32_t seed_>
-struct prand_generator_t<T,
-                         seed_,
-                         std::enable_if_t<std::is_same_v<T, half_t> || std::is_same_v<T, bf16_t>>>
+// version for fp16
+template <uint32_t seed_>
+struct prand_generator_t<half_t, seed_>
 {
-    CK_TILE_HOST_DEVICE uint32_t operator()(int id, T val, uint32_t seed = seed_)
+    CK_TILE_HOST_DEVICE uint32_t operator()(int id, half_t val, uint32_t seed = seed_)
     {
-        uint16_t x         = bit_cast<uint16_t>(val);
+        uint16_t x         = *(reinterpret_cast<uint16_t*>(&val));
         uint32_t drop_bits = uint32_t(x) & 0xFFFFu;
         drop_bits          = ((drop_bits & 31) << 11) | (drop_bits >> 5);
         drop_bits *= 0x7000149;

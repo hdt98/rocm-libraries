@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -50,10 +50,6 @@ namespace rocsparse
                                                     I* __restrict__ bsr_row_ptr,
                                                     J* __restrict__ bsr_col_ind)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
-        static_assert(WFSIZE % BLOCKDIM == 0, "WFSIZE must be a multiple of BLOCKDIM.");
         int bid = hipBlockIdx_x;
         int tid = hipThreadIdx_x;
 
@@ -75,7 +71,6 @@ namespace rocsparse
         I row_end   = (row < m && r < block_dim) ? csr_row_ptr[row + 1] - csr_base : 0;
 
         I block_row_begin = (block_row < mb) ? bsr_row_ptr[block_row] - bsr_base : 0;
-        I block_row_end   = (block_row < mb) ? bsr_row_ptr[block_row + 1] - bsr_base : 0;
 
         I next_k = row_begin;
 
@@ -122,10 +117,10 @@ namespace rocsparse
             __threadfence_block();
 
             rocsparse::wfreduce_min<(WFSIZE / BLOCKDIM)>(&index_k);
-            next_k = rocsparse::shfl(index_k, (WFSIZE / BLOCKDIM) - 1, (WFSIZE / BLOCKDIM));
+            next_k = __shfl(index_k, (WFSIZE / BLOCKDIM) - 1, (WFSIZE / BLOCKDIM));
 
             int offset = 0;
-            if(table[wid] && block_row < mb && block_row_begin < block_row_end)
+            if(table[wid])
             {
                 bsr_col_ind[block_row_begin] = chunk_begin + bsr_base;
 
@@ -156,7 +151,7 @@ namespace rocsparse
             block_row_begin += offset;
 
             rocsparse::wfreduce_min<WFSIZE>(&min_block_col);
-            chunk_begin = rocsparse::shfl(min_block_col, WFSIZE - 1, WFSIZE);
+            chunk_begin = __shfl(min_block_col, WFSIZE - 1, WFSIZE);
 
             __threadfence_block();
         }
@@ -179,9 +174,6 @@ namespace rocsparse
                                                 I* __restrict__ bsr_row_ptr,
                                                 J* __restrict__ bsr_col_ind)
     {
-        static_assert(BLOCKSIZE > 0 && (BLOCKSIZE & (BLOCKSIZE - 1)) == 0,
-                      "BLOCKSIZE must be a power of two.");
-        static_assert(BLOCKSIZE % BLOCKDIM == 0, "BLOCKSIZE must be a multiple of BLOCKDIM.");
         int bid = hipBlockIdx_x;
         int tid = hipThreadIdx_x;
 
@@ -245,7 +237,7 @@ namespace rocsparse
             __syncthreads();
 
             rocsparse::wfreduce_min<BLOCKSIZE / BLOCKDIM>(&index_k);
-            next_k = rocsparse::shfl(index_k, (BLOCKSIZE / BLOCKDIM) - 1, BLOCKSIZE / BLOCKDIM);
+            next_k = __shfl(index_k, (BLOCKSIZE / BLOCKDIM) - 1, BLOCKSIZE / BLOCKDIM);
 
             int offset = 0;
             if(table)
@@ -311,8 +303,6 @@ namespace rocsparse
                                J* __restrict__ temp2,
                                T* __restrict__ temp3)
     {
-        static_assert(BLOCKSIZE > 0 && (BLOCKSIZE & (BLOCKSIZE - 1)) == 0,
-                      "BLOCKSIZE must be a power of two.");
         J block_id = hipBlockIdx_x;
         J lane_id  = hipThreadIdx_x;
 
@@ -399,10 +389,10 @@ namespace rocsparse
             }
 
             // broadcast CSR minimum column index from last thread in segment to all threads in segment
-            min_csr_col_index = rocsparse::shfl(min_csr_col_index, BLOCKSIZE - 1, BLOCKSIZE);
+            min_csr_col_index = __shfl(min_csr_col_index, BLOCKSIZE - 1, BLOCKSIZE);
 
             // broadcast nnzb_per_row from last thread in segment to all threads in segment
-            nnzb_per_row = rocsparse::shfl(nnzb_per_row, BLOCKSIZE - 1, BLOCKSIZE);
+            nnzb_per_row = __shfl(nnzb_per_row, BLOCKSIZE - 1, BLOCKSIZE);
 
             // Write BSR values
             for(J j = 0; j < rows_per_segment; j++)

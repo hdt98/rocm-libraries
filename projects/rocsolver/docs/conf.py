@@ -18,12 +18,11 @@ left_nav_title = f"rocSOLVER {version_number} Documentation"
 # for PDF output on Read the Docs
 project = "rocSOLVER Documentation"
 author = "Advanced Micro Devices, Inc."
-copyright = "Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved."
+copyright = "Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved."
 version = version_number
 release = version_number
 
 external_toc_path = "./sphinx/_toc.yml"
-numfig = False
 
 docs_core = ROCmDocs(left_nav_title)
 docs_core.run_doxygen(doxygen_root="doxygen", doxygen_path="doxygen/xml")

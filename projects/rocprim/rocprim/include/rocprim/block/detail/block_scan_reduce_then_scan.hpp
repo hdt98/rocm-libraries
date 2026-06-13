@@ -29,9 +29,6 @@
 #include "../../intrinsics.hpp"
 #include "../../functional.hpp"
 
-#include "../../intrinsics/thread.hpp"
-#include "../../thread/thread_reduce.hpp"
-#include "../../thread/thread_scan.hpp"
 #include "../../warp/warp_scan.hpp"
 
 BEGIN_ROCPRIM_NAMESPACE
@@ -39,23 +36,24 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<class T,
-         unsigned int            BlockSizeX,
-         unsigned int            BlockSizeY,
-         unsigned int            BlockSizeZ,
-         arch::wavefront::target TargetWaveSize>
+template<
+    class T,
+    unsigned int BlockSizeX,
+    unsigned int BlockSizeY,
+    unsigned int BlockSizeZ
+>
 class block_scan_reduce_then_scan
 {
     static constexpr unsigned int BlockSize = BlockSizeX * BlockSizeY * BlockSizeZ;
     // Number of items to reduce per thread
     static constexpr unsigned int thread_reduction_size_
-        = (BlockSize + arch::wavefront::size_from_target<TargetWaveSize>() - 1)
-          / arch::wavefront::size_from_target<TargetWaveSize>();
+        = (BlockSize + ::rocprim::arch::wavefront::min_size() - 1)
+          / ::rocprim::arch::wavefront::min_size();
 
     // Warp scan, warp_scan_crosslane does not require shared memory (storage), but
     // logical warp size must be a power of two.
     static constexpr unsigned int warp_size_
-        = detail::get_min_warp_size(BlockSize, arch::wavefront::size_from_target<TargetWaveSize>());
+        = detail::get_min_warp_size(BlockSize, ::rocprim::arch::wavefront::min_size());
     using warp_scan_prefix_type = ::rocprim::detail::warp_scan_crosslane<T, warp_size_>;
 
     // Minimize LDS bank conflicts
@@ -149,7 +147,12 @@ public:
                         BinaryFunction scan_op)
     {
         // Reduce thread items
-        T thread_input = ::rocprim::thread_reduce(input, scan_op);
+        T thread_input = input[0];
+        ROCPRIM_UNROLL
+        for(unsigned int i = 1; i < ItemsPerThread; i++)
+        {
+            thread_input = scan_op(thread_input, input[i]);
+        }
 
         // Scan of reduced values to get prefixes
         const auto flat_tid = ::rocprim::flat_block_thread_id<BlockSizeX, BlockSizeY, BlockSizeZ>();
@@ -161,7 +164,14 @@ public:
         );
 
         // Include prefix (first thread does not have prefix)
-        ::rocprim::thread_scan_inclusive(input, output, scan_op, thread_input, flat_tid > 0);
+        output[0] = input[0];
+        if(flat_tid != 0) output[0] = scan_op(thread_input, input[0]);
+        // Final thread-local scan
+        ROCPRIM_UNROLL
+        for(unsigned int i = 1; i < ItemsPerThread; i++)
+        {
+            output[i] = scan_op(output[i-1], input[i]);
+        }
     }
 
     template<unsigned int ItemsPerThread, class BinaryFunction>
@@ -182,8 +192,33 @@ public:
                         storage_type&  storage,
                         BinaryFunction scan_op)
     {
-        this->inclusive_scan(input, output, storage, scan_op);
-        apply_init(init, output, scan_op);
+        // Reduce thread items
+        T thread_input = input[0];
+        ROCPRIM_UNROLL
+        for(unsigned int i = 1; i < ItemsPerThread; i++)
+        {
+            thread_input = scan_op(thread_input, input[i]);
+        }
+
+        // Scan of reduced values to get prefixes
+        const auto flat_tid = ::rocprim::flat_block_thread_id<BlockSizeX, BlockSizeY, BlockSizeZ>();
+        // Calculates inclusive scan, result for each thread is stored in storage_.threads[flat_tid]
+        this->exclusive_scan_init_impl(flat_tid,
+                                       thread_input,
+                                       thread_input, // input, output
+                                       init,
+                                       storage,
+                                       scan_op);
+
+        // Include prefix (first thread has init as prefix)
+        output[0] = scan_op(thread_input, input[0]);
+
+        // Final thread-local scan
+        ROCPRIM_UNROLL
+        for(unsigned int i = 1; i < ItemsPerThread; i++)
+        {
+            output[i] = scan_op(output[i - 1], input[i]);
+        }
     }
 
     template<unsigned int ItemsPerThread, class BinaryFunction>
@@ -231,8 +266,10 @@ public:
                         storage_type&  storage,
                         BinaryFunction scan_op)
     {
-        this->inclusive_scan(input, output, reduction, storage, scan_op);
-        apply_init(init, output, scan_op);
+        storage_type_& storage_ = storage.get();
+        this->inclusive_scan(input, init, output, storage, scan_op);
+        // Save reduction result
+        reduction = storage_.threads[index(BlockSize - 1)];
     }
 
     template<unsigned int ItemsPerThread, class BinaryFunction>
@@ -261,7 +298,12 @@ public:
     {
         storage_type_& storage_ = storage.get();
         // Reduce thread items
-        T thread_input = ::rocprim::thread_reduce(input, scan_op);
+        T thread_input = input[0];
+        ROCPRIM_UNROLL
+        for(unsigned int i = 1; i < ItemsPerThread; i++)
+        {
+            thread_input = scan_op(thread_input, input[i]);
+        }
 
         // Scan of reduced values to get prefixes
         const auto flat_tid = ::rocprim::flat_block_thread_id<BlockSizeX, BlockSizeY, BlockSizeZ>();
@@ -559,12 +601,7 @@ private:
                 thread_reduction = input;
             }
 
-            ::rocprim::wave_barrier();
-
             storage_.threads[idx_start] = thread_reduction;
-
-            ::rocprim::wave_barrier();
-
             ROCPRIM_UNROLL
             for(unsigned int i = 1; i < thread_reduction_size_; i++)
             {
@@ -612,12 +649,7 @@ private:
                 thread_reduction = scan_op(init, input);
             }
 
-            ::rocprim::wave_barrier();
-
             storage_.threads[idx_start] = thread_reduction;
-
-            ::rocprim::wave_barrier();
-
             ROCPRIM_UNROLL
             for(unsigned int i = 1; i < thread_reduction_size_; i++)
             {
@@ -726,21 +758,10 @@ private:
 
     // Change index to minimize LDS bank conflicts if necessary
     ROCPRIM_DEVICE ROCPRIM_INLINE
-    static unsigned int index(unsigned int n)
+    unsigned int index(unsigned int n) const
     {
         // Move every 32-bank wide "row" (32 banks * 4 bytes) by one item
         return has_bank_conflicts_ ? (n + (n/banks_no_)) : n;
-    }
-
-    template<int N, typename F>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    static void apply_init(const T& init, T (&items)[N], F scan_op)
-    {
-        ROCPRIM_UNROLL
-        for(int i = 0; i < N; ++i)
-        {
-            items[i] = scan_op(init, items[i]);
-        }
     }
 };
 

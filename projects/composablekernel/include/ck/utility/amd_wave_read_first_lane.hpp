@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -44,8 +44,7 @@ struct get_carrier<3>
 
         // replacement of host std::copy_n()
         template <typename InputIterator, typename Size, typename OutputIterator>
-        __device__ static OutputIterator
-        copy_n(InputIterator from, Size size, [[clang::lifetimebound]] OutputIterator to)
+        __device__ static OutputIterator copy_n(InputIterator from, Size size, OutputIterator to)
         {
             if(0 < size)
             {
@@ -125,7 +124,8 @@ __device__ inline int64_t amd_wave_read_first_lane(int64_t value)
     return *reinterpret_cast<int64_t*>(to_obj);
 }
 
-template <typename Object, typename = ck::enable_if_t<ck::is_trivially_copyable_v<Object>>>
+template <typename Object,
+          typename = ck::enable_if_t<ck::is_class_v<Object> && ck::is_trivially_copyable_v<Object>>>
 __device__ auto amd_wave_read_first_lane(const Object& obj)
 {
     using Size                = unsigned;

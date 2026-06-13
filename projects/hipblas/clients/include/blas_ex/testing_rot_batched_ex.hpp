@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -51,10 +51,10 @@ void testing_rot_batched_ex_bad_arg(const Arguments& arg)
     auto hipblasRotBatchedExFn_64
         = arg.api == FORTRAN_64 ? hipblasRotBatchedEx_64Fortran : hipblasRotBatchedEx_64;
 
-    hipDataType xType         = arg.a_type;
-    hipDataType yType         = arg.b_type;
-    hipDataType csType        = arg.c_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t xType         = arg.a_type;
+    hipblasDatatype_t yType         = arg.b_type;
+    hipblasDatatype_t csType        = arg.c_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     int64_t N           = 100;
     int64_t incx        = 1;
@@ -170,10 +170,10 @@ void testing_rot_batched_ex(const Arguments& arg)
     int64_t incy        = arg.incy;
     int64_t batch_count = arg.batch_count;
 
-    hipDataType xType         = arg.a_type;
-    hipDataType yType         = arg.b_type;
-    hipDataType csType        = arg.c_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t xType         = arg.a_type;
+    hipblasDatatype_t yType         = arg.b_type;
+    hipblasDatatype_t csType        = arg.c_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     hipblasLocalHandle handle(arg);
 
@@ -201,7 +201,7 @@ void testing_rot_batched_ex(const Arguments& arg)
     int64_t abs_incx = incx >= 0 ? incx : -incx;
     int64_t abs_incy = incy >= 0 ? incy : -incy;
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     host_batch_vector<Tx> hx_host(N, incx, batch_count);
     host_batch_vector<Ty> hy_host(N, incy, batch_count);

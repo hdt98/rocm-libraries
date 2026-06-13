@@ -76,10 +76,7 @@ template<unsigned int OutputPerThread,
          class Constant,
          class T,
          class Distribution>
-struct generate_sobol_host
-{
-    template<host::target_arch Arch = host::target_arch::unknown>
-    static void generate(dim3,
+void generate_sobol_host(dim3,
                          dim3,
                          dim3,
                          dim3,
@@ -89,8 +86,7 @@ struct generate_sobol_host
                          const Constant*,
                          const unsigned int,
                          Distribution)
-    {}
-};
+{}
 
 template<unsigned int OutputPerThread,
          bool         Scrambled,
@@ -99,13 +95,13 @@ template<unsigned int OutputPerThread,
          class T,
          class Distribution,
          int block_size>
-__global__ __launch_bounds__(block_size)
-void generate_sobol_kernel(T*                 data,
-                           const size_t       n,
-                           const Constant*    direction_vectors,
-                           const Constant*    scramble_constants,
-                           const unsigned int offset,
-                           Distribution       distribution)
+__global__
+    __launch_bounds__(block_size) void generate_sobol_kernel(T*                 data,
+                                                             const size_t       n,
+                                                             const Constant*    direction_vectors,
+                                                             const Constant*    scramble_constants,
+                                                             const unsigned int offset,
+                                                             Distribution       distribution)
 #else
 template<unsigned int OutputPerThread,
          bool         Scrambled,
@@ -114,8 +110,7 @@ template<unsigned int OutputPerThread,
          class T,
          class Distribution,
          int block_size>
-__global__ __launch_bounds__(block_size)
-void generate_sobol_kernel(
+__global__ __launch_bounds__(block_size) void generate_sobol_kernel(
     T*, const size_t, const Constant*, const Constant*, const unsigned int, Distribution)
 {}
 
@@ -125,10 +120,7 @@ template<unsigned int OutputPerThread,
          class Constant,
          class T,
          class Distribution>
-struct generate_sobol_host
-{
-    template<host::target_arch Arch = host::target_arch::unknown>
-    static void generate(dim3               block_idx,
+void generate_sobol_host(dim3               block_idx,
                          dim3               thread_idx,
                          dim3               grid_dim,
                          dim3               block_dim,
@@ -166,7 +158,7 @@ struct generate_sobol_host
             // On AMD GPUs we must use a constexpr size shared array for performance.
             // But this code won't compile with NVCC, because we are in a __host__ __device__
             // function.
-        __shared__ Constant shared_vectors[vector_size];
+            __shared__ Constant shared_vectors[vector_size];
 #else
             // NVCC won't accept extern __shared__ Constant shared_bytes[];
             // Thereby we must resort to aliasing.
@@ -215,7 +207,7 @@ struct generate_sobol_host
     {
         const uintptr_t uintptr   = reinterpret_cast<uintptr_t>(data);
         const size_t misalignment = (output_per_thread - uintptr / sizeof(T)) % output_per_thread;
-        const unsigned int head_size = cpp_utils::min(n, misalignment);
+        const unsigned int head_size    = cpp_utils::min(n, misalignment);
         const unsigned int tail_size = (n - head_size) % output_per_thread;
         const size_t       vec_n     = (n - head_size) / output_per_thread;
 
@@ -267,9 +259,6 @@ struct generate_sobol_host
         }
     }
 }
-#ifndef __HIP_DEVICE_COMPILE__
-};
-#endif
 
 template<bool Is64, bool Scrambled, bool UseSharedVectors>
 struct sobol_device_engine;
@@ -461,7 +450,6 @@ private:
         {
             return status;
         }
-
         const hipError_t error = hipMemcpy(*scramble_constants,
                                            get_scramble_constants_ptr(),
                                            sizeof(constant_type) * SCRAMBLED_SOBOL_DIM,
@@ -506,17 +494,27 @@ private:
     template<bool IsDevice = system_type::is_device(), bool IsScrambled = Scrambled>
     std::enable_if_t<IsDevice && IsScrambled> deallocate()
     {
-        hipError_t m_dir_error   = hipFree(m_direction_vectors);
-        hipError_t m_scram_error = hipFree(m_scramble_constants);
-        if((m_dir_error != hipErrorInvalidValue) && (m_scram_error != hipErrorInvalidValue))
+        hipError_t error;
+
+        error = hipFree(m_direction_vectors);
+        if(error != hipErrorInvalidValue)
         {
             // hipErrorInvalidValue is thrown when hipFree tries to call an already
             // deallocated section of memory. This may occur when 'hipDeviceReset()' is
             // used before the current class' deconstructor is called.
             return;
         }
-        ROCRAND_HIP_FATAL_ASSERT(m_dir_error);
-        ROCRAND_HIP_FATAL_ASSERT(m_scram_error);
+        ROCRAND_HIP_FATAL_ASSERT(error);
+
+        error = hipFree(m_scramble_constants);
+        if(error != hipErrorInvalidValue)
+        {
+            // hipErrorInvalidValue is thrown when hipFree tries to call an already
+            // deallocated section of memory. This may occur when 'hipDeviceReset()' is
+            // used before the current class' deconstructor is called.
+            return;
+        }
+        ROCRAND_HIP_FATAL_ASSERT(error);
     }
 };
 
@@ -528,7 +526,7 @@ public:
     using system_type                         = System;
     using base_type                           = generator_impl_base;
     using engine_type       = sobol_device_engine_t<Is64, Scrambled, system_type::is_device()>;
-    using constant_type     = std::conditional_t<Is64, unsigned long long int, unsigned int>;
+    using constant_type = std::conditional_t<Is64, unsigned long long int, unsigned int>;
     using constant_accessor = sobol_constant_accessor<system_type, Is64, Scrambled>;
     using poisson_distribution_manager_t
         = poisson_distribution_manager<DISCRETE_METHOD_CDF, system_type>;
@@ -541,7 +539,6 @@ public:
                              hipStream_t        stream = 0)
         : base_type(order, offset, stream)
     {
-
         rocrand_status status = get_constants().get_direction_vectors(&m_direction_vectors);
         if(status != ROCRAND_STATUS_SUCCESS)
         {
@@ -684,7 +681,7 @@ public:
             // On AMD GPUs we must resort to static shared memory for performance.
             = 0;
 #else
-                = system_type::is_device() ? ((Is64 ? 64 : 32) * sizeof(constant_type)) : 0;
+            = system_type::is_device() ? ((Is64 ? 64 : 32) * sizeof(constant_type)) : 0;
 #endif
 
         const size_t       size             = data_size / m_dimensions;
@@ -726,22 +723,13 @@ public:
         else
         {
             using block_size_provider = static_block_size_config_provider<threads>;
-
-            host::target_arch target_arch;
-            hipError_t        result = host::get_device_arch(m_stream, target_arch);
-            if(result != hipSuccess)
-            {
-                return ROCRAND_STATUS_INTERNAL_ERROR;
-            }
-
             status = system_type::template launch<generate_sobol_host<output_per_thread,
                                                                       Scrambled,
                                                                       engine_type,
                                                                       constant_type,
                                                                       T,
                                                                       Distribution>,
-                                                  block_size_provider>(target_arch,
-                                                                       dim3(blocks_x, blocks_y),
+                                                  block_size_provider>(dim3(blocks_x, blocks_y),
                                                                        dim3(threads),
                                                                        shared_mem_bytes,
                                                                        m_stream,

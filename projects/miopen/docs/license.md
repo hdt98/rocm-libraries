@@ -7,5 +7,5 @@ myst:
 
 # License
 
-```{include} ../LICENSE.md
+```{include} ../LICENSE.txt
 ```

@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -15,8 +15,6 @@
 #include "include/ck/utility/data_type.hpp"
 #include "profiler/profile_gemm_splitk_impl.hpp"
 
-extern ck::index_t param_mask;
-extern ck::index_t instance_index;
 namespace ck {
 namespace test {
 
@@ -50,13 +48,8 @@ class TestGemmSplitK : public testing::Test
              const int StrideB,
              const int StrideC)
     {
-        for(size_t i = 0; i < k_batches_.size(); i++)
+        for(auto kb : k_batches_)
         {
-            if((param_mask & (1 << i)) == 0)
-            {
-                continue;
-            }
-            auto kb = k_batches_[i];
             RunSingle(M, N, K, StrideA, StrideB, StrideC, kb);
         }
     }
@@ -89,8 +82,7 @@ class TestGemmSplitK : public testing::Test
                                                                     StrideC,
                                                                     kbatch,
                                                                     n_warmup,
-                                                                    n_iter,
-                                                                    instance_index);
+                                                                    n_iter);
         EXPECT_TRUE(pass);
     }
 };

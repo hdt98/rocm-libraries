@@ -1,101 +1,294 @@
 .. meta::
-   :description: Installation instructions for rocSOLVER
-   :keywords: lib, rocsolver, solver, algorithm, install, sdk, rocm
+  :description: rocSOLVER documentation and API reference library
+  :keywords: rocSOLVER, ROCm, API, documentation
 
-.. _installation:
+.. _install-linux:
 
-*****************
-Install rocSOLVER
-*****************
+********************************************
+Installing rocSOLVER on Linux
+********************************************
 
-Before you begin, verify that your system is supported. For more information,
-see :ref:`ROCm Core SDK components <rocm:release-components>`.
+Prerequisites
+=================
 
-For advanced workflows, source builds, or custom configurations, see
-:doc:`./build`.
+rocSOLVER requires a ROCm-enabled platform. For more information, see the
+:doc:`ROCm install guide <rocm-install-on-linux:index>`.
 
-.. _install-rocm:
+rocSOLVER also requires a compatible versions of rocBLAS installed on the system and may require
+rocSPARSE depending on the build options. For more information, see the
+:doc:`rocBLAS install guide <rocblas:install/Linux_Install_Guide>` and
+:doc:`rocSPARSE install guide <rocsparse:install/install>`.
 
-Install the ROCm Core SDK
-=========================
+rocBLAS, rocSPARSE, and rocSOLVER are still under active development, and it is hard to define minimal
+compatibility versions. For now, a good rule of thumb is to always use rocSOLVER together with the
+matching rocBLAS and rocSPARSE version. For example, if you want to install rocSOLVER from the ROCm 5.6
+release, then be sure that the ROCm 5.6 versions of rocBLAS and rocSPARSE are also installed. If you are
+building the rocSOLVER branch tip, then you will need to build and install the rocBLAS and rocSPARSE branch
+tips as well.
 
-rocSOLVER is included with the ROCm Core SDK on Linux and Windows. For the most
-complete installation on Linux, we recommend that developers use the
-``amdrocm-core-sdk`` meta package.
 
-For instructions, see :doc:`Install AMD ROCm <rocm:install/rocm>`. Use the
-selector panel on that page to view instructions appropriate for your system
-environment.
+Installing from pre-built packages
+====================================
 
-.. _install-base:
+If you have added the ROCm repositories to your Linux distribution, the latest release version of
+rocSOLVER can be installed using a package manager. On Ubuntu, for example, use the commands:
 
-Install ROCm solver libraries on Linux
-======================================
+.. code-block:: bash
 
-Alternatively, if you want to install rocSOLVER as part of the ROCm
-solver package (a subset of the ROCm Core SDK ``amdrocm-core-sdk``) without
-additional ROCm libraries and tools, install the ``amdrocm-solver`` package.
-This includes rocSOLVER and hipSOLVER.
+    sudo apt-get update
+    sudo apt-get install rocsolver
 
-1. Complete the :doc:`ROCm installation prerequisites <rocm:install/rocm>` to
-   install dependencies and configure GPU access permissions.
 
-2. Install the ROCm solver package that matches your desired ROCm version,
-   development package needs, and AMD GPU architecture. Package names use the
-   following format:
+.. _linux-install-source:
 
-   .. code-block:: shell-session
+Building and installing from source
+=====================================
 
-      amdrocm-solver<-dev/-devel><rocm_version><-llvm_target>
+The `rocSOLVER source code <https://github.com/ROCm/rocSOLVER.git>`_ is hosted
+on GitHub. Download the code and checkout the desired branch using:
 
-   Where:
+.. code-block:: bash
 
-   * ``<-dev/-devel>`` specifies whether to install the library files and
-     headers. Omit this suffix to only install runtime packages.
+    git clone -b <desired_branch_name> https://github.com/ROCmSoftwarePlatform/rocSOLVER.git
+    cd rocSOLVER
 
-     * ``-dev`` is used on Debian-based distributions, including Ubuntu.
+To build from source, some external dependencies such as CMake and Python are required. Additionally, if the library clients
+are to be built (by default they are not), then LAPACK and GoogleTest will be also required.
+(The library clients, rocsolver-test and rocsolver-bench, provide the infrastructure for testing and benchmarking rocSOLVER.
+For more details see the :ref:`rocSOLVER clients How-To <clients>`).
 
-     * ``-devel`` is used on RPM-based distributions, including RHEL and SLES.
+Using the install.sh script
+-------------------------------
 
-   * ``<rocm_version>`` is the ROCm Core SDK version to install. Omit this
-     suffix to install the latest available version.
+It is recommended that the provided install.sh script be used to build and install rocSOLVER. The command
 
-   * ``<-llvm_target>`` (starting with ``gfx``) is used if you are installing
-     for a single AMD GPU architecture. Omit this to install for all
-     architectures at the cost of disk space.
+.. code-block:: bash
 
-   For example: ``amdrocm-solver-dev7.13-gfx950``
+    ./install.sh --help
 
-   Use the following command to install the latest FFT development package
-   release for supported GPU architectures:
+gives detailed information on how to use this installation script.
 
-   .. tab-set::
+Next, some common use cases are listed:
 
-      .. tab-item:: Debian-based distros
+.. code-block:: bash
 
-         .. code-block:: bash
+    ./install.sh
 
-            sudo apt install amdrocm-solver-dev
+This command builds rocSOLVER and puts the generated library files, such as headers and
+``librocsolver.so``, in the output directory: ``rocSOLVER/build/release/rocsolver-install``.
+Other output files from the configuration and building process can also be found in the
+``rocSOLVER/build`` and ``rocSOLVER/build/release`` directories. It is assumed that all
+external library dependencies have been installed. It also assumes that the rocBLAS library
+is located at ``/opt/rocm/rocblas``.
 
-      .. tab-item:: RHEL-based distros
+.. code-block:: bash
 
-         .. code-block:: bash
+    ./install.sh --no-sparse
 
-            sudo dnf install amdrocm-solver-devel
+Use the ``--no-sparse`` to build rocSOLVER without rocSPARSE as a dependency. This will
+disable sparse functionality within rocSOLVER and will cause all relevant methods to
+return ``rocblas_status_not_implemented``.
 
-      .. tab-item:: SLES
+.. code-block:: bash
 
-         .. code-block:: bash
+    ./install.sh -g
 
-            sudo zypper install amdrocm-solver-devel
+Use the ``-g`` flag to build in debug mode. In this case the generated library files will be located at
+``rocSOLVER/build/debug/rocsolver-install``.
+Other output files from the configuration
+and building process can also be found
+in the ``rocSOLVER/build`` and ``rocSOLVER/build/debug`` directories.
 
-.. _install-nightly:
+.. code-block:: bash
 
-Install a nightly build
-=======================
+    ./install.sh --lib_dir /home/user/rocsolverlib --build_dir buildoutput
 
-The `TheRock <https://github.com/ROCm/TheRock>`__ build system also publishes
-nightly builds for the ROCm Core SDK and its components, including rocSOLVER.
-See `Nightly release status
-<https://github.com/ROCm/TheRock#nightly-release-status>`__ for details.
+Use ``--lib_dir`` and ``--build_dir`` to
+change output directories.
+In this case, for example, the installer
+will put the headers and library files in
+``/home/user/rocsolverlib``, while the outputs
+of the configuration and building processes will
+be in ``rocSOLVER/buildoutput`` and ``rocSOLVER/buildoutput/release``.
+The selected output directories must be
+local, otherwise the user may require sudo
+privileges.
+To install rocSOLVER system-wide, we
+recommend the use of the ``-i`` flag as shown
+below.
 
+.. code-block:: bash
+
+    ./install.sh --rocblas_dir /alternative/rocblas/location
+
+Use ``--rocblas_dir`` to change where the build system will search for the rocBLAS
+library. In this case, for example, the installer will look for the rocBLAS library at
+``/alternative/rocblas/location``. Similarly, you may use ``--rocsparse_dir`` to specify
+an alternative location for the rocSPARSE library.
+
+.. code-block:: bash
+
+    ./install.sh -s
+
+With the ``-s`` flag, the installer will
+generate a static library
+(``librocsolver.a``) instead.
+
+.. code-block:: bash
+
+    ./install.sh -d
+
+With the ``-d`` flag, the installer will first
+install all the external dependencies
+required by the rocSOLVER library in
+``/usr/local``.
+This flag only needs to be used once. For
+subsequent invocations of install.sh it is
+not necessary to rebuild the dependencies.
+
+.. code-block:: bash
+
+    ./install.sh -c
+
+With the ``-c`` flag, the installer will
+additionally build the library clients
+``rocsolver-bench`` and
+``rocsolver-test``.
+The binaries will be located at
+``rocSOLVER/build/release/clients/staging``.
+It is assumed that all external dependencies
+for the client have been installed.
+
+.. code-block:: bash
+
+    ./install.sh -dc
+
+By combining the ``-c`` and ``-d`` flags, the installer
+will also install all the external
+dependencies required by rocSOLVER clients.
+Again, the ``-d`` flag only needs to be used once.
+
+.. code-block:: bash
+
+    ./install.sh -i
+
+With the ``-i`` flag, the installer will
+additionally
+generate a pre-built rocSOLVER package and
+install it, using a suitable package
+manager, at the standard location:
+``/opt/rocm/rocsolver``.
+This is the preferred approach to install
+rocSOLVER on a system, as it will allow
+the library to be safely removed using the
+package manager.
+
+.. code-block:: bash
+
+    ./install.sh -p
+
+With the ``-p`` flag, the installer will also
+generate the rocSOLVER package, but it will
+not be installed.
+
+.. code-block:: bash
+
+    ./install.sh -i --install_dir /package/install/path
+
+When generating a package, use ``--install_dir`` to change the directory where
+it will be installed.
+In this case, for example, the rocSOLVER
+package will be installed at
+``/package/install/path``.
+
+Manual building and installation
+--------------------------------------
+
+Manual installation of all the external dependencies is not an easy task. Get more information on
+how to install each dependency at the corresponding documentation sites:
+
+* `CMake <https://cmake.org/>`_ (version 3.16 is recommended).
+* `LAPACK <https://github.com/Reference-LAPACK/lapack-release>`_ (which internally depends on a Fortran compiler), and
+* `GoogleTest <https://github.com/google/googletest>`_
+* `fmt <https://github.com/fmtlib/fmt>`_
+
+Once all dependencies are installed (including ROCm, rocBLAS, and rocSPARSE), rocSOLVER
+can be manually built using a combination of CMake and Make commands. Using CMake options
+can provide more flexibility in tailoring the building and installation process. Here we
+provide a list of examples of common use cases (see the CMake documentation for more
+information on CMake options).
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install ../..
+    make install
+
+This is equivalent to ``./install.sh``.
+
+.. code-block:: bash
+
+    mkdir -p buildoutput/release && cd buildoutput/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=/home/user/rocsolverlib ../..
+    make install
+
+This is equivalent to ``./install.sh --lib_dir /home/user/rocsolverlib --build_dir buildoutput``.
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -DBUILD_WITH_SPARSE=OFF ../..
+    make install
+
+This is equivalent to ``./install.sh --no-sparse``.
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -Drocblas_DIR=/alternative/rocblas/location ../..
+    make install
+
+This is equivalent to ``./install.sh --rocblas_dir /alternative/rocblas/location``.
+
+.. code-block:: bash
+
+    mkdir -p build/debug && cd build/debug
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -DCMAKE_BUILD_TYPE=Debug ../..
+    make install
+
+This is equivalent to ``./install.sh -g``.
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -DBUILD_SHARED_LIBS=OFF ../..
+    make install
+
+This is equivalent to ``./install.sh -s``.
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -DBUILD_CLIENTS_TESTS=ON -DBUILD_CLIENTS_BENCHMARKS=ON ../..
+    make install
+
+This is equivalent to ``./install.sh -c``.
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -DCPACK_SET_DESTDIR=OFF -DCPACK_PACKAGING_INSTALL_PREFIX=/opt/rocm ../..
+    make install
+    make package
+
+This is equivalent to ``./install.sh -p``.
+
+.. code-block:: bash
+
+    mkdir -p build/release && cd build/release
+    cmake --toolchain=toolchain-linux.cmake -DCMAKE_INSTALL_PREFIX=rocsolver-install -DCPACK_SET_DESTDIR=OFF -DCPACK_PACKAGING_INSTALL_PREFIX=/package/install/path ../..
+    make install
+    make package
+    sudo dpkg -i rocsolver[-\_]*.deb
+
+On an Ubuntu system, for example, this would be equivalent to ``./install.sh -i --install_dir /package/install/path``.

@@ -23,7 +23,6 @@
 * ************************************************************************ */
 #pragma once
 
-#include "rocsparse_memory_check.hpp"
 #include "rocsparse_test_call.hpp"
 #include "rocsparse_test_check.hpp"
 #include "rocsparse_test_dispatch.hpp"
@@ -165,22 +164,40 @@ namespace
 
             static bool memory_filter(const Arguments& arg)
             {
-                size_t available_host   = rocsparse_memory_check::get_available_host_memory_gb();
-                size_t available_device = rocsparse_memory_check::get_available_device_memory_gb();
-
-                bool can_run = (arg.host_memory_gb <= available_host)
-                               && (arg.device_memory_gb <= available_device);
-
-                if(!can_run)
+                static double available_memory_in_GB = 0.0;
+                static bool   query_device_memory    = true;
+                if(query_device_memory)
                 {
-                    std::cout << "SKIPPING TEST: Insufficient memory" << std::endl;
-                    std::cout << "  Required host:   " << arg.host_memory_gb
-                              << " GB (available: " << available_host << " GB)" << std::endl;
-                    std::cout << "  Required device: " << arg.device_memory_gb
-                              << " GB (available: " << available_device << " GB)" << std::endl;
+                    size_t available_memory;
+                    size_t total_memory;
+
+                    if(hipDeviceSynchronize() != hipSuccess)
+                    {
+                        return false;
+                    }
+
+                    if(hipMemGetInfo(&available_memory, &total_memory) != hipSuccess)
+                    {
+                        return false;
+                    }
+
+                    available_memory_in_GB = (double)available_memory / (1024 * 1024 * 1024);
+
+                    query_device_memory = false;
                 }
 
-                return can_run;
+                if(available_memory_in_GB < arg.req_memory)
+                {
+                    std::cout << "Skipping test "
+                              << (std::string(arg.category) + "/" + std::string(arg.function) + "/"
+                                  + name_suffix(arg))
+                              << " because insufficient memory avaiable. Required: "
+                              << arg.req_memory << "GB. Available: " << available_memory_in_GB
+                              << "GB." << std::endl;
+                    return false;
+                }
+
+                return true;
             }
 
             static std::string name_suffix(const Arguments& arg)
@@ -212,17 +229,13 @@ namespace
                 }
 
                 case rocsparse_test_dispatch_enum::it:
-                case rocsparse_test_dispatch_enum::it_sparse_to_dense:
-                case rocsparse_test_dispatch_enum::it_dense_to_sparse:
-                case rocsparse_test_dispatch_enum::it_gather_scatter:
+                case rocsparse_test_dispatch_enum::it_plus_int8_float16:
                 {
                     s << rocsparse_indextype2string(arg.index_type_I) << '_'
                       << rocsparse_datatype2string(arg.compute_type);
                     break;
                 }
                 case rocsparse_test_dispatch_enum::ijt:
-                case rocsparse_test_dispatch_enum::ijt_sparse_to_dense:
-                case rocsparse_test_dispatch_enum::ijt_dense_to_sparse:
                 {
                     s << rocsparse_indextype2string(arg.index_type_I) << '_'
                       << rocsparse_indextype2string(arg.index_type_J) << '_'
@@ -230,7 +243,6 @@ namespace
                     break;
                 }
                 case rocsparse_test_dispatch_enum::ixyt:
-                case rocsparse_test_dispatch_enum::ixyt_axpby:
                 {
                     s << rocsparse_indextype2string(arg.index_type_I) << '_'
                       << rocsparse_datatype2string(arg.x_type) << '_'
@@ -267,7 +279,6 @@ namespace
                     break;
                 }
                 case rocsparse_test_dispatch_enum::ijabct:
-                case rocsparse_test_dispatch_enum::ijabct_sddmm:
                 {
                     s << rocsparse_indextype2string(arg.index_type_I) << '_'
                       << rocsparse_indextype2string(arg.index_type_J) << '_'
@@ -446,6 +457,30 @@ namespace
                          T,
                          typename std::enable_if<check_t::template is_type_valid<I, J, T>()>::type>
             : rocsparse_test_template<ROUTINE>::template test_call_proxy<I, J, T>
+        {
+        };
+
+        struct test : rocsparse_test_template<ROUTINE>::template test_proxy<test, test_call>
+        {
+        };
+    };
+
+    template <rocsparse_test_enum::value_type ROUTINE>
+    struct rocsparse_test_it_plus_int8_float16_template
+    {
+        using check_t = rocsparse_test_check<ROUTINE>;
+        //
+        template <typename T, typename I = int32_t, typename = void>
+        struct test_call : rocsparse_test_invalid
+        {
+        };
+
+        //
+        template <typename I, typename T>
+        struct test_call<I,
+                         T,
+                         typename std::enable_if<check_t::template is_type_valid<I, T>()>::type>
+            : rocsparse_test_template<ROUTINE>::template test_call_proxy<I, T>
         {
         };
 

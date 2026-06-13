@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file gather.h
  *  \brief Irregular copying from a source range
  */
@@ -21,7 +22,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/execution_policy.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -31,7 +31,8 @@ THRUST_NAMESPACE_BEGIN
  *  \{
  */
 
-/*! \p gather copies elements from a source array into a destination range according
+
+/*! \p gather copies elements from a source array into a destination range according 
  *  to a map. For each input iterator \c i in the range <tt>[map_first, map_last)</tt>, the
  *  value <tt>input_first[\*i]</tt> is assigned to <tt>*(result + (i - map_first))</tt>.
  *  \p RandomAccessIterator must permit random access.
@@ -45,15 +46,12 @@ THRUST_NAMESPACE_BEGIN
  *  \param result Beginning of the destination range.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a> and \c InputIterator's \c value_type must be convertible to \c RandomAccessIterator's \c
- * difference_type. \tparam RandomAccessIterator must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access Iterator</a> and \c
- * RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type. \tparam OutputIterator
- * must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam InputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator's \c value_type must be convertible to \c RandomAccessIterator's \c difference_type.
+ *  \tparam RandomAccessIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access Iterator</a> and \c RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type.
+ *  \tparam OutputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
- *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last -
- * map_first))</tt>. \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
  *
  *  \remark \p gather is the inverse of thrust::scatter.
  *
@@ -82,15 +80,19 @@ THRUST_NAMESPACE_BEGIN
  *  // d_output is now {1, 1, 1, 1, 1, 0, 0, 0, 0, 0}
  *  \endcode
  */
-template <typename DerivedPolicy, typename InputIterator, typename RandomAccessIterator, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator gather(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  InputIterator map_first,
-  InputIterator map_last,
-  RandomAccessIterator input_first,
-  OutputIterator result);
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename RandomAccessIterator,
+         typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator gather(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                        InputIterator                                               map_first,
+                        InputIterator                                               map_last,
+                        RandomAccessIterator                                        input_first,
+                        OutputIterator                                              result);
 
-/*! \p gather copies elements from a source array into a destination range according
+
+/*! \p gather copies elements from a source array into a destination range according 
  *  to a map. For each input iterator \c i in the range <tt>[map_first, map_last)</tt>, the
  *  value <tt>input_first[\*i]</tt> is assigned to <tt>*(result + (i - map_first))</tt>.
  *  \p RandomAccessIterator must permit random access.
@@ -100,15 +102,12 @@ THRUST_HOST_DEVICE OutputIterator gather(
  *  \param input_first Beginning of the source range.
  *  \param result Beginning of the destination range.
  *
- *  \tparam InputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a> and \c InputIterator's \c value_type must be convertible to \c RandomAccessIterator's \c
- * difference_type. \tparam RandomAccessIterator must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access Iterator</a> and \c
- * RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type. \tparam OutputIterator
- * must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam InputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator's \c value_type must be convertible to \c RandomAccessIterator's \c difference_type.
+ *  \tparam RandomAccessIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access Iterator</a> and \c RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type.
+ *  \tparam OutputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
- *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last -
- * map_first))</tt>. \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
  *
  *  \remark \p gather is the inverse of thrust::scatter.
  *
@@ -135,11 +134,16 @@ THRUST_HOST_DEVICE OutputIterator gather(
  *  // d_output is now {1, 1, 1, 1, 1, 0, 0, 0, 0, 0}
  *  \endcode
  */
-template <typename InputIterator, typename RandomAccessIterator, typename OutputIterator>
-OutputIterator
-gather(InputIterator map_first, InputIterator map_last, RandomAccessIterator input_first, OutputIterator result);
+template<typename InputIterator,
+         typename RandomAccessIterator,
+         typename OutputIterator>
+  OutputIterator gather(InputIterator        map_first,
+                        InputIterator        map_last,
+                        RandomAccessIterator input_first,
+                        OutputIterator       result);
 
-/*! \p gather_if conditionally copies elements from a source array into a destination
+
+/*! \p gather_if conditionally copies elements from a source array into a destination 
  *  range according to a map. For each input iterator \c i in the range <tt>[map_first, map_last)</tt>,
  *  such that the value of <tt>\*(stencil + (i - map_first))</tt> is \c true, the value
  *  <tt>input_first[\*i]</tt> is assigned to <tt>*(result + (i - map_first))</tt>.
@@ -155,19 +159,14 @@ gather(InputIterator map_first, InputIterator map_last, RandomAccessIterator inp
  *  \param result Beginning of the destination range.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c
- * difference_type. \tparam InputIterator2 must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c
- * value_type must be convertible to \c bool. \tparam RandomAccessIterator must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c
- * RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type. \tparam OutputIterator
- * must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c difference_type.
+ *  \tparam InputIterator2 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c value_type must be convertible to \c bool.
+ *  \tparam RandomAccessIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type.
+ *  \tparam OutputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
- *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last -
- * map_first))</tt>. \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range
- * <tt>[result, result + (map_last - map_first))</tt>. \pre The input data shall not overlap the range <tt>[result,
- * result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
  *
  *  \remark \p gather_if is the inverse of \p scatter_if.
  *
@@ -201,20 +200,21 @@ gather(InputIterator map_first, InputIterator map_last, RandomAccessIterator inp
  *  // d_output is now {0, 7, 4, 7, 8, 7, 3, 7, 7, 7}
  *  \endcode
  */
-template <typename DerivedPolicy,
-          typename InputIterator1,
-          typename InputIterator2,
-          typename RandomAccessIterator,
-          typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator gather_if(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  InputIterator1 map_first,
-  InputIterator1 map_last,
-  InputIterator2 stencil,
-  RandomAccessIterator input_first,
-  OutputIterator result);
+template<typename DerivedPolicy,
+         typename InputIterator1,
+         typename InputIterator2,
+         typename RandomAccessIterator,
+         typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator gather_if(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                           InputIterator1                                              map_first,
+                           InputIterator1                                              map_last,
+                           InputIterator2                                              stencil,
+                           RandomAccessIterator                                        input_first,
+                           OutputIterator                                              result);
 
-/*! \p gather_if conditionally copies elements from a source array into a destination
+
+/*! \p gather_if conditionally copies elements from a source array into a destination 
  *  range according to a map. For each input iterator \c i in the range <tt>[map_first, map_last)</tt>,
  *  such that the value of <tt>\*(stencil + (i - map_first))</tt> is \c true, the value
  *  <tt>input_first[\*i]</tt> is assigned to <tt>*(result + (i - map_first))</tt>.
@@ -226,19 +226,14 @@ THRUST_HOST_DEVICE OutputIterator gather_if(
  *  \param input_first Beginning of the source range.
  *  \param result Beginning of the destination range.
  *
- *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c
- * difference_type. \tparam InputIterator2 must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c
- * value_type must be convertible to \c bool. \tparam RandomAccessIterator must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c
- * RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type. \tparam OutputIterator
- * must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c difference_type.
+ *  \tparam InputIterator2 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c value_type must be convertible to \c bool.
+ *  \tparam RandomAccessIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type.
+ *  \tparam OutputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
- *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last -
- * map_first))</tt>. \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range
- * <tt>[result, result + (map_last - map_first))</tt>. \pre The input data shall not overlap the range <tt>[result,
- * result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
  *
  *  \remark \p gather_if is the inverse of \p scatter_if.
  *
@@ -270,15 +265,18 @@ THRUST_HOST_DEVICE OutputIterator gather_if(
  *  // d_output is now {0, 7, 4, 7, 8, 7, 3, 7, 7, 7}
  *  \endcode
  */
-template <typename InputIterator1, typename InputIterator2, typename RandomAccessIterator, typename OutputIterator>
-OutputIterator gather_if(
-  InputIterator1 map_first,
-  InputIterator1 map_last,
-  InputIterator2 stencil,
-  RandomAccessIterator input_first,
-  OutputIterator result);
+template<typename InputIterator1,
+         typename InputIterator2,
+         typename RandomAccessIterator,
+         typename OutputIterator>
+  OutputIterator gather_if(InputIterator1       map_first,
+                           InputIterator1       map_last,
+                           InputIterator2       stencil,
+                           RandomAccessIterator input_first,
+                           OutputIterator       result);
 
-/*! \p gather_if conditionally copies elements from a source array into a destination
+
+/*! \p gather_if conditionally copies elements from a source array into a destination 
  *  range according to a map. For each input iterator \c i in the range <tt>[map_first, map_last)</tt>
  *  such that the value of <tt>pred(\*(stencil + (i - map_first)))</tt> is \c true,
  *  the value <tt>input_first[\*i]</tt> is assigned to <tt>*(result + (i - map_first))</tt>.
@@ -295,32 +293,26 @@ OutputIterator gather_if(
  *  \param pred Predicate to apply to the stencil values.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c
- * difference_type. \tparam InputIterator2 must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c
- * value_type must be convertible to \c Predicate's \c argument_type. \tparam RandomAccessIterator must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c
- * RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type. \tparam OutputIterator
- * must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>. \tparam
- * Predicate must be a model of <a href="https://en.cppreference.com/w/cpp/concepts/predicate">Predicate</a>.
+ *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c difference_type.
+ *  \tparam InputIterator2 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c value_type must be convertible to \c Predicate's \c argument_type.
+ *  \tparam RandomAccessIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type.
+ *  \tparam OutputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam Predicate must be a model of <a href="https://en.cppreference.com/w/cpp/concepts/predicate">Predicate</a>.
  *
- *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last -
- * map_first))</tt>. \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range
- * <tt>[result, result + (map_last - map_first))</tt>. \pre The input data shall not overlap the range <tt>[result,
- * result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
  *
  *  \remark \p gather_if is the inverse of \p scatter_if.
  *
  *  The following code snippet demonstrates how to use \p gather_if to gather selected values from
- *  an input range based on an arbitrary selection function using the \p thrust::device execution policy for
- * parallelization:
+ *  an input range based on an arbitrary selection function using the \p thrust::device execution policy for parallelization:
  *
  *  \code
  *  #include <thrust/gather.h>
  *  #include <thrust/device_vector.h>
  *  #include <thrust/execution_policy.h>
- *
+ *  
  *  struct is_even
  *  {
  *    THRUST_HOST_DEVICE
@@ -353,22 +345,23 @@ OutputIterator gather_if(
  *  // d_output is now {0, 7, 4, 7, 8, 7, 3, 7, 7, 7}
  *  \endcode
  */
-template <typename DerivedPolicy,
-          typename InputIterator1,
-          typename InputIterator2,
-          typename RandomAccessIterator,
-          typename OutputIterator,
-          typename Predicate>
-THRUST_HOST_DEVICE OutputIterator gather_if(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  InputIterator1 map_first,
-  InputIterator1 map_last,
-  InputIterator2 stencil,
-  RandomAccessIterator input_first,
-  OutputIterator result,
-  Predicate pred);
+template<typename DerivedPolicy,
+         typename InputIterator1,
+         typename InputIterator2,
+         typename RandomAccessIterator,
+         typename OutputIterator,
+         typename Predicate>
+THRUST_HOST_DEVICE
+  OutputIterator gather_if(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                           InputIterator1                                              map_first,
+                           InputIterator1                                              map_last,
+                           InputIterator2                                              stencil,
+                           RandomAccessIterator                                        input_first,
+                           OutputIterator                                              result,
+                           Predicate                                                   pred);
 
-/*! \p gather_if conditionally copies elements from a source array into a destination
+
+/*! \p gather_if conditionally copies elements from a source array into a destination 
  *  range according to a map. For each input iterator \c i in the range <tt>[map_first, map_last)</tt>
  *  such that the value of <tt>pred(\*(stencil + (i - map_first)))</tt> is \c true,
  *  the value <tt>input_first[\*i]</tt> is assigned to <tt>*(result + (i - map_first))</tt>.
@@ -381,20 +374,15 @@ THRUST_HOST_DEVICE OutputIterator gather_if(
  *  \param result Beginning of the destination range.
  *  \param pred Predicate to apply to the stencil values.
  *
- *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input
- * Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c
- * difference_type. \tparam InputIterator2 must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c
- * value_type must be convertible to \c Predicate's \c argument_type. \tparam RandomAccessIterator must be a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c
- * RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type. \tparam OutputIterator
- * must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>. \tparam
- * Predicate must be a model of <a href="https://en.cppreference.com/w/cpp/concepts/predicate">Predicate</a>.
+ *  \tparam InputIterator1 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator1's \c value_type must be convertible to \c RandomAccessIterator's \c difference_type.
+ *  \tparam InputIterator2 must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/input_iterator">Input Iterator</a> and \c InputIterator2's \c value_type must be convertible to \c Predicate's \c argument_type.
+ *  \tparam RandomAccessIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/random_access_iterator">Random Access iterator</a> and \c RandomAccessIterator's \c value_type must be convertible to \c OutputIterator's \c value_type.
+ *  \tparam OutputIterator must be a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam Predicate must be a model of <a href="https://en.cppreference.com/w/cpp/concepts/predicate">Predicate</a>.
  *
- *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last -
- * map_first))</tt>. \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range
- * <tt>[result, result + (map_last - map_first))</tt>. \pre The input data shall not overlap the range <tt>[result,
- * result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[map_first, map_last)</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The range <tt>[stencil, stencil + (map_last - map_first))</tt> shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
+ *  \pre The input data shall not overlap the range <tt>[result, result + (map_last - map_first))</tt>.
  *
  *  \remark \p gather_if is the inverse of \p scatter_if.
  *
@@ -404,7 +392,7 @@ THRUST_HOST_DEVICE OutputIterator gather_if(
  *  \code
  *  #include <thrust/gather.h>
  *  #include <thrust/device_vector.h>
- *
+ *  
  *  struct is_even
  *  {
  *    THRUST_HOST_DEVICE
@@ -436,18 +424,17 @@ THRUST_HOST_DEVICE OutputIterator gather_if(
  *  // d_output is now {0, 7, 4, 7, 8, 7, 3, 7, 7, 7}
  *  \endcode
  */
-template <typename InputIterator1,
-          typename InputIterator2,
-          typename RandomAccessIterator,
-          typename OutputIterator,
-          typename Predicate>
-OutputIterator gather_if(
-  InputIterator1 map_first,
-  InputIterator1 map_last,
-  InputIterator2 stencil,
-  RandomAccessIterator input_first,
-  OutputIterator result,
-  Predicate pred);
+template<typename InputIterator1,
+         typename InputIterator2,
+         typename RandomAccessIterator,
+         typename OutputIterator,
+         typename Predicate>
+  OutputIterator gather_if(InputIterator1       map_first,
+                           InputIterator1       map_last,
+                           InputIterator2       stencil,
+                           RandomAccessIterator input_first,
+                           OutputIterator       result,
+                           Predicate            pred);
 
 /*! \} // gathering
  */
@@ -455,3 +442,4 @@ OutputIterator gather_if(
 THRUST_NAMESPACE_END
 
 #include <thrust/detail/gather.inl>
+

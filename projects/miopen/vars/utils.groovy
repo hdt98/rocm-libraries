@@ -25,14 +25,23 @@
  *******************************************************************************/
 def miopenCheckout()
 {
-    // checkout project
     checkout([
         $class: 'GitSCM',
         branches: scm.branches,
-        doGenerateSubmoduleConfigurations: scm.doGenerateSubmoduleConfigurations,
-        extensions: scm.extensions + [[$class: 'CleanCheckout']] + [[$class: 'SubmoduleOption', disableSubmodules: false, parentCredentials: true, recursiveSubmodules: true, ]],
-        userRemoteConfigs: scm.userRemoteConfigs
-    ])
+        doGenerateSubmoduleConfigurations: true,
+        extensions: scm.extensions + [[$class: 'SubmoduleOption', parentCredentials: true]],
+       userRemoteConfigs: scm.userRemoteConfigs
+   ])
+}
+
+def show_node_info() {
+    sh """
+        echo "NODE_NAME = \$NODE_NAME"
+        lsb_release -sd
+        uname -r
+        cat /sys/module/amdgpu/version
+        ls /opt/ -la
+    """
 }
 
 def check_host() {
@@ -50,7 +59,7 @@ def check_host() {
 }
 
 //default
-// CXX=/opt/rocm/llvm/bin/clang++ CXXFLAGS='-Werror' cmake -G Ninja -DMIOPEN_GPU_SYNC=Off -DCMAKE_PREFIX_PATH=/usr/local -DBUILD_DEV=On -DCMAKE_BUILD_TYPE=release ..
+// CXX=/opt/rocm/llvm/bin/clang++ CXXFLAGS='-Werror' cmake -DMIOPEN_GPU_SYNC=Off -DCMAKE_PREFIX_PATH=/usr/local -DBUILD_DEV=On -DCMAKE_BUILD_TYPE=release ..
 //
 def cmake_build(Map conf=[:]){
 
@@ -60,7 +69,7 @@ def cmake_build(Map conf=[:]){
     def build_envs = "CTEST_PARALLEL_LEVEL=4 " + conf.get("build_env","")
     def prefixpath = conf.get("prefixpath","/opt/rocm")
     def build_type_debug = (conf.get("build_type",'release') == 'debug')
-    def miopen_install_path = conf.get("miopen_install_path", "${env.WORKSPACE}/${env.MIOPEN_DIR}/install")
+    def miopen_install_path = conf.get("miopen_install_path", "${env.WORKSPACE}/install")
 
     def mlir_args = " -DMIOPEN_USE_MLIR=" + conf.get("mlir_build", "ON")
     // WORKAROUND_ISSUE_3192 Disabling MLIR for debug builds since MLIR generates sanitizer errors.
@@ -98,9 +107,7 @@ def cmake_build(Map conf=[:]){
     def test_flags = conf.get("test_flags","")
 
     if (conf.get("vcache_enable","") == "true"){
-        //grab root of node workspace. not guaranteed to be /var/jenkins
-        String remote_root = env.WORKSPACE.substring(0, env.WORKSPACE.lastIndexOf("workspace/"))
-        def vcache = conf.get(vcache_path,"${remote_root}/.cache/miopen/vcache")
+        def vcache = conf.get(vcache_path,"/var/jenkins/.cache/miopen/vcache")
         build_envs = " MIOPEN_VERIFY_CACHE_PATH='${vcache}' " + build_envs
     } else{
         test_flags = " --disable-verification-cache " + test_flags
@@ -134,7 +141,6 @@ def cmake_build(Map conf=[:]){
     def pre_setup_cmd = """
             echo \$HSA_ENABLE_SDMA
             ulimit -c unlimited
-            cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
             rm -rf build
             mkdir build
             rm -rf install
@@ -143,10 +149,10 @@ def cmake_build(Map conf=[:]){
             rm -f src/kernels/miopen*.udb
             cd build
         """
-    def setup_cmd = conf.get("setup_cmd", "${cmake_envs} cmake -G Ninja ${setup_args}   .. ")
+    def setup_cmd = conf.get("setup_cmd", "${cmake_envs} cmake ${setup_args}   .. ")
     // WORKAROUND_SWDEV_290754
     // It seems like this W/A is not required since 4.5.
-    def build_cmd = conf.get("build_cmd", "LLVM_PATH=/opt/rocm/llvm ${build_envs} dumb-init ninja -j\$(nproc) ${make_targets}")
+    def build_cmd = conf.get("build_cmd", "LLVM_PATH=/opt/rocm/llvm ${build_envs} dumb-init make -j\$(nproc) ${make_targets}")
     def execute_cmd = conf.get("execute_cmd", "")
 
     def cmd = conf.get("cmd", """
@@ -160,7 +166,7 @@ def cmake_build(Map conf=[:]){
         def fin_build_cmd = cmake_fin_build_cmd(miopen_install_path)
         cmd += """
             export RETDIR=\$PWD
-            cd ${env.WORKSPACE}/${env.MIOPEN_DIR}/fin
+            cd ${env.WORKSPACE}/fin
             ${fin_build_cmd}
             cd \$RETDIR
         """
@@ -207,39 +213,12 @@ def cmake_fin_build_cmd(prefixpath){
 
 def getDockerImageName(dockerArgs)
 {
-    sh "echo ${dockerArgs} > ${env.WORKSPACE}/factors.txt"
-    // Include the candidate image so the CI docker hash changes per TheRock hash.
-    if (env.THEROCK_CANDIDATE_IMAGE) {
-        sh "echo ${env.THEROCK_CANDIDATE_IMAGE} >> ${env.WORKSPACE}/factors.txt"
-    }
+    checkout scm
+    sh "echo ${dockerArgs} > factors.txt"
     def image = "${env.MIOPEN_DOCKER_IMAGE_URL}"
-    // Note: The following files and directories from the CK repo are used to generate a hash for
-    // the docker image build. To ensure that we rebuild the docker image only when necessary.
-    // Add any other files or directories that should trigger a rebuild of the docker image when changed.
-    sh """
-        cd ${env.WORKSPACE}/${env.CK_DIR} && \
-        { \
-            find cmake experimental include library -type f -print0; \
-            find . -maxdepth 1 -type f \\( \
-                -name 'CMakeLists.txt' -o \
-                -name 'Config.cmake.in' -o \
-                -name 'dev-requirements.txt' -o \
-                -name 'pyproject.toml' -o \
-                -name 'rbuild.ini' -o \
-                -name 'requirements.txt' \
-            \\) -print0; \
-        } \
-        | tr '\\0' '\\n' \
-        | LC_ALL=C sort \
-        | xargs -d '\\n' md5sum \
-        | LC_ALL=C sort \
-        | md5sum \
-        | awk '{print \$1}' >> "${env.WORKSPACE}/factors.txt"
-    """
-
-    sh "cd ${env.WORKSPACE}/${env.MIOPEN_DIR}/ && md5sum Dockerfile requirements.txt dev-requirements.txt >> ${env.WORKSPACE}/factors.txt"
-    def docker_hash = sh(script: "cd ${env.WORKSPACE} && md5sum factors.txt | awk '{print \$1}' | head -c 6", returnStdout: true)
-    sh "rm ${env.WORKSPACE}/factors.txt"
+    sh "md5sum Dockerfile requirements.txt dev-requirements.txt >> factors.txt"
+    def docker_hash = sh(script: "md5sum factors.txt | awk '{print \$1}' | head -c 6", returnStdout: true)
+    sh "rm factors.txt"
     echo "Docker tag hash: ${docker_hash}"
     image = "${image}:ci_${docker_hash}"
     if(params.DOCKER_IMAGE_OVERRIDE && !params.DOCKER_IMAGE_OVERRIDE.empty)
@@ -250,207 +229,14 @@ def getDockerImageName(dockerArgs)
     return image
 }
 
-// Builds rocm/miopen:therock-<shortHash> from source; returns {image, fullHash, shortHash, skip}.
-// Skips if :therock already carries this hash; reuses the hash-tagged image if it exists.
-def buildTheRockDockerImage(Map conf=[:])
-{
-    env.DOCKER_BUILDKIT=1
-    def prefixpath = conf.get("prefixpath", "/opt/rocm")
-
-    def cacheRef = "${env.MIOPEN_DOCKER_IMAGE_URL}-ci-docker:therock_cache"
-
-    def gpu_arch = "gfx908;gfx90a;gfx942;gfx950;gfx1101;gfx1151;gfx1201" // multiarch builds
-
-    // Read the TheRock hash from the ci-env action (single source of truth).
-    def theRockHash = sh(
-        script: """
-            grep -A 2 'therock-ref:' ${env.WORKSPACE}/.github/actions/ci-env/action.yml \
-            | grep 'value:' \
-            | awk '{print \$2}' \
-            | tr -d '"'
-        """.stripIndent(),
-        returnStdout: true
-    ).trim()
-
-    def shortHash   = theRockHash.take(7)
-    def hashedImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:therock-${shortHash}"
-
-    // Check whether this hash is already live on :therock via its baked-in label.
-    // Pull and inspect are separated so that docker pull stdout does not contaminate the captured label.
-    def lastPromotedHash = ""
-    try {
-        withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-            sh "docker pull ${env.MIOPEN_DOCKER_IMAGE_URL}:therock > /dev/null 2>&1 || true"
-            lastPromotedHash = sh(
-                script: """
-                    docker inspect \
-                        --format '{{ index .Config.Labels "therock.git.hash" }}' \
-                        ${env.MIOPEN_DOCKER_IMAGE_URL}:therock 2>/dev/null || true
-                """.stripIndent(),
-                returnStdout: true
-            ).trim()
-        }
-    } catch (Exception e) {
-        echo "Could not read label from existing :therock image (first-time run?): ${e.message}"
-    }
-
-    if (lastPromotedHash == theRockHash) {
-        echo "TheRock hash ${shortHash} is already promoted to :therock - skipping build."
-        return [image: null, fullHash: theRockHash, shortHash: shortHash, skip: true]
-    }
-    echo "New TheRock hash detected: ${theRockHash} (previously promoted: '${lastPromotedHash ?: 'none'}')"
-
-    // Reuse the hash-tagged image if a previous nightly already built it.
-    def imageAlreadyBuilt = false
-    withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-        def rc = sh(script: "docker manifest inspect ${hashedImage} > /dev/null 2>&1", returnStatus: true)
-        imageAlreadyBuilt = (rc == 0)
-    }
-    if (imageAlreadyBuilt) {
-        echo "Hash-tagged image ${hashedImage} already exists - reusing without rebuild."
-    } else {
-        echo "Hash-tagged image ${hashedImage} not found - will build now."
-    }
-
-    if (!imageAlreadyBuilt) {
-        def dockerArgs = "--build-arg PREFIX=${prefixpath} " +
-                         "--build-arg THEROCK_GIT_HASH=\"${theRockHash}\" " +
-                         "--build-arg THEROCK_ASIC=\"${gpu_arch}\" " +
-                         "--build-arg BUILD_TYPE=build " +
-                         "--label therock.git.hash=${theRockHash} " +
-                         "--target update_therock " +
-                         " -f ${env.WORKSPACE}/${env.MIOPEN_DIR}/Dockerfile "
-
-        if (params.USE_SCCACHE_DOCKER && check_host() && "${env.MIOPEN_SCCACHE}" != "null") {
-            dockerArgs = dockerArgs + " --build-arg MIOPEN_SCCACHE=${env.MIOPEN_SCCACHE} --build-arg COMPILER_LAUNCHER=sccache "
-        }
-
-        echo "Building ${hashedImage} with args: ${dockerArgs}"
-
-        def buildContext    = "${env.WORKSPACE}/${env.PROJ_DIR}/."
-        def dockerCacheArgs = "--cache-to type=registry,ref=${cacheRef},compression=zstd,mode=min " +
-                              "--cache-from type=registry,ref=${cacheRef} "
-
-        try {
-            withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-                sh """
-                    docker buildx inspect ci-builder >/dev/null 2>&1 || \
-                    docker buildx create --name ci-builder --driver docker-container --use
-                    docker buildx use ci-builder
-                    docker buildx inspect --bootstrap
-                """.stripIndent()
-
-                sh """
-                    DOCKER_BUILDKIT=1 docker buildx build \
-                    --push \
-                    --tag ${hashedImage} \
-                    ${dockerCacheArgs} \
-                    ${dockerArgs} \
-                    ${buildContext}
-                """.stripIndent()
-            }
-        } catch (Exception bex) {
-            echo "Buildx not available or failed, falling back to docker.build"
-            def dockerImage = docker.build("${hashedImage}", "${dockerArgs} ${buildContext}")
-            withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-                dockerImage.push()
-            }
-        }
-    }
-
-    return [image: hashedImage, fullHash: theRockHash, shortHash: shortHash, skip: false]
-}
-
-// Retags the CI image as rocm/miopen-dev:multiarch_dev_<date> and :latest.
-// Uses CI_DOCKER_IMAGE set by the Build Docker stage to avoid recomputing the image name.
-def publishDevDockerImage(Map conf=[:])
-{
-    def date = new Date().format('yyyyMMdd')
-    def devImageUrl = "${env.MIOPEN_DOCKER_IMAGE_URL}-dev"
-    def dateTag   = "${devImageUrl}:multiarch_dev_${date}"
-    def latestTag = "${devImageUrl}:latest"
-    def ciImage   = env.CI_DOCKER_IMAGE
-
-    if (!ciImage) {
-        error "CI_DOCKER_IMAGE is not set - Build Docker stage must run before Publish Dev Image."
-    }
-
-    echo "Publishing dev image: ${ciImage} -> ${dateTag}"
-    withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
-        sh """
-            docker pull ${ciImage}
-            docker tag  ${ciImage} ${dateTag}
-            docker tag  ${ciImage} ${latestTag}
-            docker push ${dateTag}
-            docker push ${latestTag}
-        """.stripIndent()
-    }
-}
-
-// Re-tags the hash-tagged image as :therock; the baked label is preserved by docker tag.
-def promoteTheRockDockerImage(String hashedImage, String fullHash)
-{
-    def targetImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:therock"
-    echo "Promoting ${hashedImage} -> ${targetImage} (hash: ${fullHash})"
-    withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-        sh """
-            docker pull ${hashedImage}
-            docker tag  ${hashedImage} ${targetImage}
-            docker push ${targetImage}
-        """.stripIndent()
-    }
-    echo "Promotion complete - :therock now points to TheRock hash ${fullHash}"
-}
-
-
 def getDockerImage(Map conf=[:])
 {
+    checkout scm
     env.DOCKER_BUILDKIT=1
     def prefixpath = conf.get("prefixpath", "/opt/rocm") // one image for each prefix 1: /usr/local 2:/opt/rocm
+    def gpu_arch = "gfx908;gfx90a;gfx942;gfx1100;gfx1101;gfx1102;gfx1103;gfx1200;gfx1201" // prebuilt dockers should have all the architectures enabled so one image can be used for all stages
 
-    def gpu_family = conf.get("gpu_family")
-
-    def cacheRef = "${env.MIOPEN_DOCKER_IMAGE_URL}-ci-docker:cache_${gpu_family}"
-
-    // Note: With offload compress disabled for CK expanding the target list might cause issues with the docker build.
-    def gpu_arch
-    if (gpu_family == "ci")
-    {
-        gpu_arch = "gfx908;gfx90a;gfx942;gfx950;gfx1101;gfx1151" // Builds docker image with subset of architectures that CI is run on.
-    }
-    else if (gpu_family == "gfx90X")
-    {
-        gpu_arch = "gfx908;gfx90a"
-    }
-    else if (gpu_family == "gfx942")
-    {
-        gpu_arch = "gfx942"
-    }
-    else if (gpu_family == "gfx950")
-    {
-        gpu_arch = "gfx950"
-    }
-    else if (gpu_family == "gfx942_gfx950")
-    {
-        gpu_arch = "gfx942;gfx950"
-    }
-    else if (gpu_family == "navi")
-    {
-        gpu_arch = "gfx1101;gfx1151"
-    }
-    else
-    {
-        error("Unsupported GPU family: ${gpu_family}")
-    }
-
-    def dockerArgs = "--build-arg PREFIX=${prefixpath} " +
-                     "--target miopen "
-
-    // Build the CI image FROM the candidate TheRock base when one is staged.
-    if (env.THEROCK_CANDIDATE_IMAGE) {
-        dockerArgs = dockerArgs + "--build-arg THEROCK_BASE_IMAGE=${env.THEROCK_CANDIDATE_IMAGE} "
-    }
-
+    def dockerArgs = "--build-arg BUILDKIT_INLINE_CACHE=1 --build-arg PREFIX=${prefixpath} --build-arg GPU_ARCHS=\"${gpu_arch}\""
     if(env.CCACHE_HOST)
     {
         def check_host = sh(script:"""(printf "PING\r\n";) | nc -N ${env.CCACHE_HOST} 6379 """, returnStdout: true).trim()
@@ -468,72 +254,17 @@ def getDockerImage(Map conf=[:])
     }
     else if (params.USE_SCCACHE_DOCKER && check_host() && "${env.MIOPEN_SCCACHE}" != "null")
     {
-        dockerArgs = dockerArgs + " --build-arg MIOPEN_SCCACHE=${env.MIOPEN_SCCACHE} --build-arg COMPILER_LAUNCHER=sccache "
+        dockerArgs = dockerArgs + " --build-arg MIOPEN_SCCACHE=${env.MIOPEN_SCCACHE} --build-arg COMPILER_LAUNCHER=sccache"
     }
+    echo "Docker Args: ${dockerArgs}"
 
     def image = getDockerImageName(dockerArgs)
-
-    // Do not append gpu family for common ci image
-    if(gpu_family != "ci"){
-        image = image + "_${gpu_family}"
-    }
-
-    // Append GPU arch after image name for a common hash
-    dockerArgs = dockerArgs + "--build-arg THEROCK_ASIC=\"${gpu_arch}\" "
-
-    // Append Dockerfile path after image name is generated to avoid affecting the hash.
-    dockerArgs = dockerArgs + " -f ${env.WORKSPACE}/${env.MIOPEN_DIR}/Dockerfile "
-
-    // Carry the promoted TheRock hash forward into the CI image metadata.
-    try {
-        withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-            sh "docker pull ${env.MIOPEN_DOCKER_IMAGE_URL}:therock > /dev/null 2>&1 || true"
-            def promotedHash = sh(
-                script: """
-                    docker inspect --format '{{ index .Config.Labels "therock.git.hash" }}' \
-                        ${env.MIOPEN_DOCKER_IMAGE_URL}:therock 2>/dev/null || true
-                """.stripIndent(),
-                returnStdout: true
-            ).trim()
-            if (promotedHash) {
-                echo "Embedding TheRock hash into CI image metadata: ${promotedHash}"
-                dockerArgs = dockerArgs + "--label therock.git.hash=${promotedHash} "
-                env.THEROCK_PROMOTED_HASH = promotedHash
-            }
-        }
-    } catch (Exception e) {
-        echo "Could not read TheRock label from :therock image, skipping metadata embedding: ${e.message}"
-    }
-
-    // Embed the CK commit hash built into this image.
-    def ckHash = sh(
-        script: "git -C ${env.WORKSPACE}/${env.CK_DIR} rev-parse HEAD",
-        returnStdout: true
-    ).trim()
-    if (ckHash) {
-        echo "Embedding CK hash into CI image metadata: ${ckHash}"
-        dockerArgs = dockerArgs + "--label ck.git.hash=${ckHash} "
-        env.CK_GIT_HASH = ckHash
-    }
-
-    echo "Docker Args: ${dockerArgs}"
 
     def dockerImage
     try{
         echo "Pulling down image: ${image}"
         dockerImage = docker.image("${image}")
-        withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-            dockerImage.pull()
-        }
-        def embeddedTheRockHash = sh(
-            script: "docker inspect --format '{{ index .Config.Labels \"therock.git.hash\" }}' ${image} 2>/dev/null || true",
-            returnStdout: true
-        ).trim()
-        def embeddedCkHash = sh(
-            script: "docker inspect --format '{{ index .Config.Labels \"ck.git.hash\" }}' ${image} 2>/dev/null || true",
-            returnStdout: true
-        ).trim()
-        echo "CI image TheRock hash: ${embeddedTheRockHash ?: 'not set'} | CK hash: ${embeddedCkHash ?: 'not set'}"
+        dockerImage.pull()
     }
     catch(org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
         echo "The job was cancelled or aborted"
@@ -541,44 +272,17 @@ def getDockerImage(Map conf=[:])
     }
     catch(Exception ex)
     {
-        echo "Building image..."
-        def buildContext = "${env.WORKSPACE}/${env.PROJ_DIR}/."
-        def dockerCacheArgs = "--cache-to type=registry,ref=${cacheRef},compression=zstd,mode=max,registry.insecure=true " +
-                              "--cache-from type=registry,ref=${cacheRef},registry.insecure=true "
-
-        try {
-
-            withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-                sh """
-                    docker buildx rm ci-builder || true
-                    docker buildx create --name ci-builder --driver docker-container --use
-                    docker buildx use ci-builder
-                    docker buildx inspect --bootstrap
-                """.stripIndent()
-                sh """
-                    DOCKER_BUILDKIT=1 docker buildx build \
-                    --builder ci-builder \
-                    --push \
-                    --tag ${image} \
-                    ${dockerCacheArgs} \
-                    ${dockerArgs} \
-                    ${buildContext}
-                """.stripIndent()
-            }
-            dockerImage = docker.image("${image}")
-        } catch (Exception bex) {
-            echo "Buildx not available or failed, falling back to docker.build"
-            dockerImage = docker.build("${image}", "${dockerArgs} ${buildContext}")
-            withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-                dockerImage.push()
-            }
+        dockerImage = docker.build("${image}", "${dockerArgs} .")
+        withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
+            dockerImage.push()
         }
     }
+
 
     if(params.INSTALL_MIOPEN == 'ON')
     {
         def freckle = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        dockerArgs = " --build-arg BASE_DOCKER=${image} --build-arg FRECKLE=${freckle} -f ${env.WORKSPACE}/${env.MIOPEN_DIR}/Dockerfile.perftests"
+        dockerArgs = " --build-arg BASE_DOCKER=${image} --build-arg FRECKLE=${freckle} -f Dockerfile.perftests"
 
         // Get updated image name for perf tests.
         image = getDockerImageName(dockerArgs)
@@ -587,9 +291,7 @@ def getDockerImage(Map conf=[:])
         try{
             echo "Pulling down perf test image: ${image}"
             dockerImage = docker.image("${image}")
-            withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-                dockerImage.pull()
-            }
+            dockerImage.pull()
         }
         catch(org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
             echo "The job was cancelled or aborted"
@@ -597,7 +299,7 @@ def getDockerImage(Map conf=[:])
         }
         catch(Exception ex)
         {
-            dockerImage = docker.build("${image}", "${dockerArgs} -f ${env.WORKSPACE}/${env.MIOPEN_DIR}/Dockerfile ")
+            dockerImage = docker.build("${image}", "${dockerArgs} .")
             withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
                 dockerImage.push()
             }
@@ -607,63 +309,10 @@ def getDockerImage(Map conf=[:])
     return [dockerImage, image]
 }
 
-def setGithubStatus(String context, String state, String description) {
-    def sha = env.GIT_COMMIT
-    def targetUrl = env.RUN_DISPLAY_URL ?: env.BUILD_URL
-    def statusUrl = "https://api.github.com/repos/ROCm/rocm-libraries/statuses/${sha}"
-    withCredentials([usernamePassword(credentialsId: 'github-app-miopen', usernameVariable: 'GITHUB_APP', passwordVariable: 'GITHUB_TOKEN')]) {
-        def code = '0'
-        try {
-            retry(3) {
-                code = sh(returnStdout: true, script: """
-                    curl -s -w "%{http_code}" -o /dev/null -X POST '${statusUrl}' \\
-                        -H "Authorization: token \$GITHUB_TOKEN" \\
-                        -H 'Content-Type: application/json' \\
-                        -d '{"state":"${state}","context":"${context}","description":"${description}","target_url":"${targetUrl}"}'
-                """).trim()
-                if (!code.startsWith('2')) {
-                    error("GitHub status POST returned ${code}")
-                }
-            }
-        } catch (Exception e) {
-            echo "WARNING: GitHub status POST failed after retries (context=${context}, state=${state}, code=${code})"
-        }
-    }
-}
-
-def getDockerImageWithStatus(Map conf=[:]) {
-    def stageName = env.STAGE_NAME ?: "Docker Image"
-    setGithubStatus(stageName, 'pending', 'In progress')
-    try {
-        def result = getDockerImage(conf)
-        setGithubStatus(stageName, 'success', 'Completed successfully')
-        return result
-    }
-    catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
-        echo "The job was cancelled or aborted"
-        setGithubStatus(stageName, 'error', 'Job cancelled or aborted')
-        throw e
-    }
-    catch (Exception ex) {
-        echo "Error in getDockerImageWithStatus: ${ex.message}"
-        setGithubStatus(stageName, 'failure', 'Stage failed')
-        throw ex
-    }
-}
-
-def runShell(String command){
-    def responseCode = sh returnStatus: true, script: "${command} > tmp.txt"
-    def output = readFile(file: "tmp.txt")
-    return (output != "")
-}
-
 def buildHipClangJob(Map conf=[:]){
-        /*
-            The following is a workaround for git submodule updating for the fin module.  After Jenkins upgrade,
-            many plugins started misbehaving, and submodules wouldn't get pulled.  This ensures that we always pull
-            the fin submodule and fail silently when the submodule directory already has artifacts in it.
-        */
-        sh(script: "git submodule update --init --recursive || true")
+        show_node_info()
+        miopenCheckout()
+        checkout scm
         env.HSA_ENABLE_SDMA=0
         env.DOCKER_BUILDKIT=1
         def image
@@ -679,103 +328,89 @@ def buildHipClangJob(Map conf=[:]){
         def variant = env.STAGE_NAME
 
         def needs_gpu = conf.get("needs_gpu", true)
-        def dvc_pull = conf.get("dvc_pull", false)
-        def build_timeout = conf.get("build_timeout", 420)
+        def lfs_pull = conf.get("lfs_pull", false)
 
         def retimage
-        setGithubStatus(variant, 'pending', 'In progress')
-        try {
+        gitStatusWrapper(credentialsId: "${env.miopen_git_creds}", gitHubContext: "Jenkins - ${variant}", account: 'ROCm', repo: 'MIOpen') {
             try {
                 (retimage, image) = getDockerImage(conf)
                 if (needs_gpu) {
                     withDockerContainer(image: image, args: dockerOpts) {
-                        timeout(time: 2, unit: 'MINUTES'){
-                            sh 'rocminfo | tee rocminfo.log'
-                            if ( !runShell('grep -n "gfx" rocminfo.log') ){
-                                throw new Exception ("GPU not found")
-                            }
-                            else{
-                                echo "GPU is OK"
-                            }
+                        timeout(time: 5, unit: 'MINUTES')
+                        {
+                            sh 'PATH="/opt/rocm/opencl/bin:/opt/rocm/opencl/bin/x86_64:$PATH" clinfo'
                         }
                     }
                 }
             }
             catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
                 echo "The job was cancelled or aborted"
-                setGithubStatus(variant, 'error', 'Job cancelled or aborted')
                 throw e
             }
             catch(Exception ex) {
                 (retimage, image) = getDockerImage(conf)
                 if (needs_gpu) {
                     withDockerContainer(image: image, args: dockerOpts) {
-                        timeout(time: 2, unit: 'MINUTES'){
-                            sh 'rocminfo | tee rocminfo.log'
-                            if ( !runShell('grep -n "gfx" rocminfo.log') ){
-                                throw new Exception ("GPU not found")
-                            }
-                            else{
-                                echo "GPU is OK"
-                            }
+                        timeout(time: 5, unit: 'MINUTES')
+                        {
+                            sh 'PATH="/opt/rocm/opencl/bin:/opt/rocm/opencl/bin/x86_64:$PATH" clinfo'
                         }
                     }
                 }
             }
 
-            //grab root of node workspace. not guaranteed to be /var/jenkins
-            String remote_root = env.WORKSPACE.substring(0, env.WORKSPACE.lastIndexOf("workspace/"))
-            withDockerContainer(image: image, args: dockerOpts + " -v=${remote_root}:${remote_root}") {
-                timeout(time: build_timeout, unit:'MINUTES')
+            withDockerContainer(image: image, args: dockerOpts + ' -v=/var/jenkins/:/var/jenkins') {
+                timeout(time: 420, unit:'MINUTES')
                 {
-                    // We set LOGNAME here because under the hood dvc calls Python's getpass.getuser() object to
-                    // create a unique hash to store its local cache in. When Jenkins runs this Docker container, it
-                    // runs as a UID that doesn't have an entry in /etc/passwd within the container. getuser() throws
-                    // an exception if it can't get the user name for the current user's UID, but it will check the
-                    // LOGNAME environment variable and use that value if it's available.
-                    // https://github.com/iterative/dvc/blob/3915fa26aa7d95d5cbe345e62846bfd82dccbfc7/dvc/repo/__init__.py#L646
-                    // https://docs.python.org/3/library/getpass.html#getpass.getuser
-                    if (dvc_pull) {
-                        sh """
-                            cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
-                            LOGNAME=temp-user dvc pull -v
-                           """.stripIndent()
+                    if (lfs_pull) {
+                        sh "git lfs pull --exclude="
                     }
                     cmake_build(conf)
                 }
             }
-            setGithubStatus(variant, 'success', 'Completed successfully')
-        }
-        catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
-            throw e  // already set status above
-        }
-        catch (Exception ex) {
-            setGithubStatus(variant, 'failure', 'Stage failed')
-            throw ex
         }
         return retimage
 }
 
+def reboot(){
+    build job: 'reboot-slaves', propagate: false , parameters: [string(name: 'server', value: "${env.NODE_NAME}"),]
+}
+
+def buildHipClangJobAndReboot(Map conf=[:]){
+    try{
+        buildHipClangJob(conf)
+        cleanWs()
+    }
+    catch(e){
+        echo "throwing error exception for the stage"
+        echo 'Exception occurred: ' + e.toString()
+        throw e
+    }
+    finally{
+        if (conf.get("needs_reboot", true)) {
+            reboot()
+        }
+    }
+}
+
+
 def RunPerfTest(Map conf=[:]){
+    checkout scm
     def dockerOpts="--device=/dev/kfd --device=/dev/dri --group-add video --group-add render --cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
     try {
         def docker_image = conf.get("docker_image")
         def miopen_install_path = conf.get("miopen_install_path", "/opt/rocm")
-        def results_dir = conf.get("results_dir", "${env.WORKSPACE}/${env.MIOPEN_DIR}/results")
-        withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
-            docker_image.pull()
-        }
+        def results_dir = conf.get("results_dir", "${env.WORKSPACE}/results")
+        docker_image.pull()
         echo "docker image: ${docker_image}"
-        //grab root of node workspace. not guaranteed to be /var/jenkins
-        String remote_root = env.WORKSPACE.substring(0, env.WORKSPACE.lastIndexOf("workspace/"))
-        docker_image.inside(dockerOpts + " -v=${remote_root}:${remote_root}")
+        docker_image.inside(dockerOpts + ' -v=/var/jenkins/:/var/jenkins')
         {
             timeout(time: 100, unit: 'MINUTES')
             {
                 ld_lib="${miopen_install_path}/lib"
                 def filename = conf.get("filename")
                 assert(filename.trim())
-                def cmd = "export LD_LIBRARY_PATH=${ld_lib} && ${miopen_install_path}/share/miopen/bin/test_perf.py  --filename ${filename} --install_path ${miopen_install_path} --results_path ${results_dir}/perf_results"
+                def cmd = "export LD_LIBRARY_PATH=${ld_lib} && ${miopen_install_path}/bin/test_perf.py  --filename ${filename} --install_path ${miopen_install_path} --results_path ${results_dir}/perf_results"
                 if(params.PERF_TEST_OVERRIDE != '')
                 {
                     echo "Appending MIOpenDriver cmd env vars: ${params.PERF_TEST_OVERRIDE}"
@@ -795,7 +430,7 @@ def RunPerfTest(Map conf=[:]){
                   }
 
                   try{
-                     sh "${miopen_install_path}/share/miopen/bin/test_perf.py --compare_results --old_results_path ${results_dir}/old_results --results_path ${results_dir}/perf_results --filename ${filename}"
+                     sh "${miopen_install_path}/bin/test_perf.py --compare_results --old_results_path ${results_dir}/old_results --results_path ${results_dir}/perf_results --filename ${filename}"
                   }
                   catch (Exception err){
                       currentBuild.result = 'SUCCESS'
@@ -808,48 +443,6 @@ def RunPerfTest(Map conf=[:]){
     catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
         echo "The job was cancelled or aborted"
         throw e
-    }
-}
-
-def sendTeamsFailureNotification(Map conf=[:]) {
-    def teamsMessage = null
-    def teamsColor = null
-    def teamsFacts = null
-
-    if (conf.get("buildTheRock", false)) {
-        teamsMessage = 'TheRock Docker Promotion Failed'
-        teamsColor = '#FF6600'
-        teamsFacts = [
-            [name: 'Build',           template: "#${env.BUILD_NUMBER}"],
-            [name: 'TheRock hash',    template: "${env.THEROCK_FULL_HASH ?: 'unknown'}"],
-            [name: 'CK hash',         template: "${env.CK_GIT_HASH ?: 'unknown'}"],
-            [name: 'Duration',        template: "${currentBuild.durationString}"],
-            [name: 'Previous result', template: "${currentBuild.previousBuild?.result ?: 'N/A'}"],
-            [name: 'Build URL',       template: "${env.BUILD_URL}"]
-        ]
-    } else if (env.BRANCH_NAME == 'develop') {
-        teamsMessage = 'MIOpen develop branch CI failed'
-        teamsColor = '#FF0000'
-        teamsFacts = [
-            [name: 'Build',           template: "#${env.BUILD_NUMBER}"],
-            [name: 'Commit',          template: "${env.GIT_COMMIT?.take(7) ?: 'unknown'}"],
-            [name: 'TheRock hash',    template: "${env.THEROCK_PROMOTED_HASH ?: 'unknown'}"],
-            [name: 'Duration',        template: "${currentBuild.durationString}"],
-            [name: 'Previous result', template: "${currentBuild.previousBuild?.result ?: 'N/A'}"],
-            [name: 'Build URL',       template: "${env.BUILD_URL}"]
-        ]
-    }
-
-    if (teamsMessage) {
-        withCredentials([string(credentialsId: 'TEAMS_WEBHOOK_URL', variable: 'TEAMS_WEBHOOK_URL')]) {
-            office365ConnectorSend(
-                webhookUrl: TEAMS_WEBHOOK_URL,
-                message: teamsMessage,
-                status: 'Failure',
-                color: teamsColor,
-                factDefinitions: teamsFacts
-            )
-        }
     }
 }
 

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,6 @@
 #pragma once
 
 #include "host_alloc.hpp"
-#include "type_utils.h"
 #include <cmath>
 #include <string.h>
 //
@@ -66,7 +65,6 @@ public:
         if(false == this->try_initialize_memory())
         {
             this->free_memory();
-            throw std::bad_alloc{};
         }
     }
 
@@ -163,14 +161,6 @@ public:
     }
 
     //!
-    //! @brief Get data reinterpretted as hipblas_internal_type
-    //!
-    inline hipblas_internal_type<T>** internal_type()
-    {
-        return reinterpret_cast<hipblas_internal_type<T>**>(this->m_data);
-    }
-
-    //!
     //! @brief Copy from a host batched vector.
     //! @param that the vector the data is copied from.
     //! @return true if the copy is done successfully, false otherwise.
@@ -237,7 +227,7 @@ private:
     bool try_initialize_memory()
     {
         bool success
-            = (nullptr != (this->m_data = (T**)host_calloc(this->m_batch_count, sizeof(T*))));
+            = (nullptr != (this->m_data = (T**)host_calloc_throw(this->m_batch_count, sizeof(T*))));
         if(success)
         {
             size_t nmemb = size_t(this->m_n) * std::abs(this->m_inc);
@@ -247,7 +237,7 @@ private:
                 {
                     success = (nullptr
                                != (m_data[batch_index]
-                                   = (T*)host_calloc(m_nmemb * m_batch_count, sizeof(T))));
+                                   = (T*)host_calloc_throw(m_nmemb * m_batch_count, sizeof(T))));
                     if(false == success)
                     {
                         break;
@@ -270,7 +260,7 @@ private:
             {
                 if(batch_index == 0 && nullptr != this->m_data[batch_index])
                 {
-                    host_free(this->m_data[batch_index]);
+                    free(this->m_data[batch_index]);
                     this->m_data[batch_index] = nullptr;
                 }
                 else
@@ -279,7 +269,7 @@ private:
                 }
             }
 
-            host_free(this->m_data);
+            free(this->m_data);
             this->m_data = nullptr;
         }
     }

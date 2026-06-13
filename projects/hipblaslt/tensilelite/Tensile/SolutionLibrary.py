@@ -22,14 +22,16 @@
 #
 ################################################################################
 
+import itertools
 from typing import Dict
 
 from . import Properties
 from . import Hardware
 from . import Contractions
-from Tensile.Common import state, IsaInfo
-from Tensile.Common.Architectures import gfxToIsa, supportsChipIdPredicate
-from Tensile.SolutionStructs.Naming import getSolutionNameMin, getKernelNameMin
+from .SolutionStructs import Solution as OriginalSolution
+from Tensile.Common import state, IsaInfo, DepthUConfig
+from Tensile.Common.Architectures import gfxToIsa
+from Tensile.SolutionStructs.Naming import getMinNaming, getNameMin
 
 class SingleSolutionLibrary:
     Tag = "Single"
@@ -71,18 +73,7 @@ class PlaceholderLibrary:
         pass
 
     def merge(self, other):
-        otherName = getattr(other, 'filenamePrefix', None)
-        if otherName != self.filenamePrefix:
-            raise RuntimeError(
-                "[PlaceholderLibrary.merge] COLLISION: two source YAMLs "
-                "converge at the same dispatch slot but reference different "
-                "per-file libraries; one .dat will be orphaned.\n"
-                f"  self:  {self.filenamePrefix}\n"
-                f"  other: {otherName!r}\n"
-                "  Likely cause: chip-id placeholder-suffix gate is out of "
-                "sync with HardwarePredicate.FromHardware, or sibling YAMLs "
-                "declare divergent DeviceNames on a chip-id-unaware arch."
-            )
+        pass
 
 
 class MatchingLibrary:
@@ -102,18 +93,6 @@ class MatchingLibrary:
         }
         if distance == "Equality" or distance == "GridBased":
             propertyKeys[0] = Properties.Property("BatchSize", index=0)
-
-        if distance == "Range":
-            propertyKeys = {
-                0: Properties.Property("FreeSizeA", index=0),
-                1: Properties.Property("FreeSizeA", index=0),
-                2: Properties.Property("FreeSizeB", index=0),
-                3: Properties.Property("FreeSizeB", index=0),
-                4: Properties.Property("BatchSize", index=0),
-                5: Properties.Property("BatchSize", index=0),
-                6: Properties.Property("BoundSize", index=0),
-                7: Properties.Property("BoundSize", index=0)
-            }
 
         properties = list([propertyKeys[i] for i in indices if i in propertyKeys])
         keyOrder = [i for i, j in enumerate(indices) if j in propertyKeys]
@@ -176,42 +155,6 @@ class FreeSizeLibrary:
                 value = IndexSolutionLibrary(solutions[index])
                 entry = {"index": value}
                 table.append(entry)
-        except KeyError:
-            pass
-
-        return cls(table)
-
-    @property
-    def tag(self):
-        return self.__class__.Tag
-
-    def merge(self, other):
-        assert self.__class__ == other.__class__
-
-        self.table += other.table
-
-    def remapSolutionIndices(self, indexMap):
-        pass
-
-    def __init__(self, table):
-        self.table = table
-
-class PredictionLibrary:
-    Tag = "Prediction"
-    StateKeys = [("type", "tag"), "table"]
-
-    @classmethod
-    def FromOriginalState(cls, d, solutions):
-        origTable = d["table"]
-
-        table = []
-
-        try:
-            indexStart  = origTable[0]
-            indexOffset = origTable[1]
-            for index in range(indexStart, indexStart + indexOffset):
-                value = IndexSolutionLibrary(solutions[index])
-                table.append(value)
         except KeyError:
             pass
 
@@ -333,53 +276,6 @@ class PredicateLibrary:
 class MasterSolutionLibrary:
     StateKeys = ["solutions", "library"]
 
-    @staticmethod
-    def hardware(d, library, placeholderName, lazyLibrary, logicFile=None):
-        """Build the Hardware-level PredicateLibrary row and update the
-        placeholder filename.
-
-        Lifted out of ``FromOriginalState`` so the placeholder-suffix gating
-        invariant (the ``_ID<chipid>`` suffix must only be appended when the
-        runtime ``HardwarePredicate`` also discriminates on chip-id, see
-        ``Hardware.HardwarePredicate.FromHardware`` and
-        ``supportsChipIdPredicate``) can be exercised behaviorally rather than
-        by source-string inspection.
-        """
-        devicePart = d["ArchitectureName"]
-        cuCount = d["CUCount"]
-
-        pciChipId = d.get("DeviceNames", None)
-
-        newLib = PredicateLibrary(tag="Hardware")
-        if devicePart == "fallback":
-            pred = Hardware.HardwarePredicate("TruePred")
-        else:
-            pred = Hardware.HardwarePredicate.FromHardware(
-                gfxToIsa(devicePart), cuCount, pciChipId, logicFile=logicFile
-            )
-
-        newLib.rows.append({"predicate": pred, "library": library})
-
-        if lazyLibrary:
-            if cuCount: placeholderName += "_CU" + str(cuCount)
-            # Only append the chip-id suffix on architectures whose runtime
-            # HardwarePredicate also includes the chip-id discriminator
-            # (see Hardware.HardwarePredicate.FromHardware). Otherwise the
-            # filename diverges between sibling YAMLs while their predicates
-            # remain equal, producing PredicateLibrary.merge collisions whose
-            # PlaceholderLibrary children silently drop one leaf.
-            if pciChipId and supportsChipIdPredicate(devicePart):
-                # Convert device names list to a sanitized string for filename
-                # e.g., ['Device 75a0', 'Device 75b0'] -> 'ID75a0-75b0'
-                if isinstance(pciChipId, list):
-                    chipIdStr = '-'.join([str(d).replace('Device ', '').strip() for d in pciChipId])
-                else:
-                    chipIdStr = str(pciChipId).replace('Device ', '').strip()
-                placeholderName += "_ID" + chipIdStr
-            placeholderName += "_" + str(devicePart)
-
-        return newLib, placeholderName
-
     @classmethod
     def FixSolutionIndices(cls, solutions):
         # fix missing and duplicate solution indices.
@@ -403,17 +299,32 @@ class MasterSolutionLibrary:
                           splitGSU: bool,
                           printSolutionRejectionReason: bool,
                           printIndexAssignmentInfo: bool,
+                          depthUConfig: DepthUConfig,
                           assembler,
                           isaInfoMap: Dict[str, IsaInfo],
                           lazyLibraryLoading: bool,
-                          logicFile=None,
                           solutionClass=Contractions.Solution,
                           libraryOrder=None,
                           placeholderName='TensileLibrary'):
 
         # functions for creating each "level" of the library
         def hardware(d, problemType, solutions, library, placeholderName):
-            return cls.hardware(d, library, placeholderName, lazyLibrary, logicFile=logicFile)
+            devicePart = d["ArchitectureName"]
+            cuCount = d["CUCount"]
+
+            newLib = PredicateLibrary(tag="Hardware")
+            if devicePart == "fallback":
+                pred = Hardware.HardwarePredicate("TruePred")
+            else:
+                pred = Hardware.HardwarePredicate.FromHardware(gfxToIsa(devicePart), cuCount)
+
+            newLib.rows.append({"predicate": pred, "library": library})
+
+            if lazyLibrary:
+                if cuCount: placeholderName += "_CU" + str(cuCount)
+                placeholderName += "_" + str(devicePart)
+
+            return newLib, placeholderName
 
         def operationIdentifier(d, problemType, solutions, library, placeholderName):
             operationID = problemType.operationIdentifier
@@ -460,10 +371,8 @@ class MasterSolutionLibrary:
             if d["LibraryType"] == "Matching":
                 if d["Library"]["distance"] == "Equality":
                     predicate = Properties.Predicate(tag="EqualityMatching")
-                elif d["Library"]["distance"] == "Range":
-                    predicate = Properties.Predicate(tag="RangeMatching")
                 else:
-                    predicate = Properties.Predicate(tag="GridBasedMatching") # to make different from TruePred
+                    predicate = Properties.Predicate(tag="TruePred")
 
                 matchingLib = MatchingLibrary.FromOriginalState(d["Library"], solutions)
                 library = PredicateLibrary(tag="Problem")
@@ -474,12 +383,6 @@ class MasterSolutionLibrary:
                 freesizeLib = FreeSizeLibrary.FromOriginalState(d["Library"], solutions)
                 library = PredicateLibrary(tag="Problem")
                 library.rows.append({"predicate": predicate, "library": freesizeLib})
-            elif d["LibraryType"] == "Prediction":
-                predicate = Properties.Predicate(tag="PredictionMatching") # So that FreeSize / Prediction can co-exist
-
-                predictionLib = PredictionLibrary.FromOriginalState(d["Library"], solutions)
-                library = PredicateLibrary(tag="Problem")
-                library.rows.append({"predicate": predicate, "library": predictionLib})
             elif d["LibraryType"] == "MLPClassification":
                 predicate = Properties.Predicate(tag="TruePred")
 
@@ -490,11 +393,8 @@ class MasterSolutionLibrary:
                 assert 0 and "Unrecognized LibraryType."
 
             if lazyLibraryLoading:
-                computeInputTypeStr = str(problemType.computeInputTypeA)
-                if problemType.computeInputTypeA != problemType.computeInputTypeB:
-                    computeInputTypeStr = str(problemType.computeInputTypeA) + str(problemType.computeInputTypeB)
                 placeholderName += '_' + str(problemType.aType) + str(problemType.bType)
-                placeholderName += '_' + str(problemType.cType) + computeInputTypeStr
+                placeholderName += '_' + str(problemType.cType) + str(problemType.computeInputType)
                 if problemType.activationType != 'none':
                     if str(problemType.activationType).upper() == 'ALL':
                         placeholderName += "_A"
@@ -502,11 +402,6 @@ class MasterSolutionLibrary:
                         placeholderName += "_HA"
                     else:
                         placeholderName += "_%s"%str(problemType.activationType).upper()
-
-                if problemType.mxBlockA:
-                    placeholderName += ('_MXA' + str(problemType.mxTypeA) + 'B' + str(problemType.mxBlockA))
-                if problemType.mxBlockB:
-                    placeholderName += ('_MXB' + str(problemType.mxTypeB) + 'B' + str(problemType.mxBlockB))
 
                 if problemType.swizzleTensorA:
                     placeholderName += '_STA'
@@ -532,8 +427,7 @@ class MasterSolutionLibrary:
                     placeholderName += '_SAV'
                 if problemType.sparse:
                     placeholderName += '_SPB' if problemType.sparse == 2 else '_SPA'
-                    placeholderName += "ML" + str(problemType.metadataLayout)
-                if not problemType.f32XdlMathOp.isSingle() and problemType.computeInputTypeA.isSingle() and problemType.computeInputTypeB.isSingle():
+                if not problemType.f32XdlMathOp.isSingle() and problemType.computeInputType.isSingle():
                     placeholderName += '_M' + str(problemType.f32XdlMathOp)
                 if problemType.supportDeviceUserArguments:
                     placeholderName += '_UA'
@@ -564,10 +458,10 @@ class MasterSolutionLibrary:
                                                         splitGSU,
                                                         printSolutionRejectionReason,
                                                         printIndexAssignmentInfo,
+                                                        depthUConfig,
                                                         assembler,
                                                         isaInfoMap,
                                                         lazyLibraryLoading,
-                                                        logicFile,
                                                         solutionClass,
                                                         libraryOrder[placeholderIndex:],
                                                         placeholderName)
@@ -580,6 +474,7 @@ class MasterSolutionLibrary:
                             splitGSU,
                             printSolutionRejectionReason,
                             printIndexAssignmentInfo,
+                            depthUConfig,
                             assembler,
                             isaInfoMap
                         ) for s in origSolutions]
@@ -610,6 +505,7 @@ class MasterSolutionLibrary:
         splitGSU: bool,
         printSolutionRejectionReason: bool,
         printIndexAssignmentInfo: bool,
+        depthUConfig: DepthUConfig,
         isaInfoMap
     ):
         solutionObjs = list([Contractions.Solution.FromOriginalState(
@@ -617,6 +513,7 @@ class MasterSolutionLibrary:
                                  splitGSU,
                                  printSolutionRejectionReason,
                                  printIndexAssignmentInfo,
+                                 depthUConfig,
                                  assembler,
                                  isaInfoMap)
                             for s in solutions])
@@ -648,10 +545,14 @@ class MasterSolutionLibrary:
             rv["version"] = self.version
         return rv
 
-    def applyNaming(self, splitGSU: bool):
+    def applyNaming(self, splitGSU: bool, naming=None):
+        if naming is None:
+            kernels = itertools.chain(s.originalSolution.getKernels() for s in self.solutions.values())
+            naming = getMinNaming(kernels)
+
         for s in list(self.solutions.values()):
-            s.name = getSolutionNameMin(s.originalSolution.getKernels()[0], splitGSU)
-            s.kernelName = getKernelNameMin(s.originalSolution.getKernels()[0], splitGSU)
+            s.name = getNameMin(s.originalSolution.getKernels()[0], naming, splitGSU)
+            s.kernelName = getNameMin(s.originalSolution.getKernels()[0], naming, splitGSU, True)
 
     def remapSolutionIndicesStartingFrom(self, curIndex):
         reIndexMap = {}

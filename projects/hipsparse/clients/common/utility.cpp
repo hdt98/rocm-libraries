@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2021 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,14 @@
 
 #ifdef WIN32
 #define strSUITEcmp(A, B) _stricmp(A, B)
+#endif
+
+#ifdef __cpp_lib_filesystem
+#include <filesystem>
+namespace fs = std::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 #endif
 
 /* ============================================================================================ */
@@ -75,38 +83,6 @@ std::string hipsparse_exepath()
 #endif
 }
 
-/* ==================================================================================== */
-// Return path where the test data file (hipsparse_test.data) is located
-std::string hipsparse_datapath()
-{
-#ifdef WIN32
-    fs::path        share_path = fs::path(hipsparse_exepath() + "../share/hipsparse/test");
-    std::error_code ec;
-    fs::path        path = fs::canonical(share_path, ec);
-    if(!ec)
-    {
-        if(fs::exists(path, ec) && !ec)
-        {
-            path += path.empty() ? "" : "/";
-            return path.string();
-        }
-    }
-#else
-    std::string pathstr;
-    std::string share_path = hipsparse_exepath() + "../share/hipsparse/test";
-    char*       path       = realpath(share_path.c_str(), 0);
-    if(path != NULL)
-    {
-        pathstr = path;
-        pathstr += "/";
-        free(path);
-        return pathstr;
-    }
-#endif
-
-    return hipsparse_exepath();
-}
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -115,48 +91,18 @@ extern "C" {
 /*  query for hipsparse version and git commit SHA-1. */
 void query_version(char* version)
 {
-    int  hipsparse_ver;
-    char hipsparse_rev[256];
-
-    hipsparseStatus_t status;
-
     hipsparseHandle_t handle;
-    status = hipsparseCreate(&handle);
-    if(HIPSPARSE_STATUS_SUCCESS != status)
-    {
-        std::cerr << "The creation of the hipsparseHandle_t failed." << std::endl;
-        throw(status);
-    }
+    hipsparseCreate(&handle);
 
-    status = hipsparseGetVersion(handle, &hipsparse_ver);
-    if(HIPSPARSE_STATUS_SUCCESS != status)
-    {
-        std::cerr << "hipsparseGetVersion failed." << std::endl;
-        throw(status);
-    }
+    int ver;
+    hipsparseGetVersion(handle, &ver);
 
-    status = hipsparseGetGitRevision(handle, hipsparse_rev);
-    if(HIPSPARSE_STATUS_SUCCESS != status)
-    {
-        std::cerr << "hipsparseGetGitRevision failed." << std::endl;
-        throw(status);
-    }
+    char rev[128];
+    hipsparseGetGitRevision(handle, rev);
 
-    status = hipsparseDestroy(handle);
+    sprintf(version, "v%d.%d.%d-%s", ver / 100000, ver / 100 % 1000, ver % 100, rev);
 
-    if(HIPSPARSE_STATUS_SUCCESS != status)
-    {
-        std::cerr << "rocsparse_destroy_handle failed." << std::endl;
-        throw(status);
-    }
-
-    snprintf(version,
-             512,
-             "v%d.%d.%d-%.256s",
-             hipsparse_ver / 100000,
-             hipsparse_ver / 100 % 1000,
-             hipsparse_ver % 100,
-             hipsparse_rev);
+    hipsparseDestroy(handle);
 }
 
 /* ============================================================================================ */
@@ -189,12 +135,12 @@ int query_device_property()
         {
             printf("Device ID %d : %s\n", i, props.name);
             printf("-------------------------------------------------------------------------\n");
-            printf("with %zuMB memory, clock rate %dMHz @ computing capability %d.%d \n",
+            printf("with %ldMB memory, clock rate %dMHz @ computing capability %d.%d \n",
                    props.totalGlobalMem >> 20,
-                   (props.clockRate / 1000),
+                   (int)(props.clockRate / 1000),
                    props.major,
                    props.minor);
-            printf("maxGridDimX %d, sharedMemPerBlock %zuKB, maxThreadsPerBlock %d, warpSize %d\n",
+            printf("maxGridDimX %d, sharedMemPerBlock %ldKB, maxThreadsPerBlock %d, warpSize %d\n",
                    props.maxGridSize[0],
                    props.sharedMemPerBlock >> 10,
                    props.maxThreadsPerBlock,
@@ -214,7 +160,7 @@ void set_device(int device_id)
     if(status != HIPSPARSE_STATUS_SUCCESS)
     {
         printf("Set device error: cannot set device ID %d, there may not be such device ID\n",
-               device_id);
+               (int)device_id);
     }
 }
 /* ============================================================================================ */

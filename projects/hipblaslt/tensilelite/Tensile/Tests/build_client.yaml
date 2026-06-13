@@ -1,6 +1,6 @@
 
 GlobalParameters:
-  MinimumRequiredVersion: 5.0.0
+  MinimumRequiredVersion: 4.4.0
   PrintLevel: 1
   ForceRedoBenchmarkProblems: True
   ForceRedoLibraryLogic: True
@@ -11,6 +11,7 @@ GlobalParameters:
   NumElementsToValidate: 0
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
+  ShortNames: False
   Platform: 0
   Device: 0
   KernelTime: True

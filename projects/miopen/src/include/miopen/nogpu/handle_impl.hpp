@@ -36,7 +36,7 @@ struct HandleImpl
     void elapsed_time(hipEvent_t start, hipEvent_t stop)
     {
         if(enable_profiling)
-            (void)hipEventElapsedTime(&this->profiling_result, start, stop);
+            hipEventElapsedTime(&this->profiling_result, start, stop);
     }
 
     std::function<void(hipEvent_t, hipEvent_t)> elapsed_time_handler()

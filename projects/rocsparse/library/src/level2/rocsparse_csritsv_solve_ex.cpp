@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,13 +22,12 @@
  *
  * ************************************************************************ */
 
+#include "common.h"
+#include "control.h"
 #include "internal/level2/rocsparse_csritsv.h"
-#include "rocsparse_assign_async.hpp"
 #include "rocsparse_common.h"
-#include "rocsparse_common.hpp"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csritsv.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "rocsparse_csrmv.hpp"
 
@@ -201,9 +200,6 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
 {
     ROCSPARSE_ROUTINE_TRACE;
 
-    static constexpr bool fallback_algorithm = true;
-    static constexpr bool force_conj         = false;
-
     const bool                    breakable   = (host_tol != nullptr);
     const bool                    recordable  = (host_history != nullptr);
     const bool                    compute_nrm = (recordable || breakable);
@@ -229,11 +225,8 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
     if(descr->diag_type == rocsparse_diag_type_unit)
     {
         rocsparse_int max = std::numeric_limits<rocsparse_int>::max();
-        RETURN_IF_HIP_ERROR(hipMemcpyAsync(info->csritsv_info->get_position(),
-                                           &max,
-                                           sizeof(rocsparse_int),
-                                           hipMemcpyHostToDevice,
-                                           stream));
+        RETURN_IF_HIP_ERROR(hipMemcpyAsync(
+            info->zero_pivot, &max, sizeof(rocsparse_int), hipMemcpyHostToDevice, stream));
 
         // Wait for device transfer to finish
         RETURN_IF_HIP_ERROR(hipStreamSynchronize(stream));
@@ -303,11 +296,8 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
         }
         else
         {
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse::assign_async(
-                1,
-                reinterpret_cast<rocsparse_int*>(info->csritsv_info->get_position()),
-                (rocsparse_int)descr->base,
-                stream));
+            RETURN_IF_HIP_ERROR(rocsparse::assign_async(
+                static_cast<rocsparse_int*>(info->zero_pivot), (rocsparse_int)descr->base, stream));
             return rocsparse_status_success;
         }
     }
@@ -445,24 +435,14 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
                                                                 ptr_diag,
                                                                 ptr_diag_shift,
                                                                 descr->base,
-                                                                (rocsparse_int*)info->csritsv_info
-                                                                    ->get_position()));
+                                                                (rocsparse_int*)info->zero_pivot));
 
-        int64_t zero_pivot;
-        auto    csritsv_info = info->csritsv_info;
+        rocsparse_int zero_pivot;
 
-        const auto indextype = rocsparse::get_indextype<int64_t>();
-        RETURN_IF_ROCSPARSE_ERROR(
-            rocsparse::singularity_get_position_async(handle,
-                                                      1,
-                                                      csritsv_info,
-                                                      nullptr,
-                                                      nullptr,
-                                                      rocsparse_pointer_mode_host,
-                                                      indextype,
-                                                      &zero_pivot));
+        RETURN_IF_HIP_ERROR(hipMemcpyAsync(
+            &zero_pivot, info->zero_pivot, sizeof(rocsparse_int), hipMemcpyDeviceToHost, stream));
         RETURN_IF_HIP_ERROR(hipStreamSynchronize(stream));
-        if(zero_pivot != -1)
+        if(zero_pivot != std::numeric_limits<rocsparse_int>::max())
         {
             return rocsparse_status_success;
         }
@@ -505,12 +485,11 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
                                                            ptr_begin,
                                                            ptr_end,
                                                            csr_col_ind,
-                                                           info->get_csrmv_info(),
+                                                           info,
                                                            y,
                                                            alpha_device_host,
                                                            y_p,
-                                                           force_conj,
-                                                           fallback_algorithm));
+                                                           false));
                 //
                 // Add scale the residual
                 //
@@ -546,12 +525,11 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
                                                               ptr_begin,
                                                               ptr_end,
                                                               csr_col_ind,
-                                                              info->get_csrmv_info(),
+                                                              info,
                                                               y,
                                                               alpha_device_host,
                                                               y_p,
-                                                              force_conj,
-                                                              fallback_algorithm));
+                                                              false));
             bool break_loop = false;
             if(compute_nrm)
             {
@@ -646,12 +624,11 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
                                                            ptr_begin,
                                                            ptr_end,
                                                            csr_col_ind,
-                                                           info->get_csrmv_info(),
+                                                           info,
                                                            y_p,
                                                            alpha_device_host,
                                                            y,
-                                                           force_conj,
-                                                           fallback_algorithm));
+                                                           false));
             }
 
             //
@@ -695,12 +672,11 @@ rocsparse_status rocsparse::csritsv_solve_ex_template(rocsparse_handle handle,
                                                               ptr_begin,
                                                               ptr_end,
                                                               csr_col_ind,
-                                                              info->get_csrmv_info(),
+                                                              info,
                                                               y_p,
                                                               alpha_device_host,
                                                               y,
-                                                              force_conj,
-                                                              fallback_algorithm));
+                                                              false));
 
             if(compute_nrm)
             {

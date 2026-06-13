@@ -1,4 +1,4 @@
-// Copyright (C) 2019 - 2026 Advanced Micro Devices, Inc. All rights
+// Copyright (C) 2019 - 2022 Advanced Micro Devices, Inc. All rights
 // reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,6 +31,8 @@ DISABLE_WARNING_RETURN_TYPE
 #include <hip/hip_runtime_api.h>
 DISABLE_WARNING_POP
 
+#include "../hipfft_params.h"
+
 int main()
 {
     std::cout << "hipfft 2D double-precision complex-to-complex transform\n";
@@ -44,22 +46,23 @@ int main()
 
     // Create HIP device object and copy data to device:
     // hipfftComplex for single-precision
+    hipError_t           hip_rt;
     hipfftDoubleComplex* x;
-    hipError_t           hip_rt = hipMalloc(&x, complex_bytes);
+    hip_rt = hipMalloc(&x, complex_bytes);
     if(hip_rt != hipSuccess)
         throw std::runtime_error("hipMalloc failed");
 
-    // Initialize the data
-    for(size_t i = 0; i < static_cast<size_t>(Nx) * Ny; i++)
+    // Inititalize the data
+    for(size_t i = 0; i < Nx * Ny; i++)
     {
         cdata[i] = i;
     }
     std::cout << "input:\n";
-    for(size_t i = 0; i < static_cast<size_t>(Nx); i++)
+    for(int i = 0; i < Nx; i++)
     {
-        for(size_t j = 0; j < static_cast<size_t>(Ny); j++)
+        for(int j = 0; j < Ny; j++)
         {
-            size_t pos = i * Ny + j;
+            int pos = i * Ny + j;
             std::cout << cdata[pos] << " ";
         }
         std::cout << "\n";
@@ -69,15 +72,18 @@ int main()
     if(hip_rt != hipSuccess)
         throw std::runtime_error("hipMemcpy failed");
 
-    // Create plan (hipfftPlan2d internally allocates the handle)
-    hipfftHandle plan{};
-    hipfftResult hipfft_rt
-        = hipfftPlan2d(&plan, // plan handle
-                       Nx, // transform length
-                       Ny, // transform length
-                       HIPFFT_Z2Z); // transform type (HIPFFT_C2C for single-precision)
+    // Create plan
+    hipfftHandle plan      = hipfft_params::INVALID_PLAN_HANDLE;
+    hipfftResult hipfft_rt = hipfftCreate(&plan);
     if(hipfft_rt != HIPFFT_SUCCESS)
-        throw std::runtime_error("hipfftPlan2d failed");
+        throw std::runtime_error("failed to create plan");
+
+    hipfft_rt = hipfftPlan2d(&plan, // plan handle
+                             Nx, // transform length
+                             Ny, // transform length
+                             HIPFFT_Z2Z); // transform type (HIPFFT_C2C for single-precision)
+    if(hipfft_rt != HIPFFT_SUCCESS)
+        throw std::runtime_error("hipfftPlandd failed");
 
     // Execute plan
     // hipfftExecZ2Z: double precision, hipfftExecC2C: for single-precision
@@ -89,9 +95,9 @@ int main()
     hip_rt = hipMemcpy(cdata.data(), x, complex_bytes, hipMemcpyDeviceToHost);
     if(hip_rt != hipSuccess)
         throw std::runtime_error("hipMemcpy failed");
-    for(size_t i = 0; i < static_cast<size_t>(Nx); i++)
+    for(size_t i = 0; i < Nx; i++)
     {
-        for(size_t j = 0; j < static_cast<size_t>(Ny); j++)
+        for(size_t j = 0; j < Ny; j++)
         {
             auto pos = i * Ny + j;
             std::cout << cdata[pos] << " ";
@@ -100,8 +106,7 @@ int main()
     }
     std::cout << std::endl;
 
-    if(hipfftDestroy(plan) != HIPFFT_SUCCESS)
-        throw std::runtime_error("hipfftDestroy failed");
+    hipfftDestroy(plan);
 
     hip_rt = hipFree(x);
     if(hip_rt != hipSuccess)

@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights Reserved.
+# Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -63,7 +63,7 @@ Tests:
   category: quick
   function: csrgeam
   precision: *single_double_precisions_complex_real
-  M: [300]
+  M: [582]
   N: [243]
   alpha_alphai: *alpha_range_quick
   beta_betai: *beta_range_quick
@@ -76,7 +76,7 @@ Tests:
   category: quick
   function: csrgeam
   precision: *single_double_precisions_complex_real
-  M: [8, 300]
+  M: [8, 582]
   N: [12, 243]
   alpha_alphai: *alpha_range_quick
   beta_betai: *beta_range_quick
@@ -89,8 +89,8 @@ Tests:
   category: pre_checkin
   function: csrgeam
   precision: *single_double_precisions_complex_real
-  M: [8, 24]
-  N: [8, 61]
+  M: [0, 24, 1582, 8422]
+  N: [0, 61, 2512, 11692]
   alpha_alphai: *alpha_range_checkin
   beta_betai: *beta_range_checkin
   baseA: [rocsparse_index_base_zero]
@@ -102,8 +102,8 @@ Tests:
   category: nightly
   function: csrgeam
   precision: *single_double_precisions_complex_real
-  M: [5000]
-  N: [5000]
+  M: [75762, 142323, 831934]
+  N: [25012, 54020, 1050323]
   alpha_alphai: *alpha_range_nightly
   beta_betai: *beta_range_nightly
   baseA: [rocsparse_index_base_zero]
@@ -123,9 +123,8 @@ Tests:
   baseB: [rocsparse_index_base_zero]
   baseC: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_file_rocalution]
-  filename: [nos1,
+  filename: [mac_econ_fwd500,
              nos2,
-             nos3,
              nos4,
              nos6]
 
@@ -178,7 +177,8 @@ Tests:
   baseB: [rocsparse_index_base_one]
   baseC: [rocsparse_index_base_one]
   matrix: [rocsparse_matrix_file_rocalution]
-  filename: [mplate]
+  filename: [qc2534,
+             Chevron2]
 
 - name: csrgeam_file
   category: pre_checkin
@@ -192,8 +192,7 @@ Tests:
   baseB: [rocsparse_index_base_zero]
   baseC: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_file_rocalution]
-  filename: [Chevron2,
-             qc2534,
+  filename: [mplate,
              scircuit]
 
 - name: csrgeam_file

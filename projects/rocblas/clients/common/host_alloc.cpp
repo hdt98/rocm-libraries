@@ -51,25 +51,14 @@ void alloc_ptr_use(void* ptr, size_t size)
     }
 }
 
-void free_ptr_use(void* ptr, bool call_free)
+void free_ptr_use(void* ptr)
 {
     std::lock_guard<std::mutex> lock(mem_mutex);
-    auto                        it = mem_allocated.find(ptr);
-
-    if(ptr && it != mem_allocated.end())
+    if(ptr && mem_allocated[ptr])
     {
-        mem_used -= it->second;
-        mem_allocated.erase(it);
+        mem_used -= mem_allocated[ptr];
+        mem_allocated.erase(ptr);
     }
-    else if(ptr && call_free)
-    {
-        rocblas_cerr << "Warning: Freeing untracked pointer " << ptr
-                     << " - untracked memory released (potential double-free or memory corruption)"
-                     << std::endl;
-    }
-
-    if(call_free)
-        free(ptr);
 }
 
 size_t host_bytes_allocated()
@@ -225,7 +214,7 @@ void* host_calloc(size_t nmemb, size_t size)
     if(host_mem_safe(nmemb * size))
     {
         void* ptr = calloc(nmemb, size);
-        alloc_ptr_use(ptr, nmemb * size);
+        alloc_ptr_use(ptr, size);
         return ptr;
     }
     else
@@ -234,5 +223,6 @@ void* host_calloc(size_t nmemb, size_t size)
 
 void host_free(void* ptr)
 {
-    free_ptr_use(ptr, true);
+    free(ptr);
+    free_ptr_use(ptr);
 }

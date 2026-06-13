@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,72 +22,15 @@
  * ************************************************************************ */
 
 #include "internal/generic/rocsparse_check_spmat.h"
-#include "rocsparse_control.hpp"
-#include "rocsparse_handle.hpp"
-#include "rocsparse_utility.hpp"
+#include "control.h"
+#include "handle.h"
+#include "utility.h"
 
 #include "rocsparse_check_matrix_coo.hpp"
 #include "rocsparse_check_matrix_csc.hpp"
 #include "rocsparse_check_matrix_csr.hpp"
 #include "rocsparse_check_matrix_ell.hpp"
 #include "rocsparse_check_matrix_gebsr.hpp"
-#include "rocsparse_determine_indextype.hpp"
-
-// LCOV_EXCL_START
-template <>
-const char* rocsparse::enum_utils::to_string(rocsparse_check_spmat_stage value_)
-{
-#define CASE(C) \
-    case C:     \
-        return #C
-    switch(value_)
-    {
-        CASE(rocsparse_check_spmat_stage_buffer_size);
-        CASE(rocsparse_check_spmat_stage_compute);
-#undef CASE
-    }
-    THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-}
-
-template <>
-const char* rocsparse::enum_utils::to_string(rocsparse_data_status data_status)
-{
-    switch(data_status)
-    {
-    case rocsparse_data_status_success:
-        return "No errors in data detected";
-    case rocsparse_data_status_inf:
-        return "An inf value was found in the values array.";
-    case rocsparse_data_status_nan:
-        return "An nan value was found in the values array.";
-    case rocsparse_data_status_invalid_offset_ptr:
-        return "An invalid offset pointer was detected.";
-    case rocsparse_data_status_invalid_index:
-        return "An invalid index was detected.";
-    case rocsparse_data_status_duplicate_entry:
-        return "A duplicate entry was detected.";
-    case rocsparse_data_status_invalid_sorting:
-        return "Sorting mode was detected to be invalid.";
-    case rocsparse_data_status_invalid_fill:
-        return "Fill mode was detected to be invalid.";
-    }
-    THROW_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
-}
-// LCOV_EXCL_STOP
-
-template <>
-bool rocsparse::enum_utils::is_invalid(rocsparse_check_spmat_stage value_)
-{
-    switch(value_)
-    {
-    case rocsparse_check_spmat_stage_buffer_size:
-    case rocsparse_check_spmat_stage_compute:
-    {
-        return false;
-    }
-    }
-    return true;
-}
 
 namespace rocsparse
 {
@@ -320,7 +263,6 @@ namespace rocsparse
 
         case rocsparse_format_coo_aos:
         case rocsparse_format_bell:
-        case rocsparse_format_sell:
         {
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
@@ -372,7 +314,6 @@ namespace rocsparse
     case rocsparse_datatype_i32_r:                                                                 \
     case rocsparse_datatype_u32_r:                                                                 \
     case rocsparse_datatype_f16_r:                                                                 \
-    case rocsparse_datatype_bf16_r:                                                                \
     {                                                                                              \
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);                               \
     }                                                                                              \
@@ -455,11 +396,10 @@ try
                        rocsparse_status_invalid_pointer);
 
     ROCSPARSE_CHECKARG(1, mat, (mat->init == false), rocsparse_status_not_initialized);
-    ROCSPARSE_CHECKARG(1, mat, (mat->batch_count != 1), rocsparse_status_not_implemented);
 
     RETURN_IF_ROCSPARSE_ERROR(
-        rocsparse::check_spmat_dynamic_dispatch(rocsparse::determine_I_indextype(mat),
-                                                rocsparse::determine_J_indextype(mat),
+        rocsparse::check_spmat_dynamic_dispatch(rocsparse::determine_I_index_type(mat),
+                                                rocsparse::determine_J_index_type(mat),
                                                 mat->data_type,
                                                 mat->format,
                                                 handle,

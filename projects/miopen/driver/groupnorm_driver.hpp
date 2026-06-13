@@ -114,15 +114,10 @@ private:
     std::vector<Tref> outhost;
     std::vector<Tref> meanhost;
     std::vector<Tref> rstdhost;
-    std::vector<Tref> outhost_mt;
-    std::vector<Tref> meanhost_mt;
-    std::vector<Tref> rstdhost_mt;
 
     int num_groups;
     float eps;
     miopenNormMode_t mode;
-
-    bool use_multithread;
 };
 
 template <typename Tgpu, typename Tref>
@@ -134,9 +129,6 @@ int GroupNormDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     {
         miopenEnableProfiling(GetHandle(), true);
     }
-
-    use_multithread = (inflags.GetValueInt("mt") != 0);
-
     return miopenStatusSuccess;
 }
 
@@ -181,7 +173,6 @@ int GroupNormDriver<Tgpu, Tref>::AddCmdLineArgs()
     inflags.AddInputFlag("time", 't', "0", "Time Each Layer (Default=0)", "int");
     inflags.AddInputFlag(
         "wall", 'w', "0", "Wall-clock Time Each Layer, Requires time == 1 (Default=0)", "int");
-    inflags.AddInputFlag("mt", 'u', "0", "Use multithreaded version (Default=0)", "int");
 
     return miopenStatusSuccess;
 }
@@ -341,8 +332,7 @@ int GroupNormDriver<Tgpu, Tref>::RunForwardCPU()
                                            rstdhost.data(),
                                            num_groups,
                                            eps,
-                                           mode,
-                                           use_multithread);
+                                           mode);
 
     return miopenStatusSuccess;
 }
@@ -370,46 +360,39 @@ template <typename Tgpu, typename Tref>
 int GroupNormDriver<Tgpu, Tref>::VerifyForward()
 {
     RunForwardCPU();
-    const Tref tolerance    = GetTolerance();
-    auto error              = miopen::rms_range(outhost, out);
-    std::string solver_type = use_multithread ? "multi-threaded" : "single-threaded";
+    const Tref tolerance = GetTolerance();
+    auto error           = miopen::rms_range(outhost, out);
 
     if(!std::isfinite(error) || error > tolerance)
     {
-        std::cout << "Forward GroupNorm FAILED against " << solver_type
-                  << " CPU reference: " << error << " > " << tolerance << std::endl;
+        std::cout << "Forward GroupNorm FAILED: " << error << std::endl;
         return EC_VerifyFwd;
     }
     else
     {
-        std::cout << "Forward GroupNorm Verifies OK against " << solver_type << " CPU reference ("
-                  << error << " < " << tolerance << ')' << std::endl;
+        printf("Forward GroupNorm Verifies on CPU and GPU (err=%f)\n", error);
     }
 
     auto meanerror = miopen::rms_range(meanhost, mean);
     if(!std::isfinite(meanerror) || meanerror > tolerance)
     {
-        std::cout << "Forward GroupNorm mean FAILED against " << solver_type
-                  << " CPU reference: " << meanerror << " > " << tolerance << std::endl;
+        std::cout << "Forward GroupNorm mean FAILED: " << meanerror << std::endl;
         return EC_VerifyFwd;
     }
     else
     {
-        std::cout << "Forward GroupNorm mean Verifies OK against " << solver_type
-                  << " CPU reference (" << meanerror << " < " << tolerance << ')' << std::endl;
+        printf("Forward GroupNorm mean Verifies on CPU and GPU (err=%f)\n", meanerror);
     }
 
     auto rstderror = miopen::rms_range(rstdhost, rstd);
     if(!std::isfinite(rstderror) || rstderror > tolerance)
     {
-        std::cout << "Forward GroupNorm rstd FAILED against " << solver_type
-                  << " CPU reference: " << rstderror << " > " << tolerance << std::endl;
+        std::cout << "Forward GroupNorm rstd FAILED: " << rstderror << std::endl;
         return EC_VerifyFwd;
     }
     else
     {
-        std::cout << "Forward GroupNorm rstd Verifies OK against " << solver_type
-                  << " CPU reference (" << rstderror << " < " << tolerance << ')' << std::endl;
+        printf("Forward GroupNorm rstd Verifies on CPU and GPU (err=%f)\n", rstderror);
     }
 
     return miopenStatusSuccess;

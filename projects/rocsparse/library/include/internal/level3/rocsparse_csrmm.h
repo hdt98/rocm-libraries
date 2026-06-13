@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 /*! \ingroup level3_module
-*  \brief Sparse matrix dense matrix multiplication using the CSR storage format.
+*  \brief Sparse matrix dense matrix multiplication using CSR storage format
 *
 *  \details
 *  \p rocsparse_csrmm multiplies the scalar \f$\alpha\f$ with a sparse \f$m \times k\f$
@@ -83,14 +83,14 @@ extern "C" {
 *  This function does not produce deterministic results when A is transposed.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  trans_A     matrix \f$A\f$ operation type.
 *  @param[in]
@@ -132,17 +132,71 @@ extern "C" {
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, \p k, \p nnz, \p ldb, or \p ldc
+*  \retval     rocsparse_status_invalid_size \p m, \p n, \p k, \p nnz, \p ldb or \p ldc
 *              is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p descr, \p alpha, \p csr_val,
-*              \p csr_row_ptr, \p csr_col_ind, \p B, \p beta, or \p C pointer is invalid.
+*              \p csr_row_ptr, \p csr_col_ind, \p B, \p beta or \p C pointer is invalid.
 *  \retval     rocsparse_status_arch_mismatch the device is not supported.
 *  \retval     rocsparse_status_not_implemented
 *              \ref rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
 *
 *  \par Example
 *  This example multiplies a CSR matrix with a column-oriented dense matrix.
-*  \snippet example_rocsparse_csrmm.cpp doc example
+*  \code{.c}
+*      //     1 2 0 3 0
+*      // A = 0 4 5 0 0
+*      //     6 0 0 7 8
+*
+*      rocsparse_int m   = 3;
+*      rocsparse_int k   = 5;
+*      rocsparse_int nnz = 8;
+*
+*      csr_row_ptr[m+1] = {0, 3, 5, 8};             // device memory
+*      csr_col_ind[nnz] = {0, 1, 3, 1, 2, 0, 3, 4}; // device memory
+*      csr_val[nnz]     = {1, 2, 3, 4, 5, 6, 7, 8}; // device memory
+*
+*      // Set dimension n of B
+*      rocsparse_int n = 64;
+*
+*      // Allocate and generate column-oriented dense matrix B
+*      std::vector<float> hB(k * n);
+*      for(rocsparse_int i = 0; i < k * n; ++i)
+*      {
+*          hB[i] = static_cast<float>(rand()) / RAND_MAX;
+*      }
+*
+*      // Copy B to the device
+*      float* B;
+*      hipMalloc((void**)&B, sizeof(float) * k * n);
+*      hipMemcpy(B, hB.data(), sizeof(float) * k * n, hipMemcpyHostToDevice);
+*
+*      // alpha and beta
+*      float alpha = 1.0f;
+*      float beta  = 0.0f;
+*
+*      // Allocate memory for the resulting matrix C
+*      float* C;
+*      hipMalloc((void**)&C, sizeof(float) * m * n);
+*
+*      // Perform the matrix multiplication
+*      rocsparse_scsrmm(handle,
+*                       rocsparse_operation_none,
+*                       rocsparse_operation_none,
+*                       m,
+*                       n,
+*                       k,
+*                       nnz,
+*                       &alpha,
+*                       descr,
+*                       csr_val,
+*                       csr_row_ptr,
+*                       csr_col_ind,
+*                       B,
+*                       k,
+*                       &beta,
+*                       C,
+*                       m);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

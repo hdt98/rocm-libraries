@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2017-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2017-2024, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,7 @@
 #include "../../../config.hpp"
 #include "../../../util_deprecated.hpp"
 
-#include <rocprim/device/device_partition.hpp> // IWYU pragma: export
+#include <rocprim/device/device_partition.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
@@ -42,17 +42,15 @@ struct DevicePartition
     template<typename InputIteratorT,
              typename FlagIterator,
              typename OutputIteratorT,
-             typename NumSelectedIteratorT,
-             typename NumItemsT>
-    HIPCUB_RUNTIME_FUNCTION
-    static hipError_t Flagged(void*                d_temp_storage,
-                              size_t&              temp_storage_bytes,
-                              InputIteratorT       d_in,
-                              FlagIterator         d_flags,
-                              OutputIteratorT      d_out,
-                              NumSelectedIteratorT d_num_selected_out,
-                              NumItemsT            num_items,
-                              hipStream_t          stream = 0)
+             typename NumSelectedIteratorT>
+    HIPCUB_RUNTIME_FUNCTION static hipError_t Flagged(void*                d_temp_storage,
+                                                      size_t&              temp_storage_bytes,
+                                                      InputIteratorT       d_in,
+                                                      FlagIterator         d_flags,
+                                                      OutputIteratorT      d_out,
+                                                      NumSelectedIteratorT d_num_selected_out,
+                                                      int                  num_items,
+                                                      hipStream_t          stream = 0)
     {
         return rocprim::partition(d_temp_storage,
                                   temp_storage_bytes,
@@ -68,18 +66,17 @@ struct DevicePartition
     template<typename InputIteratorT,
              typename FlagIterator,
              typename OutputIteratorT,
-             typename NumSelectedIteratorT,
-             typename NumItemsT>
-    HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
-    static hipError_t Flagged(void*                d_temp_storage,
-                              size_t&              temp_storage_bytes,
-                              InputIteratorT       d_in,
-                              FlagIterator         d_flags,
-                              OutputIteratorT      d_out,
-                              NumSelectedIteratorT d_num_selected_out,
-                              NumItemsT            num_items,
-                              hipStream_t          stream,
-                              bool                 debug_synchronous)
+             typename NumSelectedIteratorT>
+    HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION static hipError_t
+        Flagged(void*                d_temp_storage,
+                size_t&              temp_storage_bytes,
+                InputIteratorT       d_in,
+                FlagIterator         d_flags,
+                OutputIteratorT      d_out,
+                NumSelectedIteratorT d_num_selected_out,
+                int                  num_items,
+                hipStream_t          stream,
+                bool                 debug_synchronous)
     {
         HIPCUB_DETAIL_RUNTIME_LOG_DEBUG_SYNCHRONOUS();
         return Flagged(d_temp_storage,
@@ -95,17 +92,15 @@ struct DevicePartition
     template<typename InputIteratorT,
              typename OutputIteratorT,
              typename NumSelectedIteratorT,
-             typename SelectOp,
-             typename NumItemsT>
-    HIPCUB_RUNTIME_FUNCTION
-    static hipError_t If(void*                d_temp_storage,
-                         size_t&              temp_storage_bytes,
-                         InputIteratorT       d_in,
-                         OutputIteratorT      d_out,
-                         NumSelectedIteratorT d_num_selected_out,
-                         NumItemsT            num_items,
-                         SelectOp             select_op,
-                         hipStream_t          stream = 0)
+             typename SelectOp>
+    HIPCUB_RUNTIME_FUNCTION static hipError_t If(void*                d_temp_storage,
+                                                 size_t&              temp_storage_bytes,
+                                                 InputIteratorT       d_in,
+                                                 OutputIteratorT      d_out,
+                                                 NumSelectedIteratorT d_num_selected_out,
+                                                 int                  num_items,
+                                                 SelectOp             select_op,
+                                                 hipStream_t          stream = 0)
     {
         return rocprim::partition(d_temp_storage,
                                   temp_storage_bytes,
@@ -121,18 +116,17 @@ struct DevicePartition
     template<typename InputIteratorT,
              typename OutputIteratorT,
              typename NumSelectedIteratorT,
-             typename SelectOp,
-             typename NumItemsT>
-    HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
-    static hipError_t If(void*                d_temp_storage,
-                         size_t&              temp_storage_bytes,
-                         InputIteratorT       d_in,
-                         OutputIteratorT      d_out,
-                         NumSelectedIteratorT d_num_selected_out,
-                         NumItemsT            num_items,
-                         SelectOp             select_op,
-                         hipStream_t          stream,
-                         bool                 debug_synchronous)
+             typename SelectOp>
+    HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION static hipError_t
+        If(void*                d_temp_storage,
+           size_t&              temp_storage_bytes,
+           InputIteratorT       d_in,
+           OutputIteratorT      d_out,
+           NumSelectedIteratorT d_num_selected_out,
+           int                  num_items,
+           SelectOp             select_op,
+           hipStream_t          stream,
+           bool                 debug_synchronous)
     {
         HIPCUB_DETAIL_RUNTIME_LOG_DEBUG_SYNCHRONOUS();
         return If(d_temp_storage,
@@ -151,20 +145,18 @@ struct DevicePartition
              typename UnselectedOutputIteratorT,
              typename NumSelectedIteratorT,
              typename SelectFirstPartOp,
-             typename SelectSecondPartOp,
-             typename NumItemsT>
-    HIPCUB_RUNTIME_FUNCTION
-    static hipError_t If(void*                     d_temp_storage,
-                         std::size_t&              temp_storage_bytes,
-                         InputIteratorT            d_in,
-                         FirstOutputIteratorT      d_first_part_out,
-                         SecondOutputIteratorT     d_second_part_out,
-                         UnselectedOutputIteratorT d_unselected_out,
-                         NumSelectedIteratorT      d_num_selected_out,
-                         NumItemsT                 num_items,
-                         SelectFirstPartOp         select_first_part_op,
-                         SelectSecondPartOp        select_second_part_op,
-                         hipStream_t               stream = 0)
+             typename SelectSecondPartOp>
+    HIPCUB_RUNTIME_FUNCTION static hipError_t If(void*                     d_temp_storage,
+                                                 std::size_t&              temp_storage_bytes,
+                                                 InputIteratorT            d_in,
+                                                 FirstOutputIteratorT      d_first_part_out,
+                                                 SecondOutputIteratorT     d_second_part_out,
+                                                 UnselectedOutputIteratorT d_unselected_out,
+                                                 NumSelectedIteratorT      d_num_selected_out,
+                                                 int                       num_items,
+                                                 SelectFirstPartOp         select_first_part_op,
+                                                 SelectSecondPartOp        select_second_part_op,
+                                                 hipStream_t               stream = 0)
     {
         return rocprim::partition_three_way(d_temp_storage,
                                             temp_storage_bytes,
@@ -186,21 +178,20 @@ struct DevicePartition
              typename UnselectedOutputIteratorT,
              typename NumSelectedIteratorT,
              typename SelectFirstPartOp,
-             typename SelectSecondPartOp,
-             typename NumItemsT>
-    HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
-    static hipError_t If(void*                     d_temp_storage,
-                         std::size_t&              temp_storage_bytes,
-                         InputIteratorT            d_in,
-                         FirstOutputIteratorT      d_first_part_out,
-                         SecondOutputIteratorT     d_second_part_out,
-                         UnselectedOutputIteratorT d_unselected_out,
-                         NumSelectedIteratorT      d_num_selected_out,
-                         NumItemsT                 num_items,
-                         SelectFirstPartOp         select_first_part_op,
-                         SelectSecondPartOp        select_second_part_op,
-                         hipStream_t               stream,
-                         bool                      debug_synchronous)
+             typename SelectSecondPartOp>
+    HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION static hipError_t
+        If(void*                     d_temp_storage,
+           std::size_t&              temp_storage_bytes,
+           InputIteratorT            d_in,
+           FirstOutputIteratorT      d_first_part_out,
+           SecondOutputIteratorT     d_second_part_out,
+           UnselectedOutputIteratorT d_unselected_out,
+           NumSelectedIteratorT      d_num_selected_out,
+           int                       num_items,
+           SelectFirstPartOp         select_first_part_op,
+           SelectSecondPartOp        select_second_part_op,
+           hipStream_t               stream,
+           bool                      debug_synchronous)
     {
         HIPCUB_DETAIL_RUNTIME_LOG_DEBUG_SYNCHRONOUS();
         return If(d_temp_storage,

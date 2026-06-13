@@ -58,5 +58,5 @@ TEST(RocprimInternalMergePathTests, Basic)
 
     std::sort(x.begin(), x.end());
 
-    ASSERT_NO_FATAL_FAILURE(test_utils::assert_eq(x, y));
+    test_utils::assert_eq(x, y);
 }

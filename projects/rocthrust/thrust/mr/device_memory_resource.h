@@ -31,3 +31,4 @@ using universal_host_pinned_memory_resource =
   thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPACE::universal_host_pinned_memory_resource;
 
 THRUST_NAMESPACE_END
+

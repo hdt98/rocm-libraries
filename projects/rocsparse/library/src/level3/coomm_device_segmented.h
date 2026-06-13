@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
  * ************************************************************************ */
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -306,7 +306,7 @@ namespace rocsparse
             {
 
                 const T v = rocsparse::shfl(val, i, WF_SIZE);
-                const I c = rocsparse::shfl(col, i, WF_SIZE);
+                const I c = __shfl(col, i, WF_SIZE);
 
                 if(!TRANSB)
                 {

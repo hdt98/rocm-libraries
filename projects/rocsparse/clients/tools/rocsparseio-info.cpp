@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2024-2026 Advanced Micro Devices, Inc.
+// Copyright (C) 2024 Advanced Micro Devices, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,18 @@
 #include <math.h>
 using rocsparseio_float_complex  = std::complex<float>;
 using rocsparseio_double_complex = std::complex<double>;
+
+typedef struct
+{
+    uint64_t mean_nnz_per_seq;
+    uint64_t min_nnz_per_seq;
+    uint64_t max_nnz_per_seq;
+    uint64_t median_nnz_per_seq;
+    bool     full_diagonal;
+    bool     symbolic_symetric;
+    bool     numeric_symetric;
+
+} rocsparseio_statistics_csx;
 
 template <typename J, typename T>
 struct transpose_pair_t
@@ -272,10 +284,6 @@ rocsparseio_status rocsparseio_csx_statistics_val_type(rocsparseio_type val_type
     {
         return rocsparseio_csx_statistics<I, J, rocsparseio_double_complex>(params...);
     }
-    case rocsparseio_type_bfloat16:
-    {
-        return rocsparseio_status_invalid_value;
-    }
     }
     return rocsparseio_status_invalid_enum;
 }
@@ -297,7 +305,6 @@ rocsparseio_status rocsparseio_csx_statistics_ind_type(rocsparseio_type ind_type
     }
     case rocsparseio_type_int8:
     case rocsparseio_type_float16:
-    case rocsparseio_type_bfloat16:
     case rocsparseio_type_float32:
     case rocsparseio_type_float64:
     case rocsparseio_type_complex32:
@@ -327,7 +334,6 @@ rocsparseio_status rocsparseio_csx_statistics_dynamic_dispatch(rocsparseio_type 
     }
     case rocsparseio_type_int8:
     case rocsparseio_type_float16:
-    case rocsparseio_type_bfloat16:
     case rocsparseio_type_float32:
     case rocsparseio_type_float64:
     case rocsparseio_type_complex32:

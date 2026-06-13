@@ -90,26 +90,29 @@ HeuristicGet(std::size_t data_size, uint32_t dim_0, uint32_t dim_1, uint32_t dim
     {
         if(dim_3 >= 16)
         {
-            default_kernel = GeneralReorderParam{16, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
+            return GeneralReorderParam{16, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
         }
         else if(dim_3 >= 8)
         {
-            default_kernel = GeneralReorderParam{8, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
+            return GeneralReorderParam{8, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
         }
         else if(dim_3 >= 4)
         {
-            default_kernel = GeneralReorderParam{4, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
+            return GeneralReorderParam{4, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
         }
         else if(dim_3 >= 2)
         {
-            default_kernel = GeneralReorderParam{2, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
+            return GeneralReorderParam{2, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
         }
         else
         {
-            default_kernel = GeneralReorderParam{1, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
+            return GeneralReorderParam{1, TENSOR_REORDER_BLOCK_SIZE, 1, 1, 1, 1};
         }
     }
-    return default_kernel;
+    else
+    {
+        return default_kernel;
+    }
 }
 
 } // namespace tensor_reorder

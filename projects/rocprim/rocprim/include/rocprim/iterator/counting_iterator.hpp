@@ -65,7 +65,7 @@ public:
     /// The category of the iterator.
     using iterator_category = std::random_access_iterator_tag;
 
-    static_assert(rocprim::is_integral<value_type>::value, "Incrementable must be integral type");
+    static_assert(std::is_integral<value_type>::value, "Incrementable must be integral type");
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
     using self_type = counting_iterator;
@@ -205,6 +205,12 @@ public:
     bool operator>=(counting_iterator other) const
     {
         return distance_to(other) <= 0;
+    }
+
+    [[deprecated]] friend std::ostream& operator<<(std::ostream& os, const counting_iterator& iter)
+    {
+        os << "[" << iter.value_ << "]";
+        return os;
     }
     #endif // DOXYGEN_SHOULD_SKIP_THIS
 

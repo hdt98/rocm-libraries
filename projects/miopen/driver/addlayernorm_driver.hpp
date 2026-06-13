@@ -52,8 +52,7 @@ int32_t mloAddLayerNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
                                       Tcheck* rstdhost,
                                       float eps,
                                       int32_t normalized_dim,
-                                      miopenNormMode_t mode,
-                                      bool use_multithread)
+                                      miopenNormMode_t mode)
 {
     auto dims         = miopen::deref(inputDesc).GetLengths();
     size_t outer_size = 1;
@@ -68,10 +67,10 @@ int32_t mloAddLayerNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
             inner_size *= dims[i];
     }
 
-    int32_t ret      = 0;
-    size_t min_grain = use_multithread ? 8 : outer_size;
+    int32_t ret = 0;
 
-    miopen::par_for(outer_size, min_grain, [&](int32_t o) {
+    for(int32_t o = 0; o < outer_size; o++)
+    {
         Tcheck pmean = 0.0f;
         Tcheck pvar  = 0.0f;
         for(int32_t i = 0; i < inner_size; i++)
@@ -101,8 +100,7 @@ int32_t mloAddLayerNormForwardRunHost(miopenTensorDescriptor_t inputDesc,
                     prstd * pweight +
                 pbias;
         }
-    });
-
+    }
     return ret;
 }
 
@@ -186,8 +184,6 @@ private:
     float eps;
     int dim;
     miopenNormMode_t mode;
-
-    bool use_multithread;
 };
 
 template <typename Tgpu, typename Tref>
@@ -199,9 +195,6 @@ int AddLayerNormDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
     {
         miopenEnableProfiling(GetHandle(), true);
     }
-
-    use_multithread = (inflags.GetValueInt("mt") != 0);
-
     return miopenStatusSuccess;
 }
 
@@ -272,7 +265,6 @@ int AddLayerNormDriver<Tgpu, Tref>::AddCmdLineArgs()
     inflags.AddInputFlag("time", 't', "0", "Time Each Layer (Default=0)", "int");
     inflags.AddInputFlag(
         "wall", 'w', "0", "Wall-clock Time Each Layer, Requires time == 1 (Default=0)", "int");
-    inflags.AddInputFlag("mt", 'u', "0", "Use multithreaded version (Default=0)", "int");
 
     return miopenStatusSuccess;
 }
@@ -428,7 +420,6 @@ int AddLayerNormDriver<Tgpu, Tref>::RunForwardGPU()
 template <typename Tgpu, typename Tref>
 int AddLayerNormDriver<Tgpu, Tref>::RunForwardCPU()
 {
-
     mloAddLayerNormForwardRunHost<Tgpu, Tref>(inputDesc,
                                               in.data(),
                                               in2.data(),
@@ -439,8 +430,7 @@ int AddLayerNormDriver<Tgpu, Tref>::RunForwardCPU()
                                               rstdhost.data(),
                                               eps,
                                               dim,
-                                              mode,
-                                              use_multithread);
+                                              mode);
 
     return miopenStatusSuccess;
 }
@@ -468,46 +458,44 @@ template <typename Tgpu, typename Tref>
 int AddLayerNormDriver<Tgpu, Tref>::VerifyForward()
 {
     RunForwardCPU();
-    const Tref tolerance    = GetTolerance();
-    auto error              = miopen::rms_range(outhost, out);
-    std::string solver_type = use_multithread ? "multi-threaded" : "single-threaded";
+    const Tref tolerance = GetTolerance();
+    auto error           = miopen::rms_range(outhost, out);
 
     if(!std::isfinite(error) || error > tolerance)
     {
-        std::cout << "Forward AddLayerNorm FAILED against " << solver_type
-                  << " CPU reference: " << error << " > " << tolerance << std::endl;
+        std::cout << "Forward AddLayerNorm FAILED: " << error << " > " << tolerance << std::endl;
         return EC_VerifyFwd;
     }
     else
     {
-        std::cout << "Forward AddLayerNorm Verifies OK against " << solver_type
-                  << " CPU reference (" << error << " < " << tolerance << ')' << std::endl;
+        std::cout << "Forward AddLayerNorm Verifies OK on CPU reference (" << error << " < "
+                  << tolerance << ')' << std::endl;
     }
 
     auto meanerror = miopen::rms_range(meanhost, mean);
     if(!std::isfinite(meanerror) || meanerror > tolerance)
     {
-        std::cout << "Forward AddLayerNorm mean FAILED against " << solver_type
-                  << " CPU reference: " << meanerror << " > " << tolerance << std::endl;
+        std::cout << "Forward AddLayerNorm mean FAILED: " << meanerror << " > " << tolerance
+                  << std::endl;
         return EC_VerifyFwd;
     }
     else
     {
-        std::cout << "Forward AddLayerNorm mean Verifies OK against " << solver_type
-                  << " CPU reference (" << meanerror << " < " << tolerance << ')' << std::endl;
+        std::cout << "Forward AddLayerNorm mean Verifies OK on CPU reference (" << meanerror
+                  << " < " << tolerance << ')' << std::endl;
     }
 
     auto rstderror = miopen::rms_range(rstdhost, rstd);
     if(!std::isfinite(rstderror) || rstderror > tolerance)
     {
-        std::cout << "Forward AddLayerNorm rstd FAILED against " << solver_type
-                  << " CPU reference: " << rstderror << " > " << tolerance << std::endl;
+        std::cout << "Forward AddLayerNorm rstd FAILED: " << rstderror << " > " << tolerance
+                  << std::endl;
         return EC_VerifyFwd;
     }
     else
     {
-        std::cout << "Forward AddLayerNorm rstd Verifies OK against " << solver_type
-                  << " CPU reference (" << rstderror << " < " << tolerance << ')' << std::endl;
+        std::cout << "Forward AddLayerNorm rstd Verifies OK on CPU reference (" << rstderror
+                  << " < " << tolerance << ')' << std::endl;
     }
 
     return miopenStatusSuccess;

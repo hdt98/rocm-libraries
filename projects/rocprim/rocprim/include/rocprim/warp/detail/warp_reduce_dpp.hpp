@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,9 +24,9 @@
 #include <type_traits>
 
 #include "../../config.hpp"
-#include "../../detail/various.hpp"
 #include "../../intrinsics.hpp"
 #include "../../types.hpp"
+#include "../../detail/various.hpp"
 
 #include "warp_reduce_shuffle.hpp"
 
@@ -35,11 +35,15 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<class T, unsigned int VirtualWaveSize, bool UseAllReduce>
+template<
+    class T,
+    unsigned int WarpSize,
+    bool UseAllReduce
+>
 class warp_reduce_dpp
 {
 public:
-    static_assert(detail::is_power_of_two(VirtualWaveSize), "VirtualWaveSize must be power of 2");
+    static_assert(detail::is_power_of_two(WarpSize), "WarpSize must be power of 2");
 
     using storage_type = detail::empty_storage_type;
 
@@ -49,99 +53,59 @@ public:
     {
         output = input;
 
-// Temporary fix: issue with dpp bound_ctrl on Windows, GFX10, GFX11, GFX12 and SPIR-V
-// RDNA encounters compile issues in hipCUB and rocThrust.
-#if defined(_WIN32) || defined(__GFX10__) || defined(__GFX11__) || defined(__GFX12__) \
-    || defined(__SPIRV__)
-        bool constexpr bndCtrl = false;
-#else
-    // Temporary fix: issue with dpp bound_ctrl for debug build. Compiler will not define macros
-    // like __GFX10__ and so on.
-    #if defined(NDEBUG) || !defined(_DEBUG)
-        bool constexpr bndCtrl = true;
-    #else
-        bool constexpr bndCtrl = false;
-    #endif
-#endif
-
-        if(VirtualWaveSize > 1)
+        if(WarpSize > 1)
         {
             // quad_perm:[1,0,3,2] -> 10110001
-            output = reduce_op(warp_move_dpp<T, 0xb1, 0xf, 0xf, bndCtrl>(output), output);
+            output = reduce_op(warp_move_dpp<T, 0xb1>(output), output);
         }
-        if(VirtualWaveSize > 2)
+        if(WarpSize > 2)
         {
             // quad_perm:[2,3,0,1] -> 01001110
-            output = reduce_op(warp_move_dpp<T, 0x4e, 0xf, 0xf, bndCtrl>(output), output);
+            output = reduce_op(warp_move_dpp<T, 0x4e>(output), output);
         }
-        if(VirtualWaveSize > 4)
+        if(WarpSize > 4)
         {
             // row_ror:4
             // Use rotation instead of shift to avoid leaving invalid values in the destination
             // registers (asume warp size of at least hardware warp-size)
-            output = reduce_op(warp_move_dpp<T, 0x124, 0xf, 0xf, bndCtrl>(output), output);
+            output = reduce_op(warp_move_dpp<T, 0x124>(output), output);
         }
-        if(VirtualWaveSize > 8)
+        if(WarpSize > 8)
         {
             // row_ror:8
             // Use rotation instead of shift to avoid leaving invalid values in the destination
             // registers (asume warp size of at least hardware warp-size)
-            output = reduce_op(warp_move_dpp<T, 0x128, 0xf, 0xf, bndCtrl>(output), output);
+            output = reduce_op(warp_move_dpp<T, 0x128>(output), output);
         }
-
-        // Check for __builtin_amdgcn_permlane16; if it exists, the DPP equivalent is not available.
-        // Swizzle is kept instead of __builtin_amdgcn_permlanex16, as the latter can be slower in some cases.
-        if ROCPRIM_AMDGCN_CONSTEXPR(ROCPRIM_HAS_PERMLANE())
+#ifdef ROCPRIM_DETAIL_HAS_DPP_BROADCAST
+        if(WarpSize > 16)
         {
-            if(VirtualWaveSize > 16)
-            {
-                // row_bcast:15
-                output = reduce_op(warp_swizzle<T, 0x1e0>(output), output);
-            }
-
-#if !ROCPRIM_TARGET_SPIRV
-            if constexpr(!ROCPRIM_IS_GENERIC())
-            {
-                static_assert(VirtualWaveSize <= 32,
-                              "VirtualWaveSize > 32 is not supported without DPP broadcasts");
-            }
-            else
-#endif
-            {
-                if constexpr(VirtualWaveSize > 32)
-                {
-                    ROCPRIM_PRINT_ERROR_ONCE(
-                        "VirtualWaveSize > 32 is not supported without DPP broadcasts");
-                    return;
-                }
-            }
+            // row_bcast:15
+            output = reduce_op(warp_move_dpp<T, 0x142>(output), output);
         }
-        else
+        if(WarpSize > 32)
         {
-            if(VirtualWaveSize > 16)
-            {
-                // row_bcast:15
-                output = reduce_op(warp_move_dpp<T, 0x142, 0xf, 0xf, bndCtrl>(output), output);
-            }
-            if(VirtualWaveSize > 32)
-            {
-                // row_bcast:31
-                output = reduce_op(warp_move_dpp<T, 0x143, 0xf, 0xf, bndCtrl>(output), output);
-            }
-
-#if !ROCPRIM_TARGET_SPIRV
-            static_assert(VirtualWaveSize <= 64, "VirtualWaveSize > 64 is not supported");
-#endif
+            // row_bcast:31
+            output = reduce_op(warp_move_dpp<T, 0x143>(output), output);
         }
+        static_assert(WarpSize <= 64, "WarpSize > 64 is not supported");
+#else
+        if(WarpSize > 16)
+        {
+            // row_bcast:15
+            output = reduce_op(warp_swizzle<T, 0x1e0>(output), output);
+        }
+        static_assert(WarpSize <= 32, "WarpSize > 32 is not supported without DPP broadcasts");
+#endif
         // Read the result from the last lane of the logical warp
-        output = warp_shuffle(output, VirtualWaveSize - 1, VirtualWaveSize);
+        output = warp_shuffle(output, WarpSize - 1, WarpSize);
     }
 
     template<class BinaryFunction>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     void reduce_impl(T input, T& output, BinaryFunction reduce_op, std::true_type)
     {
-        warp_reduce_shuffle<T, VirtualWaveSize, UseAllReduce>().reduce(input, output, reduce_op);
+        warp_reduce_shuffle<T, WarpSize, UseAllReduce>().reduce(input, output, reduce_op);
     }
 
     template<class BinaryFunction>
@@ -152,15 +116,14 @@ public:
             input,
             output,
             reduce_op,
-            std::integral_constant<bool,
-                                   (VirtualWaveSize < ::rocprim::arch::wavefront::min_size())>{});
+            std::integral_constant<bool, (WarpSize < ::rocprim::arch::wavefront::min_size())>{});
     }
 
     template<class BinaryFunction>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     void reduce(T input, T& output, storage_type& storage, BinaryFunction reduce_op)
     {
-        (void)storage; // disables unused parameter warning
+        (void) storage; // disables unused parameter warning
         this->reduce(input, output, reduce_op);
     }
 
@@ -169,21 +132,16 @@ public:
     void reduce(T input, T& output, unsigned int valid_items, BinaryFunction reduce_op)
     {
         // Fallback to shuffle-based implementation
-        warp_reduce_shuffle<T, VirtualWaveSize, UseAllReduce>().reduce(input,
-                                                                       output,
-                                                                       valid_items,
-                                                                       reduce_op);
+        warp_reduce_shuffle<T, WarpSize, UseAllReduce>()
+            .reduce(input, output, valid_items, reduce_op);
     }
 
     template<class BinaryFunction>
     ROCPRIM_DEVICE ROCPRIM_INLINE
-    void reduce(T              input,
-                T&             output,
-                unsigned int   valid_items,
-                storage_type&  storage,
-                BinaryFunction reduce_op)
+    void reduce(T input, T& output, unsigned int valid_items,
+                storage_type& storage, BinaryFunction reduce_op)
     {
-        (void)storage; // disables unused parameter warning
+        (void) storage; // disables unused parameter warning
         this->reduce(input, output, valid_items, reduce_op);
     }
 
@@ -192,10 +150,8 @@ public:
     void head_segmented_reduce(T input, T& output, Flag flag, BinaryFunction reduce_op)
     {
         // Fallback to shuffle-based implementation
-        warp_reduce_shuffle<T, VirtualWaveSize, UseAllReduce>().head_segmented_reduce(input,
-                                                                                      output,
-                                                                                      flag,
-                                                                                      reduce_op);
+        warp_reduce_shuffle<T, WarpSize, UseAllReduce>()
+            .head_segmented_reduce(input, output, flag, reduce_op);
     }
 
     template<class Flag, class BinaryFunction>
@@ -203,36 +159,28 @@ public:
     void tail_segmented_reduce(T input, T& output, Flag flag, BinaryFunction reduce_op)
     {
         // Fallback to shuffle-based implementation
-        warp_reduce_shuffle<T, VirtualWaveSize, UseAllReduce>().tail_segmented_reduce(input,
-                                                                                      output,
-                                                                                      flag,
-                                                                                      reduce_op);
+        warp_reduce_shuffle<T, WarpSize, UseAllReduce>()
+            .tail_segmented_reduce(input, output, flag, reduce_op);
     }
 
     template<class Flag, class BinaryFunction>
     ROCPRIM_DEVICE ROCPRIM_INLINE
-    void head_segmented_reduce(
-        T input, T& output, Flag flag, storage_type& storage, BinaryFunction reduce_op)
+    void head_segmented_reduce(T input, T& output, Flag flag,
+                               storage_type& storage, BinaryFunction reduce_op)
     {
         // Fallback to shuffle-based implementation
-        warp_reduce_shuffle<T, VirtualWaveSize, UseAllReduce>().head_segmented_reduce(input,
-                                                                                      output,
-                                                                                      flag,
-                                                                                      storage,
-                                                                                      reduce_op);
+        warp_reduce_shuffle<T, WarpSize, UseAllReduce>()
+            .head_segmented_reduce(input, output, flag, storage, reduce_op);
     }
 
     template<class Flag, class BinaryFunction>
     ROCPRIM_DEVICE ROCPRIM_INLINE
-    void tail_segmented_reduce(
-        T input, T& output, Flag flag, storage_type& storage, BinaryFunction reduce_op)
+    void tail_segmented_reduce(T input, T& output, Flag flag,
+                               storage_type& storage, BinaryFunction reduce_op)
     {
         // Fallback to shuffle-based implementation
-        warp_reduce_shuffle<T, VirtualWaveSize, UseAllReduce>().tail_segmented_reduce(input,
-                                                                                      output,
-                                                                                      flag,
-                                                                                      storage,
-                                                                                      reduce_op);
+        warp_reduce_shuffle<T, WarpSize, UseAllReduce>()
+            .tail_segmented_reduce(input, output, flag, storage, reduce_op);
     }
 };
 

@@ -23,18 +23,13 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include <cstdio>
-#include <cstdlib>
-
 #include "log.hpp"
 #include "tensor_util.hpp"
 #include "get_handle.hpp"
 #include "../lib_env_var.hpp"
 
-#include <gtest/gtest_common.hpp>
 #include <miopen/config.h>
 #include <miopen/fusion_plan.hpp>
-#include <miopen/logger.hpp>
 #include "../random.hpp"
 
 #if MIOPEN_BACKEND_OPENCL
@@ -57,11 +52,11 @@ const std::string logFindConv =
     "-k 64 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 -m conv -g 1 -F 1 -t 1";
 
 const std::string logFusionConvBiasActiv =
-    "MIOpen(" BKEND "): Command [LogCmdFusion] " MDEXE " CBAInfer -J 4 -n 128 -c 3 -H 32 "
+    "MIOpen(" BKEND "): Command [LogCmdFusion] " MDEXE " CBAInfer -F 4 -n 128 -c 3 -H 32 "
     "-W 32 -k 64 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1";
 
 const std::string logBnormActiv = "MIOpen(" BKEND "): Command [LogCmdFusion] " MDEXE
-                                  " CBAInfer -J 2 -n 64 -c 64 -H 56 -W 56 -m 1";
+                                  " CBAInfer -F 2 -n 64 -c 64 -H 56 -W 56 -m 1";
 
 // Captures the std::cerr buffer and store it to a string.
 struct CerrRedirect
@@ -112,18 +107,7 @@ struct Tensor
         clGetCommandQueueInfo(q, CL_QUEUE_CONTEXT, sizeof(cl_context), &ctx, nullptr);
         data = clCreateBuffer(ctx, CL_MEM_READ_WRITE, data_size, nullptr, nullptr);
 #elif MIOPEN_BACKEND_HIP
-        // ASSERT_* cannot be used in constructors (generates illegal
-        // return-void). Use hard abort on allocation failure instead.
-        auto err = hipMalloc(&data, data_size);
-        if(err != hipSuccess)
-        {
-            fprintf(stderr,
-                    "hipMalloc failed: %s at %s:%d\n",
-                    hipGetErrorString(err),
-                    __FILE__,
-                    __LINE__);
-            abort();
-        }
+        EXPECT_EQ(hipMalloc(&data, data_size), hipSuccess);
 #endif
     }
 
@@ -133,7 +117,7 @@ struct Tensor
 #if MIOPEN_BACKEND_OPENCL
         clReleaseMemObject(data);
 #elif MIOPEN_BACKEND_HIP
-        (void)hipFree(data);
+        hipFree(data);
 #endif
     }
 };
@@ -158,16 +142,8 @@ struct Conv
 
 struct CreateCBAFusionPlan
 {
-    miopenFusionPlanDescriptor_t fusePlanDesc = nullptr;
+    miopenFusionPlanDescriptor_t fusePlanDesc;
     miopen::OperatorArgs op_args;
-
-    ~CreateCBAFusionPlan()
-    {
-        if(fusePlanDesc != nullptr)
-        {
-            miopenDestroyFusionPlan(fusePlanDesc);
-        }
-    }
 
     void CBAPlan()
     {
@@ -189,16 +165,8 @@ struct CreateCBAFusionPlan
 template <typename T>
 struct CreateBNormFusionPlan
 {
-    miopenFusionPlanDescriptor_t fusePlanDesc = nullptr;
+    miopenFusionPlanDescriptor_t fusePlanDesc;
     miopen::OperatorArgs op_args;
-
-    ~CreateBNormFusionPlan()
-    {
-        if(fusePlanDesc != nullptr)
-        {
-            miopenDestroyFusionPlan(fusePlanDesc);
-        }
-    }
 
     miopen::TensorDescriptor bn_desc;
     miopen::ActivationDescriptor activ_desc;
@@ -216,13 +184,13 @@ struct CreateBNormFusionPlan
     miopen::Allocator::ManageDataPtr estMean_dev;
     miopen::Allocator::ManageDataPtr estVariance_dev;
     miopenActivationMode_t activ_mode = miopenActivationRELU;
-    const float alpha{1.0f};
-    const float beta{0.0f};
-    const float activ_alpha{0.5f};
-    const float activ_beta{0.5f};
-    const float activ_gamma{0.5f};
-    double epsilon{1.0e-5};
-    std::vector<int> input_lens = {64, 64, 56, 56};
+    const float alpha                 = static_cast<float>(1.0f);
+    const float beta                  = static_cast<float>(0);
+    const float activ_alpha           = static_cast<double>(0.5f);
+    const float activ_beta            = static_cast<double>(0.5f);
+    const float activ_gamma           = static_cast<double>(0.5f);
+    double epsilon                    = 1.0e-5;
+    std::vector<int> input_lens       = {64, 64, 56, 56};
 
     void Init()
     {
@@ -361,122 +329,4 @@ void TestLogCmdBNormFusion(std::function<void(const miopenFusionPlanDescriptor_t
         ASSERT_TRUE(isSubStr(str, sub_str)) << "str     : " << str << "str_sub : " << sub_str;
     else
         ASSERT_FALSE(isSubStr(str, sub_str)) << "str     : " << str << "str_sub : " << sub_str;
-}
-
-void TestLogBufferEnvEnabled()
-{
-    auto filename =
-        fs::temp_directory_path() / ("miopen_error_" + std::to_string(getpid()) + ".log");
-    size_t line_i = 0;
-    std::string line;
-
-    fs::remove(filename);
-
-    ScopedEnvironment<std::string> log_level_env(MIOPEN_LOG_LEVEL,
-                                                 "5"); // miopen::LoggingLevel::Info
-    ScopedEnvironment<std::string> log_buffer_on_env(MIOPEN_LOG_BUFFER_SIZE,
-                                                     "128"); // enable logging
-    // test log dump after error
-    miopen::ClearLogBuffer();
-    MIOPEN_LOG_W("warn");
-    MIOPEN_LOG_I("info");
-    MIOPEN_LOG_I2("info2");
-    MIOPEN_LOG_T("trace");
-    MIOPEN_LOG_E("error");
-
-    ASSERT_TRUE(fs::exists(filename));
-    {
-        auto log_file = std::ifstream{filename};
-        while(std::getline(log_file, line))
-        {
-            switch(line_i)
-            {
-            case 0: ASSERT_TRUE(isSubStr(line, "warn")); break;
-            case 1: ASSERT_TRUE(isSubStr(line, "info")); break;
-            case 2: ASSERT_TRUE(isSubStr(line, "info2")); break;
-            case 3: ASSERT_TRUE(isSubStr(line, "error")); break;
-            case 4: ASSERT_TRUE(isSubStr(line, "")); break;
-            }
-            line_i++;
-        }
-    }
-
-    // test log dump after 2nd error
-    MIOPEN_LOG_W("warn 2nd");
-    MIOPEN_LOG_I("info 2nd");
-    MIOPEN_LOG_I2("info2 2nd");
-    MIOPEN_LOG_T("trace 2nd");
-    MIOPEN_LOG_E("error 2nd");
-
-    EXPECT_TRUE(fs::exists(filename));
-    {
-        auto log_file = std::ifstream{filename};
-        line_i        = 0;
-        while(std::getline(log_file, line))
-        {
-            switch(line_i)
-            {
-            case 0: ASSERT_TRUE(isSubStr(line, "warn")); break;
-            case 1: ASSERT_TRUE(isSubStr(line, "info")); break;
-            case 2: ASSERT_TRUE(isSubStr(line, "info2")); break;
-            case 3: ASSERT_TRUE(isSubStr(line, "error")); break;
-            case 4: ASSERT_TRUE(isSubStr(line, "")); break;
-            case 5: ASSERT_TRUE(isSubStr(line, "warn 2nd")); break;
-            case 6: ASSERT_TRUE(isSubStr(line, "info 2nd")); break;
-            case 7: ASSERT_TRUE(isSubStr(line, "info2 2nd")); break;
-            case 8: ASSERT_TRUE(isSubStr(line, "error 2nd")); break;
-            case 9: ASSERT_TRUE(isSubStr(line, "")); break;
-            }
-            line_i++;
-        }
-        ASSERT_TRUE(line_i == 10);
-    }
-    fs::remove(filename);
-
-    EXPECT_ANY_THROW({ MIOPEN_THROW("throw"); });
-    ASSERT_FALSE(fs::exists(filename));
-}
-
-void TestLogBufferOff()
-{
-    auto filename =
-        fs::temp_directory_path() / ("miopen_error_" + std::to_string(getpid()) + ".log");
-
-    fs::remove(filename);
-
-    ScopedEnvironment<std::string> log_level_env(MIOPEN_LOG_LEVEL,
-                                                 "5"); // miopen::LoggingLevel::Info
-
-    miopen::ClearLogBuffer();
-    // log messages
-    MIOPEN_LOG_W("warn");
-    MIOPEN_LOG_I("info");
-    MIOPEN_LOG_I2("info2");
-    MIOPEN_LOG_T("trace");
-    // test log dump after error
-    MIOPEN_LOG_E("error");
-    ASSERT_FALSE(fs::exists(filename));
-}
-
-void TestLogBufferOffAtHighLevel()
-{
-    auto filename =
-        fs::temp_directory_path() / ("miopen_error_" + std::to_string(getpid()) + ".log");
-
-    fs::remove(filename);
-
-    ScopedEnvironment<std::string> log_level_env(MIOPEN_LOG_LEVEL,
-                                                 "6"); // miopen::LoggingLevel::Info2
-    ScopedEnvironment<std::string> log_buffer_on_env(MIOPEN_LOG_BUFFER_SIZE,
-                                                     "128"); // enable logging
-
-    miopen::ClearLogBuffer();
-    // log messages
-    MIOPEN_LOG_W("warn");
-    MIOPEN_LOG_I("info");
-    MIOPEN_LOG_I2("info2");
-    MIOPEN_LOG_T("trace");
-    // test log dump after error
-    MIOPEN_LOG_E("error");
-    ASSERT_FALSE(fs::exists(filename));
 }

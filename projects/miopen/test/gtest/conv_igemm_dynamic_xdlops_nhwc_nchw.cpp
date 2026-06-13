@@ -45,13 +45,11 @@ void GetArgs(const std::string& param, std::vector<std::string>& tokens)
 class GPU_Conv2d_conv_igemm_dynamic_xdlops_nhwc_nchw_FP32
     : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 class GPU_Conv2d_conv_igemm_dynamic_xdlops_nhwc_nchw_FP16
     : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 void Run2dDriver(miopenDataType_t prec)
@@ -66,7 +64,6 @@ void Run2dDriver(miopenDataType_t prec)
     case miopenHalf:
         params = GPU_Conv2d_conv_igemm_dynamic_xdlops_nhwc_nchw_FP16::GetParam();
         break;
-
     case miopenInt8:
     case miopenBFloat16:
     case miopenInt32:
@@ -74,6 +71,7 @@ void Run2dDriver(miopenDataType_t prec)
     case miopenDouble:
     case miopenFloat8_fnuz:
     case miopenBFloat8_fnuz:
+    default:
         FAIL() << "miopenInt8, miopenBFloat16, miopenInt32, "
                   "miopenDouble, miopenFloat8_fnuz, miopenBFloat8_fnuz "
                   "data type not supported by conv_igemm_dynamic_xdlops_nhwc_nchw test";
@@ -106,7 +104,7 @@ bool IsTestSupportedForDevice(const miopen::Handle& handle)
 {
     const auto& target  = handle.GetTargetProperties();
     std::string devName = handle.GetDeviceName();
-    if(target.isXnackEnabled())
+    if(target.Xnack() && *target.Xnack())
         return false;
     if(devName == "gfx908" || devName == "gfx90a" || devName == "gfx942")
         return true;
@@ -126,7 +124,7 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     const std::string out_nhwc      = " --out_layout NHWC";
     const std::string args_nhwc_wrw = dis_fwd + dis_bk_data + in_nhwc + fil_nhwc + out_nhwc;
 
-    return {
+    const std::vector<std::string> test_cases = {
         // clang-format off
     //nhwc_fwd
     {flags + "  --input  64 256  7  7 --weights 128 256 1 1 --pads_strides_dilations 0 0 1 1 1 1" + dis_bk_data + dis_bk_wei + in_nhwc + fil_nhwc + out_nhwc},
@@ -265,6 +263,7 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     {flags + "  --input  2 64 19 19 --weights 510 64 3 3 --pads_strides_dilations 1 1 1 1 1 1" + dis_fwd + dis_bk_data}
         // clang-format on
     };
+    return test_cases;
 }
 
 } // namespace conv_igemm_dynamic_xdlops_nhwc_nchw

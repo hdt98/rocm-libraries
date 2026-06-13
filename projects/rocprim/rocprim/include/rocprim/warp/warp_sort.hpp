@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -41,19 +41,19 @@ BEGIN_ROCPRIM_NAMESPACE
 /// bitonic sort, and only accepts warp sizes that are powers of two.
 ///
 /// \tparam Key Data type for parameter Key
-/// \tparam VirtualWaveSize [optional] The number of threads in a warp
+/// \tparam WarpSize [optional] The number of threads in a warp
 /// \tparam Value [optional] Data type for parameter Value. By default, it's empty_type
 ///
 /// \par Overview
-/// * \p VirtualWaveSize must be power of two.
-/// * \p VirtualWaveSize must be equal to or less than the size of hardware warp (see
-/// rocprim::arch::wavefront::max_size()). If it is less, sort is performed separately within groups
-/// determined by VirtualWaveSize.
-/// For example, if \p VirtualWaveSize is 4, hardware warp is 64, sort will be performed in logical
+/// * \p WarpSize must be power of two.
+/// * \p WarpSize must be equal to or less than the size of hardware warp (see
+/// rocprim::arch::wavefront::min_size()). If it is less, sort is performed separately within groups
+/// determined by WarpSize.
+/// For example, if \p WarpSize is 4, hardware warp is 64, sort will be performed in logical
 /// warps grouped like this: `{ {0, 1, 2, 3}, {4, 5, 6, 7 }, ..., {60, 61, 62, 63} }`
 /// (thread is represented here by its id within hardware warp).
 /// * Accepts custom compare_functions for sorting across a warp.
-/// * Number of threads executing warp_sort's function must be a multiple of \p VirtualWaveSize.
+/// * Number of threads executing warp_sort's function must be a multiple of \p WarpSize.
 ///
 /// \par Stability
 /// \p warp_sort is <b>not stable</b>: it doesn't necessarily preserve the relative ordering
@@ -69,8 +69,6 @@ BEGIN_ROCPRIM_NAMESPACE
 /// Every thread within the warp uses the warp_sort class by first specializing the
 /// warp_sort type, and instantiating an object that will be used to invoke a
 /// member function.
-///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/warp/example_warp_sort.cpp).
 ///
 /// \code{.cpp}
 /// __global__ void example_kernel(...)
@@ -102,17 +100,14 @@ BEGIN_ROCPRIM_NAMESPACE
 /// }
 /// \endcode
 /// \endparblock
-template<class Key,
-         unsigned int VirtualWaveSize           = arch::wavefront::min_size(),
-         class Value                            = empty_type,
-         arch::wavefront::target TargetWaveSize = arch::wavefront::get_target()>
-class warp_sort : detail::warp_sort_shuffle<Key, VirtualWaveSize, Value>
+template<class Key, unsigned int WarpSize = arch::wavefront::min_size(), class Value = empty_type>
+class warp_sort : detail::warp_sort_shuffle<Key, WarpSize, Value>
 {
-    using base_type = typename detail::warp_sort_shuffle<Key, VirtualWaveSize, Value>;
+    using base_type = typename detail::warp_sort_shuffle<Key, WarpSize, Value>;
 
-    // Check if VirtualWaveSize is valid for the targets
-    static_assert(VirtualWaveSize <= ROCPRIM_MAX_WARP_SIZE,
-                  "VirtualWaveSize can't be greater than hardware warp size.");
+    // Check if WarpSize is valid for the targets
+    static_assert(WarpSize <= ROCPRIM_MAX_WARP_SIZE,
+                  "WarpSize can't be greater than hardware warp size.");
 
 public:
     /// \brief Struct used to allocate a temporary memory that is required for thread
@@ -135,33 +130,25 @@ public:
     /// The signature of the function should be equivalent to the following:
     /// <tt>bool f(const T &a, const T &b);</tt>. The signature does not need to have
     /// <tt>const &</tt>, but function object must not modify the objects passed to it.
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key& thread_key, BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(thread_key, compare_function);
     }
 
     /// \brief Warp sort for any data type.
     /// Invalid Warp Size
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&, BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort for any data type.
@@ -175,37 +162,31 @@ public:
     /// <tt>bool f(const T &a, const T &b);</tt>. The signature does not need to have
     /// <tt>const &</tt>, but function object must not modify the objects passed to it.
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(thread_keys, compare_function);
     }
 
     /// \brief Warp sort for any data type.
     /// Invalid Warp Size
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)thread_keys; // disables unused parameter warning
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort for any data type using temporary storage.
@@ -236,22 +217,13 @@ public:
     ///     ...
     /// }
     /// \endcode
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&           thread_key,
               storage_type&  storage,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(
             thread_key, storage, compare_function
         );
@@ -259,14 +231,15 @@ public:
 
     /// \brief Warp sort for any data type using temporary storage.
     /// Invalid Warp Size
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&, storage_type&, BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort for any data type using temporary storage.
@@ -298,22 +271,14 @@ public:
     /// }
     /// \endcode
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               storage_type&  storage,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(
             thread_keys, storage, compare_function
         );
@@ -322,17 +287,19 @@ public:
     /// \brief Warp sort for any data type using temporary storage.
     /// Invalid Warp Size
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               storage_type&,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)thread_keys; // disables unused parameter warning
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort by key for any data type.
@@ -346,22 +313,13 @@ public:
     /// The signature of the function should be equivalent to the following:
     /// <tt>bool f(const T &a, const T &b);</tt>. The signature does not need to have
     /// <tt>const &</tt>, but function object must not modify the objects passed to it.
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&           thread_key,
               Value&         thread_value,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(
             thread_key, thread_value, compare_function
         );
@@ -369,14 +327,15 @@ public:
 
     /// \brief Warp sort by key for any data type.
     /// Invalid Warp Size
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&, Value&, BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort by key for any data type.
@@ -391,22 +350,14 @@ public:
     /// <tt>bool f(const T &a, const T &b);</tt>. The signature does not need to have
     /// <tt>const &</tt>, but function object must not modify the objects passed to it.
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               Value (&thread_values)[ItemsPerThread],
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(
             thread_keys, thread_values, compare_function
         );
@@ -415,18 +366,20 @@ public:
     /// \brief Warp sort by key for any data type.
     /// Invalid Warp Size
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               Value (&thread_values)[ItemsPerThread],
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)thread_keys; // disables unused parameter warning
         (void)thread_values; // disables unused parameter warning
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort by key for any data type using temporary storage.
@@ -458,23 +411,14 @@ public:
     ///     ...
     /// }
     /// \endcode
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&           thread_key,
               Value&         thread_value,
               storage_type&  storage,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(
             thread_key, thread_value, storage, compare_function
         );
@@ -482,14 +426,15 @@ public:
 
     /// \brief Warp sort by key for any data type using temporary storage.
     /// Invalid Warp Size
-    template<class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+    template<class BinaryFunction = ::rocprim::less<Key>, unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key&, Value&, storage_type&, BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 
     /// \brief Warp sort by key for any data type using temporary storage.
@@ -522,23 +467,15 @@ public:
     /// }
     /// \endcode
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               Value (&thread_values)[ItemsPerThread],
               storage_type&  storage,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize <= arch::wavefront::max_size()),
-                                void>::type
+        typename std::enable_if<(FunctionWarpSize <= arch::wavefront::min_size()), void>::type
     {
-        if constexpr(TargetWaveSize == ::rocprim::arch::wavefront::target::dynamic)
-        {
-            if(VirtualWaveSize > ::rocprim::arch::wavefront::size())
-            {
-                __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
-            }
-        }
         base_type::sort(
             thread_keys, thread_values, storage, compare_function
         );
@@ -547,19 +484,21 @@ public:
     /// \brief Warp sort by key for any data type using temporary storage.
     /// Invalid Warp Size
     template<unsigned int ItemsPerThread,
-             class BinaryFunction                 = ::rocprim::less<Key>,
-             unsigned int FunctionVirtualWaveSize = VirtualWaveSize>
+             class BinaryFunction          = ::rocprim::less<Key>,
+             unsigned int FunctionWarpSize = WarpSize>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     auto sort(Key (&thread_keys)[ItemsPerThread],
               Value (&thread_values)[ItemsPerThread],
               storage_type&,
               BinaryFunction compare_function = BinaryFunction()) ->
-        typename std::enable_if<(FunctionVirtualWaveSize > arch::wavefront::max_size()), void>::type
+        typename std::enable_if<(FunctionWarpSize > arch::wavefront::min_size()), void>::type
     {
         (void)thread_keys; // disables unused parameter warning
         (void)thread_values; // disables unused parameter warning
         (void)compare_function; // disables unused parameter warning
-        __builtin_trap(); // behavior undefined if virtual wave size exceeds hardware limit
+        ROCPRIM_PRINT_ERROR_ONCE("Specified warp size exceeds current hardware supported warp "
+                                 "size. Aborting warp sort.");
+        return;
     }
 };
 

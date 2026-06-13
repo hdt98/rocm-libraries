@@ -19,5 +19,6 @@
 
 #pragma once
 
-#include <thrust/detail/config/config.h>
 #include <thrust/version.h>
+#include <thrust/detail/config/config.h>
+

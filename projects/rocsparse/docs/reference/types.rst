@@ -1,6 +1,6 @@
 .. meta::
-  :description: rocSPARSE data types documentation
-  :keywords: rocSPARSE, ROCm, API, documentation, data types
+  :description: rocSPARSE documentation and API reference library
+  :keywords: rocSPARSE, ROCm, API, documentation
 
 .. _rocsparse_types_:
 
@@ -13,25 +13,16 @@ rocsparse_handle
 
 .. doxygentypedef:: rocsparse_handle
 
-rocsparse_error
----------------
-
-.. doxygentypedef:: rocsparse_error
-
 rocsparse_int
 -------------
 
 .. doxygentypedef:: rocsparse_int
 
-rocsparse_bfloat16
-------------------
-
-.. doxygenstruct:: rocsparse_bfloat16
-
 rocsparse_float_complex
 -----------------------
 
 .. doxygenstruct:: rocsparse_float_complex
+
 
 rocsparse_double_complex
 ------------------------
@@ -109,34 +100,3 @@ rocsparse_extract_descr
 -----------------------
 
 .. doxygentypedef:: rocsparse_extract_descr
-
-rocsparse_spmv_descr
---------------------
-
-.. doxygentypedef:: rocsparse_spmv_descr
-
-rocsparse_sptrsv_descr
-----------------------
-
-.. doxygentypedef:: rocsparse_sptrsv_descr
-
-rocsparse_sptrsm_descr
-----------------------
-
-.. doxygentypedef:: rocsparse_sptrsm_descr
-
-rocsparse_spilu0_descr
-----------------------
-
-.. doxygentypedef:: rocsparse_spilu0_descr
-
-rocsparse_spic0_descr
----------------------
-
-.. doxygentypedef:: rocsparse_spic0_descr
-
-rocsparse_spgeam_descr
-----------------------
-
-.. doxygentypedef:: rocsparse_spgeam_descr
-		    

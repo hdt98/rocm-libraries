@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +34,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <bool STRIDED, typename T, typename S, typename W>
 void gesvdx_checkBadArgs(const rocblas_handle handle,
@@ -633,7 +632,7 @@ void gesvdx_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -649,13 +648,13 @@ void gesvdx_getPerfData(const rocblas_handle handle,
     {
         gesvdx_initData<false, true, T>(handle, left_svect, right_svect, m, n, dA, lda, bc, hA, A, 0);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_gesvdx(STRIDED, handle, left_svect, right_svect, srange, m, n, dA.data(), lda,
                          stA, vl, vu, il, iu, dNsv.data(), dS.data(), stS, dU.data(), ldu, stU,
                          dV.data(), ldv, stV, difail.data(), stF, dinfo.data(), bc);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <bool BATCHED, bool STRIDED, typename T>
@@ -835,7 +834,7 @@ void testing_gesvdx(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         if(BATCHED)
@@ -863,9 +862,13 @@ void testing_gesvdx(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // memory allocations (all cases)
@@ -939,7 +942,7 @@ void testing_gesvdx(Arguments& argus)
         }
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
         {
             gesvdx_getPerfData<STRIDED, T>(handle, leftv, rightv, srange, m, n, dA, lda, stA, vl,
                                            vu, il, iu, dNsv, dS, stS, dU, ldu, stU, dV, ldv, stV,
@@ -982,7 +985,7 @@ void testing_gesvdx(Arguments& argus)
         }
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
         {
             gesvdx_getPerfData<STRIDED, T>(handle, leftv, rightv, srange, m, n, dA, lda, stA, vl,
                                            vu, il, iu, dNsv, dS, stS, dU, ldu, stU, dV, ldv, stV,

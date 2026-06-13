@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,7 @@
 #
 ################################################################################
 
-from rocisa.code import Module
-from rocisa.enum import DataTypeEnum
-from ..Common.DataType import DataType
+from ..TensileInstructions import DataType, Module
 from ..Component import Component, MAC
 
 class MAC_F16_Plain(MAC):
@@ -35,8 +33,7 @@ class MAC_F16_Plain(MAC):
                "v_pk_fma_f16": False,
                "v_fma_f16": False}
     #archCaps = {}
-    kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Half),
-                              "MacDataTypeB": DataType(DataTypeEnum.Half),
+    kernel = {"ProblemType": {"DataType": DataType(DataType.half),
                               "HighPrecisionAccumulate": False}}
 
     def __call__(self, writer, m, innerUnroll):
@@ -81,8 +78,7 @@ class FMA_F16_NonPacked(MAC):
     asmCaps = {"v_fma_f16": True,
                "v_pk_fma_f16": False}
     #archCaps = {}
-    kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Half),
-                              "MacDataTypeB": DataType(DataTypeEnum.Half),
+    kernel = {"ProblemType": {"DataType": DataType(DataType.half),
                               "HighPrecisionAccumulate": False}}
 
     def __call__(self, writer, m, innerUnroll):
@@ -133,8 +129,7 @@ class FMA_F16_NonPacked(MAC):
 class FMA_F16_Packed(MAC):
     asmCaps = {"v_pk_fma_f16": True}
     #archCaps = {}
-    kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Half),
-                              "MacDataTypeB": DataType(DataTypeEnum.Half),
+    kernel = {"ProblemType": {"DataType": DataType(DataType.half),
                               "HighPrecisionAccumulate": False}}
 
     def __call__(self, writer, m, innerUnroll):

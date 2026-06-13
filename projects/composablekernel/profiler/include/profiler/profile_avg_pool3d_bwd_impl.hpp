@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -48,8 +48,7 @@ bool profile_avg_pool3d_bwd_impl(int do_verification,
                                  std::vector<index_t> window_strides,
                                  std::vector<index_t> window_dilations,
                                  std::vector<index_t> input_left_pads,
-                                 std::vector<index_t> input_right_pads,
-                                 index_t instance_index = -1)
+                                 std::vector<index_t> input_right_pads)
 {
     constexpr index_t InOutRank  = 5;
     constexpr index_t WindowRank = 3;
@@ -94,8 +93,7 @@ bool profile_avg_pool3d_bwd_impl(int do_verification,
             using namespace ck::literals;
 
             return HostTensorDescriptor({N_, C_, D, H, W},
-                                        {D * C_ * H * W, 1_uz, C_ * H * W, W * C_, C_},
-                                        ck::tensor_layout::convolution::NDHWC{});
+                                        {D * C_ * H * W, 1_uz, C_ * H * W, W * C_, C_});
         };
 
     Tensor<DOutDataType> dout_n_c_do_ho_wo(f_host_tensor_descriptor(N, C, Do, Ho, Wo));
@@ -148,14 +146,9 @@ bool profile_avg_pool3d_bwd_impl(int do_verification,
     }
 
     int num_kernel = 0;
-    for(size_t i = 0; i < instance_ptrs.size(); i++)
+
+    for(auto& inst_ptr : instance_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& inst_ptr    = instance_ptrs[i];
         auto argument_ptr = inst_ptr->MakeArgumentPointer(
             static_cast<DOutDataType*>(dout_device_buf.GetDeviceBuffer()),
             static_cast<DInDataType*>(din_device_buf.GetDeviceBuffer()),
@@ -252,6 +245,7 @@ bool profile_avg_pool3d_bwd_impl(int do_verification,
         std::cout << "Error: No kernel is applicable" << std::endl;
         return false;
     }
+
     return true;
 }
 

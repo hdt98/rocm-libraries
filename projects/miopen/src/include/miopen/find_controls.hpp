@@ -31,7 +31,8 @@
 #include <miopen/solver_id.hpp>
 #include <miopen/miopen.h>
 
-#include <optional>
+#include <boost/optional.hpp>
+
 #include <ostream>
 
 namespace miopen {
@@ -60,7 +61,7 @@ enum class FindEnforceAction
     EnforcedLast_  = DbClean,
 };
 
-class FindEnforce
+class MIOPEN_INTERNALS_EXPORT FindEnforce
 {
     FindEnforceAction action;
 
@@ -72,7 +73,7 @@ private:
     }
 
 public:
-    MIOPEN_INTERNALS_EXPORT FindEnforce();
+    FindEnforce();
     explicit FindEnforce(FindEnforceAction action_) : action(action_) {}
 
     template <class Context>
@@ -105,9 +106,9 @@ public:
     MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream&, const FindEnforce&);
 };
 
-MIOPEN_INTERNALS_EXPORT std::optional<std::vector<solver::Id>> GetEnvFindOnlySolver();
+MIOPEN_INTERNALS_EXPORT boost::optional<std::vector<solver::Id>> GetEnvFindOnlySolver();
 
-class FindMode
+class MIOPEN_INTERNALS_EXPORT FindMode
 {
 public:
     enum class Values
@@ -118,8 +119,6 @@ public:
         Hybrid               = miopenConvolutionFindModeHybrid,
         DeprecatedFastHybrid = 4,
         DynamicHybrid        = miopenConvolutionFindModeDynamicHybrid,
-        TrustVerify          = miopenConvolutionFindModeTrustVerify,
-        TrustVerifyFull      = miopenConvolutionFindModeTrustVerifyFull,
         End_,
         Default_ = miopenConvolutionFindModeDefault,
     };
@@ -140,7 +139,7 @@ private:
 
 public:
     // Todo: remove default value of primitive
-    MIOPEN_INTERNALS_EXPORT FindMode(solver::Primitive primitive = solver::Primitive::Convolution);
+    FindMode(solver::Primitive primitive = solver::Primitive::Convolution);
     Values Get() const { return value; }
     void Set(Values const v) { value = v; }
 
@@ -153,35 +152,13 @@ public:
     template <class Context>
     bool IsHybrid(const Context& context) const
     {
-        return (value == Values::Hybrid || value == Values::DynamicHybrid ||
-                value == Values::TrustVerify || value == Values::TrustVerifyFull) &&
-               IsEnabled(context);
+        return (value == Values::Hybrid || value == Values::DynamicHybrid) && IsEnabled(context);
     }
 
     template <class Context>
     bool IsDynamicHybrid(const Context& context) const
     {
-        return (value == Values::DynamicHybrid || value == Values::TrustVerify ||
-                value == Values::TrustVerifyFull) &&
-               IsEnabled(context);
-    }
-
-    template <class Context>
-    bool IsTrustVerify(const Context& context) const
-    {
-        // TrustVerify uses user db as groud truth, disable if no user db
-#if MIOPEN_DISABLE_USERDB
-        return false;
-#else
-        return (value == Values::TrustVerify || value == Values::TrustVerifyFull) &&
-               IsEnabled(context);
-#endif
-    }
-
-    template <class Context>
-    bool IsExhaustive(const Context& context) const
-    {
-        return (value == Values::TrustVerifyFull) && IsEnabled(context);
+        return value == Values::DynamicHybrid && IsEnabled(context);
     }
 
     MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream&, const FindMode&);

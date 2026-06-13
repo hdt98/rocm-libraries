@@ -24,11 +24,11 @@
 
 #include "rocsparse_csrgemm_symbolic_scal.hpp"
 #include "../conversion/rocsparse_identity.hpp"
+#include "common.h"
+#include "control.h"
 #include "internal/extra/rocsparse_csrgemm.h"
-#include "rocsparse_common.hpp"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csrgemm.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {

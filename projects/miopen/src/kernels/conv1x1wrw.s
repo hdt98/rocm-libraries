@@ -811,15 +811,14 @@ miopenGcnAsmConv1x1WrW:
         .endr
     .endm
 
-data_prefetch_limited = data_prefetch
 .if(full_reads > 0 && full_reads < data_prefetch + 1)
-    data_prefetch_limited = full_reads - 1
+    data_prefetch = full_reads - 1
 .endif
 
 LD_PARTIAL_CHUNKS = 1
 LD_FULL_CHUNKS = 0
 LD_PART_A_ID = 0
-LD_PART_B_ID = data_prefetch_limited
+LD_PART_B_ID = data_prefetch
 last_free_ld_part = LD_PART_B_ID
 
 
@@ -844,14 +843,14 @@ last_free_ld_part = LD_PART_B_ID
 
 .macro data_prefetch_init_q q_wait_cnt, singl_wait_cnt
     q_id = LD_PART_A_ID
-    .rept data_prefetch_limited
+    .rept data_prefetch
         ld_buffers_inc_pointers_rept_waitcnt LD_FULL_CHUNKS, q_id, \singl_wait_cnt
         \q_wait_cnt = \q_wait_cnt + \singl_wait_cnt
         q_id = (q_id + 1)
     .endr
 .endm
 
-.macro data_ld_prefetch_active_loop q_wait_cnt, loop_cnt=data_prefetch_limited+1
+.macro data_ld_prefetch_active_loop q_wait_cnt, loop_cnt=data_prefetch+1
     q_id_conv = LD_PART_A_ID
     q_id_data_ld = LD_PART_B_ID
     .rept \loop_cnt
@@ -861,19 +860,19 @@ last_free_ld_part = LD_PART_B_ID
 
         m_conv_accums elements_per_lane, q_id_conv
 
-        q_id_conv = ((q_id_conv + 1) % (data_prefetch_limited + 1))
-        q_id_data_ld = ((q_id_data_ld + 1) % (data_prefetch_limited + 1))
+        q_id_conv = ((q_id_conv + 1) % (data_prefetch + 1))
+        q_id_data_ld = ((q_id_data_ld + 1) % (data_prefetch + 1))
     .endr
 .endm
 
 .macro data_prefetch_conv_finalizing q_wait_cnt, singl_wait_cnt, q_id_conv_off=0
-    q_id_conv = ((LD_PART_A_ID + \q_id_conv_off) % (data_prefetch_limited + 1))
+    q_id_conv = ((LD_PART_A_ID + \q_id_conv_off) % (data_prefetch + 1))
 
-    .rept data_prefetch_limited
+    .rept data_prefetch
         \q_wait_cnt = (\q_wait_cnt - \singl_wait_cnt)
         s_wait \q_wait_cnt
         m_conv_accums elements_per_lane, q_id_conv
-        q_id_conv = ((q_id_conv + 1) % (data_prefetch_limited + 1))
+        q_id_conv = ((q_id_conv + 1) % (data_prefetch + 1))
     .endr
 .endm
 
@@ -890,21 +889,21 @@ loop_n_begin: // loop over batch (n)
 
         data_prefetch_init_q q_wait_vec_load_full, single_wait_vec_load_full
 
-        .if(full_reads >= 2 * data_prefetch_limited + 1)
+        .if(full_reads >= 2 * data_prefetch + 1)
             loop_hw_begin:
                 data_ld_prefetch_active_loop q_wait_vec_load_full
 
             loop_hw_end:
-                s_addk_i32 s[loop_hw_cnt], 1 + data_prefetch_limited
-                s_cmpk_gt_u32 s[loop_hw_cnt], 0 + full_reads - (2 * data_prefetch_limited + 1)
+                s_addk_i32 s[loop_hw_cnt], 1 + data_prefetch
+                s_cmpk_gt_u32 s[loop_hw_cnt], 0 + full_reads - (2 * data_prefetch + 1)
                 s_cbranch_scc0 loop_hw_begin
         .endif
-        .if( (full_reads - data_prefetch_limited) % (data_prefetch_limited + 1) != 0)
-            loop_resi = ((full_reads - data_prefetch_limited) % (data_prefetch_limited + 1))
+        .if( (full_reads - data_prefetch) % (data_prefetch + 1) != 0)
+            loop_resi = ((full_reads - data_prefetch) % (data_prefetch + 1))
 
             data_ld_prefetch_active_loop q_wait_vec_load_full, loop_resi
 
-            last_free_ld_part = ((LD_PART_B_ID + loop_resi) % (data_prefetch_limited + 1))
+            last_free_ld_part = ((LD_PART_B_ID + loop_resi) % (data_prefetch + 1))
         .endif
     .endif
 
@@ -920,7 +919,7 @@ loop_n_begin: // loop over batch (n)
         q_wait_vec_load_full = q_wait_vec_load_full + wait_vec_load_part
     .endif
 
-    .if(full_reads != 0 && data_prefetch_limited != 0)
+    .if(full_reads != 0 && data_prefetch != 0)
         data_prefetch_conv_finalizing q_wait_vec_load_full, single_wait_vec_load_full, loop_resi
     .endif
 

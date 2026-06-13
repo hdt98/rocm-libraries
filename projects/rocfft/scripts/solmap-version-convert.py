@@ -38,7 +38,7 @@ console = logging.StreamHandler()
 # # Commands
 # #
 def version_check(arguments):
-    """Check versions of solution map and do conversion"""
+    """Check versions of solution map and do convertion"""
 
     input_folder = None
 

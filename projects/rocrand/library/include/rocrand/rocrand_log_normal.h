@@ -26,6 +26,8 @@
  *  @{
  */
 
+#include <math.h>
+
 #include "rocrand/rocrand_lfsr113.h"
 #include "rocrand/rocrand_mrg31k3p.h"
 #include "rocrand/rocrand_mrg32k3a.h"
@@ -42,10 +44,6 @@
 #include "rocrand/rocrand_xorwow.h"
 
 #include "rocrand/rocrand_normal.h"
-
-#include <hip/hip_runtime.h>
-
-#include <math.h>
 
 /**
  * \brief Returns a log-normally distributed \p float value.

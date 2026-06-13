@@ -1,12 +1,7 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
-
-// use macro to minimize code change
-#ifndef EXAMPLE_WITH_COMPUTE_DATATYPE
-using ComputeDataType = AccDataType;
-#endif
 
 template <typename ProblemType>
 bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
@@ -28,17 +23,17 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         [](std::size_t row, std::size_t col, std::size_t stride, auto layout) {
             if constexpr(std::is_same_v<decltype(layout), ck::tensor_layout::gemm::RowMajor>)
             {
-                return HostTensorDescriptor({row, col}, {stride, 1_uz}, layout);
+                return HostTensorDescriptor({row, col}, {stride, 1_uz});
             }
             else
             {
-                return HostTensorDescriptor({row, col}, {1_uz, stride}, layout);
+                return HostTensorDescriptor({row, col}, {1_uz, stride});
             }
         };
 
     auto f_get_default_stride =
         [](std::size_t row, std::size_t col, ck::index_t stride, auto layout) {
-            if(stride == -1 || stride == 0)
+            if(stride == -1)
             {
                 // give a chance if stride is -1, return a default packed stride
                 if constexpr(std::is_same_v<decltype(layout), ck::tensor_layout::gemm::RowMajor>)
@@ -211,8 +206,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         pass &= ck::utils::check_err(c_m_n_device_result,
                                      c_m_n_host_result,
                                      "Error: Incorrect results!",
-                                     get_rtol<CDataType, ComputeDataType>(),
-                                     get_atol<CDataType, ComputeDataType>());
+                                     get_rtol<CDataType>(),
+                                     get_atol<CDataType>());
 #endif
     }
 
@@ -242,8 +237,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         pass &= ck::utils::check_err(c_m_n_device_result,
                                      c_m_n_device_ref_result,
                                      "Error: Incorrect results!",
-                                     get_rtol<CDataType, ComputeDataType>(),
-                                     get_atol<CDataType, ComputeDataType>());
+                                     get_rtol<CDataType>(),
+                                     get_atol<CDataType>());
     }
 
     return pass == true;

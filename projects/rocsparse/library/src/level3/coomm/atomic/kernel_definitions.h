@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
-* Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights Reserved.
+* Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights Reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 * ************************************************************************ */
 #include "../../coomm_device_atomic.h"
 #include "../coomm_common.h"
-#include "rocsparse_scalar.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -41,7 +41,6 @@ namespace rocsparse
                                  bool    conj_B,
                                  I       ncol,
                                  int64_t nnz,
-                                 I       m,
                                  I       n,
                                  int64_t batch_stride_A,
                                  ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),
@@ -67,7 +66,6 @@ namespace rocsparse
                 conj_B,
                 ncol,
                 nnz,
-                m,
                 n,
                 alpha,
                 load_pointer(coo_row_ind, hipBlockIdx_y, batch_stride_A),
@@ -94,7 +92,6 @@ namespace rocsparse
         void coommnn_atomic_remainder(bool    conj_A,
                                       bool    conj_B,
                                       I       ncol_offset,
-                                      I       m,
                                       I       n,
                                       int64_t nnz,
                                       int64_t batch_stride_A,
@@ -119,7 +116,6 @@ namespace rocsparse
                 conj_A,
                 conj_B,
                 ncol_offset,
-                m,
                 n,
                 nnz,
                 alpha,
@@ -146,7 +142,6 @@ namespace rocsparse
         void coommtn_atomic_main(bool    conj_A,
                                  bool    conj_B,
                                  int64_t nnz,
-                                 I       m,
                                  I       n,
                                  int64_t batch_stride_A,
                                  ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),
@@ -170,7 +165,6 @@ namespace rocsparse
                 conj_A,
                 conj_B,
                 nnz,
-                m,
                 n,
                 alpha,
                 load_pointer(coo_row_ind, hipBlockIdx_z, batch_stride_A),
@@ -193,7 +187,6 @@ namespace rocsparse
             bool    conj_B,                                                         \
             I       ncol,                                                           \
             int64_t nnz,                                                            \
-            I       m,                                                              \
             I       n,                                                              \
             int64_t batch_stride_A,                                                 \
             ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),                          \
@@ -216,7 +209,6 @@ namespace rocsparse
             bool    conj_A,                                                       \
             bool    conj_B,                                                       \
             I       ncol_offset,                                                  \
-            I       m,                                                            \
             I       n,                                                            \
             int64_t nnz,                                                          \
             int64_t batch_stride_A,                                               \
@@ -240,7 +232,6 @@ namespace rocsparse
             bool    conj_A,                                          \
             bool    conj_B,                                          \
             int64_t nnz,                                             \
-            I       m,                                               \
             I       n,                                               \
             int64_t batch_stride_A,                                  \
             ROCSPARSE_DEVICE_HOST_SCALAR_PARAMS(T, alpha),           \

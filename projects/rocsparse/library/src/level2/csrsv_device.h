@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 extern "C" void __builtin_amdgcn_s_sleep(int);
 
@@ -42,11 +42,6 @@ namespace rocsparse
                                      rocsparse_index_base idx_base,
                                      rocsparse_diag_type  diag_type)
     {
-        static_assert(WF_SIZE > 0 && (WF_SIZE & (WF_SIZE - 1)) == 0,
-                      "WF_SIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WF_SIZE == 0, "BLOCKSIZE must be a multiple of WF_SIZE.");
-
         int lid = hipThreadIdx_x & (WF_SIZE - 1);
         int wid = hipThreadIdx_x / WF_SIZE;
 
@@ -170,11 +165,6 @@ namespace rocsparse
                                      rocsparse_index_base idx_base,
                                      rocsparse_diag_type  diag_type)
     {
-        static_assert(WF_SIZE > 0 && (WF_SIZE & (WF_SIZE - 1)) == 0,
-                      "WF_SIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WF_SIZE == 0, "BLOCKSIZE must be a multiple of WF_SIZE.");
-
         int lid = hipThreadIdx_x & (WF_SIZE - 1);
         int wid = hipThreadIdx_x / WF_SIZE;
 
@@ -291,33 +281,25 @@ namespace rocsparse
                                            const I* __restrict__ csr_row_ptr,
                                            const J* __restrict__ csr_col_ind,
                                            const T* __restrict__ csr_val,
-                                           int64_t csr_val_inc,
                                            const T* __restrict__ x,
                                            int64_t x_inc,
                                            T* __restrict__ y,
-                                           int64_t y_inc,
                                            int* __restrict__ done_array,
-                                           const J* __restrict__ map,
+                                           J* __restrict__ map,
                                            int offset,
                                            J* __restrict__ zero_pivot,
                                            rocsparse_index_base idx_base,
                                            rocsparse_fill_mode  fill_mode,
                                            rocsparse_diag_type  diag_type)
     {
-        static_assert(WF_SIZE > 0 && (WF_SIZE & (WF_SIZE - 1)) == 0,
-                      "WF_SIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WF_SIZE == 0, "BLOCKSIZE must be a multiple of WF_SIZE.");
-
-        const uint32_t lid = hipThreadIdx_x & (WF_SIZE - 1);
-        int            wid = hipThreadIdx_x / WF_SIZE;
-
+        int lid = hipThreadIdx_x & (WF_SIZE - 1);
+        int wid = hipThreadIdx_x / WF_SIZE;
         // Scalarize wid, i.e. move it from a vector register to a scalar register, so all dependent
         // values can be loaded or computed with scalar instructions (idx, row, row_begin...)
-        wid = rocsparse::read_first_lane(wid);
+        wid = __builtin_amdgcn_readfirstlane(wid);
 
         // Index into the row map
-        const J idx = hipBlockIdx_x * (BLOCKSIZE / WF_SIZE) + wid;
+        J idx = hipBlockIdx_x * (BLOCKSIZE / WF_SIZE) + wid;
 
         // Shared memory to hold diagonal entry
         __shared__ T diagonal[BLOCKSIZE / WF_SIZE];
@@ -329,11 +311,11 @@ namespace rocsparse
         }
 
         // Get the row this warp will operate on
-        const J row = map[idx + offset];
+        J row = map[idx + offset];
 
         // Current row entry point and exit point
-        const I row_begin = csr_row_ptr[row] - idx_base;
-        const I row_end   = csr_row_ptr[row + 1] - idx_base;
+        I row_begin = csr_row_ptr[row] - idx_base;
+        I row_end   = csr_row_ptr[row + 1] - idx_base;
 
         // Local summation variable.
         T local_sum = static_cast<T>(0);
@@ -347,10 +329,10 @@ namespace rocsparse
         for(I j = row_begin + lid; j < row_end; j += WF_SIZE)
         {
             // Current column this lane operates on
-            const J local_col = rocsparse::nontemporal_load(csr_col_ind + j) - idx_base;
+            J local_col = rocsparse::nontemporal_load(csr_col_ind + j) - idx_base;
 
             // Local value this lane operates with
-            T local_val = rocsparse::nontemporal_load(csr_val + j * csr_val_inc);
+            T local_val = rocsparse::nontemporal_load(csr_val + j);
 
             // Check for numerical zero
             if(local_val == static_cast<T>(0) && local_col == row
@@ -415,7 +397,7 @@ namespace rocsparse
             __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "agent");
 
             // Local sum computation for each lane
-            local_sum = rocsparse::fma(-local_val, y[local_col * y_inc], local_sum);
+            local_sum = rocsparse::fma(-local_val, y[local_col], local_sum);
         }
 
         // Gather all local sums for each lane
@@ -433,7 +415,7 @@ namespace rocsparse
         if(lid == WF_SIZE - 1)
         {
             // Store the rows result in y
-            rocsparse::nontemporal_store(local_sum, &y[row * y_inc]);
+            rocsparse::nontemporal_store(local_sum, &y[row]);
 
             // Mark row as done
             __hip_atomic_store(&done_array[row], 1, __ATOMIC_RELEASE, __HIP_MEMORY_SCOPE_AGENT);

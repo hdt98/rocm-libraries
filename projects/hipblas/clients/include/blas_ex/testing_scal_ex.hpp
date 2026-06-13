@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,17 +39,16 @@ inline void testname_scal_ex(const Arguments& arg, std::string& name)
 template <typename Ta, typename Tx = Ta, typename Tex = Tx>
 void testing_scal_ex_bad_arg(const Arguments& arg)
 {
-    using Ts                = hipblas_internal_type<Ta>;
     auto hipblasScalExFn    = arg.api == FORTRAN ? hipblasScalExFortran : hipblasScalEx;
     auto hipblasScalExFn_64 = arg.api == FORTRAN_64 ? hipblasScalEx_64Fortran : hipblasScalEx_64;
 
-    hipDataType alphaType     = arg.a_type;
-    hipDataType xType         = arg.b_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t alphaType     = arg.a_type;
+    hipblasDatatype_t xType         = arg.b_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     int64_t N     = 100;
     int64_t incx  = 1;
-    Ta      alpha = Ta(0.6);
+    Ta      alpha = (Ta)0.6;
 
     hipblasLocalHandle handle(arg);
 
@@ -62,10 +61,9 @@ void testing_scal_ex_bad_arg(const Arguments& arg)
         // Notably scal differs from axpy such that x can /never/ be a nullptr, regardless of alpha.
 
         // None of these test cases will write to result so using device pointer is fine for both modes
-        DAPI_EXPECT(
-            HIPBLAS_STATUS_NOT_INITIALIZED,
-            hipblasScalExFn,
-            (nullptr, N, reinterpret_cast<Ts*>(&alpha), alphaType, dx, xType, incx, executionType));
+        DAPI_EXPECT(HIPBLAS_STATUS_NOT_INITIALIZED,
+                    hipblasScalExFn,
+                    (nullptr, N, &alpha, alphaType, dx, xType, incx, executionType));
 
         if(arg.bad_arg_all)
         {
@@ -74,14 +72,7 @@ void testing_scal_ex_bad_arg(const Arguments& arg)
                         (handle, N, nullptr, alphaType, dx, xType, incx, executionType));
             DAPI_EXPECT(HIPBLAS_STATUS_INVALID_VALUE,
                         hipblasScalExFn,
-                        (handle,
-                         N,
-                         reinterpret_cast<Ts*>(&alpha),
-                         alphaType,
-                         nullptr,
-                         xType,
-                         incx,
-                         executionType));
+                        (handle, N, &alpha, alphaType, nullptr, xType, incx, executionType));
 
             // This is a little different than the checks for L2. In rocBLAS implementation n <= 0 is a quick-return success before other arg checks.
             // Here, for 32-bit API, I'm counting on the rollover to return success, and for the 64-bit API I'm passing in invalid
@@ -97,7 +88,6 @@ void testing_scal_ex_bad_arg(const Arguments& arg)
 template <typename Ta, typename Tx = Ta, typename Tex = Tx>
 void testing_scal_ex(const Arguments& arg)
 {
-    using Ts                = hipblas_internal_type<Ta>;
     auto hipblasScalExFn    = arg.api == FORTRAN ? hipblasScalExFortran : hipblasScalEx;
     auto hipblasScalExFn_64 = arg.api == FORTRAN_64 ? hipblasScalEx_64Fortran : hipblasScalEx_64;
 
@@ -112,9 +102,9 @@ void testing_scal_ex(const Arguments& arg)
 
     hipblasLocalHandle handle(arg);
 
-    hipDataType alphaType     = arg.a_type;
-    hipDataType xType         = arg.b_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t alphaType     = arg.a_type;
+    hipblasDatatype_t xType         = arg.b_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     // argument sanity check, quick return if input parameters are invalid before allocating invalid
     // memory
@@ -140,7 +130,7 @@ void testing_scal_ex(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dx.memcheck());
     CHECK_DEVICE_ALLOCATION(d_alpha.memcheck());
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_vector(hx_host, arg, hipblas_client_alpha_sets_nan, true);
@@ -159,14 +149,7 @@ void testing_scal_ex(const Arguments& arg)
         =================================================================== */
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
         DAPI_CHECK(hipblasScalExFn,
-                   (handle,
-                    N,
-                    reinterpret_cast<Ts*>(&h_alpha),
-                    alphaType,
-                    dx,
-                    xType,
-                    incx,
-                    executionType));
+                   (handle, N, &h_alpha, alphaType, dx, xType, incx, executionType));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(hx_host.transfer_from(dx));

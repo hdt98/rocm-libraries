@@ -28,7 +28,6 @@
 #include <gtest/gtest_common.hpp>
 #include <gtest/gtest.h>
 #include "get_handle.hpp"
-#include "gtest_common.hpp"
 
 namespace regression_issue_2012 {
 
@@ -63,7 +62,6 @@ using TestCase = decltype(GetTestCases(std::string{}))::value_type;
 
 class GPU_regression_issue_2012_FP32 : public testing::TestWithParam<std::vector<TestCase>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 bool IsTestSupportedForDevice()

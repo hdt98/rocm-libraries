@@ -43,18 +43,6 @@ environmental variables to control logging. Both variables are disabled by defau
 * ``MIOPEN_ENABLE_LOGGING_ELAPSED_TIME``: Adds a timestamp to each log line that indicates the
   time elapsed (in milliseconds) since the previous log message.
 
-* ``MIOPEN_ENABLE_LOGGING_DATE_TIME``: Adds a timestamp to each log line that indicates the
-  system time (with milliseconds).
-
-* ``MIOPEN_WARN_SEARCH``: Elevate log messages for Search to warnings.
-
-* ``MIOPEN_LOG_BUFFER_SIZE``: Message length of the Info2 buffer in lines.
-  If ``MIOPEN_LOG_LEVEL`` is less than 6, then log messages will be buffered.
-  The buffered logs will be dumped to a log file when MIOpen logs an error message,
-  or an error is thrown by MIOpen.
-  This log can be found in ``/tmp/miopen_error_<pid>``.
-  This feature is disabled by default and can be enabled by setting the value to greater than 0 (e.g., 128).
-
 .. note::
 
   If you require technical support, include the console log that is produced from these settings:
@@ -148,9 +136,14 @@ Some of the solutions have individual controls, which affect both find and immed
   * ``MIOPEN_DEBUG_CONV_DIRECT_ASM_7X7C3H224W224`` -- ``ConvAsm7x7c3h224w224k64u2v2p3q3f1``
   * ``MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW3X3`` -- ``ConvAsmBwdWrW3x3``
   * ``MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW1X1`` -- ``ConvAsmBwdWrW1x1``
-  * ``MIOPEN_DEBUG_CONV_DIRECT_HIP_FWD11X11`` -- ``ConvHipDirectFwd11x11``
+  * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD11X11`` -- ``ConvOclDirectFwd11x11``
+  * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_FWDGEN`` -- ``ConvOclDirectFwdGen``
   * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD`` -- ``ConvOclDirectFwd``
-  * ``MIOPEN_DEBUG_CONV_DIRECT_HIP_WRW53`` -- ``ConvHipBwdWrW53``
+  * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_FWD1X1`` -- ``ConvOclDirectFwd1x1``
+  * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW2`` -- ``ConvOclBwdWrW2<n>`` (where n =
+    ``{1,2,4,8,16}``) and ``ConvOclBwdWrW2NonTunable``
+  * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53`` -- ``ConvOclBwdWrW53``
+  * ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1`` -- ``ConvOclBwdWrW1x1``
 
 * Winograd solutions:
 
@@ -325,17 +318,6 @@ settings to help with debugging:
   (note that this is slow).
 
 .. _control-parallel-compilation:
-
-Check for GPU sub-buffer out-of-bounds memory accesses
-==========================================================
-Use the ``MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS`` to help debug potential out-of-bounds (OOBs)
-memory access errors on GPU sub-buffers.  If the environment variable is undefined or set to zero, then no
-sub-buffer out-of-bounds detection is performed. To verify the memory accesses, use one of these values:
-
-* ``MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS=1``: Check for OOBs before the start of the sub-buffers.
-* ``MIOPEN_DEBUG_CHECK_SUB_BUFFER_OOB_MEMORY_ACCESS=2``: Check for OOBs after the end of the sub-buffers.
-
-Note that these checks are not intended for production use because they might cause a performance hit.
 
 Controlling parallel compilation
 ==========================================================

@@ -6,86 +6,10 @@
 Build MIOpen from source
 ********************************************************************
 
-To build MIOpen as part of the ROCm Core SDK, see `TheRock build
-instructions
-<https://github.com/ROCm/TheRock/blob/main/docs/development/README.md>`__.
-TheRock is the recommended way to build ROCm components from source.
-
-Alternatively, you can build MIOpen standalone using the following
-instructions.
-
 This topic discusses how to build MIOpen from source and configure the resulting application.
 It also explains how to build the library and driver and run the tests. For a list of MIOpen
 prerequisites, see :doc:`MIOpen prerequisites <./prerequisites>`. To install MIOpen from a
-package, see :doc:`Install MIOpen <./install>`.
-
-Prerequisites
-=============
-
-To install MIOpen, you must first install these prerequisites. These prerequisites apply to
-all types of MIOpen installations.
-
-* A :doc:`ROCm <rocm:index>`-enabled platform
-* A base software stack that includes either:
-
-  * :doc:`HIP <hip:index>` (HIP and HCC libraries and header files)
-  * OpenCL (OpenCL libraries and header files) (Using MIOpen with OpenCL is now deprecated.)
-
-* `ROCm CMake <https://github.com/ROCm/rocm-cmake>`_: CMake modules for common
-  build tasks needed for the ROCm software stack
-* `Half <http://half.sourceforge.net/>`_: An IEEE 754-based, half-precision floating-point library
-* `SQLite3 <https://sqlite.org/index.html>`_: A read-write performance database
-* lbzip2: A multi-threaded compression and decompression utility
-* :doc:`rocBLAS <rocblas:index>`: AMD's library for Basic Linear Algebra Subprograms (BLAS) on the
-  ROCm platform.
-
-  * Minimum version for pre-ROCm 3.5
-    `master-rocm-2.10 <https://github.com/ROCm/rocBLAS/tree/master-rocm-2.10>`_
-  * Minimum version for post-ROCm 3.5
-    `master-rocm-3.5 <https://github.com/ROCm/rocBLAS/tree/master-rocm-3.5>`_
-
-* `Multi-Level Intermediate Representation (MLIR) <https://github.com/ROCm/rocMLIR>`_, with an
-  MIOpen dialect to support and complement kernel development
-* :doc:`Composable Kernel <composable_kernel:index>`: A C++ templated device library for
-  GEMM-like and reduction-like operators.
-
-Installing dependencies
-================================================
-
-To install the MIOpen dependencies, use the ``install_deps.cmake`` command:
-
-.. note::
-
-   You can run ``install_deps.cmake`` from the ``rocm-libraries/projects/miopen`` directory.
-
-.. code:: shell
-
-   cmake -P install_deps.cmake
-
-By default, this installs the dependencies in ``/usr/local``, but you can specify another location using the ``--prefix``
-argument:
-
-.. code:: shell
-
-  cmake -P install_deps.cmake --prefix <miopen-dependency-path>
-
-The following example demonstrates how to use ``cmake`` with a specific installation directory:
-
-.. code:: shell
-
-   cmake -P install_deps.cmake --minimum --prefix /root/MIOpen/install_dir
-
-You can specify this directory during the configuration phase using ``CMAKE_PREFIX_PATH``.
-
-MIOpen's HIP backend uses :doc:`rocBLAS <rocblas:index>` by default. You can install the rocBLAS
-minimum release using ``apt-get install rocblas``. To disable rocBLAS, set the configuration flag
-``-DMIOPEN_USE_ROCBLAS=Off``. rocBLAS is **not** available with OpenCL.
-
-MIOpen's HIP backend can use :doc:`hipBLASLt <hipblaslt:index>`. To install the minimum release of hipBLASLt,
-use ``apt-get install hipblaslt``. In addition to installing hipBLASLt, you must also
-install :doc:`hipBLAS <hipblas:index>`. To install the hipBLAS minimum release, use ``apt-get install hipblas``.
-To disable hipBLASLt, set the configuration flag ``-DMIOPEN_USE_HIPBLASLT=Off``.
-hipBLASLt is **not** available with OpenCL.
+package, see :doc:`install MIOpen <./install>`.
 
 Building MIOpen
 ================================================
@@ -227,7 +151,7 @@ You can build the library from the ``build`` directory using the ``Release`` con
 .. code:: shell
 
    cmake --build . --config Release
-
+   
 or
 
 .. code:: shell
@@ -259,7 +183,7 @@ To build the driver, use the ``MIOpenDriver`` target:
 .. code:: shell
 
    cmake --build . --config Release --target MIOpenDriver
-
+   
 or
 
 .. code:: shell
@@ -274,7 +198,7 @@ To run tests, use the ``check`` target:
 .. code:: shell
 
    cmake --build . --config Release --target check
-
+   
 or
 
 .. code:: shell
@@ -295,7 +219,7 @@ To format the code using ``clang-format``, use this command:
 
 .. code:: shell
 
-  clang-format -style=file -i <path-to-source-file>
+  clang-format-10 -style=file -i <path-to-source-file>
 
 To format the code per commit, install githooks:
 
@@ -306,35 +230,60 @@ To format the code per commit, install githooks:
 Storing large file using Git Large File Storage
 =========================================================
 
-`Data Versioning System (DVS) <https://dvc.org/>`_ replaces large files, such as audio samples, videos, datasets, and
-graphics with text pointers inside Git, while storing the file contents on a remote server. MIOpen uses DVC to
-store large files, such as kernel database files (``*.kdb``), which are normally > 0.5 GB.
+Git Large File Storage (LFS) replaces large files, such as audio samples, videos, datasets, and graphics
+with text pointers inside Git, while storing the file contents on a remote server. MIOpen uses Git
+LFS to store large files, such as kernel database files (``*.kdb``), which are normally > 0.5 GB.
 
-To install DVC, use the `instructions provided for your platform here <https://dvc.org/doc/install>`_.
-
-You can `pull <https://dvc.org/doc/command-reference/pull>`_ all large files or a single large file using:
+To install Git LFS, use these commands:
 
 .. code:: shell
 
-   dvc pull
+   sudo apt install git-lfs
+   git lfs install
 
+In the Git repository where you want to use Git LFS, track the file type using the following code. If the
+file type is already being tracked, you can skip this step:
+
+.. code:: shell
+
+   git lfs track "*.file_type"
+   git add .gitattributes
+
+To pull all files or a single large file, use:
+
+.. code:: shell
+
+   git lfs pull --exclude=
+ 
 or
 
 .. code:: shell
 
-   dvc pull "filename"
+   git lfs pull --exclude= --include "filename"
 
+Update the large files and push to GitHub using the following sequence of commands:
 
-If you are familiar with using Git LFS, a key difference with DVC is that you must manually run ``dvc pull`` after you
-switch branches or merge changes in Git to ensure any large binaries are kept in sync with your checkout.
+.. code:: shell
+
+   git add my_large_files
+   git commit -m "the message"
+   git push
 
 Installing the dependencies manually
 ===============================================================
 
-If you're using Ubuntu, you can install the ``BZip2`` packages using:
+If you're using Ubuntu v16, you can install the ``Boost`` packages using:
 
 .. code:: shell
 
-   sudo apt-get install libbz2-dev
+   sudo apt-get install libboost-dev
+   sudo apt-get install libboost-system-dev
+   sudo apt-get install libboost-filesystem-dev
+
+.. note::
+
+   By default, MIOpen attempts to build with Boost statically linked libraries. To build
+   with dynamically linked Boost libraries, use the ``-DBoost_USE_STATIC_LIBS=Off`` flag during the
+   configuration stage. However, this is not recommended.
 
 You must install the ``half`` header from the `half website <http://half.sourceforge.net/>`_.

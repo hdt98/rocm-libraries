@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -34,8 +34,7 @@ Most components should be able to get away with defining their requirements via 
         asmCaps = {"v_fma_f16": True,
                 "v_pk_fma_f16": False}
         #archCaps = {}
-        kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Half),
-                                  "MacDataTypeB": DataType(DataTypeEnum.Half),
+        kernel = {"ProblemType": {"DataType": DataType(DataType.half),
                                 "HighPrecisionAccumulate": False}}
 ```
 
@@ -45,8 +44,7 @@ Values in the dictionaries can be lambdas for more advanced logic:
     class FMA_HPA_MAD_MIX(MAC):
         asmCaps = {"v_mad_mix_f32": True}
         #archCaps = {}
-        kernel = {"ProblemType": {"MacDataTypeA": DataType(DataTypeEnum.Half),
-                                  "MacDataTypeB": DataType(DataTypeEnum.Half),
+        kernel = {"ProblemType": {"DataType": DataType(DataType.half),
                                 "HighPrecisionAccumulate": True},
                 }
 ```
@@ -78,6 +76,7 @@ class LraTileProperties:
     """
     Lra tile assignment properties.
     """
+    pass
 
 def PartialMatch(pattern, obj, debug=False, level=0):
     indent = "    " * level
@@ -197,6 +196,7 @@ class Component(metaclass=ComponentMeta):
         """
         Concrete subclasses must implement __call__.
         """
+        pass
 
     def commentHeader(self):
         """
@@ -208,27 +208,19 @@ class MAC(Component):
     """
     Multiply-accumulate block.
     """
+    pass
 
 class Signature(Component):
     """
     Function signature block.
     """
+    pass
 
 class LocalRead(Component):
     """
     Local read block.
     """
-    def _getLdsReadMemToken(self, writer, kernel, tP):
-        from rocisa.container import MemTokenData
-        tok = writer.states.ldsReadTokenIdx
-        return MemTokenData([tok]), tok
-
-    def _emitLdsRead(self, writer, kernel, tP, LocalReadX, dst, src, ds, module, comment=""):
-        ldsMemToken, ldsMemTokenIdx = self._getLdsReadMemToken(writer, kernel, tP)
-        fullComment = "%s sync LDS%u" % (comment, ldsMemTokenIdx) if comment else "sync LDS%u" % ldsMemTokenIdx
-        inst = LocalReadX(dst=dst, src=src, ds=ds, comment=fullComment)
-        inst.setMemToken(ldsMemToken)
-        module.add(inst)
+    pass
 
 class SumUnroll(Component):
     """
@@ -250,26 +242,31 @@ class ShiftVectorComponents(Component):
     """
     Shift vector components block.
     """
+    pass
 
 class ComputeStoreVgprs(Component):
     """
     Compute store vgprs block.
     """
+    pass
 
 class NotLocalFullTileElements(Component):
     """
     Not local full tile elements block.
     """
+    pass
 
 class LraTileAssignment(Component):
     """
     Lra tile assignment block.
     """
+    pass
 
 class PackData(Component):
     """
     Pack data block.
     """
+    pass
 
 class SIA(Component):
     """
@@ -277,22 +274,12 @@ class SIA(Component):
     """
     @abc.abstractmethod
     def schedIntoIteration(self, writer, kernel, tensorParametersA, tensorParametersB, \
-        localWriteEndIter, firstIter, lastLoop, lastLc, globalReadIncACode, \
+        localWriteEndIter, firstIter, lastLoop, lastLc, maxVmcnt, globalReadIncACode, \
         globalReadIncBCode):
         pass
 
 class GlobalWriteComponents(Component):
     pass
-
-class TensorDataMover(Component):
-    """
-    TDM
-    """
-
-class GL2Prefetch(Component):
-    """
-    GL2 Prefetch
-    """
 
 # Importing here allows auto-registry of components in the Components directory.
 # Each file must be listed in __all__ in Components/__init__.py

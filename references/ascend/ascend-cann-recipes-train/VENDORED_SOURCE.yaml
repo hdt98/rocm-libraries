@@ -1,0 +1,24 @@
+source:
+  name: cann-recipes-train
+  remote: https://atomgit.com/cann/cann-recipes-train.git
+  branch: master
+  commit: 55315e2ee4e6b1f21ff6b040631075bbb84628fb
+  imported_at: 2026-05-30
+  local_state: sparse_snapshot
+
+imported_paths:
+  - llm_pretrain/deepseekv4
+  - docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md
+  - docs/llm_pretrain/figures/deepseek_v4
+
+source_urls:
+  recipe_readme: https://atomgit.com/cann/cann-recipes-train/blob/master/llm_pretrain/deepseekv4/README.md
+  autofuse_report: https://atomgit.com/cann/cann-recipes-train/blob/master/docs/llm_pretrain/deepseek-v4_torchtitan_npu_autofuse.md
+
+role: ascend_torchtitan_npu_cann_autofuse_dsv4_training_reference
+
+notes:
+  - Reports DeepSeek-V4-Flash BF16 4K training on 64 Atlas A3 cards.
+  - Uses pure FSDP plus large EP, TorchTitan-NPU, CANN AutoFuse, and custom sparse-attention fusion operators.
+  - Public performance anchor used by this experiment is 1100 tokens/GPU/s for the 43-layer Flash configuration.
+  - Equivalent 8xMI350 end-to-end target is 8800 tokens/s node-wide and approximately 244.5 TFLOPs/GPU/s with the current 4K microbench FLOP accounting.

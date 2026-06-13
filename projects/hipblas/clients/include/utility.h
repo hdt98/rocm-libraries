@@ -75,22 +75,24 @@
 /* =============================================================================================== */
 /* Epsilon helpers for near checks.                                                                */
 template <typename>
-inline constexpr double hipblas_type_epsilon = 0;
+HIPBLAS_CLANG_STATIC constexpr double hipblas_type_epsilon = 0;
 template <>
-inline constexpr double hipblas_type_epsilon<float> = std::numeric_limits<float>::epsilon();
+HIPBLAS_CLANG_STATIC constexpr double
+    hipblas_type_epsilon<float> = std::numeric_limits<float>::epsilon();
 template <>
-inline constexpr double hipblas_type_epsilon<double> = std::numeric_limits<double>::epsilon();
+HIPBLAS_CLANG_STATIC constexpr double
+    hipblas_type_epsilon<double> = std::numeric_limits<double>::epsilon();
 template <>
-inline constexpr double
-    hipblas_type_epsilon<std::complex<float>> = std::numeric_limits<float>::epsilon();
+HIPBLAS_CLANG_STATIC constexpr double
+    hipblas_type_epsilon<hipblasComplex> = std::numeric_limits<float>::epsilon();
 template <>
-inline constexpr double
-    hipblas_type_epsilon<std::complex<double>> = std::numeric_limits<double>::epsilon();
+HIPBLAS_CLANG_STATIC constexpr double
+    hipblas_type_epsilon<hipblasDoubleComplex> = std::numeric_limits<double>::epsilon();
 template <>
-inline constexpr double hipblas_type_epsilon<
+HIPBLAS_CLANG_STATIC constexpr double hipblas_type_epsilon<
     hipblasHalf> = 0.0009765625; // in fp16 diff between 0x3C00 (1.0) and fp16 0x3C01
 template <>
-inline constexpr double hipblas_type_epsilon<
+HIPBLAS_CLANG_STATIC constexpr double hipblas_type_epsilon<
     hipblasBfloat16> = 0.0078125; // in bf16 diff between 0x3F80 (1.0) and bf16 0x3F81 in double precision
 
 /* =============================================================================================== */
@@ -172,23 +174,13 @@ public:
     }
 
     // Random NaN Complex
-    explicit operator std::complex<float>()
+    explicit operator hipblasComplex()
     {
         return {float(*this), float(*this)};
     }
 
     // Random NaN Double Complex
-    explicit operator std::complex<double>()
-    {
-        return {double(*this), double(*this)};
-    }
-
-    explicit operator hipComplex()
-    {
-        return {float(*this), float(*this)};
-    }
-
-    explicit operator hipDoubleComplex()
+    explicit operator hipblasDoubleComplex()
     {
         return {double(*this), double(*this)};
     }
@@ -266,18 +258,18 @@ inline hipblasBfloat16 random_generator<hipblasBfloat16>()
         float((rand() % 3 + 1))); // generate an integer number in range [1,2,3]
 }
 
-// for std::complex<float>, generate 2 floats
+// for hipblasComplex, generate 2 floats
 /*! \brief  generate two random numbers in range [1,2,3,4,5,6,7,8,9,10] */
 template <>
-inline std::complex<float> random_generator<std::complex<float>>()
+inline hipblasComplex random_generator<hipblasComplex>()
 {
     return {float(rand() % 10 + 1), float(rand() % 10 + 1)};
 }
 
-// for std::complex<double>, generate 2 doubles
+// for hipblasDoubleComplex, generate 2 doubles
 /*! \brief  generate two random numbers in range [1,2,3,4,5,6,7,8,9,10] */
 template <>
-inline std::complex<double> random_generator<std::complex<double>>()
+inline hipblasDoubleComplex random_generator<hipblasDoubleComplex>()
 {
     return {double(rand() % 10 + 1), double(rand() % 10 + 1)};
 }
@@ -311,13 +303,13 @@ inline hipblasBfloat16 random_generator_negative<hipblasBfloat16>()
 *           imaginary value in range [-1, -10]
 */
 template <>
-inline std::complex<float> random_generator_negative<std::complex<float>>()
+inline hipblasComplex random_generator_negative<hipblasComplex>()
 {
     return {float(-(rand() % 10 + 1)), float(-(rand() % 10 + 1))};
 }
 
 template <>
-inline std::complex<double> random_generator_negative<std::complex<double>>()
+inline hipblasDoubleComplex random_generator_negative<hipblasDoubleComplex>()
 {
     return {double(-(rand() % 10 + 1)), double(-(rand() % 10 + 1))};
 }
@@ -494,7 +486,6 @@ typedef enum hipblasClientProcessor
     gfx906  = 906,
     gfx908  = 908,
     gfx90a  = 910,
-    gfx90c  = 912,
     gfx942  = 942,
     gfx950  = 950,
     gfx1010 = 1010,
@@ -507,15 +498,7 @@ typedef enum hipblasClientProcessor
     gfx1035 = 1035,
     gfx1100 = 1100,
     gfx1101 = 1101,
-    gfx1102 = 1102,
-    gfx1103 = 1103,
-    gfx1150 = 1150,
-    gfx1151 = 1151,
-    gfx1152 = 1152,
-    gfx1153 = 1153,
-    gfx1200 = 1200,
-    gfx1201 = 1201,
-    gfx1250 = 1250
+    gfx1102 = 1102
 } hipblasClientProcessor;
 
 /* get architecture number */

@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@
 #ifndef GBYTE_HPP
 #define GBYTE_HPP
 
-#include "rocsparse.h"
+#include <rocsparse.h>
 
 /*
  * ===========================================================================
@@ -143,16 +143,6 @@ constexpr double ellmv_gbyte_count(I M, I N, int64_t nnz, bool beta = false)
            / 1e9;
 }
 
-template <typename A, typename X, typename Y, typename I, typename J>
-constexpr double sellmv_gbyte_count(
-    J M, J N, int64_t nnz, J sell_slice_size, I sell_colval_size, bool beta = false)
-{
-    J nslices = (M - 1) / sell_slice_size + 1;
-    return (sizeof(I) * (nslices + 1) + sizeof(J) * sell_colval_size + sizeof(A) * sell_colval_size
-            + sizeof(Y) * (M + (beta ? M : 0)) + sizeof(X) * N)
-           / 1e9;
-}
-
 template <typename T, typename I>
 constexpr double ellmv_gbyte_count(I M, I N, int64_t nnz, bool beta = false)
 {
@@ -246,23 +236,15 @@ constexpr double gebsrmm_gbyte_count(rocsparse_int Mb,
     return (reads + writes) / 1e9;
 }
 
-template <typename A, typename B, typename C, typename I>
-constexpr double bellmm_gbyte_count(I Mb, I width, I block_dim, I nnz_B, I nnz_C, bool beta = false)
-{
-    return (sizeof(A) * Mb * width * block_dim * block_dim + sizeof(I) * Mb * width
-            + sizeof(B) * nnz_B + sizeof(C) * (nnz_C + (beta ? nnz_C : 0)))
-           / 1e9;
-}
-
-template <typename A, typename B, typename C, typename I, typename J>
+template <typename T, typename I, typename J>
 constexpr double csrmm_gbyte_count(J M, I nnz_A, I nnz_B, I nnz_C, bool beta = false)
 {
-    return ((M + 1) * sizeof(I) + nnz_A * sizeof(J) + nnz_A * sizeof(A) + nnz_B * sizeof(B)
-            + (nnz_C + (beta ? nnz_C : 0)) * sizeof(C))
+    return ((M + 1) * sizeof(I) + nnz_A * sizeof(J)
+            + (nnz_A + nnz_B + nnz_C + (beta ? nnz_C : 0)) * sizeof(T))
            / 1e9;
 }
 
-template <typename A, typename B, typename C, typename I, typename J>
+template <typename T, typename I, typename J>
 constexpr double csrmm_batched_gbyte_count(J    M,
                                            I    nnz_A,
                                            I    nnz_B,
@@ -273,27 +255,27 @@ constexpr double csrmm_batched_gbyte_count(J    M,
                                            bool beta = false)
 {
     // read A matrix
-    size_t readA = batch_count_A * ((M + 1) * sizeof(I) + nnz_A * sizeof(J) + nnz_A * sizeof(A));
+    size_t readA = batch_count_A * ((M + 1) * sizeof(I) + nnz_A * sizeof(J) + nnz_A * sizeof(T));
 
     // read B matrix
-    size_t readB = batch_count_B * nnz_B * sizeof(B);
+    size_t readB = batch_count_B * nnz_B * sizeof(T);
 
     // read C matrix
-    size_t readC = batch_count_C * (beta ? nnz_C : 0) * sizeof(C);
+    size_t readC = batch_count_C * (beta ? nnz_C : 0) * sizeof(T);
 
     // write C matrix
-    size_t writeC = batch_count_C * nnz_C * sizeof(C);
+    size_t writeC = batch_count_C * nnz_C * sizeof(T);
 
     return (readA + readB + readC + writeC) / 1e9;
 }
 
-template <typename A, typename B, typename C, typename I, typename J>
+template <typename T, typename I, typename J>
 constexpr double cscmm_gbyte_count(J N, I nnz_A, I nnz_B, I nnz_C, bool beta = false)
 {
-    return csrmm_gbyte_count<A, B, C>(N, nnz_A, nnz_B, nnz_C, beta);
+    return csrmm_gbyte_count<T>(N, nnz_A, nnz_B, nnz_C, beta);
 }
 
-template <typename A, typename B, typename C, typename I, typename J>
+template <typename T, typename I, typename J>
 constexpr double cscmm_batched_gbyte_count(J    N,
                                            I    nnz_A,
                                            I    nnz_B,
@@ -304,29 +286,28 @@ constexpr double cscmm_batched_gbyte_count(J    N,
                                            bool beta = false)
 {
     // read A matrix
-    size_t readA = batch_count_A * ((N + 1) * sizeof(I) + nnz_A * sizeof(J) + nnz_A * sizeof(A));
+    size_t readA = batch_count_A * ((N + 1) * sizeof(I) + nnz_A * sizeof(J) + nnz_A * sizeof(T));
 
     // read B matrix
-    size_t readB = batch_count_B * nnz_B * sizeof(B);
+    size_t readB = batch_count_B * nnz_B * sizeof(T);
 
     // read C matrix
-    size_t readC = batch_count_C * (beta ? nnz_C : 0) * sizeof(C);
+    size_t readC = batch_count_C * (beta ? nnz_C : 0) * sizeof(T);
 
     // write C matrix
-    size_t writeC = batch_count_C * nnz_C * sizeof(C);
+    size_t writeC = batch_count_C * nnz_C * sizeof(T);
 
     return (readA + readB + readC + writeC) / 1e9;
 }
 
-template <typename A, typename B, typename C, typename I>
+template <typename T, typename I>
 constexpr double coomm_gbyte_count(int64_t nnz_A, int64_t nnz_B, int64_t nnz_C, bool beta = false)
 {
-    return (2.0 * nnz_A * sizeof(I) + nnz_A * sizeof(A) + nnz_B * sizeof(B)
-            + (nnz_C + (beta ? nnz_C : 0)) * sizeof(C))
+    return (2.0 * nnz_A * sizeof(I) + (nnz_A + nnz_B + nnz_C + (beta ? nnz_C : 0)) * sizeof(T))
            / 1e9;
 }
 
-template <typename A, typename B, typename C, typename I>
+template <typename T, typename I>
 constexpr double coomm_batched_gbyte_count(I       M,
                                            int64_t nnz_A,
                                            int64_t nnz_B,
@@ -337,16 +318,16 @@ constexpr double coomm_batched_gbyte_count(I       M,
                                            bool    beta = false)
 {
     // read A matrix
-    size_t readA = batch_count_A * (nnz_A * sizeof(I) + nnz_A * sizeof(I) + nnz_A * sizeof(A));
+    size_t readA = batch_count_A * (nnz_A * sizeof(I) + nnz_A * sizeof(I) + nnz_A * sizeof(T));
 
     // read B matrix
-    size_t readB = batch_count_B * nnz_B * sizeof(B);
+    size_t readB = batch_count_B * nnz_B * sizeof(T);
 
     // read C matrix
-    size_t readC = batch_count_C * (beta ? nnz_C : 0) * sizeof(C);
+    size_t readC = batch_count_C * (beta ? nnz_C : 0) * sizeof(T);
 
     // write C matrix
-    size_t writeC = batch_count_C * nnz_C * sizeof(C);
+    size_t writeC = batch_count_C * nnz_C * sizeof(T);
 
     return (readA + readB + readC + writeC) / 1e9;
 }

@@ -35,43 +35,13 @@ std::string rocsparse_get_version()
 {
     int  rocsparse_ver;
     char rocsparse_rev[64];
-
-    rocsparse_handle handle;
-    rocsparse_status status = rocsparse_create_handle(&handle);
-    if(rocsparse_status_success != status)
     {
-        std::cerr << "The creation of the rocsparse_handle failed." << std::endl;
-        if(0 == rocsparse_state_debug())
-        {
-            std::cerr << "To get more information, please export the ROCSPARSE_DEBUG environment "
-                         "variable:"
-                      << std::endl;
-            std::cerr << "export ROCSPARSE_DEBUG=1" << std::endl;
-        }
-        throw(status);
+        rocsparse_handle handle;
+        rocsparse_create_handle(&handle);
+        rocsparse_get_version(handle, &rocsparse_ver);
+        rocsparse_get_git_rev(handle, rocsparse_rev);
+        rocsparse_destroy_handle(handle);
     }
-
-    status = rocsparse_get_version(handle, &rocsparse_ver);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "rocsparse_get_version failed." << std::endl;
-        throw(status);
-    }
-
-    status = rocsparse_get_git_rev(handle, rocsparse_rev);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "rocsparse_get_git_rev failed." << std::endl;
-        throw(status);
-    }
-
-    status = rocsparse_destroy_handle(handle);
-    if(rocsparse_status_success != status)
-    {
-        std::cerr << "rocsparse_destroy_handle failed." << std::endl;
-        throw(status);
-    }
-
     std::ostringstream os;
     os << rocsparse_ver / 100000 << "." << rocsparse_ver / 100 % 1000 << "." << rocsparse_ver % 100
        << "-" << rocsparse_rev;
@@ -91,10 +61,8 @@ void rocsparse_bench::parse(int& argc, char**& argv, rocsparse_arguments_config&
     config.sddmm_alg           = rocsparse_sddmm_alg_default;
     config.spmv_alg            = rocsparse_spmv_alg_default;
     config.spsv_alg            = rocsparse_spsv_alg_default;
-    config.sptrsv_alg          = rocsparse_sptrsv_alg_default;
     config.spitsv_alg          = rocsparse_spitsv_alg_default;
     config.spsm_alg            = rocsparse_spsm_alg_default;
-    config.sptrsm_alg          = rocsparse_sptrsm_alg_default;
     config.spmm_alg            = rocsparse_spmm_alg_default;
     config.spgemm_alg          = rocsparse_spgemm_alg_default;
     config.spgeam_alg          = rocsparse_spgeam_alg_default;

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,16 +41,15 @@ inline void testname_spr2_strided_batched(const Arguments& arg, std::string& nam
 template <typename T>
 void testing_spr2_strided_batched_bad_arg(const Arguments& arg)
 {
-    using Ts                            = hipblas_internal_type<T>;
     auto hipblasSpr2StridedBatchedFn    = arg.api == FORTRAN ? hipblasSpr2StridedBatched<T, true>
                                                              : hipblasSpr2StridedBatched<T, false>;
     auto hipblasSpr2StridedBatchedFn_64 = arg.api == FORTRAN_64
                                               ? hipblasSpr2StridedBatched_64<T, true>
                                               : hipblasSpr2StridedBatched_64<T, false>;
 
-    const Ts          h_alpha{1}, h_zero{0};
-    const Ts*         alpha = &h_alpha;
-    const Ts*         zero  = &h_zero;
+    const T           h_alpha(1), h_zero(0);
+    const T*          alpha = &h_alpha;
+    const T*          zero  = &h_zero;
     hipblasFillMode_t uplo  = HIPBLAS_FILL_MODE_UPPER;
 
     for(auto pointer_mode : {HIPBLAS_POINTER_MODE_HOST, HIPBLAS_POINTER_MODE_DEVICE})
@@ -266,7 +265,6 @@ void testing_spr2_strided_batched_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_spr2_strided_batched(const Arguments& arg)
 {
-    using Ts                            = hipblas_internal_type<T>;
     auto hipblasSpr2StridedBatchedFn    = arg.api == FORTRAN ? hipblasSpr2StridedBatched<T, true>
                                                              : hipblasSpr2StridedBatched<T, false>;
     auto hipblasSpr2StridedBatchedFn_64 = arg.api == FORTRAN_64
@@ -347,7 +345,7 @@ void testing_spr2_strided_batched(const Arguments& arg)
 
     T h_alpha = arg.get_alpha<T>();
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_matrix(hA, arg, hipblas_client_never_set_nan, hipblas_symmetric_matrix, true);
@@ -375,7 +373,7 @@ void testing_spr2_strided_batched(const Arguments& arg)
                    (handle,
                     uplo,
                     N,
-                    reinterpret_cast<Ts*>(&h_alpha),
+                    &h_alpha,
                     dx,
                     incx,
                     stride_x,

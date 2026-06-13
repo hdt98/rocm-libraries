@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,6 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <stdlib.h>
 
 /*!\file
  * \brief provide common utilities
@@ -278,11 +277,7 @@ public:
         this->m_status = hipsparseLtMatmulAlgSelectionInit(handle, &this->m_alg_sel, matmul, alg);
     }
 
-    ~hipsparselt_local_matmul_alg_selection() 
-    {
-        if(this->m_status == HIPSPARSE_STATUS_SUCCESS)        
-            hipsparseLtMatmulAlgSelectionDestroy(&this->m_alg_sel);
-    }
+    ~hipsparselt_local_matmul_alg_selection() {}
 
     hipsparselt_local_matmul_alg_selection(const hipsparselt_local_matmul_alg_selection&) = delete;
     hipsparselt_local_matmul_alg_selection(hipsparselt_local_matmul_alg_selection&&)      = delete;
@@ -550,14 +545,8 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_size(hipDataType   
     switch(type)
     {
     case HIP_R_8I:
-#if HIP_FP8_TYPE_OCP
     case HIP_R_8F_E4M3:
     case HIP_R_8F_E5M2:
-#endif    
-#if HIP_FP8_TYPE_FNUZ
-    case HIP_R_8F_E4M3_FNUZ:
-    case HIP_R_8F_E5M2_FNUZ:
-#endif    
         if(isSparse)
             row_ = col_ = ld_ = 32;
         else
@@ -578,14 +567,8 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_size(hipDataType   
     switch(type)
     {
     case HIP_R_8I:
-#if HIP_FP8_TYPE_OCP
     case HIP_R_8F_E4M3:
     case HIP_R_8F_E5M2:
-#endif    
-#if HIP_FP8_TYPE_FNUZ
-    case HIP_R_8F_E4M3_FNUZ:
-    case HIP_R_8F_E5M2_FNUZ:
-#endif
         row_ = col_ = 16;
         break;
     case HIP_R_16BF:
@@ -655,35 +638,3 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_stride(
     else
         return HIPSPARSE_STATUS_INVALID_VALUE;
 }
-
-class Logger
-{
-
-public:
-    Logger(int log_level)
-    {
-        this->log_level = log_level;
-        this->pre_log_level = -1;
-        if(this->log_level)
-        {
-            char* str_layer_mode;
-            if((str_layer_mode = getenv("HIPSPARSELT_LOG_LEVEL")) != NULL)
-            {
-                this->pre_log_level = atoi(str_layer_mode);
-            }
-            setenv("HIPSPARSELT_LOG_LEVEL", std::to_string(this->log_level).c_str(), 1);
-        }
-    }
-    ~Logger()
-    {
-        if(this->log_level)
-        {
-            if(this->pre_log_level == -1)
-                unsetenv("HIPSPARSELT_LOG_LEVEL");
-            else
-                setenv("HIPSPARSELT_LOG_LEVEL", std::to_string(this->pre_log_level).c_str(), 1);
-        }
-    }
-    int log_level;
-    int pre_log_level;
-};

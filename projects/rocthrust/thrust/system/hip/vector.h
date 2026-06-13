@@ -1,6 +1,6 @@
 /*
  *  Copyright 2008-2013 NVIDIA Corporation
- *  Modifications Copyright (c) 2019-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ *  Modifications Copyright (c) 2019-2021, Advanced Micro Devices, Inc.  All rights reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -23,17 +23,8 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/vector_base.h>
 #include <thrust/system/hip/memory.h>
-
+#include <thrust/detail/vector_base.h>
 #include <vector>
 
 THRUST_NAMESPACE_BEGIN
@@ -56,7 +47,6 @@ namespace hip_rocprim
  *                   shared by \p hip::vector
  *  \see device_vector
  *  \see universal_vector
- *  \see universal_host_pinned_vector
  */
 template <typename T, typename Allocator = thrust::system::hip::allocator<T>>
 using vector = thrust::detail::vector_base<T, Allocator>;
@@ -66,7 +56,7 @@ using vector = thrust::detail::vector_base<T, Allocator>;
  *  insertion and removal of elements at the beginning or in the middle. The
  *  number of elements in a \p hip::universal_vector may vary dynamically;
  *  memory management is automatic. The elements contained in a
- *  \p hip::universal_vector reside in managed memory accessible by the \p hip system
+ *  \p hip::universal_vector reside in memory accessible by the \p hip system
  *  and host systems.
  *
  *  \tparam T The element type of the \p hip::universal_vector.
@@ -77,33 +67,23 @@ using vector = thrust::detail::vector_base<T, Allocator>;
  *  \see host_vector For the documentation of the complete interface which is
  *                   shared by \p hip::universal_vector
  *  \see device_vector
- *  \see universal_host_pinned_vector
+ *  \see universal_vector
  */
 template <typename T, typename Allocator = thrust::system::hip::universal_allocator<T>>
 using universal_vector = thrust::detail::vector_base<T, Allocator>;
 
-//! Like \ref hip::universal_vector but uses pinned host memory (cudaMallocHost).
-//! \see device_vector
-//! \see universal_vector
-template <typename T>
-using universal_host_pinned_vector = thrust::detail::vector_base<T, universal_host_pinned_allocator<T>>;
 } // namespace hip_rocprim
 
-namespace system
+namespace system { namespace hip
 {
-namespace hip
-{
-using thrust::hip_rocprim::universal_host_pinned_vector;
-using thrust::hip_rocprim::universal_vector;
 using thrust::hip_rocprim::vector;
-} // namespace hip
-} // namespace system
+using thrust::hip_rocprim::universal_vector;
+}}
 
 namespace hip
 {
-using thrust::hip_rocprim::universal_host_pinned_vector;
-using thrust::hip_rocprim::universal_vector;
 using thrust::hip_rocprim::vector;
-} // namespace hip
+using thrust::hip_rocprim::universal_vector;
+}
 
 THRUST_NAMESPACE_END

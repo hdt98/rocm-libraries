@@ -22,10 +22,12 @@ THRUST_NAMESPACE_BEGIN
 namespace detail
 {
 
-template <typename Allocator, typename Pointer, typename Size>
-THRUST_HOST_DEVICE inline void destroy_range(Allocator& a, Pointer p, Size n) noexcept;
+template<typename Allocator, typename Pointer, typename Size>
+THRUST_HOST_DEVICE
+  inline void destroy_range(Allocator &a, Pointer p, Size n);
 
-} // namespace detail
+} // end detail
 THRUST_NAMESPACE_END
 
 #include <thrust/detail/allocator/destroy_range.inl>
+

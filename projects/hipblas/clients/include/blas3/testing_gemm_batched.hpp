@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -53,7 +53,6 @@ inline void testname_gemm_batched(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_gemm_batched_bad_arg(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasGemmBatchedFn
         = arg.api == FORTRAN ? hipblasGemmBatched<T, true> : hipblasGemmBatched<T, false>;
     auto hipblasGemmBatchedFn_64
@@ -83,17 +82,15 @@ void testing_gemm_batched_bad_arg(const Arguments& arg)
     device_batch_matrix<T> dC(M, N, ldc, batch_count);
 
     device_vector<T> d_alpha(1), d_beta(1), d_one(1), d_zero(1);
-    Ts               h_alpha{1.0f}, h_beta{2.0f}, h_one{1.0f}, h_zero{0.0f};
+    T                h_alpha(1), h_beta(2), h_one(1), h_zero(0);
 
     if constexpr(std::is_same_v<T, hipblasHalf>)
         h_one = float_to_half(1.0f);
-    else if constexpr(is_complex<T>)
-        h_one = {1, 0};
 
-    const Ts* alpha = &h_alpha;
-    const Ts* beta  = &h_beta;
-    const Ts* one   = &h_one;
-    const Ts* zero  = &h_zero;
+    const T* alpha = &h_alpha;
+    const T* beta  = &h_beta;
+    const T* one   = &h_one;
+    const T* zero  = &h_zero;
 
     for(auto pointer_mode : {HIPBLAS_POINTER_MODE_HOST, HIPBLAS_POINTER_MODE_DEVICE})
     {
@@ -295,7 +292,7 @@ void testing_gemm_batched_bad_arg(const Arguments& arg)
                         ldc,
                         batch_count));
 
-            // If K == 0, A, and B can be nullptr
+            // If K == 0, alpha, A, and B can be nullptr
             DAPI_CHECK(hipblasGemmBatchedFn,
                        (handle,
                         transA,
@@ -303,7 +300,7 @@ void testing_gemm_batched_bad_arg(const Arguments& arg)
                         M,
                         N,
                         0,
-                        alpha,
+                        nullptr,
                         nullptr,
                         lda,
                         nullptr,
@@ -389,7 +386,6 @@ void testing_gemm_batched_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_gemm_batched(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasGemmBatchedFn
         = arg.api == FORTRAN ? hipblasGemmBatched<T, true> : hipblasGemmBatched<T, false>;
     auto hipblasGemmBatchedFn_64
@@ -440,7 +436,7 @@ void testing_gemm_batched(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Naming: `h` is in CPU (host) memory(eg hA), `d` is in GPU (device) memory (eg dA).
     // Allocate host memory
@@ -518,9 +514,9 @@ void testing_gemm_batched(const Arguments& arg)
                     N,
                     K,
                     d_alpha,
-                    dA.ptr_on_device(),
+                    (const T* const*)dA.ptr_on_device(),
                     lda,
-                    dB.ptr_on_device(),
+                    (const T* const*)dB.ptr_on_device(),
                     ldb,
                     d_beta,
                     dC.ptr_on_device(),
@@ -539,12 +535,12 @@ void testing_gemm_batched(const Arguments& arg)
                     M,
                     N,
                     K,
-                    reinterpret_cast<Ts*>(&h_alpha),
-                    dA.ptr_on_device(),
+                    &h_alpha,
+                    (const T* const*)dA.ptr_on_device(),
                     lda,
-                    dB.ptr_on_device(),
+                    (const T* const*)dB.ptr_on_device(),
                     ldb,
-                    reinterpret_cast<Ts*>(&h_beta),
+                    &h_beta,
                     dC.ptr_on_device(),
                     ldc,
                     batch_count));
@@ -597,12 +593,12 @@ void testing_gemm_batched(const Arguments& arg)
                            M,
                            N,
                            K,
-                           reinterpret_cast<Ts*>(&h_alpha),
-                           dA.ptr_on_device(),
+                           &h_alpha,
+                           (const T* const*)dA.ptr_on_device(),
                            lda,
-                           dB.ptr_on_device(),
+                           (const T* const*)dB.ptr_on_device(),
                            ldb,
-                           reinterpret_cast<Ts*>(&h_beta),
+                           &h_beta,
                            dC.ptr_on_device(),
                            ldc,
                            batch_count));

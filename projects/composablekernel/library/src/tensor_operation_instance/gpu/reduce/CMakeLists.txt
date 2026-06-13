@@ -1,6 +1,3 @@
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 add_instance_library(device_reduce_instance
    device_reduce_instance_blockwise_f16_f16_f16_min.cpp
    device_reduce_instance_blockwise_f16_f16_f16_max.cpp

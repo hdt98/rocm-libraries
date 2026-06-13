@@ -29,19 +29,7 @@
 
 #include <vector>
 
-// GoogleTest-compatible HIP_CHECK macro. FAIL is called to log the Google Test trace.
-// The lambda is invoked immediately as assertions that generate a fatal failure can
-// only be used in void-returning functions.
-#define HIP_CHECK(condition)                                                                \
-    {                                                                                       \
-        hipError_t error = condition;                                                       \
-        if(error != hipSuccess)                                                             \
-        {                                                                                   \
-            [error]()                                                                       \
-                { FAIL() << "HIP error " << error << ": " << hipGetErrorString(error); }(); \
-            exit(error);                                                                    \
-        }                                                                                   \
-    }
+#define HIP_CHECK(state) ASSERT_EQ(state, hipSuccess)
 
 using namespace rocrand_impl::host;
 

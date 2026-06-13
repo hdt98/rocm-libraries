@@ -53,8 +53,7 @@ void ComputeCPUBNInference(DLModule& dl_module)
                                       dl_module.shift,
                                       dl_module.epsilon,
                                       dl_module.estMean,
-                                      dl_module.estVariance,
-                                      dl_module.useInverseVariance);
+                                      dl_module.estVariance);
     }
     else if(dl_module.bn_mode == miopenBNPerActivation)
     {
@@ -64,8 +63,7 @@ void ComputeCPUBNInference(DLModule& dl_module)
                                        dl_module.shift,
                                        dl_module.epsilon,
                                        dl_module.estMean,
-                                       dl_module.estVariance,
-                                       dl_module.useInverseVariance);
+                                       dl_module.estVariance);
     }
     else
     {
@@ -101,14 +99,10 @@ void ComputeCPUBNBwd(DLModule& dl_module)
                                      dl_module.dy,
                                      dl_module.out_ref,
                                      dl_module.bnScale,
-                                     dl_module.bnBias,
                                      dl_module.dScale_ref,
                                      dl_module.dBias_ref,
                                      dl_module.savedMean,
-                                     dl_module.savedInvVar,
-                                     dl_module.activ_mode,
-                                     dl_module.activ_beta,
-                                     dl_module.activ_alpha);
+                                     dl_module.savedInvVar);
     }
     else if(dl_module.bn_mode == miopenBNPerActivation)
     {

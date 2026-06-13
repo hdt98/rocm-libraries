@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -47,11 +47,9 @@ bool profile_gemm_ab_scale_impl(int do_verification,
                                 int StrideA,
                                 int StrideB,
                                 int StrideE,
-                                int KBatch,
                                 int n_warmup,
                                 int n_iter,
-                                uint64_t rotating  = 0,
-                                int instance_index = -1)
+                                uint64_t rotating = 0)
 {
     bool pass = true;
 
@@ -110,8 +108,8 @@ bool profile_gemm_ab_scale_impl(int do_verification,
     case 1:
         a0_m_k.GenerateTensorValue(GeneratorTensor_2<A0DataType>{-2, 2});
         b0_k_n.GenerateTensorValue(GeneratorTensor_2<B0DataType>{-2, 2});
-        a1_m_k.GenerateTensorValue(GeneratorTensor_2<A1DataType>{-1, 2});
-        b1_k_n.GenerateTensorValue(GeneratorTensor_2<B1DataType>{-1, 2});
+        a1_m_k.GenerateTensorValue(GeneratorTensor_3<A1DataType>{0, 1.0});
+        b1_k_n.GenerateTensorValue(GeneratorTensor_3<B1DataType>{0, 1.0});
         break;
     default:
         a0_m_k.GenerateTensorValue(GeneratorTensor_3<A0DataType>{-0.5, 0.5});
@@ -219,15 +217,10 @@ bool profile_gemm_ab_scale_impl(int do_verification,
     float best_ave_time   = 0;
     float best_tflops     = 0;
     float best_gb_per_sec = 0;
+
     // profile device GEMM instances
-    for(size_t i = 0; i < op_ptrs.size(); i++)
+    for(auto& op_ptr : op_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& op_ptr = op_ptrs[i];
         auto argument_ptr =
             op_ptr->MakeArgumentPointer(static_cast<A0DataType*>(a0_device_buf.GetDeviceBuffer()),
                                         static_cast<B0DataType*>(b0_device_buf.GetDeviceBuffer()),
@@ -245,7 +238,6 @@ bool profile_gemm_ab_scale_impl(int do_verification,
                                         a_element_op,
                                         b_element_op,
                                         c_element_op);
-        op_ptr->SetKBatch(argument_ptr.get(), KBatch);
 
         auto invoker_ptr = op_ptr->MakeInvokerPointer();
 
@@ -308,7 +300,7 @@ bool profile_gemm_ab_scale_impl(int do_verification,
             float gb_per_sec = num_btype / 1.E6 / ave_time;
 
             std::cout << "Perf: " << std::setw(10) << ave_time << " ms, " << tflops << " TFlops, "
-                      << gb_per_sec << " GB/s, " << op_name << ", KBatch " << KBatch << std::endl;
+                      << gb_per_sec << " GB/s, " << op_name << std::endl;
 
             if(tflops > best_tflops)
             {

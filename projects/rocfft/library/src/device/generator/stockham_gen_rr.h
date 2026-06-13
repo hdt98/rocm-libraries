@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#pragma once
 #include "../../../../shared/arithmetic.h"
 #include "stockham_gen_base.h"
 
@@ -87,6 +86,7 @@ struct StockhamKernelRR : public StockhamKernel
                                 LoadGlobal{buf, offset + idx * stride0}};
             }
             stmts += LineBreak();
+            stmts += CommentLines{"append extra global loading for C2Real pre-process only"};
 
             StatementList stmts_c2real_pre;
             stmts_c2real_pre += CommentLines{
@@ -95,11 +95,7 @@ struct StockhamKernelRR : public StockhamKernel
                 thread == threads_per_transform - 1,
                 {Assign{lds_complex[offset_lds + thread + (height - 1) * width + 1],
                         LoadGlobal{buf, offset + (thread + (height - 1) * width + 1) * stride0}}}};
-            if(ebtype == EmbeddedType::C2Real_PRE)
-            {
-                stmts += CommentLines{"append extra global loading for C2Real pre-process only"};
-                stmts += stmts_c2real_pre;
-            }
+            stmts += If{embedded_type == Literal{"EmbeddedType::C2Real_PRE"}, stmts_c2real_pre};
         }
         else
         {
@@ -131,6 +127,7 @@ struct StockhamKernelRR : public StockhamKernel
             }
 
             stmts += LineBreak{};
+            stmts += CommentLines{"append extra global write for Real2C post-process only"};
             StatementList stmts_real2c_post;
             stmts_real2c_post += CommentLines{
                 "use the last thread of each transform to write one more element per row"};
@@ -139,12 +136,7 @@ struct StockhamKernelRR : public StockhamKernel
                       {StoreGlobal{buf,
                                    offset + (thread + (height - 1) * width + 1) * stride0,
                                    lds_complex[offset_lds + thread + (height - 1) * width + 1]}}};
-
-            if(ebtype == EmbeddedType::Real2C_POST)
-            {
-                stmts += CommentLines{"append extra global write for Real2C post-process only"};
-                stmts += stmts_real2c_post;
-            }
+            stmts += If{Equal{embedded_type, "EmbeddedType::Real2C_POST"}, stmts_real2c_post};
         }
         else
         {
@@ -162,17 +154,14 @@ struct StockhamKernelRR : public StockhamKernel
         return {If{inbound, stmts}};
     }
 
-    StatementList real_trans_pre_post() override
+    StatementList real_trans_pre_post(ProcessingType type) override
     {
-        if(ebtype == EmbeddedType::NONE)
-            return {};
-
-        std::string   pre_post   = (ebtype == EmbeddedType::C2Real_PRE) ? " before " : " after ";
+        std::string   pre_post   = (type == ProcessingType::PRE) ? " before " : " after ";
         auto          twd_offset = (length - factors.front());
         StatementList stmts;
         stmts += CommentLines{"handle even-length real to complex pre-process in lds" + pre_post
                               + "transform"};
-        stmts += real2cmplx_pre_post(length, threads_per_transform, twd_offset);
+        stmts += real2cmplx_pre_post(length, type, threads_per_transform, twd_offset);
         return stmts;
     }
 };

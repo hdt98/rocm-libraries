@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -52,7 +52,6 @@ template <typename T>
 void testing_herkx_strided_batched_bad_arg(const Arguments& arg)
 {
     using U                              = real_t<T>;
-    using Ts                             = hipblas_internal_type<T>;
     auto hipblasHerkxStridedBatchedFn    = arg.api == FORTRAN
                                                ? hipblasHerkxStridedBatched<T, U, true>
                                                : hipblasHerkxStridedBatched<T, U, false>;
@@ -85,13 +84,13 @@ void testing_herkx_strided_batched_bad_arg(const Arguments& arg)
 
     device_vector<T> d_alpha(1), d_zero(1);
     device_vector<U> d_beta(1), d_one(1);
-    const Ts         h_alpha{1}, h_zero{0};
-    const U          h_beta{2}, h_one{1};
+    const T          h_alpha(1), h_zero(0);
+    const U          h_beta(2), h_one(1);
 
-    const Ts* alpha = &h_alpha;
-    const U*  beta  = &h_beta;
-    const U*  one   = &h_one;
-    const Ts* zero  = &h_zero;
+    const T* alpha = &h_alpha;
+    const U* beta  = &h_beta;
+    const U* one   = &h_one;
+    const T* zero  = &h_zero;
 
     for(auto pointer_mode : {HIPBLAS_POINTER_MODE_HOST, HIPBLAS_POINTER_MODE_DEVICE})
     {
@@ -415,7 +414,6 @@ template <typename T>
 void testing_herkx_strided_batched(const Arguments& arg)
 {
     using U                              = real_t<T>;
-    using Ts                             = hipblas_internal_type<T>;
     bool FORTRAN                         = arg.api == hipblas_client_api::FORTRAN;
     auto hipblasHerkxStridedBatchedFn    = arg.api == FORTRAN
                                                ? hipblasHerkxStridedBatched<T, U, true>
@@ -506,7 +504,7 @@ void testing_herkx_strided_batched(const Arguments& arg)
     T h_alpha = arg.get_alpha<T>();
     U h_beta  = arg.get_beta<U>();
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_matrix(hA, arg, hipblas_client_alpha_sets_nan, hipblas_general_matrix, true);
@@ -535,7 +533,7 @@ void testing_herkx_strided_batched(const Arguments& arg)
                     transA,
                     N,
                     K,
-                    reinterpret_cast<Ts*>(&h_alpha),
+                    &h_alpha,
                     dA,
                     lda,
                     stride_A,

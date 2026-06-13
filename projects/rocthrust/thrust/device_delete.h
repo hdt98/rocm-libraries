@@ -21,7 +21,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/device_ptr.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -41,8 +40,9 @@ THRUST_NAMESPACE_BEGIN
  *  \see device_ptr
  *  \see device_new
  */
-template <typename T>
-inline void device_delete(thrust::device_ptr<T> ptr, const size_t n = 1);
+template<typename T>
+  inline void device_delete(thrust::device_ptr<T> ptr,
+                            const size_t n = 1);
 
 /*! \} // memory_management
  */
@@ -50,3 +50,4 @@ inline void device_delete(thrust::device_ptr<T> ptr, const size_t n = 1);
 THRUST_NAMESPACE_END
 
 #include <thrust/detail/device_delete.inl>
+

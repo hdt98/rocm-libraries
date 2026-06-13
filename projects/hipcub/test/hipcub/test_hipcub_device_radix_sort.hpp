@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,8 +26,8 @@
 #include "common_test_header.hpp"
 
 // hipcub API
-#include <hipcub/device/device_radix_sort.hpp>
-#include <hipcub/util_type.hpp>
+#include "hipcub/device/device_radix_sort.hpp"
+#include "hipcub/util_type.hpp"
 
 #include "test_utils_custom_test_types.hpp"
 #include "test_utils_data_generation.hpp"
@@ -36,10 +36,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
-
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    #include <rocprim/device/config_types.hpp>
-#endif
 
 #define HIP_CHECK_MEMORY(condition)                                                         \
     {                                                                                       \
@@ -53,11 +49,10 @@
         if(error != hipSuccess)                                                             \
         {                                                                                   \
             std::cout << "HIP error: " << hipGetErrorString(error) << " line: " << __LINE__ \
-                    << std::endl;                                                           \
+                      << std::endl;                                                         \
             exit(error);                                                                    \
         }                                                                                   \
     }
-
 
 template<class Key,
          class Value,
@@ -87,9 +82,9 @@ public:
 TYPED_TEST_SUITE_P(HipcubDeviceRadixSort);
 
 template<class T>
-auto generate_key_input(size_t size, unsigned int seed_value) HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
+auto generate_key_input(size_t size, unsigned int seed_value)
     -> std::enable_if_t<hipcub::NumericTraits<T>::CATEGORY == hipcub::FLOATING_POINT,
-                        std::vector<T>> HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
+                        std::vector<T>>
 {
     auto result = test_utils::get_random_data<T>(size,
                                                  test_utils::numeric_limits<T>::min(),
@@ -100,9 +95,9 @@ auto generate_key_input(size_t size, unsigned int seed_value) HIPCUB_CLANG_SUPPR
 }
 
 template<class T>
-auto generate_key_input(size_t size, unsigned int seed_value) HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
+auto generate_key_input(size_t size, unsigned int seed_value)
     -> std::enable_if_t<hipcub::NumericTraits<T>::CATEGORY != hipcub::FLOATING_POINT,
-                        std::vector<T>> HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
+                        std::vector<T>>
 {
     using inner_t = typename test_utils::inner_type<T>::type;
     return test_utils::get_random_data<T>(size,
@@ -239,15 +234,6 @@ void sort_keys()
     constexpr bool         check_large_sizes = TestFixture::params::check_large_sizes;
 
     hipStream_t stream = 0; // default
-    
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -280,18 +266,7 @@ void sort_keys()
                                 hipMemcpyHostToDevice));
 
             // Calculate expected results on host
-            std::vector<key_type> expected;
-            try
-            {
-                expected.assign(keys_input.begin(), keys_input.end());
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_input));
-                HIP_CHECK(hipFree(d_keys_output));
-                continue;
-            }
-
+            std::vector<key_type> expected(keys_input);
             std::stable_sort(
                 expected.begin(),
                 expected.end(),
@@ -314,7 +289,7 @@ void sort_keys()
                 test_common_utils::hipMallocHelper(&d_temporary_storage, temporary_storage_bytes));
 
             test_utils::GraphHelper gHelper;
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.startStreamCapture(stream);
 
             HIP_CHECK(invoke_sort_keys<descending>(d_temporary_storage,
@@ -326,22 +301,13 @@ void sort_keys()
                                                    end_bit,
                                                    stream));
 
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.createAndLaunchGraph(stream);
 
             HIP_CHECK(hipFree(d_temporary_storage));
             HIP_CHECK(hipFree(d_keys_input));
-            std::vector<key_type> keys_output;
-            try
-            {
-                keys_output.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_output));
-                continue;
-            }
 
+            std::vector<key_type> keys_output(size);
             HIP_CHECK(hipMemcpy(keys_output.data(),
                                 d_keys_output,
                                 size * sizeof(key_type),
@@ -509,15 +475,6 @@ void sort_pairs()
     constexpr bool         check_large_sizes = TestFixture::params::check_large_sizes;
 
     hipStream_t stream = 0; // default
-
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -539,15 +496,7 @@ void sort_pairs()
             SCOPED_TRACE(testing::Message() << "with size= " << size);
             // Generate data
             const std::vector<key_type> keys_input = generate_key_input<key_type>(size, seed_value);
-            std::vector<value_type>     values_input;
-            try
-            {
-                values_input.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                continue;
-            }
+            std::vector<value_type>     values_input(size);
             std::iota(values_input.begin(), values_input.end(), 0);
 
             key_type* d_keys_input;
@@ -573,17 +522,7 @@ void sort_pairs()
             using key_value = std::pair<key_type, value_type>;
 
             // Calculate expected results on host
-            std::vector<key_value> expected;
-            try
-            {
-                expected.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_values_input));
-                HIP_CHECK(hipFree(d_values_output));
-                continue;
-            }
+            std::vector<key_value> expected(size);
             for(size_t i = 0; i < size; i++)
             {
                 expected[i] = key_value(keys_input[i], values_input[i]);
@@ -613,7 +552,7 @@ void sort_pairs()
                 test_common_utils::hipMallocHelper(&d_temporary_storage, temporary_storage_bytes));
 
             test_utils::GraphHelper gHelper;
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.startStreamCapture(stream);
 
             HIP_CHECK(invoke_sort_pairs<descending>(d_temporary_storage,
@@ -627,39 +566,20 @@ void sort_pairs()
                                                     end_bit,
                                                     stream));
 
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.createAndLaunchGraph(stream);
 
             HIP_CHECK(hipFree(d_temporary_storage));
             HIP_CHECK(hipFree(d_keys_input));
             HIP_CHECK(hipFree(d_values_input));
-            std::vector<key_type> keys_output;
-            try
-            {
-                keys_output.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_output));
-                HIP_CHECK(hipFree(d_values_output));
-                continue;
-            }
+
+            std::vector<key_type> keys_output(size);
             HIP_CHECK(hipMemcpy(keys_output.data(),
                                 d_keys_output,
                                 size * sizeof(key_type),
                                 hipMemcpyDeviceToHost));
 
-            std::vector<value_type> values_output;
-            try
-            {
-                values_output.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_output));
-                HIP_CHECK(hipFree(d_values_output));
-                continue;
-            }
+            std::vector<value_type> values_output(size);
             HIP_CHECK(hipMemcpy(values_output.data(),
                                 d_values_output,
                                 size * sizeof(value_type),
@@ -668,17 +588,8 @@ void sort_pairs()
             HIP_CHECK(hipFree(d_keys_output));
             HIP_CHECK(hipFree(d_values_output));
 
-            std::vector<key_type>   keys_expected;
-            std::vector<value_type> values_expected;
-            try
-            {
-                keys_expected.resize(size);
-                values_expected.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                continue;
-            }
+            std::vector<key_type>   keys_expected(size);
+            std::vector<value_type> values_expected(size);
             for(size_t i = 0; i < size; i++)
             {
                 keys_expected[i]   = expected[i].first;
@@ -815,15 +726,6 @@ void sort_keys_double_buffer()
     constexpr bool         check_large_sizes = TestFixture::params::check_large_sizes;
 
     hipStream_t stream = 0; // default
-
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -855,17 +757,7 @@ void sort_keys_double_buffer()
                                 hipMemcpyHostToDevice));
 
             // Calculate expected results on host
-            std::vector<key_type> expected;
-            try
-            {
-                expected.assign(keys_input.begin(), keys_input.end());
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_input));
-                HIP_CHECK(hipFree(d_keys_output));
-                continue;
-            }
+            std::vector<key_type> expected(keys_input);
             std::stable_sort(
                 expected.begin(),
                 expected.end(),
@@ -889,7 +781,7 @@ void sort_keys_double_buffer()
                 test_common_utils::hipMallocHelper(&d_temporary_storage, temporary_storage_bytes));
 
             test_utils::GraphHelper gHelper;
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.startStreamCapture(stream);
 
             HIP_CHECK(invoke_sort_keys<descending>(d_temporary_storage,
@@ -900,22 +792,12 @@ void sort_keys_double_buffer()
                                                    end_bit,
                                                    stream));
 
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.createAndLaunchGraph(stream);
 
             HIP_CHECK(hipFree(d_temporary_storage));
 
-            std::vector<key_type> keys_output;
-            try
-            {
-                keys_output.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_input));
-                HIP_CHECK(hipFree(d_keys_output));
-                continue;
-            }
+            std::vector<key_type> keys_output(size);
             HIP_CHECK(hipMemcpy(keys_output.data(),
                                 d_keys.Current(),
                                 size * sizeof(key_type),
@@ -1064,15 +946,6 @@ void sort_pairs_double_buffer()
     constexpr bool         check_large_sizes = TestFixture::params::check_large_sizes;
 
     hipStream_t stream = 0; // default
-
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -1094,16 +967,7 @@ void sort_pairs_double_buffer()
             SCOPED_TRACE(testing::Message() << "with size= " << size);
             // Generate data
             const std::vector<key_type> keys_input = generate_key_input<key_type>(size, seed_value);
-            std::vector<value_type>     values_input;
-
-            try
-            {
-                values_input.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                continue;
-            }
+            std::vector<value_type>     values_input(size);
             std::iota(values_input.begin(), values_input.end(), 0);
 
             key_type* d_keys_input;
@@ -1129,19 +993,7 @@ void sort_pairs_double_buffer()
             using key_value = std::pair<key_type, value_type>;
 
             // Calculate expected results on host
-            std::vector<key_value> expected;
-            try
-            {
-                expected.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_input));
-                HIP_CHECK(hipFree(d_keys_output));
-                HIP_CHECK(hipFree(d_values_input));
-                HIP_CHECK(hipFree(d_values_output));
-                continue;
-            }
+            std::vector<key_value> expected(size);
             for(size_t i = 0; i < size; i++)
             {
                 expected[i] = key_value(keys_input[i], values_input[i]);
@@ -1172,7 +1024,7 @@ void sort_pairs_double_buffer()
                 test_common_utils::hipMallocHelper(&d_temporary_storage, temporary_storage_bytes));
 
             test_utils::GraphHelper gHelper;
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.startStreamCapture(stream);
 
             HIP_CHECK(invoke_sort_pairs<descending>(d_temporary_storage,
@@ -1184,42 +1036,18 @@ void sort_pairs_double_buffer()
                                                     end_bit,
                                                     stream));
 
-            if(TestFixture::params::use_graphs)
+            if (TestFixture::params::use_graphs)
                 gHelper.createAndLaunchGraph(stream);
 
             HIP_CHECK(hipFree(d_temporary_storage));
 
-            std::vector<key_type> keys_output;
-            try
-            {
-                keys_output.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_input));
-                HIP_CHECK(hipFree(d_keys_output));
-                HIP_CHECK(hipFree(d_values_input));
-                HIP_CHECK(hipFree(d_values_output));
-                continue;
-            }
+            std::vector<key_type> keys_output(size);
             HIP_CHECK(hipMemcpy(keys_output.data(),
                                 d_keys.Current(),
                                 size * sizeof(key_type),
                                 hipMemcpyDeviceToHost));
 
-            std::vector<value_type> values_output;
-            try
-            {
-                values_output.resize(size);
-            }
-            catch(const std::bad_alloc& e)
-            {
-                HIP_CHECK(hipFree(d_keys_input));
-                HIP_CHECK(hipFree(d_keys_output));
-                HIP_CHECK(hipFree(d_values_input));
-                HIP_CHECK(hipFree(d_values_output));
-                continue;
-            }
+            std::vector<value_type> values_output(size);
             HIP_CHECK(hipMemcpy(values_output.data(),
                                 d_values.Current(),
                                 size * sizeof(value_type),
@@ -1230,18 +1058,8 @@ void sort_pairs_double_buffer()
             HIP_CHECK(hipFree(d_values_input));
             HIP_CHECK(hipFree(d_values_output));
 
-            std::vector<key_type>   keys_expected;
-            std::vector<value_type> values_expected;
-            try
-            {
-                keys_expected.resize(size);
-                values_expected.resize(size);
-            }
-            catch(std::bad_alloc& e)
-            {
-                continue;
-            }
-
+            std::vector<key_type>   keys_expected(size);
+            std::vector<value_type> values_expected(size);
             for(size_t i = 0; i < size; i++)
             {
                 keys_expected[i]   = expected[i].first;
@@ -1273,16 +1091,9 @@ inline void sort_keys_over_4g()
     constexpr size_t       size                    = (1ull << 32) + 32;
     constexpr size_t       number_of_possible_keys = 1ull << (8ull * sizeof(key_type));
     assert(std::is_unsigned<key_type>::value);
+
     hipDeviceProp_t dev_prop;
     HIP_CHECK(hipGetDeviceProperties(&dev_prop, device_id));
-
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
 
     // Radix sort requires 2 buffers of `size`, so a minimum of 8 GB of vram for this test.
     // This is more than some cards provide.
@@ -1291,16 +1102,8 @@ inline void sort_keys_over_4g()
         GTEST_SKIP() << "insufficient global memory";
     }
 
-    std::vector<size_t> histogram;
-    try
-    {
-        histogram.resize(number_of_possible_keys, 0);
-    }
-    catch(const std::bad_alloc& e)
-    {
-        GTEST_SKIP() << "insufficient memory";
-    }
-    const int seed_value = rand();
+    std::vector<size_t> histogram(number_of_possible_keys, 0);
+    const int           seed_value = rand();
     SCOPED_TRACE(testing::Message() << "with seed= " << seed_value);
 
     std::vector<key_type> keys_input
@@ -1342,18 +1145,7 @@ inline void sort_keys_over_4g()
                                                 end_bit,
                                                 stream));
 
-    std::vector<key_type> output;
-    try
-    {
-        output.resize(keys_input.size());
-    }
-    catch(const std::bad_alloc& e)
-    {
-
-        HIP_CHECK(hipFree(d_keys_input_output));
-        HIP_CHECK(hipFree(d_temporary_storage));
-        GTEST_SKIP() << "insufficient memory";
-    }
+    std::vector<key_type> output(keys_input.size());
     HIP_CHECK(hipMemcpy(output.data(),
                         d_keys_input_output,
                         size * sizeof(key_type),
@@ -1386,35 +1178,14 @@ inline void sort_keys_large_sizes()
     constexpr unsigned int end_bit    = 8;
 
     hipStream_t stream = 0;
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
 
-    // Workaround: `hipMalloc` always returns `hipSuccess` even when allocation fails.
-    // We limit the maximum size so this bug doesn't occur.
-#ifdef _WIN32
-    const std::vector<size_t> sizes = test_utils::get_large_sizes<34>(seeds[0]);
-#else
     const std::vector<size_t> sizes = test_utils::get_large_sizes(seeds[0]);
-#endif
     for(const size_t size : sizes)
     {
         SCOPED_TRACE(testing::Message() << "with size = " << size);
 
         // Generate data
-        std::vector<key_type> keys_input;
-        try
-        {
-            keys_input.resize(size);
-        }
-        catch(const std::bad_alloc& e)
-        {
-            continue;
-        }
+        std::vector<key_type> keys_input(size);
         std::iota(keys_input.begin(), keys_input.end(), 0);
 
         key_type* d_keys;
@@ -1450,16 +1221,6 @@ inline void sort_keys_large_sizes()
         HIP_CHECK(hipFree(d_temporary_storage));
 
         std::vector<key_type> keys_output(size);
-        try
-        {
-            keys_output.resize(size);
-        }
-        catch(const std::bad_alloc& e)
-        {
-            HIP_CHECK(hipFree(d_keys));
-            continue;
-        }
-
         HIP_CHECK(
             hipMemcpy(keys_output.data(), d_keys, size * sizeof(key_type), hipMemcpyDeviceToHost));
 

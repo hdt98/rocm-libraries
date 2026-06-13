@@ -1,4 +1,4 @@
-- {MinimumRequiredVersion: 5.0.0}
+- {MinimumRequiredVersion: 4.33.0}
 - aquavanjaram
 - gfx942
 - [Device 0049, Device 0050]
@@ -68,8 +68,8 @@
   TileAwareSelection: false
   TileB: 1
   TotalIndices: 4
-  TransposeA: True
-  TransposeB: False
+  TransposeA: 1
+  TransposeB: 0
   UseBeta: true
   UseBias: 1
   UseE: false
@@ -98,18 +98,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -225,14 +225,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 0
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT2_4_NLCA2_SU0_SUM1_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT2_4_NLCA2_SU0_SUM0_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -252,13 +329,13 @@
     ThreadTileA: 8
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -313,18 +390,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -440,14 +517,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 1
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT4_4_NLCA2_SU0_SUM1_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT4_4_NLCA2_SU0_SUM0_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -467,13 +621,13 @@
     ThreadTileA: 16
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -528,18 +682,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -655,14 +809,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 2
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT4_4_NLCA2_SU0_SUM1_SUS0_VWB4_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x64x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT4_4_NLCA2_SU0_SUM0_SUS0_VWB4_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -682,13 +913,13 @@
     ThreadTileA: 16
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -743,18 +974,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -870,14 +1101,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 3
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT192x96x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT3_6_NLCA2_SU0_SUM1_SUS0_VWB2_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT192x96x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT3_6_NLCA2_SU0_SUM0_SUS0_VWB2_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -897,13 +1205,13 @@
     ThreadTileA: 12
     ThreadTileB: 6
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -958,18 +1266,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -1085,14 +1393,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 4
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT192x96x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT3_6_NLCA2_SU8_SUM0_SUS128_VWB2_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT192x96x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT3_6_NLCA2_SU8_SUM1_SUS128_VWB2_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 8
-    StaggerUMapping: 0
+    StaggerUMapping: 1
     StaggerUStride: 128
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -1112,13 +1497,13 @@
     ThreadTileA: 12
     ThreadTileB: 6
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -1173,18 +1558,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -1300,14 +1685,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 5
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x96x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT4_6_NLCA2_SU8_SUM0_SUS128_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x96x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT4_6_NLCA2_SU8_SUM1_SUS128_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 8
-    StaggerUMapping: 0
+    StaggerUMapping: 1
     StaggerUStride: 128
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -1327,13 +1789,13 @@
     ThreadTileA: 16
     ThreadTileB: 6
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -1388,18 +1850,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -1515,14 +1977,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 6
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x128x64_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT4_8_NLCA2_SU0_SUM1_SUS0_VWB8_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x128x64_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT4_8_NLCA2_SU0_SUM0_SUS0_VWB8_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -1542,13 +2081,13 @@
     ThreadTileA: 16
     ThreadTileB: 8
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -1603,18 +2142,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -1730,14 +2269,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 7
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT512x128x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT8_8_NLCA2_SU0_SUM1_SUS0_VWB8_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT512x128x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT8_8_NLCA2_SU0_SUM0_SUS0_VWB8_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -1757,13 +2373,13 @@
     ThreadTileA: 32
     ThreadTileB: 8
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -1818,18 +2434,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -1945,14 +2561,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 8
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT512x128x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT8_8_NLCA2_SU8_SUM0_SUS128_VWB8_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT512x128x64_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT8_8_NLCA2_SU8_SUM1_SUS128_VWB8_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 8
-    StaggerUMapping: 0
+    StaggerUMapping: 1
     StaggerUStride: 128
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -1972,13 +2665,13 @@
     ThreadTileA: 32
     ThreadTileB: 8
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -2033,18 +2726,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 64
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 4
     GlobalSplitU: 1
@@ -2160,14 +2853,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 9
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x144x64_MI16x16x1_SN_LDSB0_GRVWB4_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB128_MIWT4_9_NLCA2_SU8_SUM0_SUS128_VWB1_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x144x64_MI16x16x1_SN_LDSB0_GRVWB4_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB128_MIWT4_9_NLCA2_SU8_SUM1_SUS128_VWB1_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 8
-    StaggerUMapping: 0
+    StaggerUMapping: 1
     StaggerUStride: 128
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -2187,13 +2957,13 @@
     ThreadTileA: 16
     ThreadTileB: 9
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -2248,18 +3018,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 128
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 2
@@ -2375,14 +3145,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 10
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x32x128_MI16x16x1_SN_LDSB0_GRVWB8_GSU2_GSUAMBSK_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_2_NLCA4_SU0_SUM1_SUS0_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x32x128_MI16x16x1_SN_LDSB0_GRVWB8_GSU2_GSUAMBSK_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_2_NLCA4_SU0_SUM0_SUS0_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -2403,13 +3250,13 @@
     ThreadTileA: 4
     ThreadTileB: 2
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -2464,18 +3311,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 128
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -2591,14 +3438,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 11
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT192x48x128_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT3_3_NLCA4_SU0_SUM1_SUS0_VWB1_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT192x48x128_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB256_MIWT3_3_NLCA4_SU0_SUM0_SUS0_VWB1_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -2618,13 +3542,13 @@
     ThreadTileA: 12
     ThreadTileB: 3
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -2679,18 +3603,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 128
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -2806,14 +3730,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 12
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_4_NLCA4_SU0_SUM1_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_4_NLCA4_SU0_SUM0_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -2833,13 +3834,13 @@
     ThreadTileA: 8
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -2894,18 +3895,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 128
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -3021,14 +4022,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 13
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_4_NLCA4_SU0_SUM1_SUS0_VWB4_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_4_NLCA4_SU0_SUM0_SUS0_VWB4_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -3048,13 +4126,13 @@
     ThreadTileA: 8
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -3109,18 +4187,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 128
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -3236,14 +4314,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 14
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_4_NLCA4_SU8_SUM0_SUS256_VWB4_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_4_NLCA4_SU8_SUM1_SUS256_VWB4_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 8
-    StaggerUMapping: 0
+    StaggerUMapping: 1
     StaggerUStride: 256
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -3263,13 +4418,13 @@
     ThreadTileA: 8
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -3324,18 +4479,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 128
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -3451,14 +4606,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 15
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT4_4_NLCA4_SU0_SUM1_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT256x64x128_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT4_4_NLCA4_SU0_SUM0_SUS0_VWB4_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -3478,13 +4710,13 @@
     ThreadTileA: 16
     ThreadTileB: 4
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -3539,18 +4771,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 256
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -3666,14 +4898,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 16
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x256_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_1_NLCA8_SU0_SUM1_SUS0_VWB1_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x256_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_1_NLCA8_SU0_SUM0_SUS0_VWB1_WG64_4_1_WGM1_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -3693,13 +5002,13 @@
     ThreadTileA: 4
     ThreadTileB: 1
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -3754,18 +5063,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 256
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -3881,14 +5190,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 17
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x256_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_1_NLCA8_SU0_SUM1_SUS0_VWB1_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x256_MI16x16x1_SN_LDSB0_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_1_NLCA8_SU0_SUM0_SUS0_VWB1_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -3908,13 +5294,13 @@
     ThreadTileA: 4
     ThreadTileB: 1
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -3969,18 +5355,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 256
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 3
@@ -4096,14 +5482,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 18
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x256_MI16x16x1_SN_LDSB0_GRVWB8_GSU3_GSUAMBSK_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_1_NLCA8_SU0_SUM1_SUS0_VWB1_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x256_MI16x16x1_SN_LDSB0_GRVWB8_GSU3_GSUAMBSK_GSUC0_GSUWGMRR0_K1_LBSPPB512_MIWT1_1_NLCA8_SU0_SUM0_SUS0_VWB1_WG64_4_1_WGM8_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -4124,13 +5587,13 @@
     ThreadTileA: 4
     ThreadTileB: 1
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -4185,18 +5648,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 256
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -4312,14 +5775,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 19
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x32x256_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT1_2_NLCA8_SU0_SUM1_SUS0_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x32x256_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT1_2_NLCA8_SU0_SUM0_SUS0_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -4339,13 +5879,13 @@
     ThreadTileA: 4
     ThreadTileB: 2
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -4400,18 +5940,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 256
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -4527,14 +6067,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 20
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x32x256_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_2_NLCA8_SU0_SUM1_SUS0_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT128x32x256_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT2_2_NLCA8_SU0_SUM0_SUS0_VWB2_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -4554,13 +6171,13 @@
     ThreadTileA: 8
     ThreadTileB: 2
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
@@ -4615,18 +6232,18 @@
     CustomKernelName: ''
     DebugStreamK: 0
     DepthU: 512
-    DirectToLds: 0
+    DirectToLds: false
     DirectToLdsA: false
     DirectToLdsB: false
-    DirectToVgprA: true
+    DirectToVgprA: 1
     DirectToVgprB: false
     DirectToVgprSparseMetadata: false
     EdgeType: ShiftPtr
     EnableF32XdlMathOp: false
     EnableMatrixInstruction: true
-    ExpandPointerSwap: false
+    ExpandPointerSwap: 0
     ForceDisableShadowInit: false
-    GlobalReadPerMfma: 1.0
+    GlobalReadPerMfma: 1
     GlobalReadVectorWidthA: 8
     GlobalReadVectorWidthB: 8
     GlobalSplitU: 1
@@ -4742,14 +6359,91 @@
     PrefetchGlobalRead: 2
     PrefetchLocalRead: 1
     PreloadKernArgs: true
+    ProblemType:
+      Activation: true
+      ActivationComputeDataType: 0
+      ActivationNoGuard: false
+      ActivationType: hipblaslt_all
+      AllowNoFreeDims: false
+      AssignedDerivedParameters: true
+      Batched: true
+      BetaOnlyUseBias: false
+      BiasDataTypeList: [0, 7]
+      BiasSrc: D
+      ComplexConjugateA: false
+      ComplexConjugateB: false
+      ComputeDataType: 0
+      DataType: 7
+      DataTypeA: 7
+      DataTypeAmaxD: 0
+      DataTypeB: 7
+      DataTypeE: 7
+      DestDataType: 7
+      F32XdlMathOp: 0
+      Gradient: false
+      GroupedGemm: false
+      HighPrecisionAccumulate: true
+      Index0: 0
+      Index01A: 0
+      Index01B: 1
+      Index1: 1
+      IndexAssignmentsA: [3, 0, 2]
+      IndexAssignmentsB: [3, 1, 2]
+      IndexAssignmentsLD: [4, 5, 6, 7]
+      IndexAssignmentsMetadata: [3, 0, 2]
+      IndexUnroll: 3
+      IndexUnrollA: 0
+      IndexUnrollB: 0
+      IndexUnrollM: 0
+      IndicesBatch: [2]
+      IndicesFree: [0, 1]
+      IndicesSummation: [3]
+      MirrorDimsA: []
+      MirrorDimsB: []
+      MirrorDimsMetadata: []
+      NumIndicesBatch: 1
+      NumIndicesC: 3
+      NumIndicesFree: 2
+      NumIndicesLD: 4
+      NumIndicesSummation: 1
+      OperationType: GEMM
+      OutputAmaxD: false
+      SetConstStrideA: []
+      SetConstStrideB: []
+      SetConstStrideBias: []
+      SilentHighPrecisionAccumulate: false
+      Sparse: 0
+      StochasticRounding: false
+      StridedBatched: true
+      SupportUserArgs: true
+      SwizzleTensorA: true
+      SwizzleTensorB: false
+      TLUA: false
+      TLUB: false
+      Tensor0: 0
+      Tensor1: 1
+      TileA: 0
+      TileAwareSelection: false
+      TileB: 1
+      TotalIndices: 4
+      TransposeA: 1
+      TransposeB: 0
+      UseBeta: true
+      UseBias: 1
+      UseE: false
+      UseInitialStridesAB: false
+      UseInitialStridesCD: false
+      UseScaleAB: ''
+      UseScaleAlphaVec: 1
+      UseScaleCD: false
     ScheduleGlobalRead: 1
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 21
-    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x512_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT1_1_NLCA16_SU0_SUM1_SUS0_VWB1_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
-    SourceSwap: true
+    SolutionNameMin: Cijk_Alik_Bljk_BBS_STA_BH_Bias_HAS_SAV_UserArgs_MT64x16x512_MI16x16x1_SN_LDSB1_GRVWB8_GSU1_GSUAMB_GSUC0_GSUWGMRR0_K1_LBSPPB1024_MIWT1_1_NLCA16_SU0_SUM0_SUS0_VWB1_WG64_4_1_WGM6_WGMXCC8_WGMXCCGn1
+    SourceSwap: 1
     StaggerU: 0
-    StaggerUMapping: 1
+    StaggerUMapping: 0
     StaggerUStride: 0
     StorePriorityOpt: false
     StoreRemapVectorWidth: 0
@@ -4769,13 +6463,13 @@
     ThreadTileA: 4
     ThreadTileB: 1
     TransposeLDS: 1
-    TransposeLDSMetadata: 1
+    TransposeLDSMetadata: true
     ULSGRODoubleG2L: 0
     UnrollLoopSwapGlobalReadOrder: 0
     UnrollMajorLDSA: true
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
-    Use64bShadowLimit: true
+    Use64bShadowLimit: 1
     UseDotInstruction: false
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1

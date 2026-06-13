@@ -26,7 +26,8 @@
 
 #pragma once
 
-#include <miopen/ford.hpp>
+#include <../test/ford.hpp>
+
 #include <miopen/tensor.hpp>
 #include <miopen/tensor_view_utils.hpp>
 #include <miopen/prelu/utils.hpp>
@@ -50,7 +51,7 @@ int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
     auto weight_sz             = miopen::deref(weightDesc).GetElementSize();
     auto weight_grad_collector = std::vector<float>(input_sz);
 
-    miopen::par_ford(input_sz)([&](int gid) {
+    par_ford(input_sz)([&](int gid) {
         auto tensor_layout = tensor_layout_t<5>(input_tv, gid);
         float input_v      = static_cast<float>(input[input_tv.get_tensor_view_idx(tensor_layout)]);
         float grad_v = static_cast<float>(doutput[doutput_tv.get_tensor_view_idx(tensor_layout)]);
@@ -86,10 +87,10 @@ int32_t mloPReLUBackwardRunHost(const miopenTensorDescriptor_t inputDesc,
             size_t inner_size = std::accumulate(
                 &input_tv.size[2], &input_tv.size[4], 1ul, std::multiplies<size_t>());
             size_t outer_size = inner_size * input_tv.size[1];
-            miopen::par_ford(weight_sz)([&](int i) {
+            par_ford(weight_sz)([&](int i) {
                 double sum = 0;
-                miopen::ford(input_tv.size[0])([&](int j) {
-                    miopen::ford(inner_size)([&](int k) {
+                ford(input_tv.size[0])([&](int j) {
+                    ford(inner_size)([&](int k) {
                         sum += static_cast<double>(
                             weight_grad_collector[j * outer_size + i * inner_size + k]);
                     });

@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2017-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2017-2024, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,24 +34,24 @@
 #include "../../../util_deprecated.hpp"
 #include "../thread/thread_operators.hpp"
 
-#include <rocprim/device/config_types.hpp> // IWYU pragma: export
-#include <rocprim/device/device_scan.hpp> // IWYU pragma: export
-#include <rocprim/device/device_scan_by_key.hpp> // IWYU pragma: export
-#include <rocprim/type_traits.hpp> // IWYU pragma: export
-#include <rocprim/types/future_value.hpp> // IWYU pragma: export
+#include <rocprim/device/config_types.hpp>
+#include <rocprim/device/device_scan.hpp>
+#include <rocprim/device/device_scan_by_key.hpp>
+#include <rocprim/type_traits.hpp>
+#include <rocprim/types/future_value.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
 class DeviceScan
 {
 public:
-    template<typename InputIteratorT, typename OutputIteratorT, typename NumItemsT>
+    template<typename InputIteratorT, typename OutputIteratorT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveSum(void*           d_temp_storage,
                                    size_t&         temp_storage_bytes,
                                    InputIteratorT  d_in,
                                    OutputIteratorT d_out,
-                                   NumItemsT       num_items,
+                                   size_t          num_items,
                                    hipStream_t     stream = 0)
     {
         return InclusiveScan(d_temp_storage,
@@ -63,13 +63,13 @@ public:
                              stream);
     }
 
-    template<typename InputIteratorT, typename OutputIteratorT, typename NumItemsT>
+    template<typename InputIteratorT, typename OutputIteratorT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveSum(void*           d_temp_storage,
                                    size_t&         temp_storage_bytes,
                                    InputIteratorT  d_in,
                                    OutputIteratorT d_out,
-                                   NumItemsT       num_items,
+                                   size_t          num_items,
                                    hipStream_t     stream,
                                    bool            debug_synchronous)
     {
@@ -77,23 +77,23 @@ public:
         return InclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, num_items, stream);
     }
 
-    template<typename IteratorT, typename NumItemsT>
+    template<typename IteratorT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveSum(void*       d_temp_storage,
                                    size_t&     temp_storage_bytes,
                                    IteratorT   d_data,
-                                   NumItemsT   num_items,
+                                   size_t      num_items,
                                    hipStream_t stream = 0)
     {
         return InclusiveSum(d_temp_storage, temp_storage_bytes, d_data, d_data, num_items, stream);
     }
 
-    template<typename IteratorT, typename NumItemsT>
+    template<typename IteratorT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveSum(void*       d_temp_storage,
                                    size_t&     temp_storage_bytes,
                                    IteratorT   d_data,
-                                   NumItemsT   num_items,
+                                   size_t      num_items,
                                    hipStream_t stream,
                                    bool        debug_synchronous)
     {
@@ -105,42 +105,42 @@ public:
                                        stream);
     }
 
-    template<typename InputIteratorT,
-             typename OutputIteratorT,
-             typename ScanOpT,
-             typename NumItemsT>
+    template<typename InputIteratorT, typename OutputIteratorT, typename ScanOpT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveScan(void*           d_temp_storage,
                                     size_t&         temp_storage_bytes,
                                     InputIteratorT  d_in,
                                     OutputIteratorT d_out,
                                     ScanOpT         scan_op,
-                                    NumItemsT       num_items,
+                                    size_t          num_items,
                                     hipStream_t     stream = 0)
     {
-        return ::rocprim::
-            inclusive_scan<::rocprim::default_config, InputIteratorT, OutputIteratorT, ScanOpT>(
-                d_temp_storage,
-                temp_storage_bytes,
-                d_in,
-                d_out,
-                num_items,
-                scan_op,
-                stream,
-                HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
+        using acc_t = ::rocprim::invoke_result_binary_op_t<
+            typename std::iterator_traits<InputIteratorT>::value_type,
+            ScanOpT>;
+
+        return ::rocprim::inclusive_scan<::rocprim::default_config,
+                                         InputIteratorT,
+                                         OutputIteratorT,
+                                         ScanOpT,
+                                         acc_t>(d_temp_storage,
+                                                temp_storage_bytes,
+                                                d_in,
+                                                d_out,
+                                                num_items,
+                                                scan_op,
+                                                stream,
+                                                HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
     }
 
-    template<typename InputIteratorT,
-             typename OutputIteratorT,
-             typename ScanOpT,
-             typename NumItemsT>
+    template<typename InputIteratorT, typename OutputIteratorT, typename ScanOpT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveScan(void*           d_temp_storage,
                                     size_t&         temp_storage_bytes,
                                     InputIteratorT  d_in,
                                     OutputIteratorT d_out,
                                     ScanOpT         scan_op,
-                                    NumItemsT       num_items,
+                                    size_t          num_items,
                                     hipStream_t     stream,
                                     bool            debug_synchronous)
     {
@@ -154,13 +154,13 @@ public:
                              stream);
     }
 
-    template<typename IteratorT, typename ScanOpT, typename NumItemsT>
+    template<typename IteratorT, typename ScanOpT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveScan(void*       d_temp_storage,
                                     size_t&     temp_storage_bytes,
                                     IteratorT   d_data,
                                     ScanOpT     scan_op,
-                                    NumItemsT   num_items,
+                                    size_t      num_items,
                                     hipStream_t stream = 0)
     {
         return InclusiveScan(d_temp_storage,
@@ -172,13 +172,13 @@ public:
                              stream);
     }
 
-    template<typename IteratorT, typename ScanOpT, typename NumItemsT>
+    template<typename IteratorT, typename ScanOpT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveScan(void*       d_temp_storage,
                                     size_t&     temp_storage_bytes,
                                     IteratorT   d_data,
                                     ScanOpT     scan_op,
-                                    NumItemsT   num_items,
+                                    size_t      num_items,
                                     hipStream_t stream,
                                     bool        debug_synchronous)
     {
@@ -191,43 +191,13 @@ public:
                                                  stream);
     }
 
-    template<typename InputIteratorT,
-             typename OutputIteratorT,
-             typename ScanOpT,
-             typename InitValueT,
-             typename NumItemsT>
-    HIPCUB_RUNTIME_FUNCTION
-    static hipError_t InclusiveScanInit(void*           d_temp_storage,
-                                        size_t&         temp_storage_bytes,
-                                        InputIteratorT  d_in,
-                                        OutputIteratorT d_out,
-                                        ScanOpT         scan_op,
-                                        InitValueT      init_value,
-                                        NumItemsT       num_items,
-                                        hipStream_t     stream = 0)
-    {
-        return ::rocprim::inclusive_scan<::rocprim::default_config,
-                                         InputIteratorT,
-                                         OutputIteratorT,
-                                         InitValueT,
-                                         ScanOpT>(d_temp_storage,
-                                                  temp_storage_bytes,
-                                                  d_in,
-                                                  d_out,
-                                                  init_value,
-                                                  num_items,
-                                                  scan_op,
-                                                  stream,
-                                                  HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
-    }
-
-    template<typename InputIteratorT, typename OutputIteratorT, typename NumItemsT>
+    template<typename InputIteratorT, typename OutputIteratorT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveSum(void*           d_temp_storage,
                                    size_t&         temp_storage_bytes,
                                    InputIteratorT  d_in,
                                    OutputIteratorT d_out,
-                                   NumItemsT       num_items,
+                                   size_t          num_items,
                                    hipStream_t     stream = 0)
     {
         using T = typename std::iterator_traits<InputIteratorT>::value_type;
@@ -241,13 +211,13 @@ public:
                              stream);
     }
 
-    template<typename InputIteratorT, typename OutputIteratorT, typename NumItemsT>
+    template<typename InputIteratorT, typename OutputIteratorT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveSum(void*           d_temp_storage,
                                    size_t&         temp_storage_bytes,
                                    InputIteratorT  d_in,
                                    OutputIteratorT d_out,
-                                   NumItemsT       num_items,
+                                   size_t          num_items,
                                    hipStream_t     stream,
                                    bool            debug_synchronous)
     {
@@ -255,23 +225,23 @@ public:
         return ExclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, num_items, stream);
     }
 
-    template<typename IteratorT, typename NumItemsT>
+    template<typename IteratorT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveSum(void*       d_temp_storage,
                                    size_t&     temp_storage_bytes,
                                    IteratorT   d_data,
-                                   NumItemsT   num_items,
+                                   size_t      num_items,
                                    hipStream_t stream = 0)
     {
         return ExclusiveSum(d_temp_storage, temp_storage_bytes, d_data, d_data, num_items, stream);
     }
 
-    template<typename IteratorT, typename NumItemsT>
+    template<typename IteratorT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveSum(void*       d_temp_storage,
                                    size_t&     temp_storage_bytes,
                                    IteratorT   d_data,
-                                   NumItemsT   num_items,
+                                   size_t      num_items,
                                    hipStream_t stream,
                                    bool        debug_synchronous)
     {
@@ -286,8 +256,7 @@ public:
     template<typename InputIteratorT,
              typename OutputIteratorT,
              typename ScanOpT,
-             typename InitValueT,
-             typename NumItemsT>
+             typename InitValueT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*           d_temp_storage,
                                     size_t&         temp_storage_bytes,
@@ -295,29 +264,33 @@ public:
                                     OutputIteratorT d_out,
                                     ScanOpT         scan_op,
                                     InitValueT      init_value,
-                                    NumItemsT       num_items,
+                                    size_t          num_items,
                                     hipStream_t     stream = 0)
     {
+        using acc_t
+            = ::rocprim::invoke_result_binary_op_t<rocprim::detail::input_type_t<InitValueT>,
+                                                   ScanOpT>;
+
         return ::rocprim::exclusive_scan<::rocprim::default_config,
                                          InputIteratorT,
                                          OutputIteratorT,
                                          InitValueT,
-                                         ScanOpT>(d_temp_storage,
-                                                  temp_storage_bytes,
-                                                  d_in,
-                                                  d_out,
-                                                  init_value,
-                                                  num_items,
-                                                  scan_op,
-                                                  stream,
-                                                  HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
+                                         ScanOpT,
+                                         acc_t>(d_temp_storage,
+                                                temp_storage_bytes,
+                                                d_in,
+                                                d_out,
+                                                init_value,
+                                                num_items,
+                                                scan_op,
+                                                stream,
+                                                HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
     }
 
     template<typename InputIteratorT,
              typename OutputIteratorT,
              typename ScanOpT,
-             typename InitValueT,
-             typename NumItemsT>
+             typename InitValueT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*           d_temp_storage,
                                     size_t&         temp_storage_bytes,
@@ -325,7 +298,7 @@ public:
                                     OutputIteratorT d_out,
                                     ScanOpT         scan_op,
                                     InitValueT      init_value,
-                                    NumItemsT       num_items,
+                                    size_t          num_items,
                                     hipStream_t     stream,
                                     bool            debug_synchronous)
     {
@@ -340,14 +313,14 @@ public:
                              stream);
     }
 
-    template<typename IteratorT, typename ScanOpT, typename InitValueT, typename NumItemsT>
+    template<typename IteratorT, typename ScanOpT, typename InitValueT>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*       d_temp_storage,
                                     size_t&     temp_storage_bytes,
                                     IteratorT   d_data,
                                     ScanOpT     scan_op,
                                     InitValueT  init_value,
-                                    NumItemsT   num_items,
+                                    size_t      num_items,
                                     hipStream_t stream = 0)
     {
         return ExclusiveScan(d_temp_storage,
@@ -360,14 +333,14 @@ public:
                              stream);
     }
 
-    template<typename IteratorT, typename ScanOpT, typename InitValueT, typename NumItemsT>
+    template<typename IteratorT, typename ScanOpT, typename InitValueT>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*       d_temp_storage,
                                     size_t&     temp_storage_bytes,
                                     IteratorT   d_data,
                                     ScanOpT     scan_op,
                                     InitValueT  init_value,
-                                    NumItemsT   num_items,
+                                    size_t      num_items,
                                     hipStream_t stream,
                                     bool        debug_synchronous)
     {
@@ -385,8 +358,7 @@ public:
              typename OutputIteratorT,
              typename ScanOpT,
              typename InitValueT,
-             typename InitValueIterT = InitValueT*,
-             typename NumItemsT      = int>
+             typename InitValueIterT = InitValueT*>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*                                   d_temp_storage,
                                     size_t&                                 temp_storage_bytes,
@@ -394,30 +366,34 @@ public:
                                     OutputIteratorT                         d_out,
                                     ScanOpT                                 scan_op,
                                     FutureValue<InitValueT, InitValueIterT> init_value,
-                                    NumItemsT                               num_items,
+                                    int                                     num_items,
                                     hipStream_t                             stream = 0)
     {
+        using acc_t
+            = ::rocprim::invoke_result_binary_op_t<rocprim::detail::input_type_t<InitValueT>,
+                                                   ScanOpT>;
+
         return ::rocprim::exclusive_scan<::rocprim::default_config,
                                          InputIteratorT,
                                          OutputIteratorT,
-                                         FutureValue<InitValueT, InitValueIterT>,
-                                         ScanOpT>(d_temp_storage,
-                                                  temp_storage_bytes,
-                                                  d_in,
-                                                  d_out,
-                                                  init_value,
-                                                  static_cast<size_t>(num_items),
-                                                  scan_op,
-                                                  stream,
-                                                  HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
+                                         InitValueT,
+                                         ScanOpT,
+                                         acc_t>(d_temp_storage,
+                                                temp_storage_bytes,
+                                                d_in,
+                                                d_out,
+                                                init_value,
+                                                num_items,
+                                                scan_op,
+                                                stream,
+                                                HIPCUB_DETAIL_DEBUG_SYNC_VALUE);
     }
 
     template<typename InputIteratorT,
              typename OutputIteratorT,
              typename ScanOpT,
              typename InitValueT,
-             typename InitValueIterT = InitValueT*,
-             typename NumItemsT      = int>
+             typename InitValueIterT = InitValueT*>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*                                   d_temp_storage,
                                     size_t&                                 temp_storage_bytes,
@@ -425,7 +401,7 @@ public:
                                     OutputIteratorT                         d_out,
                                     ScanOpT                                 scan_op,
                                     FutureValue<InitValueT, InitValueIterT> init_value,
-                                    NumItemsT                               num_items,
+                                    int                                     num_items,
                                     hipStream_t                             stream,
                                     bool                                    debug_synchronous)
     {
@@ -443,15 +419,14 @@ public:
     template<typename IteratorT,
              typename ScanOpT,
              typename InitValueT,
-             typename InitValueIterT = InitValueT*,
-             typename NumItemsT      = int>
+             typename InitValueIterT = InitValueT*>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*                                   d_temp_storage,
                                     size_t&                                 temp_storage_bytes,
                                     IteratorT                               d_data,
                                     ScanOpT                                 scan_op,
                                     FutureValue<InitValueT, InitValueIterT> init_value,
-                                    NumItemsT                               num_items,
+                                    int                                     num_items,
                                     hipStream_t                             stream = 0)
     {
         return ExclusiveScan(d_temp_storage,
@@ -467,16 +442,15 @@ public:
     template<typename IteratorT,
              typename ScanOpT,
              typename InitValueT,
-             typename InitValueIterT = InitValueT*,
-             typename NumItemsT      = int>
+             typename InitValueIterT = InitValueT*>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScan(void*                                   d_temp_storage,
                                     size_t&                                 temp_storage_bytes,
                                     IteratorT                               d_data,
                                     ScanOpT                                 scan_op,
                                     FutureValue<InitValueT, InitValueIterT> init_value,
-                                    NumItemsT                               num_items,
-                                    hipStream_t                             stream,
+                                    int                                     num_items,
+                                    hipError_t                              stream,
                                     bool                                    debug_synchronous)
     {
         HIPCUB_DETAIL_RUNTIME_LOG_DEBUG_SYNCHRONOUS();
@@ -492,15 +466,14 @@ public:
     template<typename KeysInputIteratorT,
              typename ValuesInputIteratorT,
              typename ValuesOutputIteratorT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveSumByKey(void*                 d_temp_storage,
                                         size_t&               temp_storage_bytes,
                                         KeysInputIteratorT    d_keys_in,
                                         ValuesInputIteratorT  d_values_in,
                                         ValuesOutputIteratorT d_values_out,
-                                        NumItemsT             num_items,
+                                        int                   num_items,
                                         EqualityOpT           equality_op = EqualityOpT(),
                                         hipStream_t           stream      = 0)
     {
@@ -513,7 +486,7 @@ public:
                                   d_values_out,
                                   ::hipcub::Sum(),
                                   static_cast<in_value_type>(0),
-                                  num_items,
+                                  static_cast<size_t>(num_items),
                                   equality_op,
                                   stream);
     }
@@ -521,15 +494,14 @@ public:
     template<typename KeysInputIteratorT,
              typename ValuesInputIteratorT,
              typename ValuesOutputIteratorT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveSumByKey(void*                 d_temp_storage,
                                         size_t&               temp_storage_bytes,
                                         KeysInputIteratorT    d_keys_in,
                                         ValuesInputIteratorT  d_values_in,
                                         ValuesOutputIteratorT d_values_out,
-                                        NumItemsT             num_items,
+                                        int                   num_items,
                                         EqualityOpT           equality_op,
                                         hipStream_t           stream,
                                         bool                  debug_synchronous)
@@ -550,8 +522,7 @@ public:
              typename ValuesOutputIteratorT,
              typename ScanOpT,
              typename InitValueT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScanByKey(void*                 d_temp_storage,
                                          size_t&               temp_storage_bytes,
@@ -560,11 +531,12 @@ public:
                                          ValuesOutputIteratorT d_values_out,
                                          ScanOpT               scan_op,
                                          InitValueT            init_value,
-                                         NumItemsT             num_items,
+                                         int                   num_items,
                                          EqualityOpT           equality_op = EqualityOpT(),
                                          hipStream_t           stream      = 0)
     {
-        using acc_t = rocprim::accumulator_t<ScanOpT, rocprim::detail::input_type_t<InitValueT>>;
+        using acc_t = rocprim::invoke_result_binary_op_t<rocprim::detail::input_type_t<InitValueT>,
+                                                         ScanOpT>;
 
         return ::rocprim::exclusive_scan_by_key<::rocprim::default_config,
                                                 KeysInputIteratorT,
@@ -591,8 +563,7 @@ public:
              typename ValuesOutputIteratorT,
              typename ScanOpT,
              typename InitValueT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t ExclusiveScanByKey(void*                 d_temp_storage,
                                          size_t&               temp_storage_bytes,
@@ -601,7 +572,7 @@ public:
                                          ValuesOutputIteratorT d_values_out,
                                          ScanOpT               scan_op,
                                          InitValueT            init_value,
-                                         NumItemsT             num_items,
+                                         int                   num_items,
                                          EqualityOpT           equality_op,
                                          hipStream_t           stream,
                                          bool                  debug_synchronous)
@@ -622,15 +593,14 @@ public:
     template<typename KeysInputIteratorT,
              typename ValuesInputIteratorT,
              typename ValuesOutputIteratorT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveSumByKey(void*                 d_temp_storage,
                                         size_t&               temp_storage_bytes,
                                         KeysInputIteratorT    d_keys_in,
                                         ValuesInputIteratorT  d_values_in,
                                         ValuesOutputIteratorT d_values_out,
-                                        NumItemsT             num_items,
+                                        int                   num_items,
                                         EqualityOpT           equality_op = EqualityOpT(),
                                         hipStream_t           stream      = 0)
     {
@@ -648,15 +618,14 @@ public:
     template<typename KeysInputIteratorT,
              typename ValuesInputIteratorT,
              typename ValuesOutputIteratorT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveSumByKey(void*                 d_temp_storage,
                                         size_t&               temp_storage_bytes,
                                         KeysInputIteratorT    d_keys_in,
                                         ValuesInputIteratorT  d_values_in,
                                         ValuesOutputIteratorT d_values_out,
-                                        NumItemsT             num_items,
+                                        int                   num_items,
                                         EqualityOpT           equality_op,
                                         hipStream_t           stream,
                                         bool                  debug_synchronous)
@@ -676,8 +645,7 @@ public:
              typename ValuesInputIteratorT,
              typename ValuesOutputIteratorT,
              typename ScanOpT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveScanByKey(void*                 d_temp_storage,
                                          size_t&               temp_storage_bytes,
@@ -685,12 +653,13 @@ public:
                                          ValuesInputIteratorT  d_values_in,
                                          ValuesOutputIteratorT d_values_out,
                                          ScanOpT               scan_op,
-                                         NumItemsT             num_items,
+                                         int                   num_items,
                                          EqualityOpT           equality_op = EqualityOpT(),
                                          hipStream_t           stream      = 0)
     {
-        using acc_t = ::rocprim::
-            accumulator_t<ScanOpT, typename std::iterator_traits<ValuesInputIteratorT>::value_type>;
+        using acc_t = ::rocprim::invoke_result_binary_op_t<
+            typename std::iterator_traits<ValuesInputIteratorT>::value_type,
+            ScanOpT>;
 
         return ::rocprim::inclusive_scan_by_key<::rocprim::default_config,
                                                 KeysInputIteratorT,
@@ -714,8 +683,7 @@ public:
              typename ValuesInputIteratorT,
              typename ValuesOutputIteratorT,
              typename ScanOpT,
-             typename EqualityOpT = ::hipcub::Equality,
-             typename NumItemsT   = std::uint32_t>
+             typename EqualityOpT = ::hipcub::Equality>
     HIPCUB_DETAIL_DEPRECATED_DEBUG_SYNCHRONOUS HIPCUB_RUNTIME_FUNCTION
     static hipError_t InclusiveScanByKey(void*                 d_temp_storage,
                                          size_t&               temp_storage_bytes,
@@ -723,7 +691,7 @@ public:
                                          ValuesInputIteratorT  d_values_in,
                                          ValuesOutputIteratorT d_values_out,
                                          ScanOpT               scan_op,
-                                         NumItemsT             num_items,
+                                         int                   num_items,
                                          EqualityOpT           equality_op,
                                          hipStream_t           stream,
                                          bool                  debug_synchronous)

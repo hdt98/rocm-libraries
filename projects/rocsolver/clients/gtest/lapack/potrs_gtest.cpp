@@ -134,7 +134,7 @@ class POTRS_BASE : public ::TestWithParam<potrs_tuple<I>>
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <bool BATCHED, bool STRIDED, typename T>

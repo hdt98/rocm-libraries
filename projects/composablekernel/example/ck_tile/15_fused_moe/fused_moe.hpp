@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -16,7 +16,6 @@ struct fused_moe_args
     const void* d_scale_ptr;           // [e, 1, k], down scale
     const void* y_smooth_scale_ptr;    // [e, 1, n], smooth-quant-scale for 2nd gemm input
     const void* local_expert_mask_ptr; // [e], local_expert_mask_ptr for EP
-    const void* local_tokens;          // [1] if not nullptr, tokens read from here
     void* o_ptr;                       // [m, k], output token (no need to do zeroing)
     void* ws_ptr;                      // size is moe_sorting_get_workspace_size()
                                        // if return zero, then could be nullptr
@@ -57,6 +56,4 @@ struct fused_moe_traits
     bool local_expert_masking; // if mask experts as local expert
 };
 
-// if return zero, no ws needed
-int fused_moe_get_workspace_size(int tokens, int num_experts, int topk);
 float fused_moe(fused_moe_traits, fused_moe_args, const ck_tile::stream_config&);

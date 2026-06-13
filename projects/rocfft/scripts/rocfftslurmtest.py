@@ -1,25 +1,5 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-
 import os
 import pathlib
 import datetime
@@ -60,9 +40,6 @@ def main():
         epilog="For a detailed usage overview, run: %(prog)s overview",
         parents=[conf_parser])
 
-    # NB: confgparser requires a value for boolean arguments, so action='store_true' isn't really an
-    # option for boolean argparse arguments which are also handled by configparser.
-
     parser.add_argument('--verbose', type=int, default=0)
     parser.add_argument('--logdir',
                         type=str,
@@ -72,21 +49,14 @@ def main():
                         type=str,
                         default=None,
                         help='build directory')
-    parser.add_argument('--srcdir',
-                        type=str,
-                        default=None,
-                        help='source directory')
     parser.add_argument('--build',
-                        type=lambda x: bool(x.lower() in
-                                            ("yes", "true", "t", "1")),
+                        type=lambda x: bool(x in ("yes", "true", "t", "1")),
                         default=False)
     parser.add_argument('--ccache',
-                        type=lambda x: bool(x.lower() in
-                                            ("yes", "true", "t", "1")),
+                        type=lambda x: bool(x in ("yes", "true", "t", "1")),
                         default=False)
     parser.add_argument('--buildcraympi',
-                        type=lambda x: bool(x.lower() in
-                                            ("yes", "true", "t", "1")),
+                        type=lambda x: bool(x in ("yes", "true", "t", "1")),
                         default=False)
     parser.add_argument('--launcher',
                         type=str,
@@ -118,11 +88,6 @@ def main():
                         type=int,
                         default=1,
                         help='Maximum number of nodes to use')
-    parser.add_argument('--reportwait',
-                        type=lambda x: bool(x.lower() in
-                                            ("yes", "true", "t", "1")),
-                        default=False,
-                        help='Do not exit until the report job has completed')
 
     if args.config_file:
         for k, v in config.items("Defaults"):
@@ -167,35 +132,13 @@ def main():
     print("modules:", args.modules)
     print("exports", args.exports)
     print("build library?", args.build)
-    print("buildcraympi library?", args.buildcraympi)
 
     # Main job script:
 
     buildjob = None
     if args.build:
-        if args.srcdir == None:
-            print("You must specify source dir if you are going to build")
-            sys.exit(1)
-        if not os.path.exists(args.srcdir):
-            print("Source dir " + args.srcdir + " does not exist")
-            sys.exit(1)
-
-        buildcmd = ""
-
-        # # If we need a new cmake, get it.
-        # buildcmd += "TEMP_DIR=$(mktemp -d) && cd ${TEMP_DIR}\n"
-        # buildcmd += "wget -q https://github.com/Kitware/CMake/releases/download/v3.31.7/cmake-3.31.7.tar.gz -O cmake-3.31.7.tar.gz\n"
-        # buildcmd += "tar -xf cmake-3.31.7.tar.gz && cd cmake-3.31.7\n"
-        # buildcmd += "mkdir build && cd build\n"
-        # buildcmd += "cmake -DCMAKE_INSTALL_PREFIX=${TEMP_DIR}/cmake .. &&  make -j && make install\n"
-        # buildcmd += "export PATH=${TEMP_DIR}/cmake/bin:$PATH\n"
-
-        buildcmd += "which cmake\n"
-        buildcmd += "cmake --version\n"
-
         # Run a compile job first.
-        buildcmd += "cd " + args.builddir + "\n"
-        buildcmd += "cmake"
+        buildcmd = "cmake"
         buildcmd += " -DCMAKE_CXX_COMPILER=amdclang++"
         buildcmd += " -DCMAKE_C_COMPILER=amdclang"
         if args.ccache:
@@ -206,8 +149,8 @@ def main():
         buildcmd += " -DROCFFT_MPI_ENABLE=on "
         if args.buildcraympi:
             buildcmd += " -DROCFFT_CRAY_MPI_ENABLE=on"
-        buildcmd += " " + args.srcdir
-        buildcmd += " && make -j"
+        buildcmd += " .."
+        buildcmd += " && make"
 
         # Set up the basic slurm parameters:
         buildparams = rocslurm.sbatchparams()
@@ -219,13 +162,14 @@ def main():
         buildparams.modules = args.modules
         buildparams.exports = args.exports
         buildparams.ntaskspernode = 1
-        buildparams.gpuspernode = None
+        buildparams.gpuspernode = 1
         buildparams.timelimit = datetime.timedelta(hours=2)
+        buildparams.ntaskspernode = 1
 
         buildjob = rocslurm.sbatch("build",
                                    buildparams,
                                    args.logdir,
-                                   args.srcdir,
+                                   args.builddir,
                                    buildcmd,
                                    verbose=args.verbose)
 
@@ -240,10 +184,10 @@ def main():
         jobparams.acct = args.acct
     jobparams.modules = args.modules
     jobparams.exports = args.exports
-    #jobparams.gpuspernode = args.gpuspernode
+    jobparams.ntaskspernode = 1
+    jobparams.gpuspernode = args.gpuspernode
     jobparams.timelimit = datetime.timedelta(hours=2)
-    #jobparams.ntaskspernode = jobparams.gpuspernode
-    jobparams.ntasks = jobparams.gpuspernode
+    jobparams.ntaskspernode = jobparams.gpuspernode
     if buildjob != None:
         jobparams.afterok = [buildjob.jobid]
 
@@ -262,10 +206,11 @@ def main():
         mpigpucmd += " --launcher srun"
         if args.gpuidvar != None:
             mpigpucmd += " --gpuidvar " + args.gpuidvar
-        mpigpucmd += " --nranks " + str(args.gpuspernode * jobparams.nnodes)
+        mpigpucmd += " --nranks " + str(
+            jobparams.ntaskspernode * jobparams.nnodes)
         mpigpucmd += " --gpusperrank " + str(1)  #args.gpuspernode
 
-        #jobparams.ntaskspernode = args.gpuspernode
+        jobparams.ntaskspernode = 8
         mpijob = rocslurm.sbatch("mpi" + str(nodes),
                                  jobparams,
                                  args.logdir,
@@ -277,8 +222,6 @@ def main():
     # Report on job status
     jobparams.ntaskspernode = 1
     jobparams.nnodes = 1
-    if args.reportwait == True:
-        jobparams.wait = True
     rocslurm.reportonjobs(jobparams, args.logdir, jobs, verbose=args.verbose)
 
 

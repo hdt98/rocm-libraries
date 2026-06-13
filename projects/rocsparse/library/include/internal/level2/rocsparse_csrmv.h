@@ -34,14 +34,14 @@ extern "C" {
 
 /*! \ingroup level2_module
 *  \details
-*  \p rocsparse_csrmv_analysis performs the analysis step for \ref rocsparse_scsrmv "rocsparse_Xcsrmv()".
+*  \p rocsparse_csrmv_analysis performs the analysis step for \ref rocsparse_scsrmv "rocsparse_Xcsrmv()". 
 *  It is expected that this function will be executed only once for a given sparsity pattern and particular operation
-*  type. The gathered analysis metadata is stored in the \ref rocsparse_mat_info object and can be cleared by
+*  type. The gathered analysis meta data is stored in the \ref rocsparse_mat_info object and can be cleared by 
 *  \ref rocsparse_csrmv_clear().
 *
-*  If the matrix sparsity pattern changes, the gathered information will become invalid. To perform another
-*  sparse matrix multiplication with a matrix having a different sparsity pattern, either destroy
-*  the old \p info object and create a new one or clear the existing info object using
+*  If the matrix sparsity pattern changes, the gathered information will become invalid. In order to perform another 
+*  sparse matrix multiplication with a matrix having a different sparsity pattern, the user would need to either destroy
+*  the old \p info object and create a new one or the user would need to clear the existing info object using
 *  \ref rocsparse_csrmv_clear(). In both cases, the analysis will need to be called again.
 *
 *  \note
@@ -51,7 +51,7 @@ extern "C" {
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  trans       matrix operation type.
 *  @param[in]
@@ -75,9 +75,9 @@ extern "C" {
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, or \p nnz is invalid.
+*  \retval     rocsparse_status_invalid_size \p m, \p n or \p nnz is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p descr, \p csr_val, \p csr_row_ptr,
-*              \p csr_col_ind, or \p info pointer is invalid.
+*              \p csr_col_ind or \p info pointer is invalid.
 *  \retval     rocsparse_status_memory_error the buffer for the gathered information
 *              could not be allocated.
 *  \retval     rocsparse_status_internal_error an internal error occurred.
@@ -138,9 +138,9 @@ rocsparse_status rocsparse_zcsrmv_analysis(rocsparse_handle                handl
 /*! \ingroup level2_module
 *  \details
 *  \p rocsparse_csrmv_clear deallocates all memory that was allocated by
-*  \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()". This is especially useful
-*  if memory is an issue and the analysis data is not required for further
-*  computation, for example, when switching to another sparse matrix format.
+*  \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()". This is especially useful, 
+*  if memory is an issue and the analysis data is not required anymore for further 
+*  computation, e.g. when switching to another sparse matrix format.
 *
 *  \note
 *  Calling \p rocsparse_csrmv_clear is optional. All allocated resources will be
@@ -151,9 +151,9 @@ rocsparse_status rocsparse_zcsrmv_analysis(rocsparse_handle                handl
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[inout]
-*  info        structure that holds the information collected during the analysis step.
+*  info        structure that holds the information collected during analysis step.
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
@@ -166,7 +166,7 @@ ROCSPARSE_EXPORT
 rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_info info);
 
 /*! \ingroup level2_module
-*  \brief Sparse matrix vector multiplication using the CSR storage format.
+*  \brief Sparse matrix vector multiplication using CSR storage format
 *
 *  \details
 *  \p rocsparse_csrmv multiplies the scalar \f$\alpha\f$ with a sparse \f$m \times n\f$
@@ -188,13 +188,13 @@ rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_in
 *  \f]
 *
 *  The \p info parameter is optional and contains information collected by
-*  \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()". If present, the
-*  information will be used to speed up the \p csrmv computation. If
-*  \p info == \p NULL, a general \p csrmv routine will be used instead. Running with
-*  analysis might result in better performance when computing the matrix vector product
+*  \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()". If present, the 
+*  information will be used to speed up the \p csrmv computation. If 
+*  \p info == \p NULL, a general \p csrmv routine will be used instead. Running with 
+*  analysis may result in better performance when computing the matrix vector product 
 *  but will also incur a performance cost attributed to the additional analysis step.
-*  For this reason, running with analysis makes sense when computing
-*  the matrix vector product many times, therefore amortizing the analysis cost.
+*  For this reason, running with analysis makes sense when a user plans on computing 
+*  the matrix vector product many times and therefore can amortize the analysis cost.
 *
 *  \code{.c}
 *      for(i = 0; i < m; ++i)
@@ -208,31 +208,31 @@ rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_in
 *      }
 *  \endcode
 *
-*  To run the above operation without analysis, call the \p rocsparse_csrmv routine while passing
+*  To run without analysis, performing the above operation involves simply calling the \p rocsparse_csrmv routine while passing 
 *  \p NULL for the \p info parameter.
 *
-*  With analysis, completing the sparse matrix vector multiplication involves two steps. First,
-*  create a \ref rocsparse_mat_info object by calling \ref rocsparse_create_mat_info and then pass this to
-*  \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()", which will perform analysis on the sparsity pattern of the
-*  matrix \f$op(A)\f$. Then complete the operation by calling \p rocsparse_csrmv. The creation of the \p info object
-*  and the call to the analysis routine only need to be performed once for a given sparsity pattern, while the computation
-*  can be performed repeatedly as long as the sparsity pattern has not changed. After all calls to \p rocsparse_csrmv have
+*  To run with analysis, completing the sparse matrix vector multiplication involves two steps. First, 
+*  the user creates a \ref rocsparse_mat_info object by calling \ref rocsparse_create_mat_info and then passes this to 
+*  \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()" which will perform analysis on the sparsity pattern of the 
+*  matrix \f$op(A)\f$. The user then completes the operation by calling \p rocsparse_csrmv. The creation of the \p info object 
+*  and the call to the analysis routine only need to be performed once for a given sparsity pattern while the computation 
+*  can be performed repeatedly as long as the sparsity pattern has not changed. Once all calls to \p rocsparse_csrmv have 
 *  been made, the \p info object can be destroyed with a call to \ref rocsparse_destroy_mat_info.
 *
-*  When running with analysis, a user might want to perform multiple sparse matrix
-*  multiplications, with each sparse matrix having a different sparsity pattern. Instead of creating and destroying multiple
-*  \ref rocsparse_mat_info objects for each unique sparsity pattern, they can instead create the \p info object once and
-*  then call \ref rocsparse_csrmv_clear and rerun the analysis in between each sparse matrix multiplication.
+*  When running with analysis, a user may find themselves in the situation where they wish to perform multiple sparse matrix 
+*  multiplications with each sparse matrix having a different sparsity pattern. Instead of creating and destroying multiple 
+*  \ref rocsparse_mat_info objects for each unique sparsity pattern, the user can instead create the \p info object once and 
+*  then call \ref rocsparse_csrmv_clear followed by re-running the analysis in between each sparse matrix multiplication.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  trans       matrix operation type.
 *  @param[in]
@@ -255,8 +255,8 @@ rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_in
 *  csr_col_ind array of \p nnz elements containing the column indices of the sparse
 *              CSR matrix.
 *  @param[in]
-*  info        information collected by \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()",
-*              which can be \p NULL if no information is available.
+*  info        information collected by \ref rocsparse_scsrmv_analysis "rocsparse_Xcsrmv_analysis()", 
+*              can be \p NULL if no information is available.
 *  @param[in]
 *  x           array of \p n elements (\f$op(A) == A\f$) or \p m elements
 *              (\f$op(A) == A^T\f$ or \f$op(A) == A^H\f$).
@@ -268,9 +268,9 @@ rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_in
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, or \p nnz is invalid.
+*  \retval     rocsparse_status_invalid_size \p m, \p n or \p nnz is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p descr, \p alpha, \p csr_val,
-*              \p csr_row_ptr, \p csr_col_ind, \p x, \p beta, or \p y pointer is
+*              \p csr_row_ptr, \p csr_col_ind, \p x, \p beta or \p y pointer is
 *              invalid.
 *  \retval     rocsparse_status_arch_mismatch the device is not supported.
 *  \retval     rocsparse_status_not_implemented
@@ -279,7 +279,45 @@ rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_in
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in CSR format
 *  using additional meta data to improve performance.
-*  \snippet example_rocsparse_csrmv.cpp doc example
+*  \code{.c}
+*      // Create matrix info structure
+*      rocsparse_mat_info info;
+*      rocsparse_create_mat_info(&info);
+*
+*      // Perform analysis step to obtain meta data
+*      rocsparse_scsrmv_analysis(handle,
+*                                rocsparse_operation_none,
+*                                m,
+*                                n,
+*                                nnz,
+*                                descr,
+*                                csr_val,
+*                                csr_row_ptr,
+*                                csr_col_ind,
+*                                info);
+*
+*      // Compute y = Ax
+*      rocsparse_scsrmv(handle,
+*                       rocsparse_operation_none,
+*                       m,
+*                       n,
+*                       nnz,
+*                       &alpha,
+*                       descr,
+*                       csr_val,
+*                       csr_row_ptr,
+*                       csr_col_ind,
+*                       info,
+*                       x,
+*                       &beta,
+*                       y);
+*
+*      // Do more work
+*      // ...
+*
+*      // Clean up
+*      rocsparse_destroy_mat_info(info);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

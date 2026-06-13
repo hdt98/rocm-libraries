@@ -1,9 +1,7 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
-
-using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
 bool run_batched_gemm_gemm_example(int argc, char* argv[])
 {
@@ -112,13 +110,11 @@ bool run_batched_gemm_gemm_example(int argc, char* argv[])
 
         if(std::is_same<decltype(layout), Row>::value)
         {
-            return HostTensorDescriptor(
-                {batch_count, row, col}, {batch_stride, stride, 1_uz}, Bypass{});
+            return HostTensorDescriptor({batch_count, row, col}, {batch_stride, stride, 1_uz});
         }
         else
         {
-            return HostTensorDescriptor(
-                {batch_count, row, col}, {batch_stride, 1_uz, stride}, Bypass{});
+            return HostTensorDescriptor({batch_count, row, col}, {batch_stride, 1_uz, stride});
         }
     };
 
@@ -274,18 +270,7 @@ bool run_batched_gemm_gemm_example(int argc, char* argv[])
         c_g_m_o_device_buf.FromDevice(c_g_m_o_device_result.mData.data());
 #endif
 
-        if constexpr(ck::is_same_v<CDataType, ck::half_t>)
-        {
-            return ck::utils::check_err(c_g_m_o_device_result,
-                                        c_g_m_o_host_result,
-                                        "Error: Incorrect results!",
-                                        1e-3,
-                                        1.1e-3);
-        }
-        else
-        {
-            return ck::utils::check_err(c_g_m_o_device_result, c_g_m_o_host_result);
-        }
+        return ck::utils::check_err(c_g_m_o_device_result, c_g_m_o_host_result);
     }
 
     return true;

@@ -30,7 +30,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Union, NamedTuple
 
-from Tensile.Common import ensurePath, print2
+from Tensile.Common import print2
 from Tensile.Common.Architectures import isaToGfx
 from ..SolutionStructs import Solution
 
@@ -42,30 +42,53 @@ class AssemblyToolchain(NamedTuple):
    bundler: Bundler
 
 
-def makeAssemblyToolchain(assembler_path, bundler_path, co_version, build_id_kind="sha1", debug=False):
-   compiler = Assembler(assembler_path, co_version, debug)
+def makeAssemblyToolchain(assembler_path, bundler_path, co_version, build_id_kind="sha1"):
+   compiler = Assembler(assembler_path, co_version)
    linker = Linker(assembler_path, build_id_kind)
    bundler = Bundler(bundler_path)
    return AssemblyToolchain(compiler, linker, bundler)
 
 
+def _batchObjectFiles(ldPath: str, objFiles: List[str], coPathDest: Union[Path, str], maxObjFiles: int=10000) -> List[str]:
+    numObjFiles = len(objFiles)
+
+    if numObjFiles <= maxObjFiles:
+      return objFiles
+
+    batchedObjFiles = [objFiles[i:i+maxObjFiles] for i in range(0, numObjFiles, maxObjFiles)]
+    numBatches = int(math.ceil(numObjFiles / maxObjFiles))
+
+    newObjFiles = [str(coPathDest) + "." + str(i) for i in range(0, numBatches)]
+    newObjFilesOutput = []
+
+    for batch, filename in zip(batchedObjFiles, newObjFiles):
+      if len(batch) > 1:
+        args = [ldPath, "-r"] + batch + [ "-o", filename]
+        print2(f"Linking object files into fewer object files: {' '.join(args)}")
+        subprocess.check_call(args)
+        newObjFilesOutput.append(filename)
+      else:
+        newObjFilesOutput.append(batchedObjFiles[0])
+
+    return newObjFilesOutput
+
+
 def buildAssemblyCodeObjectFiles(
       linker: Linker,
       bundler: Bundler,
+      ldPath: str,
       kernels: List[Solution],
-      destRoot: Union[Path, str],
+      destDir: Union[Path, str],
       asmDir: Union[Path, str],
       compress: bool=True,
     ):
-    """Builds code object files from assembly files.
+    """Builds code object files from assembly files
 
     Args:
         toolchain: The assembly toolchain object to use for building.
         kernels: A list of the kernel objects to build.
         writer: The KernelWriterAssembly object to use.
-        destRoot: The library/ root directory. Per-arch outputs are written to
-            destRoot/<gfx>/; isaToGfx() yields a bare gfx name already (no target
-            features), so the routing here is the bare gfx.
+        destDir: The destination directory for the code object files.
         asmDir: The directory containing the assembly files.
         compress: Whether to compress the code object files.
     """
@@ -74,7 +97,6 @@ def buildAssemblyCodeObjectFiles(
     extCo = ".co"
     extCoRaw = ".co.raw"
 
-    destRoot = Path(destRoot)
     archKernelMap = collections.defaultdict(list)
     for k in kernels:
       archKernelMap[tuple(k['ISA'])].append(k)
@@ -85,18 +107,18 @@ def buildAssemblyCodeObjectFiles(
         continue
 
       gfx = isaToGfx(arch)
-      destDir = Path(ensurePath(destRoot / gfx))
 
       objectFiles = [str(asmDir / (k["BaseName"] + extObj)) for k in archKernels if 'codeObjectFile' not in k]
-      coFileMap = collections.defaultdict(set)
+      coFileMap = collections.defaultdict(list)
       if len(objectFiles):
         coFileMap[asmDir / ("TensileLibrary_"+ gfx + extCoRaw)] = objectFiles
       for kernel in archKernels:
         coName = kernel.get("codeObjectFile", None)
         if coName:
-          coFileMap[asmDir / (coName + extCoRaw)].add(str(asmDir / (kernel["BaseName"] + extObj)))
+          coFileMap[asmDir / (coName + extCoRaw)].append(str(asmDir / (kernel["BaseName"] + extObj)))
 
       for coFileRaw, objFiles in coFileMap.items():
+        objFiles = _batchObjectFiles(ldPath, objFiles, coFileRaw)
         linker(objFiles, str(coFileRaw))
         coFile = destDir / coFileRaw.name.replace(extCoRaw, extCo)
         if compress:

@@ -28,7 +28,6 @@
 #include <gtest/gtest.h>
 #include "../conv3d.hpp"
 #include "get_handle.hpp"
-#include "gtest_common.hpp"
 
 namespace conv3d_test {
 
@@ -43,7 +42,6 @@ void GetArgs(const std::string& param, std::vector<std::string>& tokens)
 
 class GPU_Conv3d_Test_FP32 : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 void Run3dDriver(miopenDataType_t prec)
@@ -52,7 +50,6 @@ void Run3dDriver(miopenDataType_t prec)
     switch(prec)
     {
     case miopenFloat: params = GPU_Conv3d_Test_FP32::GetParam(); break;
-
     case miopenInt8:
     case miopenHalf:
     case miopenBFloat16:
@@ -64,8 +61,7 @@ void Run3dDriver(miopenDataType_t prec)
                   "type not supported by "
                   "test_conv3d_extra test";
 
-    case miopenFloat8_fnuz:
-    case miopenBFloat8_fnuz: params = GPU_Conv3d_Test_FP32::GetParam();
+    default: params = GPU_Conv3d_Test_FP32::GetParam();
     }
 
     for(const auto& test_value : params)
@@ -94,7 +90,7 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     const std::string psd4 = " --pads_strides_dilations 1 1 1 1 1 1 1 1 1";
     const std::string psd5 = " --pads_strides_dilations 0 0 0 1 1 1 1 1 1";
 
-    return {
+    const std::vector<std::string> test_cases = {
         // clang-format off
     // test_conv3d_extra
     {precision + " --input 2 16 50 50 50 --weights 32 16 5 5 5" + psd0},
@@ -112,6 +108,7 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     {precision + " --input 1 16 4 140 602 --weights 16 16 3 11 11" + psd5 }
         // clang-format on
     };
+    return test_cases;
 }
 
 } // namespace conv3d_test

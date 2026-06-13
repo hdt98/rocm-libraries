@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -33,8 +33,6 @@ namespace rocsparse
     template <uint32_t HASHVAL, uint32_t HASHSIZE, typename I>
     ROCSPARSE_DEVICE_ILF bool insert_key(I key, I* __restrict__ table)
     {
-        static_assert(HASHSIZE > 0 && (HASHSIZE & (HASHSIZE - 1)) == 0,
-                      "HASHSIZE must be a power of two.");
         constexpr I empty = -1;
 
         // Compute hash
@@ -76,8 +74,6 @@ namespace rocsparse
     ROCSPARSE_DEVICE_ILF bool
         insert_key(J key, I* __restrict__ table, I* __restrict__ local_idxs, I local_idx)
     {
-        static_assert(HASHSIZE > 0 && (HASHSIZE & (HASHSIZE - 1)) == 0,
-                      "HASHSIZE must be a power of two.");
         constexpr I empty = -1;
 
         // Compute hash
@@ -112,8 +108,6 @@ namespace rocsparse
     ROCSPARSE_DEVICE_ILF void
         insert_pair(I key, T val, I* __restrict__ table, T* __restrict__ data, I empty)
     {
-        static_assert(HASHSIZE > 0 && (HASHSIZE & (HASHSIZE - 1)) == 0,
-                      "HASHSIZE must be a power of two.");
         // Compute hash
         I hash = (key * HASHVAL) & (HASHSIZE - 1);
 
@@ -126,7 +120,7 @@ namespace rocsparse
             if(temp == key)
             {
                 // Element already present, add value to exsiting entry
-                rocsparse::atomic_add(data, hash, HASHSIZE, val);
+                rocsparse::atomic_add(&data[hash], val);
                 break;
             }
             else if(temp == empty)
@@ -135,7 +129,7 @@ namespace rocsparse
                 if(rocsparse::atomic_cas(&table[hash], empty, key) == empty)
                 {
                     // Add value
-                    rocsparse::atomic_add(data, hash, HASHSIZE, val);
+                    rocsparse::atomic_add(&data[hash], val);
                     break;
                 }
             }
@@ -180,11 +174,7 @@ namespace rocsparse
                                                bool                 mul,
                                                bool                 add)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
-        static_assert(HASHSIZE > 0 && (HASHSIZE & (HASHSIZE - 1)) == 0,
-                      "HASHSIZE must be a power of two.");
+
         // Lane id
         int lid = hipThreadIdx_x & (WFSIZE - 1);
         // Wavefront id
@@ -343,11 +333,6 @@ namespace rocsparse
                                                   bool                 mul,
                                                   bool                 add)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
-        static_assert(HASHSIZE > 0 && (HASHSIZE & (HASHSIZE - 1)) == 0,
-                      "HASHSIZE must be a power of two.");
         // Lane id
         int lid = hipThreadIdx_x & (WFSIZE - 1);
         // Wavefront id
@@ -561,9 +546,6 @@ namespace rocsparse
                                                             bool                 mul,
                                                             bool                 add)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
         // Lane id
         int lid = hipThreadIdx_x & (WFSIZE - 1);
         // Wavefront id
@@ -647,8 +629,7 @@ namespace rocsparse
                             table[col_B - chunk_begin] = 1;
 
                             // Atomically accumulate the intermediate products
-                            rocsparse::atomic_add(
-                                data, col_B - chunk_begin, CHUNKSIZE, val_A * csr_val_B[k]);
+                            rocsparse::atomic_add(&data[col_B - chunk_begin], val_A * csr_val_B[k]);
                         }
                         else if(col_B >= chunk_end)
                         {
@@ -692,8 +673,7 @@ namespace rocsparse
                         table[col_D - chunk_begin] = 1;
 
                         // Atomically accumulate the entry of D
-                        rocsparse::atomic_add(
-                            data, col_D - chunk_begin, CHUNKSIZE, beta * csr_val_D[j]);
+                        rocsparse::atomic_add(&data[col_D - chunk_begin], beta * csr_val_D[j]);
                     }
                     else if(col_D >= chunk_end)
                     {

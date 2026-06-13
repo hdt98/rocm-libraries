@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,6 @@ inline void testname_trmm(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_trmm_bad_arg(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasTrmmFn
         = arg.api == hipblas_client_api::FORTRAN ? hipblasTrmm<T, true> : hipblasTrmm<T, false>;
     auto hipblasTrmmFn_64 = arg.api == hipblas_client_api::FORTRAN_64 ? hipblasTrmm_64<T, true>
@@ -63,10 +62,10 @@ void testing_trmm_bad_arg(const Arguments& arg)
 
         device_vector<T> alpha_d(1), zero_d(1);
 
-        const Ts alpha_h{1}, zero_h{0};
+        const T alpha_h(1), zero_h(0);
 
-        const Ts* alpha = &alpha_h;
-        const Ts* zero  = &zero_h;
+        const T* alpha = &alpha_h;
+        const T* zero  = &zero_h;
 
         hipblasLocalHandle handle(arg);
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, pointer_mode));
@@ -332,7 +331,6 @@ void testing_trmm_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_trmm(const Arguments& arg)
 {
-    using Ts = hipblas_internal_type<T>;
     auto hipblasTrmmFn
         = arg.api == hipblas_client_api::FORTRAN ? hipblasTrmm<T, true> : hipblasTrmm<T, false>;
     auto hipblasTrmmFn_64 = arg.api == hipblas_client_api::FORTRAN_64 ? hipblasTrmm_64<T, true>
@@ -402,7 +400,7 @@ void testing_trmm(const Arguments& arg)
 
     device_matrix<T>* dOut = inplace ? &dB : &dC;
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_matrix(hA, arg, hipblas_client_alpha_sets_nan, hipblas_triangular_matrix, true);
@@ -429,21 +427,9 @@ void testing_trmm(const Arguments& arg)
         =================================================================== */
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
 
-        DAPI_CHECK(hipblasTrmmFn,
-                   (handle,
-                    side,
-                    uplo,
-                    transA,
-                    diag,
-                    M,
-                    N,
-                    reinterpret_cast<Ts*>(&h_alpha),
-                    dA,
-                    lda,
-                    dB,
-                    ldb,
-                    *dOut,
-                    ldOut));
+        DAPI_CHECK(
+            hipblasTrmmFn,
+            (handle, side, uplo, transA, diag, M, N, &h_alpha, dA, lda, dB, ldb, *dOut, ldOut));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(hOut_host.transfer_from(*dOut));

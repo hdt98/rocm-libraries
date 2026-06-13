@@ -23,35 +23,18 @@
 cmake_minimum_required( VERSION 3.5 )
 
 function( get_lapack lapack_lib lapack_inc )
-  if(EXISTS  "${BUILD_DIR}/deps/deps-install/lib/liblapack64.a")
-    set( lib "${BUILD_DIR}/deps/deps-install/lib/liblapack64.a" )
+  if(EXISTS  "${BUILD_DIR}/deps/deps-install/lib/liblapack.a")
+    set( lib "${BUILD_DIR}/deps/deps-install/lib/liblapack.a" )
     set( inc "${BUILD_DIR}/deps/deps-install/include" )
-    set( ${lapack_inc} ${inc} PARENT_SCOPE )
-    enable_language( Fortran )
+    set( ${cblas_inc} ${inc} PARENT_SCOPE )
   else()
-    set(BLA_SIZEOF_INTEGER 8)
-    find_package( LAPACK REQUIRED )
-    set( lib "${LAPACK_LIBRARIES}" )
-    # TheRock (and similar) provide LAPACK via OpenBLAS64::OpenBLAS; no Fortran toolchain needed to link.
-    # LAPACK_LIBRARIES may be a list (target + system libs); only enable Fortran when no entry is a CMake target.
-    set( _lapack_has_cmake_target FALSE )
-    foreach( _lapack_lib IN LISTS LAPACK_LIBRARIES )
-      if(TARGET "${_lapack_lib}")
-        set( _lapack_has_cmake_target TRUE )
-        break()
-      endif()
-    endforeach()
-    if(NOT _lapack_has_cmake_target)
-      enable_language( Fortran )
-    endif()
+    find_package( lapack REQUIRED CONFIG )
+    set( lib "lapack" )
   endif()
   set( ${lapack_lib} ${lib} PARENT_SCOPE )
 endfunction( )
 
-function( get_cblas cblas_libs cblas_inc cblas_defs )
-  # When LINK_BLIS is ON but no local BLIS is found, fall through to ILP64 OpenBLAS (e.g. TheRock therock-host-blas64).
-  set( libs "" )
-  set( defs "" )
+function( get_cblas cblas_libs cblas_inc )
   if(LINK_BLIS)
     if(EXISTS    "${BUILD_DIR}/deps/blis/lib/libblis.a")
         set( libs ${BUILD_DIR}/deps/blis/lib/libblis.a )
@@ -62,78 +45,18 @@ function( get_cblas cblas_libs cblas_inc cblas_defs )
         set( inc     /usr/local/include/blis )
         set( ${cblas_inc} ${inc} PARENT_SCOPE )
     endif()
-  endif()
-
-  if(NOT libs)
-    if(EXISTS "${BUILD_DIR}/deps/deps-install/lib/libcblas64.a" AND EXISTS "${BUILD_DIR}/deps/deps-install/lib/libblas64.a")
-      set( libs ${BUILD_DIR}/deps/deps-install/lib/libcblas64.a ${BUILD_DIR}/deps/deps-install/lib/libblas64.a )
+  else()
+    if(EXISTS "${BUILD_DIR}/deps/deps-install/lib/libcblas.a" AND EXISTS "${BUILD_DIR}/deps/deps-install/lib/libblas.a")
+      set( libs ${BUILD_DIR}/deps/deps-install/lib/libcblas.a ${BUILD_DIR}/deps/deps-install/lib/libblas.a )
       set( inc "${BUILD_DIR}/deps/deps-install/include" )
       set( ${cblas_inc} ${inc} PARENT_SCOPE )
     else()
-      # ILP64 BLAS/LAPACK: TheRock FindBLAS maps this to OpenBLAS64::OpenBLAS when therock-host-blas64 is available.
-      set(BLA_SIZEOF_INTEGER 8)
-      find_package( BLAS REQUIRED )
-      set( libs ${BLAS_LIBRARIES} )
-
-      # Path-based cblas64 next to BLAS_LIBRARIES only applies to plain library paths. Imported targets that
-      # are *not* unified OpenBLAS would need a different discovery path; this ILP64 client path is built
-      # around OpenBLAS / TheRock OpenBLAS64. For OpenBLAS:: / OpenBLAS64:: targets, skip split CBLAS lookup.
-      # BLAS_LIBRARIES may be a list; inspect each entry (targets vs file paths).
-      set( _need_split_cblas TRUE )
-      set( _blas_path_for_dir "" )
-      foreach( _blas_lib IN LISTS BLAS_LIBRARIES )
-        if(TARGET "${_blas_lib}")
-          if("${_blas_lib}" MATCHES "OpenBLAS")
-            set( _need_split_cblas FALSE )
-          endif()
-        elseif(NOT _blas_path_for_dir)
-          set( _blas_path_for_dir "${_blas_lib}" )
-        endif()
-      endforeach()
-      if( _need_split_cblas AND _blas_path_for_dir )
-        get_filename_component(BLAS_DIR "${_blas_path_for_dir}" DIRECTORY)
-        set(ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-        if(BLA_STATIC)
-          if(WIN32)
-            list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES .lib .a)
-          else()
-            set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
-          endif()
-        endif()
-        find_library(CBLAS_LIBRARIES NAMES cblas64 PATHS ${BLAS_DIR})
-        set(CMAKE_FIND_LIBRARY_SUFFIXES ${ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-
-        if(CBLAS_LIBRARIES)
-          list( PREPEND libs ${CBLAS_LIBRARIES} )
-        endif()
-      endif()
+      find_package( cblas REQUIRED CONFIG )
+      set( libs cblas blas )
     endif()
-
-    # defines to set cblas.h to 64-bit indices (OpenBLAS ILP64)
-    set( defs "WeirdNEC" "LAPACK_ILP64" "USE64BITINT" "OPENBLAS_USE64BITINT")
   endif()
   set( ${cblas_libs} ${libs} PARENT_SCOPE )
-  set( ${cblas_defs} ${defs} PARENT_SCOPE )
 endfunction( )
-
-function( apply_omp_settings lib_target_ )
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TARGET OpenMP::OpenMP_CXX)
-    set_target_properties( ${lib_target_} PROPERTIES
-      BUILD_RPATH "${HIP_CLANG_ROOT}/lib"
-    )
-    set_target_properties( ${lib_target_} PROPERTIES
-      INSTALL_RPATH "$ORIGIN/../llvm/lib"
-    )
-  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TARGET OpenMP::omp)
-    set_target_properties( ${lib_target_} PROPERTIES
-      BUILD_RPATH "${HIP_CLANG_ROOT}/${openmp_LIB_DIR}"
-    )
-    set_target_properties( ${lib_target_} PROPERTIES
-      INSTALL_RPATH "$ORIGIN/../llvm/${openmp_LIB_DIR}"
-    )
-  endif()
-endfunction()
-
 
 # Consider removing this in the future
 # This should appear before the project command, because it does not use FORCE
@@ -150,13 +73,7 @@ if( NOT DEFINED CMAKE_CONFIGURATION_TYPES AND NOT DEFINED CMAKE_BUILD_TYPE )
 endif()
 
 # This project may compile dependencies for clients
-if ( BUILD_FORTRAN_CLIENTS )
-  if ( NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC} )
-    set( CMAKE_Fortran_COMPILER  "gfortran" )
-  endif()
-  set( fortran_language "Fortran" )
-endif()
-project( hipblas-clients LANGUAGES CXX ${fortran_language} )
+project( hipblas-clients LANGUAGES CXX Fortran )
 
 # We use C++14 features, this will add compile option: -std=c++14
 set( CMAKE_CXX_STANDARD 17 )
@@ -165,7 +82,7 @@ list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 
 include( build-options )
 
-if( BUILD_FORTRAN_CLIENTS )
+if( NOT WIN32 )
     set(hipblas_f90_source_clients_no_solver
       include/hipblas_fortran_no_solver_module.f90
     )
@@ -173,34 +90,19 @@ if( BUILD_FORTRAN_CLIENTS )
     set(hipblas_f90_source_clients_solver
       include/hipblas_fortran_module.f90
     )
-
-    set (hipblas_f90_source
-      ../library/src/hipblas_module.f90
-    )
 endif()
 
 if( BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_SAMPLES )
-  # Create hipBLAS Fortran module
-  if( BUILD_FORTRAN_CLIENTS )
-      # Set Fortran module output directory
-      set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/include/hipblas)
-      add_library(hipblas_fortran OBJECT ${hipblas_f90_source})
-  endif()
-
-  if( BUILD_FORTRAN_CLIENTS )
+  if( NOT WIN32 )
     if( BUILD_WITH_SOLVER )
-      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_solver} $<TARGET_OBJECTS:hipblas_fortran>)
+      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_solver})
     else()
-      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_no_solver} $<TARGET_OBJECTS:hipblas_fortran>)
+      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_no_solver})
     endif()
+    add_dependencies(hipblas_fortran_client hipblas_fortran)
   endif()
-
-  if(SKIP_LIBRARY)
-    include_directories(${HIPBLAS_LIBRARY_DIR}/include/hipblas)
-  else()
-    include_directories(${CMAKE_BINARY_DIR}/include/hipblas)
-    include_directories(${CMAKE_BINARY_DIR}/include)
-  endif()
+  include_directories(${CMAKE_BINARY_DIR}/include/hipblas)
+  include_directories(${CMAKE_BINARY_DIR}/include)
 endif( )
 
 if( BUILD_CLIENTS_SAMPLES )
@@ -212,20 +114,19 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
 
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Look for openmp config in ROCm install to populate openmp_LIB_DIR and openmp_LIB_INSTALL_DIR
-    find_package(OpenMP CONFIG PATHS "${HIP_CLANG_ROOT}/lib/cmake")
-  endif()
+  # if it fails to find OpenMP compile and link flags in strange configurations it can just use non-parallel reference computation
+  # if there is no omp.h to find the client compilation will fail and this should be obvious, used to be REQUIRED
+  find_package(OpenMP)
 
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TARGET OpenMP::omp)
-    set( COMMON_LINK_LIBS "OpenMP::omp")
-    message(STATUS "Found openmp-config.cmake at ${OpenMP_DIR}")
-  else()
-    # if it fails to find OpenMP compile and link flags in strange configurations it can just use non-parallel reference computation
-    # if there is no omp.h to find the client compilation will fail and this should be obvious, used to be REQUIRED
-    find_package(OpenMP)
-    if (TARGET OpenMP::OpenMP_CXX)
-      set( COMMON_LINK_LIBS "OpenMP::OpenMP_CXX")
+  if (TARGET OpenMP::OpenMP_CXX)
+    set( COMMON_LINK_LIBS "OpenMP::OpenMP_CXX")
+    if(HIP_PLATFORM STREQUAL amd)
+      list( APPEND COMMON_LINK_LIBS "-L\"${HIP_CLANG_ROOT}/lib\"")
+      if (NOT WIN32)
+        list( APPEND COMMON_LINK_LIBS "-Wl,-rpath=${HIP_CLANG_ROOT}/lib -lomp")
+      else()
+        list( APPEND COMMON_LINK_LIBS "libomp")
+      endif()
     endif()
   endif()
 
@@ -233,15 +134,11 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     list( APPEND COMMON_LINK_LIBS "Threads::Threads")
   endif()
 
-  set( COMMON_DEFINES HIPBLAS_USE_HIP_HALF HIPBLAS_BFLOAT16_CLASS ROCM_USE_FLOAT16 HIPBLAS_NO_DEPRECATED_WARNINGS ${HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES} )
-  if (BUILD_FORTRAN_CLIENTS)
-    list( APPEND COMMON_DEFINES "HIPBLAS_FORTRAN_CLIENTS" )
-  endif()
+  set( COMMON_DEFINES HIPBLAS_BFLOAT16_CLASS ROCM_USE_FLOAT16 HIPBLAS_NO_DEPRECATED_WARNINGS ${HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES} )
 
-  # Default search for static host libraries
-  if(NOT DEFINED BLA_STATIC)
-    set(BLA_STATIC ON)
-  endif()
+  message(STATUS "CLIENT COMMON_DEFINES: ${COMMON_DEFINES}")
+  message(STATUS "CLIENT COMMON CXX_OPTIONS: ${COMMON_CXX_OPTIONS}")
+  message(STATUS "CLIENT COMMON LINK: ${COMMON_LINK_LIBS}")
 
   if( NOT WIN32 )
     if (LINK_BLIS)
@@ -264,58 +161,35 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
       else()
         # fallbacks include earlier blis
         get_lapack( LAPACK_LIB LAPACK_INCLUDE_DIR )
-        get_cblas( BLAS_LIBRARY BLAS_INCLUDE_DIR BLAS_DEFINES )
-        if(NOT "${LAPACK_LIB}" STREQUAL "${BLAS_LIBRARY}")
-          list( PREPEND BLAS_LIBRARY ${LAPACK_LIB} )
-        endif()
-        list( APPEND COMMON_DEFINES ${BLAS_DEFINES} )
+        get_cblas( BLAS_LIBRARY BLAS_INCLUDE_DIR )
+        list( PREPEND BLAS_LIBRARY ${LAPACK_LIB} )
       endif()
     else()
       # Linking lapack library requires fortran flags
       get_lapack( LAPACK_LIB LAPACK_INCLUDE_DIR )
-      get_cblas( BLAS_LIBRARY BLAS_INCLUDE_DIR BLAS_DEFINES )
-      if(NOT "${LAPACK_LIB}" STREQUAL "${BLAS_LIBRARY}")
-        list( PREPEND BLAS_LIBRARY ${LAPACK_LIB} )
-      endif()
-      list( APPEND COMMON_DEFINES ${BLAS_DEFINES} )
+      get_cblas( BLAS_LIBRARY BLAS_INCLUDE_DIR )
+      list( PREPEND BLAS_LIBRARY ${LAPACK_LIB} )
     endif()
   else() # WIN32
     file(TO_CMAKE_PATH "C:/Program\ Files/AMD/AOCL-Windows" AOCL_ROOT)
-    if (LINK_BLIS AND EXISTS "${AOCL_ROOT}/amd-blis/lib/ILP64/AOCL-LibBlis-Win-MT.lib" AND EXISTS "${AOCL_ROOT}/amd-libflame/lib/ILP64/AOCL-LibFlame-Win-MT.lib" AND EXISTS "${AOCL_ROOT}/amd-utils/lib/libaoclutils.lib" )
-      set( BLAS_LIBRARY "-l\"${AOCL_ROOT}/amd-blis/lib/ILP64/AOCL-LibBlis-Win-MT\"" "-l\"${AOCL_ROOT}/amd-libflame/lib/ILP64/AOCL-LibFlame-Win-MT\"" "-l\"${AOCL_ROOT}/amd-utils/lib/libaoclutils\"" )
-      set( BLIS_INCLUDE_DIR "${AOCL_ROOT}/amd-blis/include/ILP64" )
-      set( FLAME_INCLUDE_DIR "${AOCL_ROOT}/amd-libflame/include/ILP64" )
+    if (LINK_BLIS AND EXISTS "C:/Program\ Files/AMD/AOCL-Windows/amd-blis/lib/ILP64/AOCL-LibBlis-Win-MT.lib" AND EXISTS "C:/Program\ Files/AMD/AOCL-Windows/amd-libflame/lib/ILP64/AOCL-LibFlame-Win-MT.lib" AND EXISTS "C:/Program\ Files/AMD/AOCL-Windows/amd-utils/lib/libaoclutils_static.lib" )
+      set( BLAS_LIBRARY "-l\"C:/Program\ Files/AMD/AOCL-Windows/amd-blis/lib/ILP64/AOCL-LibBlis-Win-MT\"" "-l\"C:/Program\ Files/AMD/AOCL-Windows/amd-libflame/lib/ILP64/AOCL-LibFlame-Win-MT\"" "-l\"C:/Program\ Files/AMD/AOCL-Windows/amd-utils/lib/libaoclutils_static\"" )
+      set( BLIS_INCLUDE_DIR "C:/Program\ Files/AMD/AOCL-Windows/amd-blis/include/ILP64" )
+      set( FLAME_INCLUDE_DIR "C:/Program\ Files/AMD/AOCL-Windows/amd-libflame/include/ILP64" )
       set( BLIS_DEFINES BLIS_ENABLE_NO_UNDERSCORE_API BLIS_ENABLE_CBLAS )
     else()
-      # Prefer ILP64 via super-project FindBLAS (TheRock -> OpenBLAS64). If unavailable, fall back to LP64 OPENBLAS_DIR layout.
-      set(BLA_SIZEOF_INTEGER 8)
-      find_package( BLAS QUIET )
-      if(BLAS_FOUND)
-        get_lapack( LAPACK_LIB LAPACK_INCLUDE_DIR )
-        get_cblas( BLAS_LIBRARY BLAS_INCLUDE_DIR BLAS_DEFINES )
-        if(NOT "${LAPACK_LIB}" STREQUAL "${BLAS_LIBRARY}")
-          list( PREPEND BLAS_LIBRARY ${LAPACK_LIB} )
-        endif()
-        list( APPEND COMMON_DEFINES ${BLAS_DEFINES} )
-      else()
-        unset( BLA_SIZEOF_INTEGER CACHE )
-        set( BLAS_INCLUDE_DIR ${OPENBLAS_DIR}/include CACHE PATH "OpenBLAS library include path" )
-        find_library( BLAS_LIBRARY libopenblas
-                      PATHS ${OPENBLAS_DIR}/lib
-                      NO_DEFAULT_PATH
-                    )
-        if (NOT BLAS_LIBRARY)
-          find_package( OpenBLAS CONFIG REQUIRED )
-          set( BLAS_LIBRARY OpenBLAS::OpenBLAS )
-          set( BLAS_INCLUDE_DIR "" )
-        endif()
+      set( BLAS_INCLUDE_DIR ${OPENBLAS_DIR}/include CACHE PATH "OpenBLAS library include path" )
+      find_library( BLAS_LIBRARY libopenblas
+                    PATHS ${OPENBLAS_DIR}/lib
+                    NO_DEFAULT_PATH
+                  )
+      if (NOT BLAS_LIBRARY)
+        find_package( OPENBLAS CONFIG REQUIRED )
+        set( BLAS_LIBRARY OpenBLAS::OpenBLAS )
+        set( BLAS_INCLUDE_DIR "" )
       endif()
     endif()
   endif()
-
-  message(STATUS "CLIENT COMMON_DEFINES: ${COMMON_DEFINES}")
-  message(STATUS "CLIENT COMMON CXX_OPTIONS: ${COMMON_CXX_OPTIONS}")
-  message(STATUS "CLIENT COMMON LINK: ${COMMON_LINK_LIBS}")
 
   if ( DEFINED BLIS_INCLUDE_DIR )
     set( BLIS_CPP ../common/blis_interface.cpp )
@@ -327,12 +201,7 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   find_package( GTest REQUIRED )
 
   message(STATUS "Build Dir: ${BUILD_DIR}")
-  message(STATUS "LINK_BLIS: ${LINK_BLIS}")
-  message(STATUS "Linking Libs: ${BLAS_LIBRARY}")
-
-  if( NOT TARGET hipblas )
-    find_package( hipblas REQUIRED CONFIG PATHS ${HIPBLAS_LIBRARY_DIR} )
-  endif( )
+  message(STATUS "Linking Ref. Libs: ${BLAS_LIBRARY}")
 
   if( BUILD_CLIENTS_TESTS )
     add_subdirectory( gtest )
@@ -368,14 +237,8 @@ add_custom_command( OUTPUT "${HIPBLAS_GENTEST}"
                     DEPENDS common/hipblas_gentest.py
                     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" )
 
-set( HIPBLAS_CLIENTS_README "${PROJECT_BINARY_DIR}/staging/hipblas_clients_readme.txt")
-add_custom_command( OUTPUT "${HIPBLAS_CLIENTS_README}"
-                    COMMAND ${CMAKE_COMMAND} -E copy hipblas_clients_readme.txt "${HIPBLAS_CLIENTS_README}"
-                    DEPENDS hipblas_clients_readme.txt
-                    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" )
 
-
-add_custom_target( hipblas-clients-common DEPENDS "${HIPBLAS_COMMON}" "${HIPBLAS_TEMPLATE}" "${HIPBLAS_SMOKE}" "${HIPBLAS_GENTEST}" "${HIPBLAS_CLIENTS_README}" )
+add_custom_target( hipblas-clients-common DEPENDS "${HIPBLAS_COMMON}" "${HIPBLAS_TEMPLATE}" "${HIPBLAS_SMOKE}" "${HIPBLAS_GENTEST}" )
 
 if( BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
   rocm_install(
@@ -387,11 +250,5 @@ if( BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
     PROGRAMS ${HIPBLAS_GENTEST}
     DESTINATION "${CMAKE_INSTALL_BINDIR}"
     COMPONENT clients-common
-  )
-  # this readme also serves to prevent an empty package hipblas-clients which dpkg may auto-remove entire hipblas-clients and non empty children
-  rocm_install(
-    FILES ${HIPBLAS_CLIENTS_README}
-    DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    COMPONENT clients
   )
 endif()

@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -41,10 +41,6 @@ namespace rocsparse
                                            T*                   y,
                                            rocsparse_index_base idx_base)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
-
         const int lid = hipThreadIdx_x & (WFSIZE - 1);
         const int wid = hipThreadIdx_x / WFSIZE;
 
@@ -81,15 +77,15 @@ namespace rocsparse
         __syncthreads();
 
         // clang-format off
-        // Accumulate row sums (from different wavefronts)
-        if(WFSIZE == 32)
-        {
-            if(wid < 16) sdata[wid * WFSIZE + lid] += sdata[(wid + 16) * WFSIZE + lid]; __syncthreads();
-        }
-        if(wid < 8) sdata[wid * WFSIZE + lid] += sdata[(wid + 8) * WFSIZE + lid]; __syncthreads();
-        if(wid < 4) sdata[wid * WFSIZE + lid] += sdata[(wid + 4) * WFSIZE + lid]; __syncthreads();
-        if(wid < 2) sdata[wid * WFSIZE + lid] += sdata[(wid + 2) * WFSIZE + lid]; __syncthreads();
-        if(wid < 1) sdata[wid * WFSIZE + lid] += sdata[(wid + 1) * WFSIZE + lid];
+    // Accumulate row sums (from different wavefronts)
+    if(WFSIZE == 32)
+    {
+        if(wid < 16) sdata[wid * WFSIZE + lid] += sdata[(wid + 16) * WFSIZE + lid]; __syncthreads();
+    }
+    if(wid < 8) sdata[wid * WFSIZE + lid] += sdata[(wid + 8) * WFSIZE + lid]; __syncthreads();
+    if(wid < 4) sdata[wid * WFSIZE + lid] += sdata[(wid + 4) * WFSIZE + lid]; __syncthreads();
+    if(wid < 2) sdata[wid * WFSIZE + lid] += sdata[(wid + 2) * WFSIZE + lid]; __syncthreads();
+    if(wid < 1) sdata[wid * WFSIZE + lid] += sdata[(wid + 1) * WFSIZE + lid];
         // clang-format on
 
         // Frist wavefront writes (accumulated) 64 row sums back to y

@@ -1,4 +1,4 @@
-// Copyright (C) 2022 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2022 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -65,17 +65,16 @@ StatementList FFTGPUWork::lower() const
         if(params.threads_per_transform > params.length / params.width)
         {
             if(g == Guard::BOTH)
-                stmts += If(params.write && (params.thread < params.length / params.width),
-                            work.statements);
+                stmts += If(params.write && (params.thread < params.length / params.width), work);
             if(g == Guard::THREAD)
-                stmts += If(params.thread < params.length / params.width, work.statements);
+                stmts += If(params.thread < params.length / params.width, work);
             if(g == Guard::WRITE)
-                stmts += If(params.write, work.statements);
+                stmts += If(params.write, work);
         }
         else
         {
             if(g == Guard::WRITE || g == Guard::BOTH)
-                stmts += If(params.write, work.statements);
+                stmts += If(params.write, work);
             else
                 stmts += work;
         }
@@ -94,13 +93,13 @@ StatementList FFTGPUWork::lower() const
             stmts += If(params.write
                             && (params.thread + iheight * params.threads_per_transform
                                 < params.length / params.width),
-                        work.statements);
+                        work);
         if(g == Guard::THREAD)
             stmts += If(params.thread + iheight * params.threads_per_transform
                             < params.length / params.width,
-                        work.statements);
+                        work);
         if(g == Guard::WRITE)
-            stmts += If(params.write, work.statements);
+            stmts += If(params.write, work);
     }
 
     return stmts;

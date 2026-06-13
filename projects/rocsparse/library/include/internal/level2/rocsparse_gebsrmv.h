@@ -33,12 +33,12 @@ extern "C" {
 #endif
 
 /*! \ingroup level2_module
-*  \brief Sparse matrix vector multiplication using the GEBSR storage format.
+*  \brief Sparse matrix vector multiplication using GEBSR storage format
 *
 *  \details
 *  \p rocsparse_gebsrmv multiplies the scalar \f$\alpha\f$ with a sparse
-*  \f$m \times n\f$ matrix, defined in GEBSR storage format, and the dense vector
-*  \f$x\f$ and adds the result to the dense vector \f$y\f$ that is multiplied by
+*  \f$m \times n\f$ matrix, defined in GEBSR storage format, and the dense vector 
+*  \f$x\f$ and adds the result to the dense vector \f$y\f$ that is multiplied by 
 *  the scalar \f$\beta\f$, such that
 *  \f[
 *    y := \alpha \cdot op(A) \cdot x + \beta \cdot y,
@@ -54,8 +54,8 @@ extern "C" {
 *  and where \f$m = mb \times row\_block\_dim\f$ and \f$n = nb \times col\_block\_dim\f$.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  Currently, only \p trans == \ref rocsparse_operation_none is supported.
@@ -64,7 +64,7 @@ extern "C" {
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  dir         matrix storage of GEBSR blocks.
 *  @param[in]
@@ -103,10 +103,10 @@ extern "C" {
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p mb, \p nb, \p nnzb, \p row_block_dim,
+*  \retval     rocsparse_status_invalid_size \p mb, \p nb, \p nnzb, \p row_block_dim
 *              or \p col_block_dim is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p descr, \p alpha, \p bsr_val,
-*              \p bsr_row_ind, \p bsr_col_ind, \p x, \p beta, or \p y pointer is invalid.
+*              \p bsr_row_ind, \p bsr_col_ind, \p x, \p beta or \p y pointer is invalid.
 *  \retval     rocsparse_status_arch_mismatch the device is not supported.
 *  \retval     rocsparse_status_not_implemented
 *              \p trans != \ref rocsparse_operation_none or
@@ -114,7 +114,105 @@ extern "C" {
 *
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in GEBSR format.
-*  \snippet example_rocsparse_gebsrmv.cpp doc example
+*  \code{.c}
+*      // rocSPARSE handle
+*      rocsparse_handle handle;
+*      rocsparse_create_handle(&handle);
+*
+*      // alpha * ( 1.0  0.0  2.0 ) * ( 1.0 ) + beta * ( 4.0 ) = (  31.1 )
+*      //         ( 3.0  0.0  4.0 ) * ( 2.0 )          ( 5.0 ) = (  62.0 )
+*      //         ( 5.0  6.0  0.0 ) * ( 3.0 )          ( 6.0 ) = (  70.7 )
+*      //         ( 7.0  0.0  8.0 ) *                  ( 7.0 ) = ( 123.8 )
+*
+*      // GEBSR block dimensions
+*      rocsparse_int row_block_dim = 2;
+*      rocsparse_int col_block_dim = 3;
+*
+*      // Number of block rows and columns
+*      rocsparse_int mb = 2;
+*      rocsparse_int nb = 1;
+*
+*      // Number of non-zero blocks
+*      rocsparse_int nnzb = 2;
+*
+*      // BSR row pointers
+*      rocsparse_int hbsr_row_ptr[3] = {0, 1, 2};
+*
+*      // BSR column indices
+*      rocsparse_int hbsr_col_ind[2] = {0, 0};
+*
+*      // BSR values
+*      double hbsr_val[16] = {1.0, 3.0, 0.0, 0.0, 2.0, 4.0, 5.0, 7.0, 6.0, 0.0, 0.0, 8.0};
+*
+*      // Block storage in column major
+*      rocsparse_direction dir = rocsparse_direction_column;
+*
+*      // Transposition of the matrix
+*      rocsparse_operation trans = rocsparse_operation_none;
+*
+*      // Scalar alpha and beta
+*      double alpha = 3.7;
+*      double beta  = 1.3;
+*
+*      // x and y
+*      double hx[4] = {1.0, 2.0, 3.0, 0.0};
+*      double hy[4] = {4.0, 5.0, 6.0, 7.0};
+*
+*      // Matrix descriptor
+*      rocsparse_mat_descr descr;
+*      rocsparse_create_mat_descr(&descr);
+*
+*      // Offload data to device
+*      rocsparse_int* dbsr_row_ptr;
+*      rocsparse_int* dbsr_col_ind;
+*      double*        dbsr_val;
+*      double*        dx;
+*      double*        dy;
+*
+*      hipMalloc((void**)&dbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1));
+*      hipMalloc((void**)&dbsr_col_ind, sizeof(rocsparse_int) * nnzb);
+*      hipMalloc((void**)&dbsr_val, sizeof(double) * nnzb * row_block_dim * col_block_dim);
+*      hipMalloc((void**)&dx, sizeof(double) * nb * col_block_dim);
+*      hipMalloc((void**)&dy, sizeof(double) * mb * row_block_dim);
+*
+*      hipMemcpy(dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice);
+*      hipMemcpy(dbsr_col_ind, hbsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice);
+*      hipMemcpy(dbsr_val, hbsr_val, sizeof(double) * nnzb * row_block_dim * col_block_dim, hipMemcpyHostToDevice);
+*      hipMemcpy(dx, hx, sizeof(double) * nb * col_block_dim, hipMemcpyHostToDevice);
+*      hipMemcpy(dy, hy, sizeof(double) * mb * row_block_dim, hipMemcpyHostToDevice);
+*
+*      // Call dbsrmv to perform y = alpha * A x + beta * y
+*      rocsparse_dgebsrmv(handle,
+*                         dir,
+*                         trans,
+*                         mb,
+*                         nb,
+*                         nnzb,
+*                         &alpha,
+*                         descr,
+*                         dbsr_val,
+*                         dbsr_row_ptr,
+*                         dbsr_col_ind,
+*                         row_block_dim,
+*                         col_block_dim,
+*                         dx,
+*                         &beta,
+*                         dy);
+*
+*      // Copy result back to host
+*      hipMemcpy(hy, dy, sizeof(double) * mb * row_block_dim, hipMemcpyDeviceToHost);
+*
+*      // Clear rocSPARSE
+*      rocsparse_destroy_mat_descr(descr);
+*      rocsparse_destroy_handle(handle);
+*
+*      // Clear device memory
+*      hipFree(dbsr_row_ptr);
+*      hipFree(dbsr_col_ind);
+*      hipFree(dbsr_val);
+*      hipFree(dx);
+*      hipFree(dy);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

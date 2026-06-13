@@ -1,0 +1,9 @@
+pytest==7.3.2
+pytest-cov
+pre-commit
+pyrefly==0.45.1
+transformers
+# Test dependencies
+einops
+expecttest
+tomli_w

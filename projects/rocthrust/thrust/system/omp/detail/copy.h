@@ -17,7 +17,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/system/omp/detail/execution_policy.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -28,12 +27,25 @@ namespace omp
 namespace detail
 {
 
-template <typename DerivedPolicy, typename InputIterator, typename OutputIterator>
-OutputIterator
-copy(execution_policy<DerivedPolicy>& exec, InputIterator first, InputIterator last, OutputIterator result);
 
-template <typename DerivedPolicy, typename InputIterator, typename Size, typename OutputIterator>
-OutputIterator copy_n(execution_policy<DerivedPolicy>& exec, InputIterator first, Size n, OutputIterator result);
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename OutputIterator>
+OutputIterator copy(execution_policy<DerivedPolicy> &exec,
+                    InputIterator first,
+                    InputIterator last,
+                    OutputIterator result);
+
+
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename Size,
+         typename OutputIterator>
+OutputIterator copy_n(execution_policy<DerivedPolicy> &exec,
+                      InputIterator first,
+                      Size n,
+                      OutputIterator result);
+
 
 } // end namespace detail
 } // end namespace omp
@@ -41,3 +53,4 @@ OutputIterator copy_n(execution_policy<DerivedPolicy>& exec, InputIterator first
 THRUST_NAMESPACE_END
 
 #include <thrust/system/omp/detail/copy.inl>
+

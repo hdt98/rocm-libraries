@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file thrust/iterator/transform_iterator.h
  *  \brief An iterator which adapts another iterator by applying a function to the result of its dereference
  */
@@ -33,23 +34,11 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
 // #include the details first
-#include <thrust/detail/type_traits.h>
 #include <thrust/iterator/detail/transform_iterator.inl>
 #include <thrust/iterator/iterator_facade.h>
 #include <thrust/iterator/iterator_traits.h>
-
-#if !_THRUST_HAS_DEVICE_SYSTEM_STD
-#  include <type_traits>
-#endif
+#include <thrust/detail/type_traits.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -80,7 +69,7 @@ THRUST_NAMESPACE_BEGIN
  *  // note: functor inherits from unary_function
  *  struct square_root : public thrust::unary_function<float,float>
  *  {
- *    __host__ __device__
+ *    THRUST_HOST_DEVICE
  *    float operator()(float x) const
  *    {
  *      return sqrtf(x);
@@ -123,7 +112,7 @@ THRUST_NAMESPACE_BEGIN
  *  // note: functor inherits from unary_function
  *  struct square : public thrust::unary_function<float,float>
  *  {
- *    __host__ __device__
+ *    THRUST_HOST_DEVICE
  *    float operator()(float x) const
  *    {
  *      return x * x;
@@ -164,7 +153,7 @@ THRUST_NAMESPACE_BEGIN
  *  // note: functor *does not* inherit from unary_function
  *  struct square_root
  *  {
- *    __host__ __device__
+ *    THRUST_HOST_DEVICE
  *    float operator()(float x) const
  *    {
  *      return sqrtf(x);
@@ -197,154 +186,143 @@ THRUST_NAMESPACE_BEGIN
  *  \see make_transform_iterator
  */
 template <class AdaptableUnaryFunction, class Iterator, class Reference = use_default, class Value = use_default>
-class transform_iterator
-    : public detail::make_transform_iterator_base<AdaptableUnaryFunction, Iterator, Reference, Value>::type
+  class transform_iterator
+    : public detail::transform_iterator_base<AdaptableUnaryFunction, Iterator, Reference, Value>::type
 {
   /*! \cond
    */
+  public:
+    using super_t =
+      typename detail::transform_iterator_base<AdaptableUnaryFunction, Iterator, Reference, Value>::type;
 
-public:
-  using super_t =
-    typename detail::make_transform_iterator_base<AdaptableUnaryFunction, Iterator, Reference, Value>::type;
-
-  friend class iterator_core_access;
+    friend class thrust::iterator_core_access;
   /*! \endcond
    */
 
-public:
-  /*! Null constructor does nothing.
-   */
-  transform_iterator() = default;
+  public:
+    /*! Null constructor does nothing.
+     */
+    transform_iterator() = default;
 
-  /*! Default copy constructor.
-   */
-  transform_iterator(transform_iterator const&) = default;
+    /*! Default copy constructor.
+    */
+    transform_iterator(transform_iterator const&) = default;
 
-  /*! This constructor takes as arguments an \c Iterator and an \c AdaptableUnaryFunction
-   *  and copies them to a new \p transform_iterator.
-   *
-   *  \param x An \c Iterator pointing to the input to this \p transform_iterator's \c AdaptableUnaryFunction.
-   *  \param f An \c AdaptableUnaryFunction used to transform the objects pointed to by \p x.
-   */
-  THRUST_HOST_DEVICE transform_iterator(Iterator const& x, AdaptableUnaryFunction f)
-      : super_t(x)
-      , m_f(f)
-  {}
+    /*! This constructor takes as arguments an \c Iterator and an \c AdaptableUnaryFunction
+     *  and copies them to a new \p transform_iterator.
+     *
+     *  \param x An \c Iterator pointing to the input to this \p transform_iterator's \c AdaptableUnaryFunction.
+     *  \param f An \c AdaptableUnaryFunction used to transform the objects pointed to by \p x.
+     */
+    THRUST_HOST_DEVICE
+    transform_iterator(Iterator const& x, AdaptableUnaryFunction f)
+      : super_t(x), m_f(f) {
+    }
 
-  /*! This explicit constructor copies the value of a given \c Iterator and creates
-   *  this \p transform_iterator's \c AdaptableUnaryFunction using its null constructor.
-   *
-   *  \param x An \c Iterator to copy.
-   */
-  THRUST_HOST_DEVICE explicit transform_iterator(Iterator const& x)
-      : super_t(x)
-  {}
+    /*! This explicit constructor copies the value of a given \c Iterator and creates
+     *  this \p transform_iterator's \c AdaptableUnaryFunction using its null constructor.
+     *
+     *  \param x An \c Iterator to copy.
+     */
+    THRUST_HOST_DEVICE
+    explicit transform_iterator(Iterator const& x)
+      : super_t(x) { }
 
-  /*! This copy constructor creates a new \p transform_iterator from another
-   *  \p transform_iterator.
-   *
-   *  \param other The \p transform_iterator to copy.
-   */
-  template <typename OtherAdaptableUnaryFunction, typename OtherIterator, typename OtherReference, typename OtherValue>
-  THRUST_HOST_DEVICE transform_iterator(
-    const transform_iterator<OtherAdaptableUnaryFunction, OtherIterator, OtherReference, OtherValue>& other,
-    thrust::detail::enable_if_convertible_t<OtherIterator, Iterator>*                             = 0,
-    thrust::detail::enable_if_convertible_t<OtherAdaptableUnaryFunction, AdaptableUnaryFunction>* = 0)
-      : super_t(other.base())
-      , m_f(other.functor())
-  {}
+    /*! This copy constructor creates a new \p transform_iterator from another
+     *  \p transform_iterator.
+     *
+     *  \param other The \p transform_iterator to copy.
+     */
+    template<typename OtherAdaptableUnaryFunction,
+             typename OtherIterator,
+             typename OtherReference,
+             typename OtherValue>
+    THRUST_HOST_DEVICE
+    transform_iterator(const transform_iterator<OtherAdaptableUnaryFunction, OtherIterator, OtherReference, OtherValue> &other,
+                       typename thrust::detail::enable_if_convertible<OtherIterator, Iterator>::type* = 0,
+                       typename thrust::detail::enable_if_convertible<OtherAdaptableUnaryFunction, AdaptableUnaryFunction>::type* = 0)
+      : super_t(other.base()), m_f(other.functor()) {}
 
-  /*! Copy assignment operator copies from another \p transform_iterator.
-   *  \p other The other \p transform_iterator to copy
-   *  \return <tt>*this</tt>
-   *
-   *  \note If the type of this \p transform_iterator's functor is not copy assignable
-   *        (for example, if it is a lambda) it is not an error to call this function.
-   *        In this case, however, the functor will not be modified.
-   *
-   *        In any case, this \p transform_iterator's underlying iterator will be copy assigned.
-   */
-  THRUST_HOST_DEVICE transform_iterator& operator=(const transform_iterator& other)
-  {
-    return do_assign(other, _THRUST_STD::is_copy_assignable<AdaptableUnaryFunction>());
-  }
+    /*! Copy assignment operator copies from another \p transform_iterator.
+     *  \p other The other \p transform_iterator to copy
+     *  \return <tt>*this</tt>
+     *
+     *  \note If the type of this \p transform_iterator's functor is not copy assignable
+     *        (for example, if it is a lambda) it is not an error to call this function.
+     *        In this case, however, the functor will not be modified.
+     *
+     *        In any case, this \p transform_iterator's underlying iterator will be copy assigned.
+     */
+    THRUST_HOST_DEVICE
+    transform_iterator &operator=(const transform_iterator &other)
+    {
+      return do_assign(other,
+      // XXX gcc 4.2.1 crashes on is_copy_assignable; just assume the functor is assignable as a WAR
+#if (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_GCC) && (THRUST_GCC_VERSION <= 40201)
+          thrust::detail::true_type()
+#else
+          typename thrust::detail::is_copy_assignable<AdaptableUnaryFunction>::type()
+#endif // THRUST_HOST_COMPILER
+      );
+    }
 
-  /*! This method returns a copy of this \p transform_iterator's \c AdaptableUnaryFunction.
-   *  \return A copy of this \p transform_iterator's \c AdaptableUnaryFunction.
-   */
-  THRUST_HOST_DEVICE AdaptableUnaryFunction functor() const
-  {
-    return m_f;
-  }
+    /*! This method returns a copy of this \p transform_iterator's \c AdaptableUnaryFunction.
+     *  \return A copy of this \p transform_iterator's \c AdaptableUnaryFunction.
+     */
+    THRUST_HOST_DEVICE
+    AdaptableUnaryFunction functor() const
+      { return m_f; }
 
-  /*! \cond
-   */
+    /*! \cond
+     */
+  private:
+    THRUST_HOST_DEVICE
+    transform_iterator &do_assign(const transform_iterator &other, thrust::detail::true_type)
+    {
+      super_t::operator=(other);
 
-private:
-  THRUST_HOST_DEVICE transform_iterator& do_assign(const transform_iterator& other, thrust::detail::true_type)
-  {
-    super_t::operator=(other);
+      // do assign to m_f
+      m_f = other.functor();
 
-    // do assign to m_f
-    m_f = other.functor();
+      return *this;
+    }
 
-    return *this;
-  }
+    THRUST_HOST_DEVICE
+    transform_iterator &do_assign(const transform_iterator &other, thrust::detail::false_type)
+    {
+      super_t::operator=(other);
 
-  THRUST_HOST_DEVICE transform_iterator& do_assign(const transform_iterator& other, thrust::detail::false_type)
-  {
-    super_t::operator=(other);
+      // don't assign to m_f
 
-    // don't assign to m_f
+      return *this;
+    }
 
-    return *this;
-  }
+    // MSVC 2013 and 2015 incorrectly warning about returning a reference to
+    // a local/temporary here.
+    // See goo.gl/LELTNp
+    THRUST_DISABLE_MSVC_WARNING_BEGIN(4172)
 
-// MSVC 2013 and 2015 incorrectly warning about returning a reference to
-// a local/temporary here.
-// See goo.gl/LELTNp
-#if (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC) && (THRUST_MSVC_VERSION < 1920)
-  THRUST_DIAG_PUSH
-  THRUST_DIAG_SUPPRESS_MSVC(4172)
-#endif // (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC) && (THRUST_MSVC_VERSION < 1920)
+    THRUST_EXEC_CHECK_DISABLE
+    THRUST_HOST_DEVICE
+    typename super_t::reference dereference() const
+    {
+      // Create a temporary to allow iterators with wrapped references to
+      // convert to their value type before calling m_f. Note that this
+      // disallows non-constant operations through m_f.
+      typename thrust::iterator_value<Iterator>::type const& x = *this->base();
+      return m_f(x);
+    }
 
-  THRUST_EXEC_CHECK_DISABLE
-  THRUST_HOST_DEVICE typename super_t::reference dereference() const
-  {
-    // TODO(bgruber): we should ideally do as `std::ranges::transform_view::iterator` does:
-    // `return std::invoke(m_f, *this->base());` and return `decltype(auto)`. However, `*this->base()` may return a
-    // wrapped reference (`device_reference<T>`), which is a temporary value. If `m_f` forwards this value, e.g. as a
-    // `device_reference<T>&&` if `m_f` is `identity<void>`, (and `super_t::reference` is thus deduced as
-    // `device_reference<T>&&` as well), we return a dangling reference. So we cannot do as
-    // `std::ranges::transform_view::iterator` does.
+    THRUST_DISABLE_MSVC_WARNING_END(4172)
 
-    // Interestingly, C++20 ranges have the same bug. The following program crashes because the transform iterator also
-    // returns a reference to an expired temporary (given by the iota iterator upon dereferencing)
-    //   for (auto e : std::views::iota(10) | std::views::transform(std::identity{}))
-    //     std::cout << e << '\n';
-    // See: https://godbolt.org/z/jrKcnMqhK
+    // tag this as mutable per Dave Abrahams in this thread:
+    // http://lists.boost.org/Archives/boost/2004/05/65332.php
+    mutable AdaptableUnaryFunction m_f;
 
-    // The workaround is to create a temporary to allow iterators with wrapped/proxy references to convert to their
-    // value type before calling m_f. This also loads values from a different memory space (cf. `device_reference`).
-    // Note that this disallows mutable operations through m_f.
-    iterator_value_t<Iterator> const& x = *this->base();
-    // FIXME(bgruber): x may be a reference to a temporary (e.g. if the base iterator is a counting_iterator). If `m_f`
-    // does not produce an independent copy and super_t::reference is a reference, we return a dangling reference (e.g.
-    // for any `[thrust|::cuda::std]::identity` functor).
-    return m_f(x);
-  }
-
-#if (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC) && (THRUST_MSVC_VERSION < 1920)
-  THRUST_DIAG_POP
-#endif // (THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_MSVC) && (THRUST_MSVC_VERSION < 1920)
-
-  // tag this as mutable per Dave Abrahams in this thread:
-  // http://lists.boost.org/Archives/boost/2004/05/65332.php
-  mutable AdaptableUnaryFunction m_f;
-
-  /*! \endcond
-   */
+    /*! \endcond
+     */
 }; // end transform_iterator
+
 
 /*! \p make_transform_iterator creates a \p transform_iterator
  *  from an \c Iterator and \c AdaptableUnaryFunction.
@@ -358,7 +336,8 @@ private:
  *  \see transform_iterator
  */
 template <class AdaptableUnaryFunction, class Iterator>
-inline THRUST_HOST_DEVICE transform_iterator<AdaptableUnaryFunction, Iterator>
+inline THRUST_HOST_DEVICE
+transform_iterator<AdaptableUnaryFunction, Iterator>
 make_transform_iterator(Iterator it, AdaptableUnaryFunction fun)
 {
   return transform_iterator<AdaptableUnaryFunction, Iterator>(it, fun);

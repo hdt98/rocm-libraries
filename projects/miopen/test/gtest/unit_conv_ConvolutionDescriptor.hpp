@@ -36,15 +36,11 @@ struct ConvolutionDescriptorParams
     ConvolutionDescriptorParams(std::vector<int>&& pads_in,
                                 std::vector<int>&& strides_in,
                                 std::vector<int>&& dilations_in,
-                                int group_count_in    = 1,
-                                bool deterministic_in = false,
-                                bool tf32_compute_in  = false)
+                                int group_count_in = 1)
         : pads(std::move(pads_in)),
           strides(std::move(strides_in)),
           dilations(std::move(dilations_in)),
-          group_count(group_count_in),
-          deterministic(deterministic_in),
-          tf32_compute(tf32_compute_in)
+          group_count(group_count_in)
     {
     }
 
@@ -54,19 +50,7 @@ struct ConvolutionDescriptorParams
     miopen::ConvolutionDescriptor GetConvolutionDescriptor() const
     {
         const auto trans_output_pads = std::vector<int>(pads.size(), 0);
-        auto desc =
-            miopen::ConvolutionDescriptor{pads, strides, dilations, trans_output_pads, group_count};
-
-        // SET DETERMINISTIC ATTRIBUTE
-        if(deterministic)
-        {
-            desc.attribute.Set(MIOPEN_CONVOLUTION_ATTRIB_DETERMINISTIC, 1);
-        }
-        // SET TF32 COMPUTE ATTRIBUTE
-        miopenMathType_t math_type = tf32_compute ? miopenMathDefault : miopenMathPedantic;
-        desc.attribute.Set(MIOPEN_CONVOLUTION_ATTRIB_MATH_TYPE, math_type);
-
-        return desc;
+        return {pads, strides, dilations, trans_output_pads, group_count};
     }
 
     friend std::ostream& operator<<(std::ostream& os, const ConvolutionDescriptorParams& cp)
@@ -83,8 +67,6 @@ private:
     std::vector<int> strides;
     std::vector<int> dilations;
     int group_count;
-    bool deterministic;
-    bool tf32_compute;
 };
 
 } // namespace unit_tests

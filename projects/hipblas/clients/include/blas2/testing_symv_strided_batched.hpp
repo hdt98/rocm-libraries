@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,6 @@ inline void testname_symv_strided_batched(const Arguments& arg, std::string& nam
 template <typename T>
 void testing_symv_strided_batched_bad_arg(const Arguments& arg)
 {
-    using Ts                            = hipblas_internal_type<T>;
     auto hipblasSymvStridedBatchedFn    = arg.api == FORTRAN ? hipblasSymvStridedBatched<T, true>
                                                              : hipblasSymvStridedBatched<T, false>;
     auto hipblasSymvStridedBatchedFn_64 = arg.api == FORTRAN_64
@@ -74,14 +73,11 @@ void testing_symv_strided_batched_bad_arg(const Arguments& arg)
 
         device_vector<T> d_alpha(1), d_beta(1), d_one(1), d_zero(1);
 
-        Ts h_alpha{1}, h_beta{2}, h_one{1}, h_zero{0};
-        if constexpr(is_complex<T>)
-            h_one = {1, 0};
-
-        const Ts* alpha = &h_alpha;
-        const Ts* beta  = &h_beta;
-        const Ts* one   = &h_one;
-        const Ts* zero  = &h_zero;
+        const T  h_alpha(1), h_beta(2), h_one(1), h_zero(0);
+        const T* alpha = &h_alpha;
+        const T* beta  = &h_beta;
+        const T* one   = &h_one;
+        const T* zero  = &h_zero;
 
         if(pointer_mode == HIPBLAS_POINTER_MODE_DEVICE)
         {
@@ -338,7 +334,6 @@ void testing_symv_strided_batched_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_symv_strided_batched(const Arguments& arg)
 {
-    using Ts                            = hipblas_internal_type<T>;
     auto hipblasSymvStridedBatchedFn    = arg.api == FORTRAN ? hipblasSymvStridedBatched<T, true>
                                                              : hipblasSymvStridedBatched<T, false>;
     auto hipblasSymvStridedBatchedFn_64 = arg.api == FORTRAN_64
@@ -420,7 +415,7 @@ void testing_symv_strided_batched(const Arguments& arg)
     T h_alpha = arg.get_alpha<T>();
     T h_beta  = arg.get_beta<T>();
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_matrix(
@@ -447,14 +442,14 @@ void testing_symv_strided_batched(const Arguments& arg)
                    (handle,
                     uplo,
                     N,
-                    reinterpret_cast<Ts*>(&h_alpha),
+                    &h_alpha,
                     dA,
                     lda,
                     stride_A,
                     dx,
                     incx,
                     stride_x,
-                    reinterpret_cast<Ts*>(&h_beta),
+                    &h_beta,
                     dy,
                     incy,
                     stride_y,

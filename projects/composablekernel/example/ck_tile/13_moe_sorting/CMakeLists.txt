@@ -1,7 +1,5 @@
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 add_executable(tile_example_moe_sorting moe_sorting.cpp moe_sorting_api.cpp)
+rocm_install(TARGETS tile_example_moe_sorting COMPONENT examples)
 target_include_directories(tile_example_moe_sorting PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/)
 
 set(EXAMPLE_MOE_SORTING_COMPILE_OPTIONS)

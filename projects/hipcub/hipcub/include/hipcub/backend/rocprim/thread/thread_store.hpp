@@ -33,36 +33,104 @@
 #include "../../../config.hpp"
 #include "../util_type.hpp"
 
-#include <rocprim/thread/thread_store.hpp> // IWYU pragma: export
-
-#include <stdint.h>
-#include <type_traits>
+#include <rocprim/thread/thread_store.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
 enum CacheStoreModifier
 {
-    STORE_DEFAULT  = 0, ///< Default (no modifier)
-    STORE_WB       = 1, ///< Cache write-back all coherent levels
-    STORE_CG       = 2, ///< Cache at global level
-    STORE_CS       = 3, ///< Cache streaming (likely to be accessed once)
-    STORE_WT       = 4, ///< Cache write-through (to system memory)
-    STORE_VOLATILE = 5 ///< Volatile shared (any memory space)
+    STORE_DEFAULT, ///< Default (no modifier)
+    STORE_WB, ///< Cache write-back all coherent levels
+    STORE_CG, ///< Cache at global level
+    STORE_CS, ///< Cache streaming (likely to be accessed once)
+    STORE_WT, ///< Cache write-through (to system memory)
+    STORE_VOLATILE, ///< Volatile shared (any memory space)
 };
+
+// TODO add to detail namespace
+// TODO cleanup
+template<CacheStoreModifier MODIFIER = STORE_DEFAULT, typename T>
+[[deprecated("This function is deprecated, use hipcub::ThreadStore.")]]
+HIPCUB_DEVICE
+HIPCUB_FORCEINLINE void AsmThreadStore(void* ptr, T val)
+{
+    __builtin_memcpy(ptr, &val, sizeof(T));
+}
+
+#if HIPCUB_THREAD_STORE_USE_CACHE_MODIFIERS == 1
+
+    // NOTE: the reason there is an interim_type is because of a bug for 8bit types.
+    // TODO fix flat_store_ubyte and flat_store_sbyte issues
+
+    // Important for syncing. Check section 9.2.2 or 7.3 in the following document
+    // https://developer.amd.com/wordpress/media/2013/12/AMD_GCN3_Instruction_Set_Architecture_rev1.1.pdf
+    #define HIPCUB_ASM_THREAD_STORE(cache_modifier,                                              \
+                                    llvm_cache_modifier,                                         \
+                                    type,                                                        \
+                                    interim_type,                                                \
+                                    asm_operator,                                                \
+                                    output_modifier,                                             \
+                                    wait_inst,                                                   \
+                                    wait_cmd)                                                    \
+        template<>                                                                               \
+        [[deprecated("This function is deprecated, use hipcub::ThreadStore.")]]                  \
+        HIPCUB_DEVICE HIPCUB_FORCEINLINE void AsmThreadStore<cache_modifier, type>(void* ptr,    \
+                                                                                   type  val)    \
+        {                                                                                        \
+            interim_type temp_val = val;                                                         \
+            asm volatile(#asm_operator " %0, %1 " llvm_cache_modifier "\n\t" #wait_inst wait_cmd \
+                                       "(%2)"                                                    \
+                         :                                                                       \
+                         : "v"(ptr), #output_modifier(temp_val), "I"(0x00));                     \
+        }
+
+    // TODO fix flat_store_ubyte and flat_store_sbyte issues
+    // TODO Add specialization for custom larger data types
+    // clang-format off
+#define HIPCUB_ASM_THREAD_STORE_GROUP(cache_modifier, llvm_cache_modifier, wait_inst, wait_cmd)                                   \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, int8_t, int16_t, flat_store_byte, v, wait_inst, wait_cmd);       \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, int16_t, int16_t, flat_store_short, v, wait_inst, wait_cmd);     \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, uint8_t, uint16_t, flat_store_byte, v, wait_inst, wait_cmd);     \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, uint16_t, uint16_t, flat_store_short, v, wait_inst, wait_cmd);   \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, uint32_t, uint32_t, flat_store_dword, v, wait_inst, wait_cmd);   \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, float, uint32_t, flat_store_dword, v, wait_inst, wait_cmd);      \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, uint64_t, uint64_t, flat_store_dwordx2, v, wait_inst, wait_cmd); \
+    HIPCUB_ASM_THREAD_STORE(cache_modifier, llvm_cache_modifier, double, uint64_t, flat_store_dwordx2, v, wait_inst, wait_cmd);
+    // clang-format on
+
+#if defined(__gfx942__) || defined(__gfx950__)
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_WB, "sc0", "s_waitcnt", "");
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_CG, "sc0 nt", "s_waitcnt", "");
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_WT, "sc0", "s_waitcnt", "vmcnt");
+    #elif defined(__gfx1200__) || defined(__gfx1201__)
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_WB, "scope:SCOPE_DEV", "s_wait_storecnt_dscnt", "");
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_CG,
+                              "th:TH_DEFAULT scope:SCOPE_DEV",
+                              "s_wait_storecnt_dscnt",
+                              "");
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_WT, "scope:SCOPE_DEV", "s_wait_storecnt_dscnt", "");
+    #else
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_WB, "glc", "s_waitcnt", "");
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_CG, "glc slc", "s_waitcnt", "");
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_WT, "glc", "s_waitcnt", "vmcnt");
+    #endif
+// TODO find correct modifiers to match these
+HIPCUB_ASM_THREAD_STORE_GROUP(STORE_CS, "", "", "");
+
+#endif
 
 template<typename T, typename Fundamental>
 HIPCUB_DEVICE
-HIPCUB_FORCEINLINE void ThreadStoreVolatilePtr(T* ptr, T val, Fundamental /*is_fundamental*/)
+HIPCUB_FORCEINLINE void
+    ThreadStoreVolatilePtr(T* ptr, T val, Fundamental /*Int2Type<Bool> is_fundamental*/)
 {
     rocprim::thread_store<rocprim::store_volatile, T>(ptr, val);
 }
 
 template<int MODIFIER, typename T>
 HIPCUB_DEVICE
-HIPCUB_FORCEINLINE void ThreadStore(T* ptr,
-                                    T  val,
-                                    detail::int_constant_t<MODIFIER> /*modifier*/,
-                                    ::std::true_type /*is_pointer*/)
+HIPCUB_FORCEINLINE void
+    ThreadStore(T* ptr, T val, Int2Type<MODIFIER> /*modifier*/, Int2Type<true> /*is_pointer*/)
 {
     rocprim::thread_store<rocprim::cache_store_modifier(MODIFIER), T>(ptr, val);
 }
@@ -71,10 +139,10 @@ template<int MODIFIER, typename OutputIteratorT, typename T>
 HIPCUB_DEVICE
 HIPCUB_FORCEINLINE void ThreadStore(OutputIteratorT itr,
                                     T               val,
-                                    detail::int_constant_t<MODIFIER> /*modifier*/,
-                                    ::std::false_type /*is_pointer*/)
+                                    Int2Type<MODIFIER> /*modifier*/,
+                                    Int2Type<false> /*is_pointer*/)
 {
-    ThreadStore<MODIFIER>(&(*itr), val, detail::int_constant_t<MODIFIER>{}, ::std::true_type{});
+    ThreadStore<MODIFIER>(&(*itr), val, Int2Type<MODIFIER>(), Int2Type<true>());
 }
 
 template<CacheStoreModifier MODIFIER = STORE_DEFAULT, typename OutputIteratorT, typename T>
@@ -83,23 +151,20 @@ HIPCUB_FORCEINLINE void ThreadStore(OutputIteratorT itr, T val)
 {
     ThreadStore(itr,
                 val,
-                detail::int_constant_t<MODIFIER>{},
-                ::std::bool_constant<::std::is_pointer<OutputIteratorT>::value>());
+                Int2Type<MODIFIER>(),
+                Int2Type<std::is_pointer<OutputIteratorT>::value>());
 }
-
-namespace detail
-{
 
 /// Helper structure for templated store iteration (inductive case)
 template<int COUNT, int MAX>
-struct iterate_thread_store
+struct IterateThreadStore
 {
     template<CacheStoreModifier MODIFIER, typename T>
     static HIPCUB_DEVICE
     HIPCUB_FORCEINLINE void Store(T* ptr, T* vals)
     {
         ThreadStore<MODIFIER>(ptr + COUNT, vals[COUNT]);
-        iterate_thread_store<COUNT + 1, MAX>::template Store<MODIFIER>(ptr, vals);
+        IterateThreadStore<COUNT + 1, MAX>::template Store<MODIFIER>(ptr, vals);
     }
 
     template<typename OutputIteratorT, typename T>
@@ -107,13 +172,13 @@ struct iterate_thread_store
     HIPCUB_FORCEINLINE void Dereference(OutputIteratorT ptr, T* vals)
     {
         ptr[COUNT] = vals[COUNT];
-        iterate_thread_store<COUNT + 1, MAX>::Dereference(ptr, vals);
+        IterateThreadStore<COUNT + 1, MAX>::Dereference(ptr, vals);
     }
 };
 
 /// Helper structure for templated store iteration (termination case)
 template<int MAX>
-struct iterate_thread_store<MAX, MAX>
+struct IterateThreadStore<MAX, MAX>
 {
     template<CacheStoreModifier MODIFIER, typename T>
     static HIPCUB_DEVICE
@@ -125,11 +190,6 @@ struct iterate_thread_store<MAX, MAX>
     HIPCUB_FORCEINLINE void Dereference(OutputIteratorT /*ptr*/, T* /*vals*/)
     {}
 };
-
-} // namespace detail
-
-template<int COUNT, int MAX>
-using IterateThreadStore HIPCUB_DEPRECATED = detail::iterate_thread_store<COUNT, MAX>;
 
 END_HIPCUB_NAMESPACE
 #endif

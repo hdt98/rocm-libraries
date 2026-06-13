@@ -28,6 +28,12 @@ These extensions support the following:
    This is an independent function used to call and get the result.
    For sample code, see :ref:`sample_hipblaslt_ext_op_amax`.
 
+*  ``hipblasltExtAMaxWithScale``
+
+   Determines the absolute maximum value and scaled output of a 2D tensor.
+   This is an independent function used to call and get the result.
+   For sample code, see :ref:`sample_hipblaslt_ext_op_amax_with_scale`.
+
 These APIs are explained in detail below.
 
 hipblasltExtSoftmax()
@@ -43,3 +49,7 @@ hipblasltExtLayerNorm()
 hipblasltExtAMax()
 ------------------------------------------
 .. doxygenfunction:: hipblasltExtAMax
+
+hipblasltExtAMaxWithScale()
+------------------------------------------
+.. doxygenfunction:: hipblasltExtAMaxWithScale

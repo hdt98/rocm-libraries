@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,14 +21,14 @@
 #ifndef ROCPRIM_DEVICE_DETAIL_DEVICE_MERGE_SORT_HPP_
 #define ROCPRIM_DEVICE_DETAIL_DEVICE_MERGE_SORT_HPP_
 
-#include <iterator>
 #include <type_traits>
+#include <iterator>
 
 #include "../../config.hpp"
 #include "../../detail/various.hpp"
 
-#include "../../functional.hpp"
 #include "../../intrinsics.hpp"
+#include "../../functional.hpp"
 #include "../../types.hpp"
 
 #include "../../block/block_load.hpp"
@@ -41,86 +41,73 @@ BEGIN_ROCPRIM_NAMESPACE
 namespace detail
 {
 
-template<bool         WithValues,
-         unsigned int BlockSize,
-         unsigned int ItemsPerThread,
-         class Key,
-         class Value,
-         arch::wavefront::target TargetWaveSize>
-struct block_store_impl
-{
-    using block_store_type = block_store<Key,
-                                         BlockSize,
-                                         ItemsPerThread,
-                                         block_store_method::block_store_transpose,
-                                         1,
-                                         1,
-                                         TargetWaveSize>;
+template<
+    bool WithValues,
+    unsigned int BlockSize,
+    unsigned int ItemsPerThread,
+    class Key,
+    class Value
+>
+struct block_store_impl {
+    using block_store_type
+        = block_store<Key, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
     using storage_type = typename block_store_type::storage_type;
 
     template<class KeysOutputIterator, class ValuesOutputIterator, class OffsetT>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    void store(const OffsetT      block_offset,
-               const unsigned int valid_in_last_block,
-               const bool         is_incomplete_block,
-               KeysOutputIterator keys_output,
-               ValuesOutputIterator /*values_output*/,
-               Key (&keys)[ItemsPerThread],
-               Value (& /*values*/)[ItemsPerThread],
-               storage_type& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE void store(const OffsetT      block_offset,
+                                             const unsigned int valid_in_last_block,
+                                             const bool         is_incomplete_block,
+                                             KeysOutputIterator keys_output,
+                                             ValuesOutputIterator /*values_output*/,
+                                             Key (&keys)[ItemsPerThread],
+                                             Value (&/*values*/)[ItemsPerThread],
+                                             storage_type& storage)
     {
         // Synchronize before reusing shared memory
         ::rocprim::syncthreads();
 
         if(is_incomplete_block)
         {
-            block_store_type().store(keys_output + block_offset,
-                                     keys,
-                                     valid_in_last_block,
-                                     storage);
+            block_store_type().store(
+                keys_output + block_offset,
+                keys,
+                valid_in_last_block,
+                storage
+            );
         }
         else
         {
-            block_store_type().store(keys_output + block_offset, keys, storage);
+            block_store_type().store(
+                keys_output + block_offset,
+                keys,
+                storage
+            );
         }
     }
 };
 
-template<unsigned int BlockSize,
-         unsigned int ItemsPerThread,
-         class Key,
-         class Value,
-         arch::wavefront::target TargetWaveSize>
-struct block_store_impl<true, BlockSize, ItemsPerThread, Key, Value, TargetWaveSize>
-{
-    using block_store_key_type   = block_store<Key,
-                                               BlockSize,
-                                               ItemsPerThread,
-                                               block_store_method::block_store_transpose,
-                                               1,
-                                               1,
-                                               TargetWaveSize>;
-    using block_store_value_type = block_store<Value,
-                                               BlockSize,
-                                               ItemsPerThread,
-                                               block_store_method::block_store_transpose,
-                                               1,
-                                               1,
-                                               TargetWaveSize>;
+template<
+    unsigned int BlockSize,
+    unsigned int ItemsPerThread,
+    class Key,
+    class Value
+>
+struct block_store_impl<true, BlockSize, ItemsPerThread, Key, Value> {
+    using block_store_key_type   = block_store<Key, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
+    using block_store_value_type = block_store<Value, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
-    union storage_type
-    {
+    union storage_type {
         typename block_store_key_type::storage_type   keys;
         typename block_store_value_type::storage_type values;
     };
 
-    template<class KeysOutputIterator, class ValuesOutputIterator, class OffsetT>
+    template <class KeysOutputIterator, class ValuesOutputIterator, class OffsetT>
     ROCPRIM_DEVICE ROCPRIM_INLINE
-    void store(const OffsetT        block_offset,
-               const unsigned int   valid_in_last_block,
-               const bool           is_incomplete_block,
-               KeysOutputIterator   keys_output,
+    void store(const OffsetT block_offset,
+               const unsigned int valid_in_last_block,
+               const bool is_incomplete_block,
+               KeysOutputIterator keys_output,
                ValuesOutputIterator values_output,
                Key (&keys)[ItemsPerThread],
                Value (&values)[ItemsPerThread],
@@ -131,51 +118,51 @@ struct block_store_impl<true, BlockSize, ItemsPerThread, Key, Value, TargetWaveS
 
         if(is_incomplete_block)
         {
-            block_store_key_type().store(keys_output + block_offset,
-                                         keys,
-                                         valid_in_last_block,
-                                         storage.keys);
+            block_store_key_type().store(
+                keys_output + block_offset,
+                keys,
+                valid_in_last_block,
+                storage.keys
+            );
 
             ::rocprim::syncthreads();
 
-            block_store_value_type().store(values_output + block_offset,
-                                           values,
-                                           valid_in_last_block,
-                                           storage.values);
+            block_store_value_type().store(
+                values_output + block_offset,
+                values,
+                valid_in_last_block,
+                storage.values
+            );
         }
         else
         {
-            block_store_key_type().store(keys_output + block_offset, keys, storage.keys);
+            block_store_key_type().store(
+                keys_output + block_offset,
+                keys,
+                storage.keys
+            );
 
             ::rocprim::syncthreads();
 
-            block_store_value_type().store(values_output + block_offset, values, storage.values);
+            block_store_value_type().store(
+                values_output + block_offset,
+                values,
+                storage.values
+            );
         }
     }
 };
 
 template<typename Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize,
+         unsigned int BlockSize,
+         unsigned int ItemsPerThread,
          typename Enable = void>
 struct block_permute_values_impl
 {
-    using values_exchange_type = block_exchange<Value,
-                                                BlockSize,
-                                                ItemsPerThread,
-                                                1,
-                                                1,
-                                                block_padding_hint::avoid_conflicts,
-                                                TargetWaveSize>;
+    using values_exchange_type = block_exchange<Value, BlockSize, ItemsPerThread>;
 
-    using values_store_type = block_store<Value,
-                                          BlockSize,
-                                          ItemsPerThread,
-                                          block_store_method::block_store_transpose,
-                                          1,
-                                          1,
-                                          TargetWaveSize>;
+    using values_store_type
+        = block_store<Value, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
     union storage_type
     {
@@ -184,11 +171,10 @@ struct block_permute_values_impl
     };
 
     template<typename ValuesInputIterator, typename ValuesOutputIterator>
-    ROCPRIM_DEVICE
-    void permute(unsigned int (&ranks)[ItemsPerThread],
-                 ValuesInputIterator  values_input,
-                 ValuesOutputIterator values_output,
-                 storage_type&        storage)
+    ROCPRIM_DEVICE void permute(unsigned int (&ranks)[ItemsPerThread],
+                                ValuesInputIterator  values_input,
+                                ValuesOutputIterator values_output,
+                                storage_type&        storage)
     {
         syncthreads();
         const auto flat_id = block_thread_id<0>();
@@ -200,12 +186,11 @@ struct block_permute_values_impl
     }
 
     template<typename ValuesOutputIterator, typename ValuesInputIterator>
-    ROCPRIM_DEVICE
-    void permute(unsigned int (&ranks)[ItemsPerThread],
-                 ValuesInputIterator  values_input,
-                 ValuesOutputIterator values_output,
-                 const unsigned int   valid_in_last_block,
-                 storage_type&        storage)
+    ROCPRIM_DEVICE void permute(unsigned int (&ranks)[ItemsPerThread],
+                                ValuesInputIterator  values_input,
+                                ValuesOutputIterator values_output,
+                                const unsigned int   valid_in_last_block,
+                                storage_type&        storage)
     {
         syncthreads();
         const auto flat_id = block_thread_id<0>();
@@ -217,19 +202,16 @@ struct block_permute_values_impl
     }
 };
 
-template<unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
-struct block_permute_values_impl<rocprim::empty_type, BlockSize, ItemsPerThread, TargetWaveSize>
+template<unsigned int BlockSize, unsigned int ItemsPerThread>
+struct block_permute_values_impl<rocprim::empty_type, BlockSize, ItemsPerThread>
 {
     using storage_type = empty_storage_type;
 
     template<typename ValuesInputIterator, typename ValuesOutputIterator>
-    ROCPRIM_DEVICE
-    void permute(unsigned int (&ranks)[ItemsPerThread],
-                 ValuesInputIterator  values_input,
-                 ValuesOutputIterator values_output,
-                 storage_type&        storage)
+    ROCPRIM_DEVICE void permute(unsigned int (&ranks)[ItemsPerThread],
+                                ValuesInputIterator  values_input,
+                                ValuesOutputIterator values_output,
+                                storage_type&        storage)
     {
         (void)ranks;
         (void)values_input;
@@ -238,12 +220,11 @@ struct block_permute_values_impl<rocprim::empty_type, BlockSize, ItemsPerThread,
     }
 
     template<typename ValuesOutputIterator, typename ValuesInputIterator>
-    ROCPRIM_DEVICE
-    void permute(unsigned int (&ranks)[ItemsPerThread],
-                 ValuesInputIterator  values_input,
-                 ValuesOutputIterator values_output,
-                 const unsigned int   valid_in_last_block,
-                 storage_type&        storage)
+    ROCPRIM_DEVICE void permute(unsigned int (&ranks)[ItemsPerThread],
+                                ValuesInputIterator  values_input,
+                                ValuesOutputIterator values_output,
+                                const unsigned int   valid_in_last_block,
+                                storage_type&        storage)
     {
         (void)ranks;
         (void)values_input;
@@ -258,17 +239,13 @@ struct block_permute_values_impl<rocprim::empty_type, BlockSize, ItemsPerThread,
 // when storing/loading those ValueTypes to/from registers.
 // Thus this is a temporary workaround.
 // TODO: Check if also the case for small types like this.
-template<typename Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
+template<typename Value, unsigned int BlockSize, unsigned int ItemsPerThread>
 struct block_permute_values_impl<Value,
                                  BlockSize,
                                  ItemsPerThread,
-                                 TargetWaveSize,
                                  std::enable_if_t<(std::is_trivially_copyable<Value>::value
                                                    && !rocprim::is_floating_point<Value>::value
-                                                   && !rocprim::is_integral<Value>::value)>>
+                                                   && !std::is_integral<Value>::value)>>
 {
     static constexpr unsigned int items_per_block = ItemsPerThread * BlockSize;
 
@@ -282,11 +259,10 @@ struct block_permute_values_impl<Value,
     ROCPRIM_DETAIL_SUPPRESS_DEPRECATION_POP
 
     template<typename ValuesInputIterator, typename ValuesOutputIterator>
-    ROCPRIM_DEVICE
-    void permute(unsigned int (&ranks)[ItemsPerThread],
-                 ValuesInputIterator  values_input,
-                 ValuesOutputIterator values_output,
-                 storage_type&        storage_)
+    ROCPRIM_DEVICE void permute(unsigned int (&ranks)[ItemsPerThread],
+                                ValuesInputIterator  values_input,
+                                ValuesOutputIterator values_output,
+                                storage_type&        storage_)
     {
         syncthreads();
         auto&      values_shared = storage_.get().values;
@@ -309,12 +285,11 @@ struct block_permute_values_impl<Value,
     }
 
     template<typename ValuesOutputIterator, typename ValuesInputIterator>
-    ROCPRIM_DEVICE
-    void permute(unsigned int (&ranks)[ItemsPerThread],
-                 ValuesInputIterator  values_input,
-                 ValuesOutputIterator values_output,
-                 const unsigned int   valid_in_last_block,
-                 storage_type&        storage_)
+    ROCPRIM_DEVICE void permute(unsigned int (&ranks)[ItemsPerThread],
+                                ValuesInputIterator  values_input,
+                                ValuesOutputIterator values_output,
+                                const unsigned int   valid_in_last_block,
+                                storage_type&        storage_)
     {
         syncthreads();
         auto&      values_shared = storage_.get().values;
@@ -345,25 +320,16 @@ struct block_permute_values_impl<Value,
 
 template<typename Key,
          typename Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize,
+         unsigned int BlockSize,
+         unsigned int ItemsPerThread,
          typename Enable = void>
 struct block_sort_impl;
 
-template<typename Key,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
-struct block_sort_impl<Key, rocprim::empty_type, BlockSize, ItemsPerThread, TargetWaveSize>
+template<typename Key, unsigned int BlockSize, unsigned int ItemsPerThread>
+struct block_sort_impl<Key, rocprim::empty_type, BlockSize, ItemsPerThread>
 {
-    using keys_load_type = block_load<Key,
-                                      BlockSize,
-                                      ItemsPerThread,
-                                      block_load_method::block_load_transpose,
-                                      1,
-                                      1,
-                                      TargetWaveSize>;
+    using keys_load_type
+        = block_load<Key, BlockSize, ItemsPerThread, block_load_method::block_load_transpose>;
 
     using sort_type = block_sort<Key,
                                  BlockSize,
@@ -371,13 +337,8 @@ struct block_sort_impl<Key, rocprim::empty_type, BlockSize, ItemsPerThread, Targ
                                  rocprim::empty_type,
                                  block_sort_algorithm::stable_merge_sort>;
 
-    using keys_store_type = block_store<Key,
-                                        BlockSize,
-                                        ItemsPerThread,
-                                        block_store_method::block_store_transpose,
-                                        1,
-                                        1,
-                                        TargetWaveSize>;
+    using keys_store_type
+        = block_store<Key, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
     union storage_type
     {
@@ -391,15 +352,14 @@ struct block_sort_impl<Key, rocprim::empty_type, BlockSize, ItemsPerThread, Targ
              typename ValuesInputIterator,
              typename ValuesOutputIterator,
              typename BinaryFunction>
-    ROCPRIM_DEVICE
-    void sort(unsigned int       valid_in_last_block,
-              const bool         is_incomplete_block,
-              KeysInputIterator  keys_input,
-              KeysOutputIterator keys_output,
-              ValuesInputIterator /*values_input*/,
-              ValuesOutputIterator /*values_output*/,
-              BinaryFunction compare_function,
-              storage_type&  storage)
+    ROCPRIM_DEVICE void sort(unsigned int       valid_in_last_block,
+                             const bool         is_incomplete_block,
+                             KeysInputIterator  keys_input,
+                             KeysOutputIterator keys_output,
+                             ValuesInputIterator /*values_input*/,
+                             ValuesOutputIterator /*values_output*/,
+                             BinaryFunction compare_function,
+                             storage_type&  storage)
     {
         Key keys[ItemsPerThread];
 
@@ -423,33 +383,18 @@ struct block_sort_impl<Key, rocprim::empty_type, BlockSize, ItemsPerThread, Targ
 };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-template<typename Key,
-         typename Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
+template<typename Key, typename Value, unsigned int BlockSize, unsigned int ItemsPerThread>
 struct block_sort_impl<Key,
                        Value,
                        BlockSize,
                        ItemsPerThread,
-                       TargetWaveSize,
                        std::enable_if_t<(sizeof(Value) <= sizeof(int))>>
 {
-    using keys_load_type = block_load<Key,
-                                      BlockSize,
-                                      ItemsPerThread,
-                                      block_load_method::block_load_transpose,
-                                      1,
-                                      1,
-                                      TargetWaveSize>;
+    using keys_load_type
+        = block_load<Key, BlockSize, ItemsPerThread, block_load_method::block_load_transpose>;
 
-    using values_load_type = block_load<Value,
-                                        BlockSize,
-                                        ItemsPerThread,
-                                        block_load_method::block_load_transpose,
-                                        1,
-                                        1,
-                                        TargetWaveSize>;
+    using values_load_type
+        = block_load<Value, BlockSize, ItemsPerThread, block_load_method::block_load_transpose>;
 
     using sort_type = block_sort<Key,
                                  BlockSize,
@@ -457,21 +402,11 @@ struct block_sort_impl<Key,
                                  Value,
                                  block_sort_algorithm::stable_merge_sort>;
 
-    using keys_store_type = block_store<Key,
-                                        BlockSize,
-                                        ItemsPerThread,
-                                        block_store_method::block_store_transpose,
-                                        1,
-                                        1,
-                                        TargetWaveSize>;
+    using keys_store_type
+        = block_store<Key, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
-    using values_store_type = block_store<Value,
-                                          BlockSize,
-                                          ItemsPerThread,
-                                          block_store_method::block_store_transpose,
-                                          1,
-                                          1,
-                                          TargetWaveSize>;
+    using values_store_type
+        = block_store<Value, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
     union storage_type
     {
@@ -487,15 +422,14 @@ struct block_sort_impl<Key,
              typename ValuesInputIterator,
              typename ValuesOutputIterator,
              typename BinaryFunction>
-    ROCPRIM_DEVICE
-    void sort(const unsigned int   valid_in_last_block,
-              const bool           is_incomplete_block,
-              KeysInputIterator    keys_input,
-              KeysOutputIterator   keys_output,
-              ValuesInputIterator  values_input,
-              ValuesOutputIterator values_output,
-              BinaryFunction       compare_function,
-              storage_type&        storage)
+    ROCPRIM_DEVICE void sort(const unsigned int   valid_in_last_block,
+                             const bool           is_incomplete_block,
+                             KeysInputIterator    keys_input,
+                             KeysOutputIterator   keys_output,
+                             ValuesInputIterator  values_input,
+                             ValuesOutputIterator values_output,
+                             BinaryFunction       compare_function,
+                             storage_type&        storage)
     {
         Key   keys[ItemsPerThread];
         Value values[ItemsPerThread];
@@ -529,25 +463,15 @@ struct block_sort_impl<Key,
         }
     }
 };
-template<typename Key,
-         typename Value,
-         unsigned int            BlockSize,
-         unsigned int            ItemsPerThread,
-         arch::wavefront::target TargetWaveSize>
+template<typename Key, typename Value, unsigned int BlockSize, unsigned int ItemsPerThread>
 struct block_sort_impl<Key,
                        Value,
                        BlockSize,
                        ItemsPerThread,
-                       TargetWaveSize,
                        std::enable_if_t<(sizeof(Value) > sizeof(int))>>
 {
-    using keys_load_type = block_load<Key,
-                                      BlockSize,
-                                      ItemsPerThread,
-                                      block_load_method::block_load_transpose,
-                                      1,
-                                      1,
-                                      TargetWaveSize>;
+    using keys_load_type
+        = block_load<Key, BlockSize, ItemsPerThread, block_load_method::block_load_transpose>;
 
     using sort_type = block_sort<Key,
                                  BlockSize,
@@ -555,16 +479,10 @@ struct block_sort_impl<Key,
                                  unsigned int,
                                  block_sort_algorithm::stable_merge_sort>;
 
-    using keys_store_type = block_store<Key,
-                                        BlockSize,
-                                        ItemsPerThread,
-                                        block_store_method::block_store_transpose,
-                                        1,
-                                        1,
-                                        TargetWaveSize>;
+    using keys_store_type
+        = block_store<Key, BlockSize, ItemsPerThread, block_store_method::block_store_transpose>;
 
-    using values_permute_type
-        = block_permute_values_impl<Value, BlockSize, ItemsPerThread, TargetWaveSize>;
+    using values_permute_type = block_permute_values_impl<Value, BlockSize, ItemsPerThread>;
 
     union storage_type
     {
@@ -579,15 +497,14 @@ struct block_sort_impl<Key,
              typename ValuesInputIterator,
              typename ValuesOutputIterator,
              typename BinaryFunction>
-    ROCPRIM_DEVICE
-    void sort(const unsigned int   valid_in_last_block,
-              const bool           is_incomplete_block,
-              KeysInputIterator    keys_input,
-              KeysOutputIterator   keys_output,
-              ValuesInputIterator  values_input,
-              ValuesOutputIterator values_output,
-              BinaryFunction       compare_function,
-              storage_type&        storage)
+    ROCPRIM_DEVICE void sort(const unsigned int   valid_in_last_block,
+                             const bool           is_incomplete_block,
+                             KeysInputIterator    keys_input,
+                             KeysOutputIterator   keys_output,
+                             ValuesInputIterator  values_input,
+                             ValuesOutputIterator values_output,
+                             BinaryFunction       compare_function,
+                             storage_type&        storage)
     {
         Key keys[ItemsPerThread];
 
@@ -672,7 +589,7 @@ void block_merge_oddeven_kernel(KeysInputIterator    keys_input,
         }
         block_load_direct_blocked(flat_id, keys_input + block_offset, keys, valid_in_last_block);
 
-        if constexpr(with_values)
+        if ROCPRIM_IF_CONSTEXPR(with_values)
         {
             block_load_direct_blocked(flat_id,
                                       values_input + block_offset,
@@ -683,7 +600,7 @@ void block_merge_oddeven_kernel(KeysInputIterator    keys_input,
     else
     {
         block_load_direct_blocked(flat_id, keys_input + block_offset, keys);
-        if constexpr(with_values)
+        if ROCPRIM_IF_CONSTEXPR(with_values)
         {
             block_load_direct_blocked(flat_id, values_input + block_offset, values);
         }
@@ -713,7 +630,7 @@ void block_merge_oddeven_kernel(KeysInputIterator    keys_input,
                 if(id < input_size)
                 {
                     keys_output[id] = keys[i];
-                    if constexpr(with_values)
+                    if ROCPRIM_IF_CONSTEXPR(with_values)
                     {
                         values_output[id] = values[i];
                     }
@@ -727,7 +644,7 @@ void block_merge_oddeven_kernel(KeysInputIterator    keys_input,
             {
                 const OffsetT id = block_offset + thread_offset + i;
                 keys_output[id]  = keys[i];
-                if constexpr(with_values)
+                if ROCPRIM_IF_CONSTEXPR(with_values)
                 {
                     values_output[id] = values[i];
                 }
@@ -758,7 +675,7 @@ void block_merge_oddeven_kernel(KeysInputIterator    keys_input,
 
         OffsetT offset      = dest_offset + i + left_id; // Destination offset (target calculation)
         keys_output[offset] = keys[i];
-        if constexpr(with_values)
+        if ROCPRIM_IF_CONSTEXPR(with_values)
         {
             values_output[offset] = values[i];
         }
@@ -785,7 +702,7 @@ void block_merge_oddeven_kernel(KeysInputIterator    keys_input,
     }
 }
 
-} // namespace detail
+} // end of detail namespace
 
 END_ROCPRIM_NAMESPACE
 

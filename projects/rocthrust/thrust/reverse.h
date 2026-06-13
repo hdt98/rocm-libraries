@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+
 /*! \file reverse.h
  *  \brief Reverses the order of a range
  */
@@ -21,7 +22,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/execution_policy.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -30,6 +30,7 @@ THRUST_NAMESPACE_BEGIN
  *  \{
  *  \ingroup algorithms
  */
+
 
 /*! \p reverse reverses a range. That is: for every <tt>i</tt> such that
  *  <tt>0 <= i <= (last - first) / 2</tt>, it exchanges <tt>*(first + i)</tt>
@@ -42,9 +43,8 @@ THRUST_NAMESPACE_BEGIN
  *  \param last The end of the range to reverse.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam BidirectionalIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a> and \p
- * BidirectionalIterator is mutable.
+ *  \tparam BidirectionalIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a> and
+ *          \p BidirectionalIterator is mutable.
  *
  *  The following code snippet demonstrates how to use \p reverse to reverse a
  *  \p device_vector of integers using the \p thrust::device execution policy for
@@ -60,15 +60,17 @@ THRUST_NAMESPACE_BEGIN
  *  thrust::reverse(thrust::device, v.begin(), v.end());
  *  // v is now {5, 4, 3, 2, 1, 0}
  *  \endcode
- *
+ *  
  *  \see https://en.cppreference.com/w/cpp/algorithm/reverse
  *  \see \p reverse_copy
  *  \see \p reverse_iterator
  */
-template <typename DerivedPolicy, typename BidirectionalIterator>
-THRUST_HOST_DEVICE void reverse(const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-                                BidirectionalIterator first,
-                                BidirectionalIterator last);
+template<typename DerivedPolicy, typename BidirectionalIterator>
+THRUST_HOST_DEVICE
+  void reverse(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+               BidirectionalIterator first,
+               BidirectionalIterator last);
+
 
 /*! \p reverse reverses a range. That is: for every <tt>i</tt> such that
  *  <tt>0 <= i <= (last - first) / 2</tt>, it exchanges <tt>*(first + i)</tt>
@@ -77,9 +79,8 @@ THRUST_HOST_DEVICE void reverse(const thrust::detail::execution_policy_base<Deri
  *  \param first The beginning of the range to reverse.
  *  \param last The end of the range to reverse.
  *
- *  \tparam BidirectionalIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a> and \p
- * BidirectionalIterator is mutable.
+ *  \tparam BidirectionalIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a> and
+ *          \p BidirectionalIterator is mutable.
  *
  *  The following code snippet demonstrates how to use \p reverse to reverse a
  *  \p device_vector of integers.
@@ -93,19 +94,21 @@ THRUST_HOST_DEVICE void reverse(const thrust::detail::execution_policy_base<Deri
  *  thrust::reverse(v.begin(), v.end());
  *  // v is now {5, 4, 3, 2, 1, 0}
  *  \endcode
- *
+ *  
  *  \see https://en.cppreference.com/w/cpp/algorithm/reverse
  *  \see \p reverse_copy
  *  \see \p reverse_iterator
  */
-template <typename BidirectionalIterator>
-void reverse(BidirectionalIterator first, BidirectionalIterator last);
+template<typename BidirectionalIterator>
+  void reverse(BidirectionalIterator first,
+               BidirectionalIterator last);
+
 
 /*! \p reverse_copy differs from \p reverse only in that the reversed range
  *  is written to a different output range, rather than inplace.
  *
  *  \p reverse_copy copies elements from the range <tt>[first, last)</tt> to the
- *  range <tt>[result, result + (last - first))</tt> such that the copy is a
+ *  range <tt>[result, result + (last - first))</tt> such that the copy is a 
  *  reverse of the original range. Specifically: for every <tt>i</tt> such that
  *  <tt>0 <= i < (last - first)</tt>, \p reverse_copy performs the assignment
  *  <tt>*(result + (last - first) - i) = *(first + i)</tt>.
@@ -120,10 +123,9 @@ void reverse(BidirectionalIterator first, BidirectionalIterator last);
  *  \param result The beginning of the output range.
  *
  *  \tparam DerivedPolicy The name of the derived execution policy.
- *  \tparam BidirectionalIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a>, and \p
- * BidirectionalIterator's \p value_type is convertible to \p OutputIterator's \p value_type. \tparam OutputIterator is
- * a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam BidirectionalIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a>,
+ *          and \p BidirectionalIterator's \p value_type is convertible to \p OutputIterator's \p value_type.
+ *  \tparam OutputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
  *  \pre The range <tt>[first, last)</tt> and the range <tt>[result, result + (last - first))</tt> shall not overlap.
  *
@@ -143,23 +145,24 @@ void reverse(BidirectionalIterator first, BidirectionalIterator last);
  *  // input is still {0, 1, 2, 3, 4, 5}
  *  // output is now  {5, 4, 3, 2, 1, 0}
  *  \endcode
- *
+ *  
  *  \see https://en.cppreference.com/w/cpp/algorithm/reverse_copy
  *  \see \p reverse
  *  \see \p reverse_iterator
  */
-template <typename DerivedPolicy, typename BidirectionalIterator, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator reverse_copy(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec,
-  BidirectionalIterator first,
-  BidirectionalIterator last,
-  OutputIterator result);
+template<typename DerivedPolicy, typename BidirectionalIterator, typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator reverse_copy(const thrust::detail::execution_policy_base<DerivedPolicy> &exec,
+                              BidirectionalIterator first,
+                              BidirectionalIterator last,
+                              OutputIterator result);
+
 
 /*! \p reverse_copy differs from \p reverse only in that the reversed range
  *  is written to a different output range, rather than inplace.
  *
  *  \p reverse_copy copies elements from the range <tt>[first, last)</tt> to the
- *  range <tt>[result, result + (last - first))</tt> such that the copy is a
+ *  range <tt>[result, result + (last - first))</tt> such that the copy is a 
  *  reverse of the original range. Specifically: for every <tt>i</tt> such that
  *  <tt>0 <= i < (last - first)</tt>, \p reverse_copy performs the assignment
  *  <tt>*(result + (last - first) - i) = *(first + i)</tt>.
@@ -170,10 +173,9 @@ THRUST_HOST_DEVICE OutputIterator reverse_copy(
  *  \param last The end of the range to reverse.
  *  \param result The beginning of the output range.
  *
- *  \tparam BidirectionalIterator is a model of <a
- * href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a>, and \p
- * BidirectionalIterator's \p value_type is convertible to \p OutputIterator's \p value_type. \tparam OutputIterator is
- * a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
+ *  \tparam BidirectionalIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/bidirectional_iterator">Bidirectional Iterator</a>,
+ *          and \p BidirectionalIterator's \p value_type is convertible to \p OutputIterator's \p value_type.
+ *  \tparam OutputIterator is a model of <a href="https://en.cppreference.com/w/cpp/iterator/output_iterator">Output Iterator</a>.
  *
  *  \pre The range <tt>[first, last)</tt> and the range <tt>[result, result + (last - first))</tt> shall not overlap.
  *
@@ -191,13 +193,16 @@ THRUST_HOST_DEVICE OutputIterator reverse_copy(
  *  // input is still {0, 1, 2, 3, 4, 5}
  *  // output is now  {5, 4, 3, 2, 1, 0}
  *  \endcode
- *
+ *  
  *  \see https://en.cppreference.com/w/cpp/algorithm/reverse_copy
  *  \see \p reverse
  *  \see \p reverse_iterator
  */
-template <typename BidirectionalIterator, typename OutputIterator>
-OutputIterator reverse_copy(BidirectionalIterator first, BidirectionalIterator last, OutputIterator result);
+template<typename BidirectionalIterator, typename OutputIterator>
+  OutputIterator reverse_copy(BidirectionalIterator first,
+                              BidirectionalIterator last,
+                              OutputIterator result);
+
 
 /*! \} // end reordering
  */

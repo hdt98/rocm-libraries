@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -72,7 +72,7 @@ void testing_rotg(const Arguments& arg)
     auto hipblasRotgFn_64
         = arg.api == FORTRAN_64 ? hipblasRotg_64<T, U, true> : hipblasRotg_64<T, U, false>;
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     hipblasLocalHandle handle(arg);
 
@@ -120,12 +120,7 @@ void testing_rotg(const Arguments& arg)
     if(arg.unit_check || arg.norm_check)
     {
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
-        DAPI_CHECK(hipblasRotgFn,
-                   (handle,
-                    ha.internal_type(),
-                    hb.internal_type(),
-                    hc.internal_type(),
-                    hs.internal_type()));
+        DAPI_CHECK(hipblasRotgFn, (handle, ha, hb, hc, hs));
 
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_DEVICE));
         DAPI_CHECK(hipblasRotgFn, (handle, da, db, dc, ds));

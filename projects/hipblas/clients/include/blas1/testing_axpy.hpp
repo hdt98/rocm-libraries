@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,7 +39,6 @@ inline void testname_axpy(const Arguments& arg, std::string& name)
 template <typename T>
 void testing_axpy_bad_arg(const Arguments& arg)
 {
-    using Ts           = hipblas_internal_type<T>;
     bool FORTRAN       = arg.api == hipblas_client_api::FORTRAN;
     auto hipblasAxpyFn = FORTRAN ? hipblasAxpy<T, true> : hipblasAxpy<T, false>;
     auto hipblasAxpyFn_64
@@ -58,9 +57,9 @@ void testing_axpy_bad_arg(const Arguments& arg)
         device_vector<T> dx(N, incx);
         device_vector<T> dy(N, incy);
 
-        const Ts  h_alpha{1.0f}, h_zero{0.0f};
-        const Ts* alpha = &h_alpha;
-        const Ts* zero  = &h_zero;
+        const T  h_alpha(1), h_zero(0);
+        const T* alpha = &h_alpha;
+        const T* zero  = &h_zero;
 
         if(pointer_mode == HIPBLAS_POINTER_MODE_DEVICE)
         {
@@ -100,7 +99,6 @@ void testing_axpy_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_axpy(const Arguments& arg)
 {
-    using Ts           = hipblas_internal_type<T>;
     bool FORTRAN       = arg.api == hipblas_client_api::FORTRAN;
     auto hipblasAxpyFn = FORTRAN ? hipblasAxpy<T, true> : hipblasAxpy<T, false>;
     auto hipblasAxpyFn_64
@@ -142,7 +140,7 @@ void testing_axpy(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dy_device.memcheck());
     CHECK_DEVICE_ALLOCATION(d_alpha.memcheck());
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_vector(hx, arg, hipblas_client_alpha_sets_nan, true);
@@ -168,8 +166,7 @@ void testing_axpy(const Arguments& arg)
         DAPI_CHECK(hipblasAxpyFn, (handle, N, d_alpha, dx, incx, dy_device, incy));
 
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));
-        DAPI_CHECK(hipblasAxpyFn,
-                   (handle, N, reinterpret_cast<Ts*>(&alpha), dx, incx, dy_host, incy));
+        DAPI_CHECK(hipblasAxpyFn, (handle, N, &alpha, dx, incx, dy_host, incy));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(hy_host.transfer_from(dy_host));

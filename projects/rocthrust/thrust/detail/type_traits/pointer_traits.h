@@ -17,204 +17,201 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
 #include <thrust/detail/type_traits.h>
-#include <thrust/detail/type_traits/has_nested_type.h>
 #include <thrust/detail/type_traits/is_metafunction_defined.h>
+#include <thrust/detail/type_traits/has_nested_type.h>
 #include <thrust/iterator/iterator_traits.h>
-
-#include _THRUST_STD_INCLUDE(cstddef)
-#include _THRUST_STD_INCLUDE(type_traits)
+#include <cstddef>
+#include <type_traits>
 
 THRUST_NAMESPACE_BEGIN
 namespace detail
 {
 
-template <typename Ptr>
-struct pointer_element;
+template<typename Ptr> struct pointer_element;
 
-template <template <typename...> class Ptr, typename FirstArg, typename... Args>
-struct pointer_element<Ptr<FirstArg, Args...>>
+template<template<typename> class Ptr, typename Arg>
+  struct pointer_element<Ptr<Arg> >
 {
-  using type = FirstArg;
+  using type = Arg;
 };
 
-template <typename T>
-struct pointer_element<T*>
+template<template<typename,typename> class Ptr, typename Arg1, typename Arg2>
+  struct pointer_element<Ptr<Arg1,Arg2> >
+{
+  using type = Arg1;
+};
+
+template<template<typename,typename,typename> class Ptr, typename Arg1, typename Arg2, typename Arg3>
+  struct pointer_element<Ptr<Arg1,Arg2,Arg3> >
+{
+  using type = Arg1;
+};
+
+template<template<typename,typename,typename,typename> class Ptr, typename Arg1, typename Arg2, typename Arg3, typename Arg4>
+  struct pointer_element<Ptr<Arg1,Arg2,Arg3,Arg4> >
+{
+  using type = Arg1;
+};
+
+template<template<typename,typename,typename,typename,typename> class Ptr, typename Arg1, typename Arg2, typename Arg3, typename Arg4, typename Arg5>
+  struct pointer_element<Ptr<Arg1,Arg2,Arg3,Arg4,Arg5> >
+{
+  using type = Arg1;
+};
+
+template<typename T>
+  struct pointer_element<T*>
 {
   using type = T;
 };
 
-template <typename Ptr>
-struct pointer_difference
+template<typename Ptr>
+  struct pointer_difference
 {
   using type = typename Ptr::difference_type;
 };
 
-template <typename T>
-struct pointer_difference<T*>
+template<typename T>
+  struct pointer_difference<T*>
 {
-  using type = _THRUST_STD::ptrdiff_t;
+  using type = std::ptrdiff_t;
 };
 
-template <typename Ptr, typename T>
-struct rebind_pointer;
+template<typename Ptr, typename T> struct rebind_pointer;
 
-template <typename T, typename U>
-struct rebind_pointer<T*, U>
+template<typename T, typename U>
+  struct rebind_pointer<T*,U>
 {
   using type = U*;
 };
 
 // Rebind generic fancy pointers.
-template <template <typename, typename...> class Ptr, typename OldT, typename... Tail, typename T>
-struct rebind_pointer<Ptr<OldT, Tail...>, T>
+template<template<typename, typename...> class Ptr, typename OldT, typename... Tail, typename T>
+  struct rebind_pointer<Ptr<OldT,Tail...>,T>
 {
-  using type = Ptr<T, Tail...>;
+  using type = Ptr<T,Tail...>;
 };
 
 // Rebind `thrust::pointer`-like things with `thrust::reference`-like references.
-template <template <typename, typename, typename, typename...> class Ptr,
-          typename OldT,
-          typename Tag,
-          template <typename...>
-          class Ref,
-          typename... RefTail,
-          typename... PtrTail,
-          typename T>
-struct rebind_pointer<Ptr<OldT, Tag, Ref<OldT, RefTail...>, PtrTail...>, T>
+template<template<typename, typename, typename, typename...> class Ptr, typename OldT, typename Tag,
+         template<typename...> class Ref, typename... RefTail,
+         typename... PtrTail, typename T>
+  struct rebind_pointer<Ptr<OldT,Tag,Ref<OldT,RefTail...>,PtrTail...>,T>
 {
-  //  static_assert(_THRUST_STD::is_same<OldT, Tag>::value, "0");
-  using type = Ptr<T, Tag, Ref<T, RefTail...>, PtrTail...>;
+//  static_assert(std::is_same<OldT, Tag>::value, "0");
+  using type = Ptr<T,Tag,Ref<T,RefTail...>,PtrTail...>;
 };
 
 // Rebind `thrust::pointer`-like things with `thrust::reference`-like references
 // and templated derived types.
-template <template <typename, typename, typename, typename...> class Ptr,
-          typename OldT,
-          typename Tag,
-          template <typename...>
-          class Ref,
-          typename... RefTail,
-          template <typename...>
-          class DerivedPtr,
-          typename... DerivedPtrTail,
-          typename T>
-struct rebind_pointer<Ptr<OldT, Tag, Ref<OldT, RefTail...>, DerivedPtr<OldT, DerivedPtrTail...>>, T>
+template<template<typename, typename, typename, typename...> class Ptr, typename OldT, typename Tag,
+         template<typename...> class Ref, typename... RefTail,
+         template<typename...> class DerivedPtr, typename... DerivedPtrTail,
+         typename T>
+  struct rebind_pointer<Ptr<OldT,Tag,Ref<OldT,RefTail...>,DerivedPtr<OldT,DerivedPtrTail...>>,T>
 {
-  //  static_assert(_THRUST_STD::is_same<OldT, Tag>::value, "1");
-  using type = Ptr<T, Tag, Ref<T, RefTail...>, DerivedPtr<T, DerivedPtrTail...>>;
+//  static_assert(std::is_same<OldT, Tag>::value, "1");
+  using type = Ptr<T,Tag,Ref<T,RefTail...>,DerivedPtr<T,DerivedPtrTail...>>;
 };
 
 // Rebind `thrust::pointer`-like things with native reference types.
-template <template <typename, typename, typename, typename...> class Ptr,
-          typename OldT,
-          typename Tag,
-          typename... PtrTail,
-          typename T>
-struct rebind_pointer<Ptr<OldT, Tag, typename _THRUST_STD::add_lvalue_reference<OldT>::type, PtrTail...>, T>
+template<template<typename, typename, typename, typename...> class Ptr, typename OldT, typename Tag,
+         typename... PtrTail, typename T>
+  struct rebind_pointer<Ptr<OldT,Tag,typename std::add_lvalue_reference<OldT>::type,PtrTail...>,T>
 {
-  //  static_assert(_THRUST_STD::is_same<OldT, Tag>::value, "2");
-  using type = Ptr<T, Tag, typename _THRUST_STD::add_lvalue_reference<T>::type, PtrTail...>;
+//  static_assert(std::is_same<OldT, Tag>::value, "2");
+  using type = Ptr<T,Tag,typename std::add_lvalue_reference<T>::type,PtrTail...>;
 };
 
 // Rebind `thrust::pointer`-like things with native reference types and templated
 // derived types.
-template <template <typename, typename, typename, typename...> class Ptr,
-          typename OldT,
-          typename Tag,
-          template <typename...>
-          class DerivedPtr,
-          typename... DerivedPtrTail,
-          typename T>
-struct rebind_pointer<
-  Ptr<OldT, Tag, typename _THRUST_STD::add_lvalue_reference<OldT>::type, DerivedPtr<OldT, DerivedPtrTail...>>,
-  T>
+template<template<typename, typename, typename, typename...> class Ptr, typename OldT, typename Tag,
+         template<typename...> class DerivedPtr, typename... DerivedPtrTail,
+         typename T>
+  struct rebind_pointer<Ptr<OldT,Tag,typename std::add_lvalue_reference<OldT>::type,DerivedPtr<OldT,DerivedPtrTail...>>,T>
 {
-  //  static_assert(_THRUST_STD::is_same<OldT, Tag>::value, "3");
-  using type = Ptr<T, Tag, typename _THRUST_STD::add_lvalue_reference<T>::type, DerivedPtr<T, DerivedPtrTail...>>;
+//  static_assert(std::is_same<OldT, Tag>::value, "3");
+  using type = Ptr<T,Tag,typename std::add_lvalue_reference<T>::type,DerivedPtr<T,DerivedPtrTail...>>;
 };
+
+__THRUST_DEFINE_HAS_NESTED_TYPE(has_raw_pointer, raw_pointer)
 
 namespace pointer_traits_detail
 {
 
-template <typename Ptr, typename Enable = void>
-struct pointer_raw_pointer_impl
-{};
+template<typename Ptr, typename Enable = void> struct pointer_raw_pointer_impl {};
 
-template <typename T>
-struct pointer_raw_pointer_impl<T*>
+template<typename T>
+  struct pointer_raw_pointer_impl<T*>
 {
   using type = T*;
 };
 
-template <typename Ptr>
-struct pointer_raw_pointer_impl<Ptr, _THRUST_STD::void_t<typename Ptr::raw_pointer>>
+template<typename Ptr>
+  struct pointer_raw_pointer_impl<Ptr, typename enable_if<has_raw_pointer<Ptr>::value>::type>
 {
   using type = typename Ptr::raw_pointer;
 };
 
-} // namespace pointer_traits_detail
+} // end pointer_traits_detail
 
-template <typename T>
-struct pointer_raw_pointer : pointer_traits_detail::pointer_raw_pointer_impl<T>
+template<typename T>
+  struct pointer_raw_pointer
+    : pointer_traits_detail::pointer_raw_pointer_impl<T>
 {};
 
 namespace pointer_traits_detail
 {
 
-template <typename Void>
-struct capture_address
+template<typename Void>
+  struct capture_address
 {
-  template <typename T>
-  THRUST_HOST_DEVICE capture_address(T& r)
-      : m_addr(&r)
+  template<typename T>
+  THRUST_HOST_DEVICE
+  capture_address(T &r)
+    : m_addr(&r)
   {}
 
-  inline THRUST_HOST_DEVICE Void* operator&() const
+  inline THRUST_HOST_DEVICE
+  Void *operator&() const
   {
     return m_addr;
   }
 
-  Void* m_addr;
+  Void *m_addr;
 };
 
 // metafunction to compute the type of pointer_to's parameter below
-template <typename T>
-struct pointer_to_param
-    : thrust::detail::eval_if<_THRUST_STD::is_void<T>::value,
-                              thrust::detail::identity_<capture_address<T>>,
-                              _THRUST_STD::add_lvalue_reference<T>>
+template<typename T>
+  struct pointer_to_param
+    : thrust::detail::eval_if<
+        thrust::detail::is_void<T>::value,
+        thrust::detail::identity_<capture_address<T> >,
+        thrust::detail::add_reference<T>
+      >
 {};
 
-} // namespace pointer_traits_detail
+}
 
-template <typename Ptr>
-struct pointer_traits
+template<typename Ptr>
+  struct pointer_traits
 {
   using pointer         = Ptr;
   using reference       = typename Ptr::reference;
   using element_type    = typename pointer_element<Ptr>::type;
   using difference_type = typename pointer_difference<Ptr>::type;
 
-  template <typename U>
-  struct rebind
+  template<typename U>
+    struct rebind
   {
     using other = typename rebind_pointer<Ptr, U>::type;
   };
 
-  THRUST_HOST_DEVICE inline static pointer
-  pointer_to(typename pointer_traits_detail::pointer_to_param<element_type>::type r)
+  THRUST_HOST_DEVICE
+  inline static pointer pointer_to(typename pointer_traits_detail::pointer_to_param<element_type>::type r)
   {
-    // XXX this is supposed to be pointer::pointer_to(&r); (i.e., call a static member function of pointer called
-    // pointer_to)
+    // XXX this is supposed to be pointer::pointer_to(&r); (i.e., call a static member function of pointer called pointer_to)
     //     assume that pointer has a constructor from raw pointer instead
 
     return pointer(&r);
@@ -223,28 +220,29 @@ struct pointer_traits
   // thrust additions follow
   using raw_pointer = typename pointer_raw_pointer<Ptr>::type;
 
-  THRUST_HOST_DEVICE inline static raw_pointer get(pointer ptr)
+  THRUST_HOST_DEVICE
+  inline static raw_pointer get(pointer ptr)
   {
     return ptr.get();
   }
 };
 
-template <typename T>
-struct pointer_traits<T*>
+template<typename T>
+  struct pointer_traits<T*>
 {
   using pointer         = T*;
   using reference       = T&;
   using element_type    = T;
   using difference_type = typename pointer_difference<T*>::type;
 
-  template <typename U>
-  struct rebind
+  template<typename U>
+    struct rebind
   {
     using other = U*;
   };
 
-  THRUST_HOST_DEVICE inline static pointer
-  pointer_to(typename pointer_traits_detail::pointer_to_param<element_type>::type r)
+  THRUST_HOST_DEVICE
+  inline static pointer pointer_to(typename pointer_traits_detail::pointer_to_param<element_type>::type r)
   {
     return &r;
   }
@@ -252,27 +250,29 @@ struct pointer_traits<T*>
   // thrust additions follow
   using raw_pointer = typename pointer_raw_pointer<T*>::type;
 
-  THRUST_HOST_DEVICE inline static raw_pointer get(pointer ptr)
+  THRUST_HOST_DEVICE
+  inline static raw_pointer get(pointer ptr)
   {
     return ptr;
   }
 };
 
-template <>
-struct pointer_traits<void*>
+template<>
+  struct pointer_traits<void*>
 {
   using pointer         = void*;
   using reference       = void;
   using element_type    = void;
   using difference_type = pointer_difference<void*>::type;
 
-  template <typename U>
-  struct rebind
+  template<typename U>
+    struct rebind
   {
     using other = U*;
   };
 
-  THRUST_HOST_DEVICE inline static pointer pointer_to(pointer_traits_detail::pointer_to_param<element_type>::type r)
+  THRUST_HOST_DEVICE
+  inline static pointer pointer_to(pointer_traits_detail::pointer_to_param<element_type>::type r)
   {
     return &r;
   }
@@ -280,27 +280,29 @@ struct pointer_traits<void*>
   // thrust additions follow
   using raw_pointer = pointer_raw_pointer<void*>::type;
 
-  THRUST_HOST_DEVICE inline static raw_pointer get(pointer ptr)
+  THRUST_HOST_DEVICE
+  inline static raw_pointer get(pointer ptr)
   {
     return ptr;
   }
 };
 
-template <>
-struct pointer_traits<const void*>
+template<>
+  struct pointer_traits<const void*>
 {
   using pointer         = const void*;
   using reference       = const void;
   using element_type    = const void;
   using difference_type = pointer_difference<const void*>::type;
 
-  template <typename U>
-  struct rebind
+  template<typename U>
+    struct rebind
   {
     using other = U*;
   };
 
-  THRUST_HOST_DEVICE inline static pointer pointer_to(pointer_traits_detail::pointer_to_param<element_type>::type r)
+  THRUST_HOST_DEVICE
+  inline static pointer pointer_to(pointer_traits_detail::pointer_to_param<element_type>::type r)
   {
     return &r;
   }
@@ -308,60 +310,86 @@ struct pointer_traits<const void*>
   // thrust additions follow
   using raw_pointer = pointer_raw_pointer<const void*>::type;
 
-  THRUST_HOST_DEVICE inline static raw_pointer get(pointer ptr)
+  THRUST_HOST_DEVICE
+  inline static raw_pointer get(pointer ptr)
   {
     return ptr;
   }
 };
 
-template <typename FromPtr, typename ToPtr>
-struct is_pointer_system_convertible
-    : _THRUST_STD::is_convertible<typename iterator_system<FromPtr>::type, typename iterator_system<ToPtr>::type>
+template<typename FromPtr, typename ToPtr>
+  struct is_pointer_system_convertible
+    : thrust::detail::is_convertible<
+        typename iterator_system<FromPtr>::type,
+        typename iterator_system<ToPtr>::type
+      >
 {};
 
-template <typename FromPtr, typename ToPtr>
-struct is_pointer_convertible
-    : ::internal::_And<
-        _THRUST_STD::is_convertible<typename pointer_element<FromPtr>::type*, typename pointer_element<ToPtr>::type*>,
-        is_pointer_system_convertible<FromPtr, ToPtr>>
+template<typename FromPtr, typename ToPtr>
+  struct is_pointer_convertible
+    : thrust::detail::and_<
+        thrust::detail::is_convertible<
+          typename pointer_element<FromPtr>::type *,
+          typename pointer_element<ToPtr>::type *
+        >,
+        is_pointer_system_convertible<FromPtr, ToPtr>
+      >
 {};
 
-template <typename FromPtr, typename ToPtr>
-struct is_void_pointer_system_convertible
-    : ::internal::_And<_THRUST_STD::is_same<typename pointer_element<FromPtr>::type, void>,
-                       is_pointer_system_convertible<FromPtr, ToPtr>>
+template<typename FromPtr, typename ToPtr>
+  struct is_void_pointer_system_convertible
+    : thrust::detail::and_<
+        thrust::detail::is_same<
+          typename pointer_element<FromPtr>::type,
+          void
+        >,
+        is_pointer_system_convertible<FromPtr, ToPtr>
+      >
 {};
 
 // this could be a lot better, but for our purposes, it's probably
 // sufficient just to check if pointer_raw_pointer<T> has meaning
-template <typename T>
-struct is_thrust_pointer : is_metafunction_defined<pointer_raw_pointer<T>>
+template<typename T>
+  struct is_thrust_pointer
+    : is_metafunction_defined<pointer_raw_pointer<T> >
 {};
 
 // avoid inspecting traits of the arguments if they aren't known to be pointers
-template <typename FromPtr, typename ToPtr>
-struct lazy_is_pointer_convertible
-    : thrust::detail::eval_if<is_thrust_pointer<FromPtr>::value && is_thrust_pointer<ToPtr>::value,
-                              is_pointer_convertible<FromPtr, ToPtr>,
-                              thrust::detail::identity_<thrust::detail::false_type>>
+template<typename FromPtr, typename ToPtr>
+  struct lazy_is_pointer_convertible
+    : thrust::detail::eval_if<
+        is_thrust_pointer<FromPtr>::value && is_thrust_pointer<ToPtr>::value,
+        is_pointer_convertible<FromPtr,ToPtr>,
+        thrust::detail::identity_<thrust::detail::false_type>
+      >
 {};
 
-template <typename FromPtr, typename ToPtr>
-struct lazy_is_void_pointer_system_convertible
-    : thrust::detail::eval_if<is_thrust_pointer<FromPtr>::value && is_thrust_pointer<ToPtr>::value,
-                              is_void_pointer_system_convertible<FromPtr, ToPtr>,
-                              thrust::detail::identity_<thrust::detail::false_type>>
+template<typename FromPtr, typename ToPtr>
+  struct lazy_is_void_pointer_system_convertible
+    : thrust::detail::eval_if<
+        is_thrust_pointer<FromPtr>::value && is_thrust_pointer<ToPtr>::value,
+        is_void_pointer_system_convertible<FromPtr,ToPtr>,
+        thrust::detail::identity_<thrust::detail::false_type>
+      >
 {};
 
-template <typename FromPtr, typename ToPtr, typename T = void>
-struct enable_if_pointer_is_convertible
-    : _THRUST_STD::enable_if<lazy_is_pointer_convertible<FromPtr, ToPtr>::type::value, T>
+template<typename FromPtr, typename ToPtr, typename T = void>
+  struct enable_if_pointer_is_convertible
+    : thrust::detail::enable_if<
+        lazy_is_pointer_convertible<FromPtr,ToPtr>::type::value,
+        T
+      >
 {};
 
-template <typename FromPtr, typename ToPtr, typename T = void>
-struct enable_if_void_pointer_is_system_convertible
-    : _THRUST_STD::enable_if<lazy_is_void_pointer_system_convertible<FromPtr, ToPtr>::type::value, T>
+template<typename FromPtr, typename ToPtr, typename T = void>
+  struct enable_if_void_pointer_is_system_convertible
+    : thrust::detail::enable_if<
+        lazy_is_void_pointer_system_convertible<FromPtr,ToPtr>::type::value,
+        T
+      >
 {};
 
-} // namespace detail
+
+} // end detail
 THRUST_NAMESPACE_END
+

@@ -1,19 +1,19 @@
 ################################################################################
-#
+# 
 # MIT License
-#
+# 
 # Copyright (c) 2017 Advanced Micro Devices, Inc.
-#
+# 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-#
+# 
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-#
+# 
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -21,14 +21,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-#
+# 
 ################################################################################
 
 find_package(Threads REQUIRED)
 
-add_executable(MIOpenDriver
+add_executable(MIOpenDriver 
     InputFlags.cpp
-    driver.cpp
     conv_common.cpp
     dm_activ.cpp
     dm_adam.cpp
@@ -39,7 +38,6 @@ add_executable(MIOpenDriver
     dm_convbfp16.cpp
     dm_convbfp8.cpp
     dm_convfp16.cpp
-    dm_convfp32.cpp
     dm_convfp8.cpp
     dm_convint8.cpp
     dm_dropout.cpp
@@ -73,23 +71,17 @@ if(WIN32)
 endif()
 add_dependencies(MIOpenDriver generate_kernels)
 target_include_directories(MIOpenDriver PRIVATE ../src/kernels)
-# MIOpen_with_plugins ensures CK plugin .so's are built alongside MIOpenDriver
-target_link_libraries(MIOpenDriver PRIVATE MIOpen_with_plugins Threads::Threads roc::rocrand nlohmann_json::nlohmann_json )
+target_link_libraries(MIOpenDriver MIOpen Threads::Threads roc::rocrand)
 if(NOT MIOPEN_EMBED_DB STREQUAL "")
-    target_link_libraries(MIOpenDriver PRIVATE $<BUILD_INTERFACE:miopen_data> )
+target_link_libraries(MIOpenDriver $<BUILD_INTERFACE:miopen_data> )
 endif()
-if(MIOPEN_ENABLE_SQLITE)
-    target_link_libraries(MIOpenDriver PRIVATE SQLite::SQLite3)
-endif()
-
 # Cmake does not add flags correctly for gcc
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU") 
     set_target_properties(MIOpenDriver PROPERTIES COMPILE_FLAGS -pthread LINK_FLAGS -pthread)
 endif()
 
 if( NOT ENABLE_ASAN_PACKAGING )
-  set_target_properties(MIOpenDriver PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
-  install(TARGETS MIOpenDriver
+  install(TARGETS MIOpenDriver 
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()

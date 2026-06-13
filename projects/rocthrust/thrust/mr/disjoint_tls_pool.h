@@ -22,6 +22,7 @@
 
 #include <thrust/detail/config.h>
 
+
 #include <thrust/mr/disjoint_pool.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -42,20 +43,23 @@ namespace mr
  *  \param upstream the first argument to the constructor, if invoked
  *  \param bookkeeper the second argument to the constructor, if invoked
  */
-template <typename Upstream, typename Bookkeeper>
-THRUST_HOST thrust::mr::disjoint_unsynchronized_pool_resource<Upstream, Bookkeeper>&
-tls_disjoint_pool(Upstream* upstream = nullptr, Bookkeeper* bookkeeper = nullptr)
+template<typename Upstream, typename Bookkeeper>
+THRUST_HOST 
+thrust::mr::disjoint_unsynchronized_pool_resource<Upstream, Bookkeeper> & tls_disjoint_pool(
+    Upstream * upstream = nullptr,
+    Bookkeeper * bookkeeper = nullptr)
 {
-  static thread_local auto adaptor = [&] {
-    assert(upstream && bookkeeper);
-    return thrust::mr::disjoint_unsynchronized_pool_resource<Upstream, Bookkeeper>(upstream, bookkeeper);
-  }();
+    static thread_local auto adaptor = [&]{
+        assert(upstream && bookkeeper);
+        return thrust::mr::disjoint_unsynchronized_pool_resource<Upstream, Bookkeeper>(upstream, bookkeeper);
+    }();
 
-  return adaptor;
+    return adaptor;
 }
 
 /*! \}
  */
 
-} // namespace mr
+} // end mr
 THRUST_NAMESPACE_END
+

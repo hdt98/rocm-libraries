@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -20,35 +20,10 @@ __global__ void set_buffer_value(T* p, T x, uint64_t buffer_element_size)
 }
 
 /**
- * @brief Manages device memory allocation and host-device data transfers
+ * @brief Container for storing data in GPU device memory
  *
- * DeviceMem encapsulates GPU memory management operations using HIP runtime API.
- * It provides functionality for allocating device memory, transferring data between
- * host and device, and performing basic memory operations.
- *
- * Key features:
- * - Automatic memory allocation and deallocation
- * - Host-to-device and device-to-host data transfers
- * - Memory initialization operations
- * - Integration with HostTensor for simplified data handling
- *
- * Usage example:
- * ```
- * // Allocate device memory
- * BHostTensor<float> AHostData({256});
- * DeviceMem d_mem(BHostData.get_element_space_size_in_bytes());
- *
- * // Transfer data to device
- * HostTensor<float> AHostTensor({256});
- * d_mem.ToDevice(AHostData.data());
- *
- * // Retrieve data from device
- * HostTensor<float> ResultHostTensor({256});
- * d_mem.FromDevice(ResultHostTensor.data());
- * ```
  */
 struct DeviceMem
-
 {
     DeviceMem() : mpDeviceBuf(nullptr), mMemSize(0) {}
     DeviceMem(std::size_t mem_size) : mMemSize(mem_size)
@@ -159,13 +134,6 @@ struct DeviceMem
             HIP_CHECK_ERROR(hipMemset(mpDeviceBuf, 0, mMemSize));
         }
     }
-    void SetBytePattern(uint8_t pattern) const
-    {
-        if(mpDeviceBuf)
-        {
-            HIP_CHECK_ERROR(hipMemset(mpDeviceBuf, pattern, mMemSize));
-        }
-    }
     template <typename T>
     void SetValue(T x) const
     {
@@ -195,8 +163,8 @@ struct DeviceMem
         }
     }
 
-    void* mpDeviceBuf;    ///< pointer to device buffer
-    std::size_t mMemSize; ///< size of device buffer in bytes
+    void* mpDeviceBuf;
+    std::size_t mMemSize;
 };
 
 } // namespace ck_tile

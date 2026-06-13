@@ -11,36 +11,30 @@ rocBLAS design and usage notes
 This topic covers the structure, organization, and concepts underlying rocBLAS. It also includes some notes on how
 to use rocBLAS effectively.
 
-.. _rocblas-tensile-hipblaslt:
-
 Use of Tensile and hipBLASLt
 ============================
 
 The rocBLAS library uses :doc:`Tensile <tensile:src/index>` and :doc:`hipBLASLt <hipblaslt:index>` internally, which
-supply high-performance implementations of GEMM. Tensile is installed as part of the rocBLAS package, while hipBLASLt is
-available as a separate package. By default, the rocBLAS library is built with Tensile and depends on the
-external hipBLASLt library.
+supply the high-performance implementation of GEMM. They are installed as part of the rocBLAS package.
+rocBLAS uses CMake for build automation, and CMake downloads Tensile and hipBLASLt during library configuration and automatically
+configures them as part of the build. No further set-up work is required by the
+user. However, external facing APIs for Tensile or hipBLASLt are not provided.
 
-rocBLAS uses CMake for building, which by default downloads the Tensile component during library configuration and automatically
-builds it as an integrated part of the rocBLAS build. No further set-up work is required by the
-user.  For hermetic builds, the Tensile component can be built from a local path installation (see command line options).
-Note that external facing APIs for Tensile are not provided.
+The choice of whether to use Tensile or hipBLASLt is handled automatically based on the architecture and problem.
+For instance, hipBLASLt is used as the default backend for non-batched and strided batched problems on the gfx12 architecture.
 
-The choice of whether to use the embedded Tensile backend or hipBLASLt is handled automatically based on the architecture and problem.
-For instance, hipBLASLt is used as the default backend for problems on the gfx12 architecture.  Source code GEMMs internal to the rocBLAS library also
-allow rocBLAS to be built without Tensile or hipBLASLt.
-They can potentially be used as fallbacks for problems that are not supported by the Tensile or hipBLASLt backends.
+The environment variable ``ROCBLAS_USE_HIPBLASLT`` is provided to manually control which GEMM backend is used,
+according to the following settings:
 
-The environment variables ``ROCBLAS_USE_HIPBLASLT`` and ``ROCBLAS_USE_HIPBLASLT_BATCHED`` are provided to manually control which GEMM backend is used. ``ROCBLAS_USE_HIPBLASLT`` is for non-batched, _strided_batched and _batched GEMM. ``ROCBLAS_USE_HIPBLASLT_BATCHED`` only affects _batched GEMM. These provide the following settings:
-
-*  ``ROCBLAS_USE_HIPBLASLT`` and ``ROCBLAS_USE_HIPBLASLT_BATCHED`` are not set: the GEMM backend is automatically selected.
-*  ``ROCBLAS_USE_HIPBLASLT=0``: Tensile is always used as the GEMM backend.
-*  ``ROCBLAS_USE_HIPBLASLT_BATCHED=0``: Tensile is always used as the GEMM _batched backend.
-*  ``ROCBLAS_USE_HIPBLASLT=1``: hipBLASLt is preferred as the GEMM backend, but the backend will fall back to Tensile for problems for which hipBLASLt does not provide a solution or if errors are encountered using the hipBLASLt backend.
+*  ``ROCBLAS_USE_HIPBLASLT`` is not set: the GEMM backend is automatically selected.
+*  ``ROCBLAS_USE_HIPBLASLT=0``: **Tensile** is always used as the GEMM backend.
+*  ``ROCBLAS_USE_HIPBLASLT=1``: **hipBLASLt** is preferred as the GEMM backend, but the backend will fallback to
+   Tensile for problems for which hipBLASLt does not provide a solution or if errors are encountered
+   using the hipBLASLt backend.
 
 .. note::
 
-   The hipBLASLt backend for rocBLAS is currently not supported on static builds,
+   hipBLASLt with rocBLAS is not supported on Windows builds or static builds,
    and is not included if building without Tensile.
 
 rocBLAS API and legacy BLAS functions
@@ -291,13 +285,23 @@ result is shown in the figure below:
 Kernel launch status error checking
 -----------------------------------
 
-The function ``hipExtGetLastError()`` is called after a rocBLAS kernel launches.
+The function ``hipPeekAtLastError()`` is called before and after a rocBLAS kernel launches.
 This function detects if the launch parameters are incorrect, for example,
 an invalid work group or thread block size. It also determines if the kernel code is unable to
-run on the current GPU device. In that case, it returns a status of ``rocblas_status_arch_mismatch``.
-Thus most rocblas API functions that launch kernels will flush a pre-existing error.
-You can check for any previous HIP error before calling a rocBLAS API function
-by calling ``hipGetLastError()``.
+run on the current GPU device. In that case, it returns ``rocblas_status_arch_mismatch``.
+
+Note that ``hipPeekAtLastError()`` does not flush the last error.
+As a detection system, the disadvantage of having ``hipPeekAtLastError()`` only report changes is
+that if the previous last error from another kernel launch or HIP call is the same
+as the error from the current kernel, no error is reported.
+In this case, only the first error would be reported.
+
+You can avoid this behavior by flushing any previous HIP error before calling a rocBLAS function
+by calling ``hipGetLastError()``. Both ``hipPeekAtLastError()`` and ``hipGetLastError()`` run
+synchronously on the CPU and only verify the kernel
+launch, not the asynchronous work done by the kernel. rocBLAS does not clear the last error
+because the caller might be relying on it to detect errors in
+a batch of HIP and rocBLAS function calls.
 
 Complex number data types
 -------------------------
@@ -334,7 +338,8 @@ Some functions within the rocBLAS library such as ``gemv``, ``symv``, ``trsv``, 
 and ``gemm`` can use atomic operations to increase performance.
 By using atomics, functions might not give bit-wise reproducible results.
 Differences between multiple runs should not be significant and the results will
-remain accurate. If you want to allow atomic operations, see :any:`rocblas_atomics_mode`,
+remain accurate. However, if you require identical results across multiple runs,
+atomics should be turned off. For more information, see :any:`rocblas_atomics_mode`,
 :any:`rocblas_set_atomics_mode`, and :any:`rocblas_get_atomics_mode`.
 
 In addition to the API above, rocBLAS also provides the environment variable ``ROCBLAS_DEFAULT_ATOMICS_MODE``,
@@ -355,9 +360,12 @@ In rocBLAS, bitwise-reproducible results can be obtained under the following con
 *  Identical GFX target ISA
 *  Single HIP stream active per rocBLAS handle
 *  Identical ROCm versions
-*  Atomic operations are not allowed (for more information, see :ref:`Atomic Operations`)
+*  Disabled atomic operations (for more information, see :ref:`Atomic Operations`)
 
-By default, atomic operations are not allowed. All other functions are bitwise reproducible by default.
+By default, rocBLAS might use atomic operations to achieve better performance in some functions.
+To ensure bitwise reproducible results when users require identical results across multiple runs,
+the functions in the list below require atomics to be disabled.
+All other functions are bitwise reproducible by default.
 
 .. note::
 
@@ -365,9 +373,9 @@ By default, atomic operations are not allowed. All other functions are bitwise r
    If device memory is unavailable, these functions proceed to use an unoptimized kernel, which could also produce variable results.
    To notify users that an unoptimized kernel is being used, the function returns the :any:`rocblas_status_perf_degraded` status.
 
-======================================================
-Functions that can be enabled to use atomic operations
-======================================================
+=================================
+Functions using atomic operations
+=================================
 
  :any:`rocblas_sgemv`
  :any:`rocblas_dgemv`
@@ -450,3 +458,4 @@ the enum value of ``rocblas_gemm_flags_fp16_alt_impl`` for the ``flags`` argumen
 
    Not all problem sizes consistently select the MFMA-based kernels.
    Additional tuning might be required to achieve good performance.
+

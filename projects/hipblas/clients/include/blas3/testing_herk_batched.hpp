@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -73,7 +73,7 @@ void testing_herk_batched_bad_arg(const Arguments& arg)
     device_batch_matrix<T> dC(N, N, ldc, batch_count);
 
     device_vector<U> d_alpha(1), d_zero(1), d_beta(1), d_one(1);
-    const U          h_alpha{1}, h_zero{0}, h_beta{2}, h_one{1};
+    const U          h_alpha(1), h_zero(0), h_beta(2), h_one(1);
 
     const U* alpha = &h_alpha;
     const U* beta  = &h_beta;
@@ -324,7 +324,7 @@ void testing_herk_batched(const Arguments& arg)
         return;
     }
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     size_t rows = (transA != HIPBLAS_OP_N ? std::max(K, int64_t(1)) : N);
     size_t cols = (transA == HIPBLAS_OP_N ? std::max(K, int64_t(1)) : N);

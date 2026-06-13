@@ -27,8 +27,13 @@
 #define GUARD_MIOPEN_LOCK_FILE_HPP_
 
 #include <miopen/filesystem.hpp>
-#include <miopen/file_lock.hpp>
 #include <miopen/logger.hpp>
+
+#include <boost/date_time/posix_time/posix_time_duration.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/date_time/time.hpp>
+#include <boost/interprocess/sync/file_lock.hpp>
 
 #include <chrono>
 #include <fstream>
@@ -40,12 +45,13 @@
 #include <string_view>
 
 namespace miopen {
+
 MIOPEN_INTERNALS_EXPORT fs::path LockFilePath(const fs::path& filename_);
-// LockFile class is a wrapper around miopen::file_lock providing MT-safety.
+// LockFile class is a wrapper around boost::interprocess::file_lock providing MT-safety.
 // One process should never have more than one instance of this class with same path at the same
 // time. It may lead to undefined behaviour on Windows.
 // Also on windows mutex can be removed because file locks are MT-safe there.
-class LockFile
+class MIOPEN_INTERNALS_EXPORT LockFile
 {
 private:
     class PassKey
@@ -54,16 +60,16 @@ private:
 
 public:
     LockFile(const fs::path&, PassKey);
-    LockFile(const LockFile&)           = delete;
+    LockFile(const LockFile&) = delete;
     LockFile operator=(const LockFile&) = delete;
 
-    bool timed_lock(const std::chrono::time_point<std::chrono::steady_clock>& abs_time)
+    bool timed_lock(const boost::posix_time::ptime& abs_time)
     {
         access_mutex.lock();
         return flock.timed_lock(abs_time);
     }
 
-    bool timed_lock_shared(const std::chrono::time_point<std::chrono::steady_clock>& abs_time)
+    bool timed_lock_shared(const boost::posix_time::ptime& abs_time)
     {
         access_mutex.lock_shared();
         return flock.timed_lock_sharable(abs_time);
@@ -116,7 +122,7 @@ public:
         access_mutex.unlock_shared();
     }
 
-    MIOPEN_INTERNALS_EXPORT static LockFile& Get(const fs::path& file);
+    static LockFile& Get(const fs::path& file);
 
     template <class TDuration>
     bool try_lock_for(TDuration duration)
@@ -161,7 +167,7 @@ public:
 private:
     fs::path path; // For logging purposes
     std::shared_timed_mutex access_mutex;
-    miopen::file_lock flock;
+    boost::interprocess::file_lock flock;
 
     static std::map<fs::path, LockFile>& LockFiles()
     {
@@ -171,18 +177,21 @@ private:
     }
 
     template <class TDuration>
-    static std::chrono::time_point<std::chrono::steady_clock> ToPTime(TDuration duration)
+    static boost::posix_time::ptime ToPTime(TDuration duration)
     {
-        return std::chrono::steady_clock::now() +
-               std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+        return boost::posix_time::second_clock::universal_time() +
+               boost::posix_time::milliseconds(
+                   std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
     }
 
-    void LogFlockError(const std::exception& ex,
+    void LogFlockError(const boost::interprocess::interprocess_exception& ex,
                        const std::string& operation,
                        const std::string_view from) const
     {
         // clang-format off
         MIOPEN_LOG_E_FROM(from, "File <" << path << "> " << operation << " failed. "
+                                "Error code: " << ex.get_error_code() << ". "
+                                "Native error: " << ex.get_native_error() << ". "
                                 "Description: '" << ex.what() << "'");
         // clang-format on
     }
@@ -195,7 +204,7 @@ private:
         {
             op();
         }
-        catch(const std::exception& ex)
+        catch(const boost::interprocess::interprocess_exception& ex)
         {
             LogFlockError(ex, op_name, from);
             throw;
@@ -213,7 +222,7 @@ private:
             MIOPEN_LOG_W("File <" << path << "> " << op_name << " timed out.");
             return false;
         }
-        catch(const std::exception& ex)
+        catch(const boost::interprocess::interprocess_exception& ex)
         {
             LogFlockError(ex, op_name, from);
             return false;

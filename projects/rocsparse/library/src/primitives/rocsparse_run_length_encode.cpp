@@ -22,9 +22,9 @@
  *
  * ************************************************************************ */
 
-#include "rocsparse_control.hpp"
-#include "rocsparse_primitives.hpp"
-#include "rocsparse_utility.hpp"
+#include "control.h"
+#include "rocsparse_primitives.h"
+#include "utility.h"
 
 #include <rocprim/rocprim.hpp>
 

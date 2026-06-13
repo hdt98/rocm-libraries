@@ -29,7 +29,6 @@
 #include <miopen/common.hpp>
 #include <miopen/miopen.h>
 
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -42,7 +41,6 @@ namespace miopen {
 
 struct Handle;
 struct TensorDescriptor;
-struct ActivationDescriptor;
 
 MIOPEN_INTERNALS_EXPORT void DeriveBNTensorDescriptor(TensorDescriptor& derivedBnDesc,
                                                       const TensorDescriptor& xDesc,
@@ -181,8 +179,7 @@ MIOPEN_INTERNALS_EXPORT void BatchNormForwardInference(const Handle& handle,
                                                        ConstData_t bnBias,
                                                        ConstData_t estimatedMean,
                                                        ConstData_t estimatedVariance,
-                                                       std::optional<double> epsilonOpt,
-                                                       const ActivationDescriptor& activDesc);
+                                                       double epsilon);
 
 MIOPEN_INTERNALS_EXPORT void BatchNormForwardTraining(const Handle& handle,
                                                       miopenBatchNormMode_t bn_mode,
@@ -203,32 +200,7 @@ MIOPEN_INTERNALS_EXPORT void BatchNormForwardTraining(const Handle& handle,
                                                       Data_t resultRunningVariance,
                                                       double epsilon,
                                                       Data_t resultSaveMean,
-                                                      Data_t resultSaveInvVariance,
-                                                      const ActivationDescriptor& activDesc);
-
-MIOPEN_INTERNALS_EXPORT void BatchNormForwardTraining(const Handle& handle,
-                                                      miopenBatchNormMode_t bn_mode,
-                                                      const void* alpha,
-                                                      const void* beta,
-                                                      const TensorDescriptor& xDesc,
-                                                      ConstData_t x,
-                                                      const TensorDescriptor& yDesc,
-                                                      Data_t y,
-                                                      const TensorDescriptor& scaleDesc,
-                                                      const TensorDescriptor& biasDesc,
-                                                      const TensorDescriptor& savedMeanDesc,
-                                                      const TensorDescriptor& savedVarianceDesc,
-                                                      ConstData_t bnScale,
-                                                      ConstData_t bnBias,
-                                                      double expAvgFactor,
-                                                      ConstData_t prevResultRunningMean,
-                                                      ConstData_t prevResultRunningVariance,
-                                                      Data_t nextResultRunningMean,
-                                                      Data_t nextResultRunningVariance,
-                                                      double epsilon,
-                                                      Data_t resultSaveMean,
-                                                      Data_t resultSaveInvVariance,
-                                                      const ActivationDescriptor& activDesc);
+                                                      Data_t resultSaveInvVariance);
 
 MIOPEN_INTERNALS_EXPORT void BatchNormBackward(const Handle& handle,
                                                miopenBatchNormMode_t bn_mode,
@@ -247,13 +219,11 @@ MIOPEN_INTERNALS_EXPORT void BatchNormBackward(const Handle& handle,
                                                const TensorDescriptor& savedMeanDesc,
                                                const TensorDescriptor& savedVarianceDesc,
                                                ConstData_t bnScale,
-                                               ConstData_t bnBias,
                                                Data_t resultBnScaleDiff,
                                                Data_t resultBnBiasDiff,
                                                double epsilon,
                                                ConstData_t savedMean,
-                                               ConstData_t savedInvVariance,
-                                               const ActivationDescriptor& activDesc);
+                                               ConstData_t savedInvVariance);
 
 } // namespace miopen
 

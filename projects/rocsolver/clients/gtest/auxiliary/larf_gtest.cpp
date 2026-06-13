@@ -126,7 +126,7 @@ class LARF_BASE : public ::TestWithParam<larf_tuple<I>>
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <typename T>

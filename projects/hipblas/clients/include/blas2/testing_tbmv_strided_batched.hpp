@@ -283,7 +283,7 @@ void testing_tbmv_strided_batched(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dAb.memcheck());
     CHECK_DEVICE_ALLOCATION(dx.memcheck());
 
-    double hipblas_error{0};
+    double hipblas_error;
 
     // Initial Data on CPU
     hipblas_init_matrix(
@@ -343,7 +343,7 @@ void testing_tbmv_strided_batched(const Arguments& arg)
 
     if(arg.timing)
     {
-        double gpu_time_used{0};
+        double gpu_time_used;
         CHECK_HIP_ERROR(dx.transfer_from(hx));
 
         hipStream_t stream;

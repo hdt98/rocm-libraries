@@ -1,0 +1,69 @@
+exclude: 'build'
+
+default_language_version:
+    python: python3
+
+repos:
+  - repo: https://gitcode.com/gh_mirrors/pr/pre-commit-hooks.git
+    rev: 6306a48f7dae5861702d573c9c247e4e9498e867
+    hooks:
+      - id: trailing-whitespace
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: no-commit-to-branch
+        args: ['--branch=main']
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: end-of-file-fixer
+        exclude: '^(\.agents/.*|.*\.svg)$'
+
+  - repo: https://gitcode.com/gh_mirrors/fl/flake8.git
+    rev: 34cbf8ef3950f43d09b85e2e45c15ae5717dc37b
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-bugbear == 22.4.25
+          - pep8-naming == 0.12.1
+          - torchfix
+          - flake8-pep585
+          - flake8-new-union-types == 0.4.1
+        args: ['--config=.flake8']
+
+  - repo: local
+    hooks:
+      - id: ufmt
+        name: ufmt
+        entry: ufmt diff
+        language: python
+        additional_dependencies:
+          - ufmt
+          - black==22.12.0
+          - usort==1.0.5
+        types: [python]
+
+  # pydoclint is removed for now because its resources
+  # cannot be found on gitcode or our ci package registry.
+
+  - repo: https://gitcode.com/gh_mirrors/co/codespell.git
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        name: codespell
+        description: Checks for common misspellings in text files.
+        entry: codespell --toml pyproject.toml
+        language: python
+        types: [text]
+        additional_dependencies:
+          - tomli
+
+  - repo: local
+    hooks:
+      - id: pyrefly
+        name: Pyrefly (type checking)
+        entry: python3 -m pyrefly check
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [--config, pyproject.toml]
+
+exclude: ^CI/

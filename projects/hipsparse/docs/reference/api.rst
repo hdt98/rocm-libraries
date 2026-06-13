@@ -1,6 +1,6 @@
 .. meta::
-  :description: Documentation for exported hipSPARSE API functions
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, exported functions
+  :description: hipSPARSE documentation and API reference library
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
 
 .. _api:
 
@@ -8,9 +8,7 @@
 Exported hipSPARSE functions
 ********************************************************************
 
-This topic provides a list of the exported hipSPARSE functions in various categories.
-
-Auxiliary functions
+Auxiliary Functions
 ===================
 
 +------------------------------------------+
@@ -128,8 +126,6 @@ Auxiliary functions
 +------------------------------------------+
 |:cpp:func:`hipsparseCreateBlockedEll`     |
 +------------------------------------------+
-|:cpp:func:`hipsparseCreateBsr`            |
-+------------------------------------------+
 |:cpp:func:`hipsparseDestroySpMat`         |
 +------------------------------------------+
 |:cpp:func:`hipsparseCooGet`               |
@@ -181,7 +177,7 @@ Auxiliary functions
 |:cpp:func:`hipsparseDnMatSetValues`       |
 +------------------------------------------+
 
-Sparse level 1 functions
+Sparse Level 1 Functions
 ========================
 
 ================================================ ====== ====== ============== ==============
@@ -196,7 +192,7 @@ Function name                                    single double single complex do
 :cpp:func:`hipsparseXsctr() <hipsparseSsctr>`    x      x      x              x
 ================================================ ====== ====== ============== ==============
 
-Sparse level 2 functions
+Sparse Level 2 Functions
 ========================
 
 ============================================================================== ====== ====== ============== ==============
@@ -220,7 +216,7 @@ Function name                                                                  s
 :cpp:func:`hipsparseXgemvi() <hipsparseSgemvi>`                                x      x      x              x
 ============================================================================== ====== ====== ============== ==============
 
-Sparse level 3 functions
+Sparse Level 3 Functions
 ========================
 
 ============================================================================= ====== ====== ============== ==============
@@ -240,7 +236,7 @@ Function name                                                                 si
 :cpp:func:`hipsparseXgemmi() <hipsparseSgemmi>`                               x      x      x              x
 ============================================================================= ====== ====== ============== ==============
 
-Sparse extra functions
+Sparse Extra Functions
 ======================
 
 ================================================================================== ====== ====== ============== ==============
@@ -258,7 +254,7 @@ Function name                                                                   
 :cpp:func:`hipsparseXcsrgemm2() <hipsparseScsrgemm2>`                              x      x      x              x
 ================================================================================== ====== ====== ============== ==============
 
-Preconditioner functions
+Preconditioner Functions
 ========================
 
 ===================================================================================================================== ====== ====== ============== ==============
@@ -296,7 +292,7 @@ Function name                                                                   
 :cpp:func:`hipsparseXgpsvInterleavedBatch() <hipsparseSgpsvInterleavedBatch>`                                         x      x      x              x
 ===================================================================================================================== ====== ====== ============== ==============
 
-Conversion functions
+Conversion Functions
 ====================
 
 ====================================================================================================================== ====== ====== ============== ==============
@@ -355,7 +351,7 @@ Function name                                                                   
 :cpp:func:`hipsparseXcsr2csru() <hipsparseScsr2csru>`                                                                  x      x      x              x
 ====================================================================================================================== ====== ====== ============== ==============
 
-Reordering functions
+Reordering Functions
 ====================
 
 ======================================================= ====== ====== ============== ==============
@@ -364,7 +360,7 @@ Function name                                           single double single com
 :cpp:func:`hipsparseXcsrcolor() <hipsparseScsrcolor>`   x      x      x              x
 ======================================================= ====== ====== ============== ==============
 
-Sparse generic functions
+Sparse Generic Functions
 ========================
 
 ================================================= ====== ====== ============== ==============
@@ -409,5 +405,5 @@ Function name                                     single double single complex d
 :cpp:func:`hipsparseSpSM_bufferSize()`            x      x      x              x
 :cpp:func:`hipsparseSpSM_analysis()`              x      x      x              x
 :cpp:func:`hipsparseSpSM_solve()`                 x      x      x              x
-:cpp:func:`hipsparseSpSM_solve_ex()`              x      x      x              x
 ================================================= ====== ====== ============== ==============
+

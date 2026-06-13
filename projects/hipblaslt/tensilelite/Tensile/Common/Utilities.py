@@ -32,22 +32,9 @@ import re
 from inspect import currentframe, getframeinfo
 from copy import deepcopy
 from enum import Enum
-from math import log
 from pathlib import Path
-from typing import Sequence, Tuple, Optional
 
 from Tensile import __version__
-
-from rocisa import rocIsa
-
-import pickle
-
-def fastdeepcopy(x):
-    # Note: Some object can't be pickled
-    return pickle.loads(pickle.dumps(x))
-
-# Global
-_global_ti = rocIsa.getInstance()
 
 _verbosity = 1
 
@@ -105,10 +92,9 @@ def isExe(filePath):
 
 def locateExe(defaultPath, exeName):  # /opt/rocm/bin, hip-clang
     # look in defaultPath first
-    if defaultPath:
-        exePath = os.path.join(defaultPath, exeName)
-        if isExe(exePath):
-            return exePath
+    exePath = os.path.join(defaultPath, exeName)
+    if isExe(exePath):
+        return exePath
     # look in PATH second
     for path in os.environ["PATH"].split(os.pathsep):
         exePath = os.path.join(path, exeName)
@@ -344,72 +330,3 @@ def isRhel8() -> bool:
         printWarning("Rhel8 environments may not support all tools for system queries such as rocm-smi.")
         return True
     return False
-
-########################################
-# Math
-########################################
-
-def log2(x):
-    return int(log(x, 2) + 0.5)
-
-def ceilDivide(numerator, denominator):
-    # import pdb
-    # pdb.set_trace()
-    try:
-        if numerator < 0 or denominator < 0:
-            raise ValueError
-    except ValueError:
-        print("ERROR: Can't have a negative register value")
-        return 0
-    try:
-        div = int((numerator+denominator-1) // denominator)
-    except ZeroDivisionError:
-        print("ERROR: Divide by 0")
-        return 0
-    return div
-
-def roundUpToNearestMultiple(numerator, denominator):
-    return ceilDivide(numerator,denominator)*int(denominator)
-
-# Given a divisor, this routine computes the corresponding multiplicative constant
-# and required post shifts.
-#
-# Algorithm based on: https://dl.acm.org/doi/pdf/10.1145/178243.178249
-#
-# Inputs:
-#   d: divisor
-#   N: Number of bits integers are represented in
-#   p: precision in bits (usually N = P)
-#
-# Output:
-#   mhigh: multiplicative constant
-#   shPost: amount to right shift after multiplication
-def choose_multiplier(d, N, p):
-    l = int(math.ceil(math.log(d, 2)))
-    shPost = l
-    mlow = 2**(N+l) // d
-    mhigh = (2**(N+l) + 2 ** (N + l - p )) // d
-    while ((mlow // 2) < (mhigh // 2)) and shPost > 0:
-        mlow //= 2
-        mhigh //= 2
-        shPost -=1
-    return mhigh, shPost, l
-
-def wmmaV3InputVgprLayout(wmma: Sequence[int], dtypeBitWidth: Optional[int] = None) -> Tuple[int]:
-    # wmmaV3InputVgprLayout: (numReadsUnroll, numVecTile, numVecUnroll, NumElementPerRead)
-    wmma = tuple(wmma)
-    if wmma == (16, 16, 4, 1):
-        return (1, 16, 2, 2)
-    elif wmma == (16, 16, 32, 1):
-        return (2, 16, 2, 8)
-    elif wmma == (16, 16, 64, 1):
-        return (2, 16, 2, 16)
-    elif wmma == (16, 16, 128, 1) or wmma == (32, 16, 128, 1):
-        assert dtypeBitWidth
-        if dtypeBitWidth == 8:
-            return (4, 16, 2, 16)
-        if dtypeBitWidth == 4 or dtypeBitWidth == 6:
-            return (2, 16, 2, 32)
-        assert False, f"Unsupported datatype bitwidth: {dtypeBitWidth}"
-    else:
-        assert False, f"Unhandled WMMA: {wmma}"

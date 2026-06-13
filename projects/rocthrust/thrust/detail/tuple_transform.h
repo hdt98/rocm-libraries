@@ -18,34 +18,39 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
-#include <thrust/detail/tuple_meta_transform.h>
 #include <thrust/tuple.h>
+#include <thrust/detail/tuple_meta_transform.h>
 
 THRUST_NAMESPACE_BEGIN
 
 namespace detail
 {
 
-template <typename Tuple,
-          template <typename>
-          class UnaryMetaFunction,
-          typename UnaryFunction,
-          typename IndexSequence = thrust::make_index_sequence<thrust::tuple_size<Tuple>::value>>
-struct tuple_transform_functor;
+template<typename Tuple,
+         template<typename> class UnaryMetaFunction,
+         typename UnaryFunction,
+         typename IndexSequence = thrust::make_index_sequence<thrust::tuple_size<Tuple>::value>>
+  struct tuple_transform_functor;
 
-template <typename Tuple, template <typename> class UnaryMetaFunction, typename UnaryFunction, size_t... Is>
-struct tuple_transform_functor<Tuple, UnaryMetaFunction, UnaryFunction, thrust::index_sequence<Is...>>
+
+template<typename Tuple,
+         template<typename> class UnaryMetaFunction,
+         typename UnaryFunction,
+         size_t... Is>
+  struct tuple_transform_functor<Tuple,UnaryMetaFunction,UnaryFunction,thrust::index_sequence<Is...>>
 {
-  static THRUST_HOST_DEVICE typename tuple_meta_transform<Tuple, UnaryMetaFunction>::type
-  do_it_on_the_host_or_device(const Tuple& t, UnaryFunction f)
+  static THRUST_HOST
+  typename tuple_meta_transform<Tuple,UnaryMetaFunction>::type
+  do_it_on_the_host(const Tuple &t, UnaryFunction f)
+  {
+    using XfrmTuple = typename tuple_meta_transform<Tuple, UnaryMetaFunction>::type;
+
+    return XfrmTuple(f(thrust::get<Is>(t))...);
+  }
+
+  static THRUST_HOST_DEVICE
+  typename tuple_meta_transform<Tuple,UnaryMetaFunction>::type
+  do_it_on_the_host_or_device(const Tuple &t, UnaryFunction f)
   {
     using XfrmTuple = typename tuple_meta_transform<Tuple, UnaryMetaFunction>::type;
 
@@ -53,13 +58,27 @@ struct tuple_transform_functor<Tuple, UnaryMetaFunction, UnaryFunction, thrust::
   }
 };
 
-template <template <typename> class UnaryMetaFunction, typename Tuple, typename UnaryFunction>
-typename tuple_meta_transform<Tuple, UnaryMetaFunction>::type THRUST_HOST_DEVICE
-tuple_host_device_transform(const Tuple& t, UnaryFunction f)
+
+template<template<typename> class UnaryMetaFunction,
+         typename Tuple,
+         typename UnaryFunction>
+typename tuple_meta_transform<Tuple,UnaryMetaFunction>::type
+tuple_host_transform(const Tuple &t, UnaryFunction f)
 {
-  return tuple_transform_functor<Tuple, UnaryMetaFunction, UnaryFunction>::do_it_on_the_host_or_device(t, f);
+  return tuple_transform_functor<Tuple,UnaryMetaFunction,UnaryFunction>::do_it_on_the_host(t,f);
 }
 
-} // namespace detail
+template<template<typename> class UnaryMetaFunction,
+         typename Tuple,
+         typename UnaryFunction>
+typename tuple_meta_transform<Tuple,UnaryMetaFunction>::type
+THRUST_HOST_DEVICE
+tuple_host_device_transform(const Tuple &t, UnaryFunction f)
+{
+  return tuple_transform_functor<Tuple,UnaryMetaFunction,UnaryFunction>::do_it_on_the_host_or_device(t,f);
+}
+
+} // end detail
 
 THRUST_NAMESPACE_END
+

@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -21,10 +21,6 @@
 
 #include "ck/utility/blkgemmpipe_scheduler.hpp"
 
-using ::ck::DeviceMem;
-using ::ck::HostTensorDescriptor;
-using ::ck::Tensor;
-
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
 
@@ -33,9 +29,8 @@ using F16 = ck::half_t;
 using F8  = ck::f8_t;
 using F32 = float;
 
-using Row    = ck::tensor_layout::gemm::RowMajor;
-using Col    = ck::tensor_layout::gemm::ColumnMajor;
-using Bypass = ck::tensor_layout::BypassLayoutVerification;
+using Row = ck::tensor_layout::gemm::RowMajor;
+using Col = ck::tensor_layout::gemm::ColumnMajor;
 
 using A0DataType       = F8;
 using B0DataType       = I4;
@@ -90,11 +85,11 @@ struct MulABScaleExpertWeight
     }
 };
 
-using CDEElementOp         = MulABScaleExpertWeight;
-static constexpr int KPack = 32 / sizeof(B0DataType);
+using CDEElementOp = MulABScaleExpertWeight;
 
 void preShuffleBuffer(const I4* src, I4* dst, int N, int K, int NXdl)
 {
+    int KPack = 32;
     int NLane = NXdl;
     int KLane = 64 / NLane;
 
@@ -140,7 +135,7 @@ static constexpr ck::index_t KPerBlock     = 128 / sizeof(A0DataType);
 static constexpr ck::index_t CShuffleNLane = 32;
 static constexpr ck::index_t CShuffleMLane = BLOCKSIZE / CShuffleNLane;
 static constexpr ck::index_t AK1           = 16 / sizeof(A0DataType);
-static constexpr ck::index_t BK1           = KPack;
+static constexpr ck::index_t BK1           = 32 / sizeof(B0DataType);
 static constexpr ck::index_t EVec          = 2;
 static constexpr ck::index_t D0Vec         = 1;
 static constexpr ck::index_t D1Vec         = 1;
@@ -164,7 +159,7 @@ int main(int argc, char* argv[])
 {
     bool do_verification = true;
     int init_method      = 1;
-    bool time_kernel     = false;
+    bool time_kernel     = true;
 
     // per expert:
     // GEMM shape
@@ -182,17 +177,21 @@ int main(int argc, char* argv[])
     {
         // use default case
     }
-    else if(argc == 3 || argc == 7)
+    else if(argc == 3)
+    {
+        // use default case
+        do_verification = std::stoi(argv[1]);
+        init_method     = std::stoi(argv[2]);
+        time_kernel     = std::stoi(argv[3]);
+    }
+    else if(argc == 7)
     {
         do_verification = std::stoi(argv[1]);
         init_method     = std::stoi(argv[2]);
         time_kernel     = std::stoi(argv[3]);
-        if(argc == 7)
-        {
-            N      = std::stoi(argv[4]);
-            K      = std::stoi(argv[5]);
-            tokens = std::stoi(argv[6]);
-        }
+        N               = std::stoi(argv[4]);
+        K               = std::stoi(argv[5]);
+        tokens          = std::stoi(argv[6]);
     }
     else
     {
@@ -200,7 +199,7 @@ int main(int argc, char* argv[])
         printf("arg2: initialization (0=no init, 1=integer value, 2=decimal value)\n");
         printf("arg3: time kernel (0=no, 1=yes)\n");
         printf("arg4 to 6: N, K, tokens\n");
-        exit(1);
+        exit(0);
     }
 
     ck::index_t StrideA              = K;
@@ -240,12 +239,12 @@ int main(int argc, char* argv[])
             sorted_token_ids.mData[i] = tokens;
         }
     }
-    Tensor<A0DataType> a0_t_k_k(HostTensorDescriptor({tokens, topk, K}, {topk * K, K, 1}, Row{}));
-    Tensor<B0DataType> b0_e_n_k(HostTensorDescriptor({experts, K, N}, {N * K, 1, K}, Col{}));
-    Tensor<B0DataType> b0_preshuffled(HostTensorDescriptor({experts, K, N}, {N * K, 1, K}, Col{}));
-    Tensor<D0DataType> d0_t_n(HostTensorDescriptor({tokens, N}, {StrideDs[0], 0}, Bypass{}));
-    Tensor<D1DataType> d1_e_n(HostTensorDescriptor({experts, N}, {1, StrideDs[1]}, Bypass{}));
-    Tensor<D2DataType> d2_e_n(HostTensorDescriptor({sorted_size, N}, {1, 0}, Bypass{}));
+    Tensor<A0DataType> a0_t_k_k(HostTensorDescriptor({tokens, topk, K}, {topk * K, K, 1}));
+    Tensor<B0DataType> b0_e_n_k(HostTensorDescriptor({experts, K, N}, {N * K, 1, K}));
+    Tensor<B0DataType> b0_preshuffled(HostTensorDescriptor({experts, K, N}, {N * K, 1, K}));
+    Tensor<D0DataType> d0_t_n(HostTensorDescriptor({tokens, N}, {StrideDs[0], 0}));
+    Tensor<D1DataType> d1_e_n(HostTensorDescriptor({experts, N}, {1, StrideDs[1]}));
+    Tensor<D2DataType> d2_e_n(HostTensorDescriptor({sorted_size, N}, {1, 0}));
     Tensor<EDataType> e_t_n_host_result(HostTensorDescriptor({tokens, N}, {N, 1}));
     Tensor<EDataType> e_t_n_device_result(HostTensorDescriptor({tokens, N}, {N, 1}));
     e_t_n_device_result.SetZero();
@@ -275,21 +274,21 @@ int main(int argc, char* argv[])
         break;
     case 3:
         a0_t_k_k.GenerateTensorValue(GeneratorTensor_3<A0DataType>{0.0, 1.0});
-        b0_e_n_k.GenerateTensorValue(GeneratorTensor_3<B0DataType>{-1, 1});
+        b0_e_n_k.GenerateTensorValue(GeneratorTensor_3<B0DataType>{-0.5, 0.5});
         d0_t_n.GenerateTensorValue(GeneratorTensor_3<D0DataType>{0.0, 1.0});
         d1_e_n.GenerateTensorValue(GeneratorTensor_3<D1DataType>{0.0, 1.0});
         d2_e_n.GenerateTensorValue(GeneratorTensor_3<D2DataType>{0.0, 1.0});
         break;
     case 4:
         a0_t_k_k.GenerateTensorValue(GeneratorTensor_1<A0DataType>{});
-        b0_e_n_k.GenerateTensorValue(GeneratorTensor_2<B0DataType>{-2, 2});
+        b0_e_n_k.GenerateTensorValue(GeneratorTensor_2<A0DataType>{-2, 2});
         d0_t_n.GenerateTensorValue(GeneratorTensor_1<D0DataType>{});
         d1_e_n.GenerateTensorValue(GeneratorTensor_1<D1DataType>{});
         d2_e_n.GenerateTensorValue(GeneratorTensor_1<D2DataType>{});
         break;
     default:
         a0_t_k_k.GenerateTensorValue(GeneratorTensor_3<A0DataType>{0.0, 1.0});
-        b0_e_n_k.GenerateTensorValue(GeneratorTensor_3<B0DataType>{-1, 1});
+        b0_e_n_k.GenerateTensorValue(GeneratorTensor_3<B0DataType>{-0.5, 0.5});
         d0_t_n.GenerateTensorValue(GeneratorTensor_3<D0DataType>{0.0, 1.0});
         d1_e_n.GenerateTensorValue(GeneratorTensor_3<D1DataType>{0.0, 1.0});
         d2_e_n.GenerateTensorValue(GeneratorTensor_3<D2DataType>{0.0, 1.0});
@@ -415,10 +414,9 @@ int main(int argc, char* argv[])
             "not support this GEMM problem");
     }
 
-    if(!(ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950" ||
-         ck::is_gfx11_supported() || ck::is_gfx12_supported()))
+    if(!(ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950"))
     {
-        std::cout << "This kernel support gfx942, gfx950, gfx11 and gfx12 only" << std::endl;
+        std::cout << "This kernel support gfx942 and gfx950 only" << std::endl;
     }
 
     if(time_kernel)

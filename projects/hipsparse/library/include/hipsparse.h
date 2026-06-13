@@ -85,8 +85,10 @@
 #endif
 #endif
 
-#include "hipsparse-bfloat16.h"
-#include "hipsparse-float16.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "hipsparse-types.h"
 
 #include "hipsparse-auxiliary.h"
@@ -223,5 +225,9 @@
 #include "internal/generic/hipsparse_spsm.h"
 #include "internal/generic/hipsparse_spsv.h"
 #include "internal/generic/hipsparse_spvv.h"
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // HIPSPARSE_H

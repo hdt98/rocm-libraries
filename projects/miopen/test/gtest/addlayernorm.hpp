@@ -59,13 +59,13 @@ void cpu_addlayernorm_forward(tensor<T> input,
         inner_size *= dims[i];
     }
 
-    miopen::par_ford(outer_size)([&](int32_t o) {
+    par_ford(outer_size)([&](int32_t o) {
         float mean_v = 0;
         float var_v  = 0;
 
-        miopen::ford(inner_size)([&](int32_t j) {
-            float tmp = static_cast<float>(input[o * inner_size + j]) +
-                        static_cast<float>(input2[o * inner_size + j]);
+        ford(inner_size)([&](int32_t i) {
+            float tmp = static_cast<float>(input[o * inner_size + i]) +
+                        static_cast<float>(input2[o * inner_size + i]);
             mean_v += tmp;
             var_v += tmp * tmp;
         });
@@ -77,14 +77,14 @@ void cpu_addlayernorm_forward(tensor<T> input,
         ref_mean[o] = static_cast<T>(mean_v);
         ref_rstd[o] = static_cast<T>(rstd_v);
 
-        miopen::ford(inner_size)([&](int32_t j) {
+        ford(inner_size)([&](int32_t i) {
             float weight_v =
-                (mode == MIOPEN_ELEMENTWISE_AFFINE_FUSED_ADD) ? 1 : static_cast<float>(weight[j]);
+                (mode == MIOPEN_ELEMENTWISE_AFFINE_FUSED_ADD) ? 1 : static_cast<float>(weight[i]);
             float bias_v =
-                (mode == MIOPEN_ELEMENTWISE_AFFINE_FUSED_ADD) ? 0 : static_cast<float>(bias[j]);
-            ref_output[o * inner_size + j] =
-                static_cast<T>((static_cast<float>(input[o * inner_size + j]) +
-                                static_cast<float>(input2[o * inner_size + j]) - mean_v) *
+                (mode == MIOPEN_ELEMENTWISE_AFFINE_FUSED_ADD) ? 0 : static_cast<float>(bias[i]);
+            ref_output[o * inner_size + i] =
+                static_cast<T>((static_cast<float>(input[o * inner_size + i]) +
+                                static_cast<float>(input2[o * inner_size + i]) - mean_v) *
                                    rstd_v * weight_v +
                                bias_v);
         });

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining A copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,6 @@
 
 #include "../blas1/rocblas_copy.hpp"
 #include "../blas1/rocblas_reduction.hpp"
-#include "asan_helpers.hpp"
 #include "device_macros.hpp"
 #include "rocblas.h"
 #include "rocblas_trmv.hpp"
@@ -105,10 +104,7 @@ ROCBLAS_KERNEL_ILF void rocblas_trmvt_kernel_calc(
             res += (CONJ ? conj(A[i]) : A[i]) * x[(tx + i) * incx];
     }
 
-    if(warpSize == WARP_32)
-        res = rocblas_dot_block_reduce<WARP_32, NB>(res);
-    else
-        res = rocblas_dot_block_reduce<WARP_64, NB>(res);
+    res = rocblas_dot_block_reduce<NB>(res);
 
     if(tx == 0)
     {
@@ -141,8 +137,10 @@ rocblas_trmvn_kernel(rocblas_int    n,
 
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
 
         rocblas_trmvn_kernel_calc<DIM_X, DIM_Y, LOWER, UNIT>(
             n,
@@ -151,7 +149,10 @@ rocblas_trmvn_kernel(rocblas_int    n,
             load_ptr_batch(x, batch, shift_x, stride_x),
             incx,
             load_ptr_batch(workspace, batch, shiftw, stride_w));
+
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 template <rocblas_int NB,
@@ -179,8 +180,10 @@ rocblas_trmvt_kernel(rocblas_int    n,
 
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
 
         rocblas_trmvt_kernel_calc<NB, LOWER, CONJ, UNIT>(
             n,
@@ -189,7 +192,10 @@ rocblas_trmvt_kernel(rocblas_int    n,
             load_ptr_batch(x, batch, shift_x, stride_x),
             incx,
             load_ptr_batch(workspace, batch, shiftw, stride_w));
+
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 template <typename TConstPtr, typename TPtr, typename TWork>
@@ -226,7 +232,7 @@ rocblas_status rocblas_internal_trmv_launcher(rocblas_handle    handle,
 
     static constexpr rocblas_int NB          = ROCBLAS_TRMV_NB;
     constexpr int                TRMVN_DIM_X = 64;
-    constexpr int                TRMVN_DIM_Y = rocblas::conditional_v<rocblas_enable_asan, 4, 16>;
+    constexpr int                TRMVN_DIM_Y = 16;
 
     dim3 trmvn_grid((n - 1) / TRMVN_DIM_X + 1, 1, batches);
     dim3 trmvn_threads(TRMVN_DIM_X, TRMVN_DIM_Y);

@@ -25,8 +25,8 @@
  *******************************************************************************/
 #include <miopen/miopen.h>
 #include <gtest/gtest.h>
+#include "../rnn_vanilla.hpp"
 #include "get_handle.hpp"
-#include "gtest_common.hpp"
 
 namespace deepbench_rnn {
 
@@ -41,7 +41,6 @@ void GetArgs(const std::string& param, std::vector<std::string>& tokens)
 
 class GPU_DeepBenchRNN_FP32 : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 void Run2dDriverFloat(void)
@@ -58,13 +57,10 @@ void Run2dDriverFloat(void)
             return str.data();
         });
 
-        // This part is commented out because rnn_vanilla_driver does not exist after porting
-        // rnn_vanilla.hpp to gtest implementation. However, this doesn't change anything because
-        // this test is already skipped before because it uses test_driver in gtest
-        // testing::internal::CaptureStderr();
-        // test_drive<rnn_vanilla_driver>(ptrs.size(), ptrs.data(), "deepbench_rnn");
-        // auto capture = testing::internal::GetCapturedStderr();
-        // std::cout << capture;
+        testing::internal::CaptureStderr();
+        test_drive<rnn_vanilla_driver>(ptrs.size(), ptrs.data(), "deepbench_rnn");
+        auto capture = testing::internal::GetCapturedStderr();
+        std::cout << capture;
     }
 };
 
@@ -75,7 +71,7 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     std::string postFlags =
         "--num-layers 1 --in-mode 1 --bias-mode 0 -dir-mode 0 --rnn-mode 0 --flat-batch-fill";
 
-    return {
+    const std::vector<std::string> test_cases = {
         // clang-format off
     {flags + " --batch-size 16 --seq-len 50 --vector-len 176 --hidden-size 176 " + postFlags},
     {flags + " --batch-size 32 --seq-len 50 --vector-len 176 --hidden-size 176 " + postFlags},
@@ -88,6 +84,8 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     {flags + " --batch-size 128 --seq-len 50 --vector-len 2560 --hidden-size 2560 " + postFlags}
         // clang-format on
     };
+
+    return test_cases;
 }
 
 } // namespace deepbench_rnn

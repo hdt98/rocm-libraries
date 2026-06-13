@@ -1,8 +1,7 @@
 TestParameters:
-  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx942, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201, skip-gfx1250] # not supported by arch
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx942, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201] # not supported by arch
 
 GlobalParameters:
-  SyncsPerBenchmark: 0
   NumElementsToValidate: -1
   BoundsCheck: False
   KernelTime: False
@@ -32,8 +31,8 @@ BenchmarkProblems:
       DestDataType: S
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: False
+      TransposeA: 0
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -63,7 +62,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -81,7 +79,6 @@ BenchmarkProblems:
         - VectorWidthA: [1]
         - VectorWidthB: [1]
         - WaveSeparateGlobalReadB: [1]
-        - WorkGroupMapping: [-4, 1, 4]
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
@@ -112,8 +109,8 @@ BenchmarkProblems:
       DestDataType: S
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: True
+      TransposeA: 0
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -143,7 +140,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -192,8 +188,8 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -223,7 +219,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -273,8 +268,8 @@ BenchmarkProblems:
       DestDataType: F8
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: True
+      TransposeA: 1
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -304,7 +299,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -353,8 +347,8 @@ BenchmarkProblems:
       DestDataType: S
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -384,7 +378,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -434,8 +427,8 @@ BenchmarkProblems:
       DestDataType: S
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: False
+      TransposeA: 0
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -465,7 +458,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -514,8 +506,8 @@ BenchmarkProblems:
       DestDataType: F8
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: True
+      TransposeA: 0
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -546,7 +538,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]
@@ -595,8 +586,8 @@ BenchmarkProblems:
       DestDataType: b
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -626,7 +617,6 @@ BenchmarkProblems:
         - MatrixInstruction:
           - [16,16,32, 1, 1, 2,2, 2,2]
           - [16,16,128, 1, 1, 2,2, 2,2]
-          - [32,32,16,1, 1, 2,1, 2,2]
           - [32,32,64,1, 1, 1,1, 2,2]
         - LdsBlockSizePerPadA: [0]
         - LdsBlockSizePerPadB: [0]

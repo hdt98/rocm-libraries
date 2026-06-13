@@ -126,6 +126,7 @@ miopenStatus_t LRNDescriptor::Forward(const Handle& handle,
                                 y,
                                 workSpace,
                                 as_float(f_norm_alphaoverarea),
+                                as_float(f_norm_alpha),
                                 as_float(f_norm_beta),
                                 as_float(f_norm_K));
             }
@@ -134,6 +135,7 @@ miopenStatus_t LRNDescriptor::Forward(const Handle& handle,
                 kernels.front()(x,
                                 y,
                                 as_float(f_norm_alphaoverarea),
+                                as_float(f_norm_alpha),
                                 as_float(f_norm_beta),
                                 as_float(f_norm_K));
             }
@@ -141,7 +143,7 @@ miopenStatus_t LRNDescriptor::Forward(const Handle& handle,
     }
     else
     {
-        const std::string program_name = construct_params.getKernelFile(); // kernel filename
+        const std::string program_name = construct_params.getKernelFile(); // CL kernel filename
         const std::string kernel_name  = construct_params.getKernelName(); // kernel name
         const std::string& compiler_parms =
             construct_params.getCompilerOptions(); // kernel parameters
@@ -157,6 +159,7 @@ miopenStatus_t LRNDescriptor::Forward(const Handle& handle,
                     y,
                     workSpace,
                     as_float(f_norm_alphaoverarea),
+                    as_float(f_norm_alpha),
                     as_float(f_norm_beta),
                     as_float(f_norm_K));
             }
@@ -165,6 +168,7 @@ miopenStatus_t LRNDescriptor::Forward(const Handle& handle,
                 obj(x,
                     y,
                     as_float(f_norm_alphaoverarea),
+                    as_float(f_norm_alpha),
                     as_float(f_norm_beta),
                     as_float(f_norm_K));
             }

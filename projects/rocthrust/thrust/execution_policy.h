@@ -22,16 +22,8 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/execute_with_allocator.h>
 #include <thrust/detail/execution_policy.h>
+#include <thrust/detail/execute_with_allocator.h>
 #include <thrust/detail/seq.h>
 
 //! \cond
@@ -53,21 +45,27 @@ THRUST_NAMESPACE_BEGIN
 /*! \cond
  */
 
+
 namespace detail
 {
+
 
 using host_t = thrust::system::__THRUST_HOST_SYSTEM_NAMESPACE::detail::par_t;
 
 using device_t = thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPACE::detail::par_t;
 
-} // namespace detail
+
+} // end detail
+
 
 /*! \endcond
  */
 
+
 /*! \addtogroup execution_policies Parallel Execution Policies
  *  \{
  */
+
 
 // define execution_policy for the purpose of Doxygenating it
 // it is actually defined elsewhere
@@ -116,7 +114,7 @@ using device_t = thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPACE::detail::par_t
  *    thrust::for_each(exec, data, data + 4, ignore_argument());
  *
  *    // can't dispatch thrust::transform because no overload exists for my_policy:
- *    //thrust::transform(exec, data, data, + 4, data, ::internal::identity{}); // error!
+ *    //thrust::transform(exec, data, data, + 4, data, thrust::identity<int>()); // error!
  *
  *    return 0;
  *  }
@@ -129,6 +127,7 @@ template<typename DerivedPolicy>
 struct execution_policy : thrust::detail::execution_policy_base<DerivedPolicy>
 {};
 #endif
+
 
 /*! \p host_execution_policy is the base class for all Thrust parallel execution policies
  *  which are derived from Thrust's default host backend system configured with the \p THRUST_HOST_SYSTEM
@@ -176,7 +175,7 @@ struct execution_policy : thrust::detail::execution_policy_base<DerivedPolicy>
  *    thrust::for_each(exec, data, data + 4, ignore_argument());
  *
  *    // dispatch thrust::transform whose behavior our policy inherits
- *    thrust::transform(exec, data, data, + 4, data, ::internal::identity{});
+ *    thrust::transform(exec, data, data, + 4, data, thrust::identity<int>());
  *
  *    return 0;
  *  }
@@ -185,9 +184,11 @@ struct execution_policy : thrust::detail::execution_policy_base<DerivedPolicy>
  *  \see execution_policy
  *  \see device_execution_policy
  */
-template <typename DerivedPolicy>
-struct host_execution_policy : thrust::system::__THRUST_HOST_SYSTEM_NAMESPACE::execution_policy<DerivedPolicy>
+template<typename DerivedPolicy>
+  struct host_execution_policy
+    : thrust::system::__THRUST_HOST_SYSTEM_NAMESPACE::execution_policy<DerivedPolicy>
 {};
+
 
 /*! \p device_execution_policy is the base class for all Thrust parallel execution policies
  *  which are derived from Thrust's default device backend system configured with the \p THRUST_DEVICE_SYSTEM
@@ -235,7 +236,7 @@ struct host_execution_policy : thrust::system::__THRUST_HOST_SYSTEM_NAMESPACE::e
  *    thrust::for_each(exec, data, data + 4, ignore_argument());
  *
  *    // dispatch thrust::transform whose behavior our policy inherits
- *    thrust::transform(exec, data, data, + 4, data, ::internal::identity{});
+ *    thrust::transform(exec, data, data, + 4, data, thrust::identity<int>());
  *
  *    return 0;
  *  }
@@ -244,9 +245,11 @@ struct host_execution_policy : thrust::system::__THRUST_HOST_SYSTEM_NAMESPACE::e
  *  \see execution_policy
  *  \see host_execution_policy
  */
-template <typename DerivedPolicy>
-struct device_execution_policy : thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPACE::execution_policy<DerivedPolicy>
+template<typename DerivedPolicy>
+  struct device_execution_policy
+    : thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPACE::execution_policy<DerivedPolicy>
 {};
+
 
 /*! \p thrust::host is the default parallel execution policy associated with Thrust's host backend system
  *  configured by the \p THRUST_HOST_SYSTEM macro.
@@ -272,7 +275,7 @@ struct device_execution_policy : thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPAC
  *
  *  struct printf_functor
  *  {
- *    __host__ __device__
+ *    THRUST_HOST_DEVICE
  *    void operator()(int x)
  *    {
  *      printf("%d\n", x);
@@ -290,6 +293,7 @@ struct device_execution_policy : thrust::system::__THRUST_DEVICE_SYSTEM_NAMESPAC
  *  \see thrust::device
  */
 static const detail::host_t host;
+
 
 /*! \p thrust::device is the default parallel execution policy associated with Thrust's device backend system
  *  configured by the \p THRUST_DEVICE_SYSTEM macro.
@@ -319,7 +323,7 @@ static const detail::host_t host;
  *
  *  struct printf_functor
  *  {
- *    __host__ __device__
+ *    THRUST_HOST_DEVICE
  *    void operator()(int x)
  *    {
  *      printf("%d\n", x);
@@ -338,6 +342,7 @@ static const detail::host_t host;
  *  \see thrust::device
  */
 THRUST_INLINE_CONSTANT detail::device_t device;
+
 
 // define seq for the purpose of Doxygenating it
 // it is actually defined elsewhere
@@ -358,7 +363,7 @@ THRUST_INLINE_CONSTANT detail::device_t device;
  *
  *  struct printf_functor
  *  {
- *    __host__ __device__
+ *    THRUST_HOST_DEVICE
  *    void operator()(int x)
  *    {
  *      printf("%d\n", x);
@@ -379,7 +384,9 @@ THRUST_INLINE_CONSTANT detail::device_t device;
 static const detail::seq_t seq;
 #endif
 
+
 /*! \}
  */
+
 
 THRUST_NAMESPACE_END

@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,14 +25,14 @@
 #include "rocsparse_bsrgemm_calc.hpp"
 #include "../conversion/rocsparse_identity.hpp"
 #include "bsrgemm_device.h"
+#include "control.h"
 #include "csrgemm_device.h"
 #include "internal/extra/rocsparse_bsrgemm.h"
 #include "rocsparse_bsrgemm.hpp"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csrgemm.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 #define BSRGEMM_MAXGROUPS 8
 #define BSRGEMM_NNZ_HASH 79
@@ -486,9 +486,7 @@ namespace rocsparse
         typename J,
         typename T,
         typename std::enable_if<std::is_same<T, float>::value || std::is_same<T, double>::value
-                                    || std::is_same<T, rocsparse_float_complex>::value
-                                    || std::is_same<T, _Float16>::value
-                                    || std::is_same<T, rocsparse_bfloat16>::value,
+                                    || std::is_same<T, rocsparse_float_complex>::value,
                                 int>::type
         = 0>
     static inline rocsparse_status bsrgemm_2x2_group_6_launcher(rocsparse_handle    handle,
@@ -2368,13 +2366,11 @@ rocsparse_status rocsparse::bsrgemm_calc_template_dispatch(rocsparse_handle    h
                                                                          d_perm,
                                                                          workspace2));
         return rocsparse_status_success;
-        // LCOV_EXCL_START
     }
     else
     {
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
     }
-    // LCOV_EXCL_STOP
 }
 
 #define INSTANTIATE(I, J, T)                                             \
@@ -2415,17 +2411,11 @@ INSTANTIATE(int32_t, int32_t, float);
 INSTANTIATE(int32_t, int32_t, double);
 INSTANTIATE(int32_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, int32_t, rocsparse_double_complex);
-INSTANTIATE(int32_t, int32_t, _Float16);
-INSTANTIATE(int32_t, int32_t, rocsparse_bfloat16);
 INSTANTIATE(int64_t, int64_t, float);
 INSTANTIATE(int64_t, int64_t, double);
 INSTANTIATE(int64_t, int64_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int64_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, int64_t, _Float16);
-INSTANTIATE(int64_t, int64_t, rocsparse_bfloat16);
 INSTANTIATE(int64_t, int32_t, float);
 INSTANTIATE(int64_t, int32_t, double);
 INSTANTIATE(int64_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int32_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, int32_t, _Float16);
-INSTANTIATE(int64_t, int32_t, rocsparse_bfloat16);

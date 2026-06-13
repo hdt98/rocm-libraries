@@ -1,12 +1,8 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "gtest/gtest.h"
 #include "test_batched_gemm_softmax_gemm_permute_util.hpp"
-#include "test_batched_gemm_device_utils.hpp"
-
-ck::index_t param_mask     = 0xffff;
-ck::index_t instance_index = -1;
 
 template <typename Tuple>
 class TestBatchedGemmMaskingScaleSoftmaxGemmPermuteFP16
@@ -108,6 +104,7 @@ TYPED_TEST(TestBatchedGemmMaskingScaleSoftmaxGemmPermuteFP16, DISABLED_Bench_FP1
                                                    {1024, 64, 80, 64, 1, 16},
                                                    {4096, 4096, 40, 40, 1, 16},
                                                    {4096, 64, 40, 64, 1, 16}};
+    this->bench_   = true;
     this->verify_  = false;
     this->Run();
 }
@@ -126,7 +123,7 @@ TYPED_TEST(TestBatchedGemmMaskingScaleSoftmaxGemmPermuteFP16, DISABLED_Bench_FP1
         {4096, 4096, 64, 64, 48, 16},
         {4096, 4096, 128, 128, 48, 16},
     };
-
+    this->bench_  = true;
     this->verify_ = false;
     this->Run();
 }
@@ -135,18 +132,8 @@ using ck::tensor_operation::device::GemmSpecialization;
 
 TEST(TestBatchedGemmMaskingScaleSoftmaxGemmPermuteInterface, GemmSpecializationSizeMatch)
 {
-    // Get device capability tier
-    auto deviceTier = ck::test::DetermineDeviceTier();
-
     int P = 120; // requires padding
     int Q = 128; // do not require padding
-
-    // For lower-end devices, we might need to skip some tests
-    if(deviceTier == ck::test::DeviceCapabilityTier::LOW)
-    {
-        std::cout << "Skipping GemmSpecialization tests for low-resource device" << std::endl;
-        return;
-    }
 
     // IsSupported(M, N, K, O)
     // clang-format off
@@ -192,21 +179,4 @@ TYPED_TEST(TestBatchedGemmMaskingScaleSoftmaxGemmPermuteFP16, AdhocTest)
         {576, 576, 64, 64, 4, 6},
     };
     this->Run();
-}
-
-int main(int argc, char** argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    if(argc == 1) {}
-    else if(argc == 3)
-    {
-        param_mask     = strtol(argv[1], nullptr, 0);
-        instance_index = atoi(argv[2]);
-    }
-    else
-    {
-        std::cout << "Usage of " << argv[0] << std::endl;
-        std::cout << "Arg1,2: param_mask instance_index(-1 means all)" << std::endl;
-    }
-    return RUN_ALL_TESTS();
 }

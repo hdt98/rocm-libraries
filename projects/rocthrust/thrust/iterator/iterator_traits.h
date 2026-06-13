@@ -14,13 +14,14 @@
  *  limitations under the License.
  */
 
+
 /*! \file thrust/iterator/iterator_traits.h
  *  \brief Traits and metafunctions for reasoning about the traits of iterators
  */
 
 /*
  * (C) Copyright David Abrahams 2003.
- *
+ * 
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying NOTICE file for the complete license)
  *
@@ -30,20 +31,9 @@
 #pragma once
 
 #include <thrust/detail/config.h>
+#include <thrust/type_traits/void_t.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
-#if THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_NVRTC
-#  include <cuda/std/iterator>
-#else // THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_NVRTC
-#  include <iterator>
-#endif // THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_NVRTC
+#include <iterator>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -51,36 +41,25 @@ THRUST_NAMESPACE_BEGIN
  *  interface for querying the properties of iterators at compile-time.
  */
 template <typename T>
-struct iterator_traits
-    :
-#if THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_NVRTC
-    ::cuda
-#endif // THRUST_HOST_COMPILER == THRUST_HOST_COMPILER_NVRTC
-    ::std::iterator_traits<T>
-{};
+struct iterator_traits : std::iterator_traits<T> {};
 
-template <typename Iterator>
-struct iterator_value;
+template<typename Iterator> struct iterator_value;
 
-template <typename Iterator>
-struct iterator_pointer;
+template<typename Iterator> struct iterator_pointer;
 
-template <typename Iterator>
-struct iterator_reference;
+template<typename Iterator> struct iterator_reference;
 
-template <typename Iterator>
-struct iterator_difference;
+template<typename Iterator> struct iterator_difference;
 
-template <typename Iterator>
-struct iterator_traversal;
+template<typename Iterator> struct iterator_traversal;
 
-template <typename Iterator>
-struct iterator_system;
+template<typename Iterator> struct iterator_system;
 
 THRUST_NAMESPACE_END
 
-#include <thrust/iterator/detail/any_system_tag.h>
-#include <thrust/iterator/detail/device_system_tag.h>
-#include <thrust/iterator/detail/host_system_tag.h>
-#include <thrust/iterator/detail/iterator_traits.inl>
 #include <thrust/iterator/detail/iterator_traversal_tags.h>
+#include <thrust/iterator/detail/host_system_tag.h>
+#include <thrust/iterator/detail/device_system_tag.h>
+#include <thrust/iterator/detail/any_system_tag.h>
+#include <thrust/iterator/detail/iterator_traits.inl>
+

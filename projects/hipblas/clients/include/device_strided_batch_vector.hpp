@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -65,8 +65,6 @@ public:
         , m_batch_count(batch_count)
     {
         m_data = this->device_vector_setup();
-        if(!m_data)
-            throw std::bad_alloc{};
     }
 
     //!
@@ -84,7 +82,7 @@ public:
     //!
     //! @brief Returns the data pointer.
     //!
-    hipblas_internal_type<T>* data()
+    T* data()
     {
         return m_data;
     }
@@ -92,7 +90,7 @@ public:
     //!
     //! @brief Returns the data pointer.
     //!
-    const hipblas_internal_type<T>* data() const
+    const T* data() const
     {
         return m_data;
     }
@@ -134,7 +132,7 @@ public:
     //! @param batch_index The batch index.
     //! @return A mutable pointer to the batch_index'th vector.
     //!
-    hipblas_internal_type<T>* operator[](int64_t batch_index)
+    T* operator[](int64_t batch_index)
     {
         return (m_stride >= 0) ? m_data + batch_index * m_stride
                                : m_data + (batch_index + 1 - m_batch_count) * m_stride;
@@ -145,7 +143,7 @@ public:
     //! @param batch_index The batch index.
     //! @return A non-mutable mutable pointer to the batch_index'th vector.
     //!
-    const hipblas_internal_type<T>* operator[](int64_t batch_index) const
+    const T* operator[](int64_t batch_index) const
     {
         return (m_stride >= 0) ? m_data + batch_index * m_stride
                                : m_data + (batch_index + 1 - m_batch_count) * m_stride;
@@ -155,7 +153,7 @@ public:
     //! @brief Cast operator.
     //! @remark Returns the pointer of the first vector.
     //!
-    operator hipblas_internal_type<T>*()
+    operator T*()
     {
         return (*this)[0];
     }
@@ -185,8 +183,8 @@ public:
     hipError_t transfer_from(const host_strided_batch_vector<T>& that)
     {
         return hipMemcpy(data(),
-                         (hipblas_internal_type<T>*)that.data(),
-                         sizeof(hipblas_internal_type<T>) * this->nmemb(),
+                         that.data(),
+                         sizeof(T) * this->nmemb(),
                          this->use_HMM ? hipMemcpyHostToHost : hipMemcpyHostToDevice);
     }
 
@@ -203,11 +201,11 @@ public:
     }
 
 private:
-    size_t                    m_n{};
-    int64_t                   m_inc{};
-    hipblasStride             m_stride{};
-    int64_t                   m_batch_count{};
-    hipblas_internal_type<T>* m_data{};
+    size_t        m_n{};
+    int64_t       m_inc{};
+    hipblasStride m_stride{};
+    int64_t       m_batch_count{};
+    T*            m_data{};
 
     static size_t calculate_nmemb(size_t n, int64_t inc, hipblasStride stride, int64_t batch_count)
     {

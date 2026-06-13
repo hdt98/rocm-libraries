@@ -55,14 +55,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rocrand/rocrand_common.h"
 
-#include <hip/hip_runtime.h>
-
 // Constants from Random123
 // See https://www.deshawresearch.com/resources_random123.html
 #define ROCRAND_PHILOX_M4x32_0 0xD2511F53U
 #define ROCRAND_PHILOX_M4x32_1 0xCD9E8D57U
-#define ROCRAND_PHILOX_W32_0 0x9E3779B9U
-#define ROCRAND_PHILOX_W32_1 0xBB67AE85U
+#define ROCRAND_PHILOX_W32_0   0x9E3779B9U
+#define ROCRAND_PHILOX_W32_1   0xBB67AE85U
 
 /** \rocrand_internal \addtogroup rocranddevice
  *
@@ -94,7 +92,9 @@ public:
         // (with mean = 0, and stddev = 1). Often user wants only one
         // normally distributed number, to save performance and random
         // numbers the 2nd value is saved for future requests.
-        float  boxmuller_float; // normally distributed float
+        unsigned int boxmuller_float_state; // is there a float in boxmuller_float
+        unsigned int boxmuller_double_state; // is there a double in boxmuller_double
+        float boxmuller_float; // normally distributed float
         double boxmuller_double; // normally distributed double
     #endif
     };
@@ -154,8 +154,8 @@ public:
         m_state.result  = {0, 0, 0, 0};
         m_state.substate = 0;
     #ifndef ROCRAND_DETAIL_BM_NOT_IN_STATE
-        m_state.boxmuller_float  = ROCRAND_NAN_FLOAT;
-        m_state.boxmuller_double = ROCRAND_NAN_DOUBLE;
+        m_state.boxmuller_float_state = 0;
+        m_state.boxmuller_double_state = 0;
     #endif
         this->discard_subsequence_impl(subsequence);
         this->discard_impl(offset);
@@ -170,11 +170,10 @@ public:
     __forceinline__ __device__ __host__ unsigned int next()
     {
     #if defined(__HIP_PLATFORM_AMD__)
-        unsigned int ret = ROCRAND_HIPVEC_ACCESS(m_state.result)[m_state.substate];
+        unsigned int ret = m_state.result.data[m_state.substate];
     #else
         unsigned int ret = (&m_state.result.x)[m_state.substate];
     #endif
-
         m_state.substate++;
         if(m_state.substate == 4)
         {
@@ -423,6 +422,6 @@ void skipahead_sequence(unsigned long long sequence, rocrand_state_philox4x32_10
     return state->discard_subsequence(sequence);
 }
 
-/** @} */ // end of group rocranddevice
-
 #endif // ROCRAND_PHILOX4X32_10_H_
+
+/** @} */ // end of group rocranddevice

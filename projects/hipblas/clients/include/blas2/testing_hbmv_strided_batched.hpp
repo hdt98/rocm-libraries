@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -50,7 +50,6 @@ inline void testname_hbmv_strided_batched(const Arguments& arg, std::string& nam
 template <typename T>
 void testing_hbmv_strided_batched_bad_arg(const Arguments& arg)
 {
-    using Ts     = hipblas_internal_type<T>;
     bool FORTRAN = arg.api == hipblas_client_api::FORTRAN;
     auto hipblasHbmvStridedBatchedFn
         = FORTRAN ? hipblasHbmvStridedBatched<T, true> : hipblasHbmvStridedBatched<T, false>;
@@ -78,14 +77,11 @@ void testing_hbmv_strided_batched_bad_arg(const Arguments& arg)
 
         device_vector<T> d_alpha(1), d_beta(1), d_one(1), d_zero(1);
 
-        Ts h_alpha{1}, h_beta{2}, h_one{1}, h_zero{0};
-        if constexpr(is_complex<T>)
-            h_one = {1, 0};
-
-        const Ts* alpha = &h_alpha;
-        const Ts* beta  = &h_beta;
-        const Ts* one   = &h_one;
-        const Ts* zero  = &h_zero;
+        const T  h_alpha(1), h_beta(2), h_one(1), h_zero(0);
+        const T* alpha = &h_alpha;
+        const T* beta  = &h_beta;
+        const T* one   = &h_one;
+        const T* zero  = &h_zero;
 
         if(pointer_mode == HIPBLAS_POINTER_MODE_DEVICE)
         {
@@ -337,7 +333,6 @@ void testing_hbmv_strided_batched_bad_arg(const Arguments& arg)
 template <typename T>
 void testing_hbmv_strided_batched(const Arguments& arg)
 {
-    using Ts     = hipblas_internal_type<T>;
     bool FORTRAN = arg.api == hipblas_client_api::FORTRAN;
 
     auto hipblasHbmvStridedBatchedFn
@@ -414,7 +409,7 @@ void testing_hbmv_strided_batched(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(d_alpha.memcheck());
     CHECK_DEVICE_ALLOCATION(d_beta.memcheck());
 
-    double hipblas_error_host{0}, hipblas_error_device{0};
+    double hipblas_error_host, hipblas_error_device;
 
     T h_alpha = arg.get_alpha<T>();
     T h_beta  = arg.get_beta<T>();
@@ -446,14 +441,14 @@ void testing_hbmv_strided_batched(const Arguments& arg)
                     uplo,
                     N,
                     K,
-                    reinterpret_cast<Ts*>(&h_alpha),
+                    (T*)&h_alpha,
                     dA,
                     lda,
                     stride_A,
                     dx,
                     incx,
                     stride_x,
-                    reinterpret_cast<Ts*>(&h_beta),
+                    (T*)&h_beta,
                     dy,
                     incy,
                     stride_y,
@@ -510,7 +505,7 @@ void testing_hbmv_strided_batched(const Arguments& arg)
 
     if(arg.timing)
     {
-        double gpu_time_used{0};
+        double gpu_time_used;
         CHECK_HIP_ERROR(dy.transfer_from(hy));
         hipStream_t stream;
         CHECK_HIPBLAS_ERROR(hipblasGetStream(handle, &stream));

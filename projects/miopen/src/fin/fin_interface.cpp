@@ -1,5 +1,28 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright (c) 2024 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 
 #include <miopen/config.h>
 
@@ -263,8 +286,14 @@ AnySolver<miopen::ExecutionContext, miopen::conv::ProblemDescription>::AnySolver
     case 2: SetObject<miopen::solver::conv::ConvAsm1x1U>(); break;
     case 3: SetObject<miopen::solver::conv::ConvAsm1x1UV2>(); break;
     case 11: SetObject<miopen::solver::conv::ConvOclDirectFwd>(); break;
+    case 13: SetObject<miopen::solver::conv::ConvOclDirectFwd1x1>(); break;
     case 16: SetObject<miopen::solver::conv::ConvAsmBwdWrW3x3>(); break;
     case 17: SetObject<miopen::solver::conv::ConvAsmBwdWrW1x1>(); break;
+    case 18: SetObject<miopen::solver::conv::ConvOclBwdWrW2<1>>(); break;
+    case 19: SetObject<miopen::solver::conv::ConvOclBwdWrW2<2>>(); break;
+    case 20: SetObject<miopen::solver::conv::ConvOclBwdWrW2<4>>(); break;
+    case 21: SetObject<miopen::solver::conv::ConvOclBwdWrW2<8>>(); break;
+    case 22: SetObject<miopen::solver::conv::ConvOclBwdWrW2<16>>(); break;
     case 26: SetObject<miopen::solver::conv::ConvHipImplicitGemmV4R1Fwd>(); break;
     case 31: SetObject<miopen::solver::conv::ConvHipImplicitGemmV4R1WrW>(); break;
     case 37: SetObject<miopen::solver::conv::ConvBinWinoRxS<3, 2>>(); break;
@@ -298,13 +327,14 @@ AnySolver<miopen::ExecutionContext, miopen::conv::ProblemDescription>::AnySolver
     case 110: SetObject<miopen::solver::conv::ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC>(); break;
     case 114: SetObject<miopen::solver::conv::ConvCkIgemmFwdV6r1DlopsNchw>(); break;
     case 127: SetObject<miopen::solver::conv::ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC>(); break;
+    case 128: SetObject<miopen::solver::conv::ConvHipImplicitGemmFwdXdlops>(); break;
+    case 129: SetObject<miopen::solver::conv::ConvHipImplicitGemmBwdXdlops>(); break;
     case 137: SetObject<miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops>(); break;
     case 138: SetObject<miopen::solver::conv::ConvHipImplicitGemm3DGroupFwdXdlops>(); break;
     case 140: SetObject<miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwXdlops>(); break;
     case 141: SetObject<miopen::solver::conv::ConvHipImplicitGemm3DGroupBwdXdlops>(); break;
     case 155: SetObject<miopen::solver::conv::ConvHipImplicitGemmGroupBwdXdlops>(); break;
     case 156: SetObject<miopen::solver::conv::ConvHipImplicitGemmGroupWrwXdlops>(); break;
-    case 185: SetObject<miopen::solver::conv::ConvDepthwiseFwd2D>(); break;
     // New tunable solver should be added here
     default:
         MIOPEN_THROW(miopenStatusInternalError, "Unknown solver ID (" + std::to_string(id) + ")");
@@ -326,6 +356,9 @@ AnySolver<miopen::ExecutionContext, miopen::batchnorm::ProblemDescription>::AnyS
     {
     case 113: SetObject<miopen::solver::batchnorm::BnFwdTrainingSpatial>(); break;
     case 117: SetObject<miopen::solver::batchnorm::BnBwdTrainingSpatial>(); break;
+    case 142: SetObject<miopen::solver::batchnorm::BnCKFwdInference>(); break;
+    case 143: SetObject<miopen::solver::batchnorm::BnCKBwdBackward>(); break;
+    case 144: SetObject<miopen::solver::batchnorm::BnCKFwdTraining>(); break;
     // New tunable solver should be added here
     default:
         MIOPEN_THROW(miopenStatusInternalError, "Unknown solver ID (" + std::to_string(id) + ")");

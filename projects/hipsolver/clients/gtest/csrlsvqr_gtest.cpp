@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2024-2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2024 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 #include "testing_csrlsvqr.hpp"
@@ -73,7 +73,7 @@ protected:
     }
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <typename T>
@@ -109,15 +109,15 @@ TEST_P(CSRLSVQR, __double)
     run_tests<double>();
 }
 
-TEST_P(CSRLSVQR, __float_complex)
-{
-    run_tests<rocblas_float_complex>();
-}
+// TEST_P(CSRLSVQR, __float_complex)
+// {
+//     run_tests<rocblas_float_complex>();
+// }
 
-TEST_P(CSRLSVQR, __double_complex)
-{
-    run_tests<rocblas_double_complex>();
-}
+// TEST_P(CSRLSVQR, __double_complex)
+// {
+//     run_tests<rocblas_double_complex>();
+// }
 
 // TEST_P(CSRLSVQRHOST, __float)
 // {

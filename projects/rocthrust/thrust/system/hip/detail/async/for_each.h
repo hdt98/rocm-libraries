@@ -1,7 +1,7 @@
 
 /******************************************************************************
  * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright© 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Modifications Copyright© 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -32,35 +32,21 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/cpp_version_check.h>
-
 #if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP
 
-#  include <thrust/system/hip/config.h>
+#include <thrust/system/hip/config.h>
 
-#  include <thrust/distance.h>
-#  include <thrust/iterator/iterator_traits.h>
-#  include <thrust/system/hip/detail/async/customization.h>
-#  include <thrust/system/hip/detail/parallel_for.h>
-#  include <thrust/system/hip/future.h>
+#include <thrust/system/hip/detail/async/customization.h>
+#include <thrust/system/hip/detail/parallel_for.h>
+#include <thrust/system/hip/future.h>
+#include <thrust/iterator/iterator_traits.h>
+#include <thrust/distance.h>
 
-#  include <type_traits> // IWYU pragma: export
+#include <type_traits>
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
 THRUST_NAMESPACE_BEGIN
 
-namespace system
-{
-namespace hip
-{
-namespace detail
+namespace system { namespace hip { namespace detail
 {
 
 template <typename ForwardIt, typename UnaryFunction>
@@ -69,20 +55,29 @@ struct async_for_each_fn
   ForwardIt first;
   UnaryFunction f;
 
-  THRUST_HOST_DEVICE async_for_each_fn(ForwardIt&& first_, UnaryFunction&& f_)
-      : first(std::move(first_))
-      , f(std::move(f_))
+  THRUST_HOST_DEVICE
+  async_for_each_fn(ForwardIt&& first_, UnaryFunction&& f_)
+    : first(std::move(first_)), f(std::move(f_))
   {}
 
   template <typename Index>
-  THRUST_HOST_DEVICE void operator()(Index idx)
+  THRUST_HOST_DEVICE
+  void operator()(Index idx)
   {
     f(thrust::raw_reference_cast(first[idx]));
   }
 };
 
-template <typename DerivedPolicy, typename ForwardIt, typename Size, typename UnaryFunction>
-unique_eager_event async_for_each_n(execution_policy<DerivedPolicy>& policy, ForwardIt first, Size n, UnaryFunction func)
+template <
+  typename DerivedPolicy
+, typename ForwardIt, typename Size, typename UnaryFunction
+>
+auto async_for_each_n(
+  execution_policy<DerivedPolicy>& policy,
+  ForwardIt                        first,
+  Size                             n,
+  UnaryFunction                    func
+) -> unique_eager_event
 {
   unique_eager_event e;
 
@@ -92,41 +87,72 @@ unique_eager_event async_for_each_n(execution_policy<DerivedPolicy>& policy, For
 
   if (thrust::hip_rocprim::default_stream() != user_raw_stream)
   {
-    e = make_dependent_event(std::tuple_cat(std::make_tuple(unique_stream(nonowning, user_raw_stream)),
-                                            extract_dependencies(std::move(thrust::detail::derived_cast(policy)))));
+    e = make_dependent_event(
+      std::tuple_cat(
+        std::make_tuple(
+          unique_stream(nonowning, user_raw_stream)
+        )
+      , extract_dependencies(
+          std::move(thrust::detail::derived_cast(policy))
+        )
+      )
+    );
   }
   else
   {
-    e = make_dependent_event(extract_dependencies(std::move(thrust::detail::derived_cast(policy))));
+    e = make_dependent_event(
+      extract_dependencies(
+        std::move(thrust::detail::derived_cast(policy))
+      )
+    );
+  }
+
+  if( n == 0)
+  {
+    e.ready();
+    return e;
   }
 
   // Run for_each.
 
-  async_for_each_fn<ForwardIt, UnaryFunction> wrapped(std::move(first), std::move(func));
+  async_for_each_fn<ForwardIt, UnaryFunction> wrapped(
+    std::move(first), std::move(func)
+  );
 
   thrust::hip_rocprim::throw_on_error(
-    thrust::hip_rocprim::__parallel_for::parallel_for(n, std::move(wrapped), e.stream().native_handle()),
-    "after for_each launch");
+    thrust::hip_rocprim::__parallel_for::parallel_for(
+      n, std::move(wrapped), e.stream().native_handle()
+    )
+  , "after for_each launch"
+  );
 
   return e;
 }
 
-} // namespace detail
-} // namespace hip
-} // namespace system
+}}} // namespace system::hip::detail
 
 namespace hip_rocprim
 {
 
 // ADL entry point.
-template <typename DerivedPolicy, typename ForwardIt, typename Sentinel, typename UnaryFunction>
-auto async_for_each(execution_policy<DerivedPolicy>& policy, ForwardIt first, Sentinel last, UnaryFunction&& func)
-  THRUST_RETURNS(
-    thrust::system::hip::detail::async_for_each_n(policy, first, thrust::distance(first, last), THRUST_FWD(func)));
+template <
+  typename DerivedPolicy
+, typename ForwardIt, typename Sentinel, typename UnaryFunction
+>
+auto async_for_each(
+  execution_policy<DerivedPolicy>& policy,
+  ForwardIt                        first,
+  Sentinel                         last,
+  UnaryFunction&&                  func
+)
+THRUST_RETURNS(
+  thrust::system::hip::detail::async_for_each_n(
+    policy, first, distance(first, last), THRUST_FWD(func)
+  )
+);
 
-} // namespace hip_rocprim
+} // hip_rocprim
 
-THRUST_SUPPRESS_DEPRECATED_POP
 THRUST_NAMESPACE_END
 
 #endif // THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP

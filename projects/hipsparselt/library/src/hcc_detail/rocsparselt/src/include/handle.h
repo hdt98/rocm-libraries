@@ -30,7 +30,6 @@
 
 #include <fstream>
 #include <hip/hip_runtime_api.h>
-#include <hip/hip_fp8.h>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -61,8 +60,7 @@ struct _rocsparselt_handle
     // asic revision
     int asic_rev;
 
-    bool has_fp8_ocp  = false;
-    bool has_fp8_fnuz = false;
+    bool has_fp8_ocp = false;
 
     // pointer mode ; default mode is host
     rocsparselt_pointer_mode pointer_mode = rocsparselt_pointer_mode_host;
@@ -112,6 +110,7 @@ struct _rocsparselt_mat_descr
         , c_k(rhs.c_k)
         , c_ld(rhs.c_ld)
         , c_n(rhs.c_n)
+        , is_hipsparselt_datatype(rhs.is_hipsparselt_datatype)
     {
         is_init = (uintptr_t)handle;
     };
@@ -166,6 +165,9 @@ struct _rocsparselt_mat_descr
     int64_t c_ld = -1;
 
     int64_t c_n = -1;
+
+    //@TODO This is used to backward support hipsparseLtDatatype_t, should remove in the later version.
+    bool is_hipsparselt_datatype = false;
 };
 
 /********************************************************************************
@@ -211,6 +213,7 @@ struct _rocsparselt_matmul_descr
         , _ldb(rhs._ldb)
         , _is_sparse_a(rhs._is_sparse_a)
         , _swap_ab(rhs._swap_ab)
+        , bias_is_hipsparselt_datatype(rhs.bias_is_hipsparselt_datatype)
     {
         matrix_A     = rhs.matrix_A->clone();
         matrix_B     = rhs.matrix_B->clone();
@@ -278,7 +281,9 @@ struct _rocsparselt_matmul_descr
     bool                  _is_sparse_a = true;
     bool                  _swap_ab     = false;
 
-    uintptr_t is_init                  = 0;
+    //@TODO This is used to backward support hipsparseLtDatatype_t, should remove in the later version.
+    bool      bias_is_hipsparselt_datatype = false;
+    uintptr_t is_init                      = 0;
 
 private:
     bool is_reference = true;
@@ -293,14 +298,12 @@ struct __attribute__((packed, aligned(8))) _rocsparselt_matmul_config
     {
         this->index               = rhs.index;
         this->max_workspace_bytes = rhs.max_workspace_bytes;
-        this->synchronizer_bytes  = rhs.synchronizer_bytes;
     }
 
     int    index;
     int    use_bias            = 0;
     int    use_scale_alpha_vec = 0;
     size_t max_workspace_bytes = 0;
-    size_t synchronizer_bytes  = 0;
 };
 
 /********************************************************************************
@@ -320,12 +323,6 @@ struct _rocsparselt_matmul_alg_selection
     // destructor
     ~_rocsparselt_matmul_alg_selection()
     {
-        clear();
-    }
-
-    void clear()
-    {
-        handle = nullptr;
         is_init = 0;
     };
 
@@ -391,48 +388,4 @@ bool check_is_init_matmul_descr(const _rocsparselt_matmul_descr* matmul);
 bool check_is_init_matmul_alg_selection(const _rocsparselt_matmul_alg_selection* alg_selection);
 bool check_is_init_plan(const _rocsparselt_matmul_plan* plan);
 
-enum _rocsparselt_matmul_datatype
-{
-    MATMUL_DATATYPE_H_H_S,
-    MATMUL_DATATYPE_B_B_S,
-    MATMUL_DATATYPE_I8_I8_S,
-    MATMUL_DATATYPE_I8_H_S,
-    MATMUL_DATATYPE_I8_B_S,
-    MATMUL_DATATYPE_I8_I_S,
-    MATMUL_DATATYPE_E4M3_S_S,
-    MATMUL_DATATYPE_E5M2_S_S,
-    MATMUL_DATATYPE_E4M3_FNUZ_S_S,
-    MATMUL_DATATYPE_E5M2_FNUZ_S_S,
-    MATMUL_DATATYPE_UNKNOWN,
-};
-
-struct _rocsparselt_matmul_type
-{
-    _rocsparselt_matmul_datatype type;
-    hipDataType a;
-    hipDataType b;
-    hipDataType c;
-    hipDataType d;
-    rocsparselt_compute_type compute;
-};
-
-constexpr _rocsparselt_matmul_type valid_matmul_datatypes[] =
-{
-    {MATMUL_DATATYPE_H_H_S, HIP_R_16F, HIP_R_16F, HIP_R_16F, HIP_R_16F, rocsparselt_compute_f32},
-    {MATMUL_DATATYPE_B_B_S, HIP_R_16BF, HIP_R_16BF, HIP_R_16BF, HIP_R_16BF, rocsparselt_compute_f32},
-    {MATMUL_DATATYPE_I8_I8_S, HIP_R_8I, HIP_R_8I, HIP_R_8I, HIP_R_8I, rocsparselt_compute_i32},
-    {MATMUL_DATATYPE_I8_H_S, HIP_R_8I, HIP_R_8I, HIP_R_16F, HIP_R_16F, rocsparselt_compute_i32},
-    {MATMUL_DATATYPE_I8_B_S, HIP_R_8I, HIP_R_8I, HIP_R_16BF, HIP_R_16BF, rocsparselt_compute_i32},
-    {MATMUL_DATATYPE_I8_I_S, HIP_R_8I, HIP_R_8I, HIP_R_32I, HIP_R_32I, rocsparselt_compute_i32},
-#if HIP_FP8_TYPE_OCP
-    {MATMUL_DATATYPE_E4M3_S_S, HIP_R_8F_E4M3, HIP_R_8F_E4M3, HIP_R_32F, HIP_R_32F, rocsparselt_compute_f32},
-    {MATMUL_DATATYPE_E5M2_S_S, HIP_R_8F_E5M2, HIP_R_8F_E5M2, HIP_R_32F, HIP_R_32F, rocsparselt_compute_f32},
-#endif
-#if HIP_FP8_TYPE_FNUZ
-    {MATMUL_DATATYPE_E4M3_FNUZ_S_S, HIP_R_8F_E4M3_FNUZ, HIP_R_8F_E4M3_FNUZ, HIP_R_32F, HIP_R_32F, rocsparselt_compute_f32},
-    {MATMUL_DATATYPE_E5M2_FNUZ_S_S, HIP_R_8F_E5M2_FNUZ, HIP_R_8F_E5M2_FNUZ, HIP_R_32F, HIP_R_32F, rocsparselt_compute_f32},
-#endif
-};
-
-_rocsparselt_matmul_datatype is_matmul_datatype_valid(hipDataType a, hipDataType b, hipDataType c, hipDataType d, rocsparselt_compute_type compute);
 #endif // HANDLE_H

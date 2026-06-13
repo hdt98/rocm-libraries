@@ -1,11 +1,8 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #pragma once
 
 TYPED_TEST(TestGroupedGemm, TinyCases)
 {
-    const std::vector<int> Ms{2, 1};
+    const std::vector<int> Ms{0, 1};
     constexpr int N = 768;
     constexpr int K = 544;
 
@@ -17,7 +14,7 @@ TYPED_TEST(TestGroupedGemm, TinyCases)
 
 TYPED_TEST(TestGroupedGemm, SmallCases)
 {
-    const std::vector<int> Ms{2, 1, 3, 4, 5};
+    const std::vector<int> Ms{2, 1, 3, 4, 5, 0};
     constexpr int N = 768;
     constexpr int K = 544;
 
@@ -65,12 +62,6 @@ TYPED_TEST(TestGroupedGemm, MNKPadded)
 
 TYPED_TEST(TestGroupedGemm, TestLargeKBatch)
 {
-    // In some cases Split K is not supported. Running this test would fail since no instance will
-    // be supported, so we skip the test
-    if(!this->IsSplitKSupported())
-        GTEST_SKIP() << "Split-K not supported for for the current configuration (FP16/BF16 on "
-                        "GFX11, or using CDE element-wise operation)";
-
     const std::vector<int> Ms{188, 210};
     constexpr int N = 768;
     constexpr int K = 4096;

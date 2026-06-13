@@ -1,33 +1,29 @@
 .. meta::
-  :description: List of ROCm and CUDA supported functions in hipBLASLt
+  :description: ROCm & CUDA supported functions
   :keywords: hipSPARSELt, ROCm, API library, API reference, supported
     functions
 
 .. _supported-functions:
 
 ******************************************************
-Supported ROCm and NVIDIA CUDA functions
+ROCm & CUDA supported functions
 ******************************************************
-
-Here is a list of the ROCm and NVIDIA CUDA functions supported by hipBLASLt:
 
 * ROCm
 
   * AMD sparse MFMA matrix core support
   * Mixed-precision computation support:
 
-    * ``FP16`` input/output, ``FP32`` matrix core accumulate
-    * ``BFLOAT16`` input/output, ``FP32`` matrix core accumulate
-    * ``INT8`` input/output, ``INT32`` matrix core accumulate
-    * ``INT8`` input, ``FP16`` output, ``INT32`` matrix core accumulate
-    * ``FP8`` input, ``FP32`` output, ``FP32`` matrix core accumulate
-    * ``BF8`` input, ``FP32`` output, ``FP32`` matrix core accumulate
+    * FP16 input/output, FP32 Matrix Core accumulate
+    * BFLOAT16 input/output, FP32 Matrix Core accumulate
+    * INT8 input/output, INT32 Matrix Core accumulate
+    * INT8 input, FP16 output, INT32 Matrix Core accumulate
 
   * Matrix pruning and compression functionalities
   * Auto-tuning functionality (see ``hipsparseLtMatmulSearch()``)
-  * Batched sparse GEMM support:
+  * Batched sparse Gemm support:
 
-    * Single sparse matrix/multiple dense matrices (broadcast)
+    * Single sparse matrix/Multiple dense matrices (Broadcast)
     * Multiple sparse and dense matrices
     * Batched bias vector
 
@@ -36,20 +32,20 @@ Here is a list of the ROCm and NVIDIA CUDA functions supported by hipBLASLt:
     * ReLU
     * ClippedReLU (ReLU with upper bound and threshold setting)
     * GeLU
-    * GeLU scaling (implied enable GeLU)
+    * GeLU Scaling (Implied enable GeLU)
     * Abs
     * LeakyReLU
     * Sigmoid
     * Tanh
 
-  * Ongoing feature development
+  * On-going feature development
 
-    * Add support for mixed-precision computation:
+    * Add support for Mixed-precision computation
 
-      * ``FP8`` input/output, ``FP32`` matrix core accumulate
-      * ``BF8`` input/output, ``FP32`` matrix core accumulate
-      * Add kernel selection and generator, used to provide the appropriate solution for the specific problem
+      * FP8 input/output, FP32 Matrix Core accumulate
+      * BF8 input/output, FP32 Matrix Core accumulate
+      * Add kernel selection and generator, used to provide the appropriate solution for the specific problem.
 
 * CUDA
 
-  * Support for CUDA cuSPARSELt v0.6.3
+  * Support cuSPARSELt v0.6.3

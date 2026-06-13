@@ -31,39 +31,25 @@
 #pragma once
 
 #include <thrust/detail/config.h>
+#include <thrust/detail/cpp14_required.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/cpp_version_check.h>
+#if THRUST_CPP_DIALECT >= 2014
 
-#if _CCCL_STD_VER >= 2017
+#if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_NVCC
 
-#  if _CCCL_HAS_CUDA_COMPILER
+#include <thrust/system/cuda/config.h>
 
-#    include <thrust/system/cuda/config.h>
+#include <thrust/system/cuda/detail/async/customization.h>
+#include <thrust/system/cuda/detail/parallel_for.h>
+#include <thrust/system/cuda/future.h>
+#include <thrust/iterator/iterator_traits.h>
+#include <thrust/distance.h>
 
-#    include <cub/device/device_for.cuh>
+#include <type_traits>
 
-#    include <thrust/distance.h>
-#    include <thrust/iterator/iterator_traits.h>
-#    include <thrust/system/cuda/detail/async/customization.h>
-#    include <thrust/system/cuda/future.h>
-
-#    include <type_traits>
-
-_CCCL_SUPPRESS_DEPRECATED_PUSH
 THRUST_NAMESPACE_BEGIN
 
-namespace system
-{
-namespace cuda
-{
-namespace detail
+namespace system { namespace cuda { namespace detail
 {
 
 template <typename ForwardIt, typename UnaryFunction>
@@ -72,21 +58,29 @@ struct async_for_each_fn
   ForwardIt first;
   UnaryFunction f;
 
-  _CCCL_HOST_DEVICE async_for_each_fn(ForwardIt&& first_, UnaryFunction&& f_)
-      : first(std::move(first_))
-      , f(std::move(f_))
+  _CCCL_HOST_DEVICE
+  async_for_each_fn(ForwardIt&& first_, UnaryFunction&& f_)
+    : first(std::move(first_)), f(std::move(f_))
   {}
 
   template <typename Index>
-  _CCCL_HOST_DEVICE void operator()(Index idx)
+  _CCCL_HOST_DEVICE
+  void operator()(Index idx)
   {
     f(thrust::raw_reference_cast(first[idx]));
   }
 };
 
-template <typename DerivedPolicy, typename ForwardIt, typename Size, typename UnaryFunction>
-unique_eager_event async_for_each_n(execution_policy<DerivedPolicy>& policy, ForwardIt first, Size n, UnaryFunction func)
-{
+template <
+  typename DerivedPolicy
+, typename ForwardIt, typename Size, typename UnaryFunction
+>
+unique_eager_event async_for_each_n(
+  execution_policy<DerivedPolicy>& policy,
+  ForwardIt                        first,
+  Size                             n,
+  UnaryFunction                    func
+) {
   unique_eager_event e;
 
   // Set up stream with dependencies.
@@ -95,42 +89,69 @@ unique_eager_event async_for_each_n(execution_policy<DerivedPolicy>& policy, For
 
   if (thrust::cuda_cub::default_stream() != user_raw_stream)
   {
-    e = make_dependent_event(std::tuple_cat(std::make_tuple(unique_stream(nonowning, user_raw_stream)),
-                                            extract_dependencies(std::move(thrust::detail::derived_cast(policy)))));
+    e = make_dependent_event(
+      std::tuple_cat(
+        std::make_tuple(
+          unique_stream(nonowning, user_raw_stream)
+        )
+      , extract_dependencies(
+          std::move(thrust::detail::derived_cast(policy))
+        )
+      )
+    );
   }
   else
   {
-    e = make_dependent_event(extract_dependencies(std::move(thrust::detail::derived_cast(policy))));
+    e = make_dependent_event(
+      extract_dependencies(
+        std::move(thrust::detail::derived_cast(policy))
+      )
+    );
   }
 
   // Run for_each.
 
-  async_for_each_fn<ForwardIt, UnaryFunction> wrapped(std::move(first), std::move(func));
+  async_for_each_fn<ForwardIt, UnaryFunction> wrapped(
+    std::move(first), std::move(func)
+  );
 
   thrust::cuda_cub::throw_on_error(
-    cub::DeviceFor::Bulk(n, std::move(wrapped), e.stream().native_handle()), "after for_each launch");
+    thrust::cuda_cub::__parallel_for::parallel_for(
+      n, std::move(wrapped), e.stream().native_handle()
+    )
+  , "after for_each launch"
+  );
 
   return e;
 }
 
-} // namespace detail
-} // namespace cuda
-} // namespace system
+}}} // namespace system::cuda::detail
 
 namespace cuda_cub
 {
 
 // ADL entry point.
-template <typename DerivedPolicy, typename ForwardIt, typename Sentinel, typename UnaryFunction>
-auto async_for_each(execution_policy<DerivedPolicy>& policy, ForwardIt first, Sentinel last, UnaryFunction&& func)
-  THRUST_RETURNS(
-    thrust::system::cuda::detail::async_for_each_n(policy, first, thrust::distance(first, last), THRUST_FWD(func)));
+template <
+  typename DerivedPolicy
+, typename ForwardIt, typename Sentinel, typename UnaryFunction
+>
+auto async_for_each(
+  execution_policy<DerivedPolicy>& policy,
+  ForwardIt                        first,
+  Sentinel                         last,
+  UnaryFunction&&                  func
+)
+THRUST_RETURNS(
+  thrust::system::cuda::detail::async_for_each_n(
+    policy, first, distance(first, last), THRUST_FWD(func)
+  )
+);
 
-} // namespace cuda_cub
+} // cuda_cub
 
-_CCCL_SUPPRESS_DEPRECATED_POP
 THRUST_NAMESPACE_END
 
-#  endif // _CCCL_CUDA_COMPILER
+#endif // THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_NVCC
 
 #endif
+

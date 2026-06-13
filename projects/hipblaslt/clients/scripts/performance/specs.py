@@ -1,6 +1,3 @@
-# Copyright © Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 from pathlib import Path
 import re
 import socket
@@ -177,7 +174,7 @@ def get_sbios_info() -> str:
     except Exception:
         sbios_info = 'None'
     return sbios_info
-
+    
 
 def get_machine_specs(filename: str, devicenum: int = 0):
     """

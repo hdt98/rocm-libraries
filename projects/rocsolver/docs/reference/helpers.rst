@@ -1,19 +1,19 @@
 .. meta::
-  :description: rocSOLVER library and logging functions API documentation
-  :keywords: rocSOLVER, ROCm, API, documentation, library functions, logging
+  :description: rocSOLVER documentation and API reference library
+  :keywords: rocSOLVER, ROCm, API, documentation
 
 .. _helpers:
 
 *****************************************************
-rocSOLVER library and logging functions
+rocSOLVER Library and Logging Functions
 *****************************************************
 
 These are helper functions that retrieve information and control some functions of the library.
 The helper functions are divided into the following categories:
 
-* :ref:`lib_info`: Return information about the library version.
-* :ref:`algo_select`: Select different algorithm modes of certain APIs.
-* :ref:`api_logging`: Control the :ref:`logging-label` capabilities.
+* :ref:`lib_info`. These functions return information about the library version.
+* :ref:`algo_select`. Functions to select different algorithm modes of certain APIs.
+* :ref:`api_logging`. These functions control the :ref:`logging-label` capabilities.
 
 
 

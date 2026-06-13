@@ -54,3 +54,4 @@ THRUST_HOST_DEVICE
 } // end detail
 } // end system
 THRUST_NAMESPACE_END
+

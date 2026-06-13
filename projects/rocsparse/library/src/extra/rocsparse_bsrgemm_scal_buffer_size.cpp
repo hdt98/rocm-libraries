@@ -24,7 +24,7 @@
 
 #include "rocsparse_bsrgemm_scal.hpp"
 #include "rocsparse_csrgemm_scal.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 rocsparse_status rocsparse::bsrgemm_scal_buffer_size_quickreturn(rocsparse_handle          handle,
                                                                  int64_t                   mb,

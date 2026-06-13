@@ -28,10 +28,9 @@ from . import LibraryIO
 from . import SolutionSelectionLibrary
 from Tensile.Common import print1, print2, HR, printExit, \
   assignParameterWithDefault, ProgressBar, printWarning, ensurePath, \
-  LIBRARY_LOGIC_DIR, BENCHMARK_DATA_DIR, getVerbosity, IsaInfo
+  LIBRARY_LOGIC_DIR, BENCHMARK_DATA_DIR, getVerbosity, IsaInfo, DepthUConfig
 from Tensile.Common.GlobalParameters import defaultAnalysisParameters, globalParameters, startTime
-from Tensile.Common.TimingInstrumentation import timing_context
-from Tensile.SolutionStructs.Naming import getKernelNameMin, getSolutionNameMin, getSolutionNameFull
+from Tensile.SolutionStructs.Naming import getMinNaming, getNameMin, getNameFull
 
 from copy import deepcopy
 from sys import stdout
@@ -73,12 +72,14 @@ def analyzeProblemType(problemType, problemSizeGroups, inputParameters, libraryL
     solutions = problemSizeGroup[4]
     problemSizesList.append(problemSizes)
     solutionsList.append(solutions)
+    solutionMinNaming = getMinNaming(solutions)
     print1("# Read: %s" % (solutionsFileName))
     print2("# ProblemSizes: %s" % problemSizes)
     print2("# Solutions:")
     solutionIdx = 0
     for solution in solutions:
-      print2("#  (%u) %s" % (solutionIdx, getSolutionNameMin(solution, splitGSU)))
+      print2("#  (%u) %s" % (solutionIdx, getNameMin(solution, \
+          solutionMinNaming, splitGSU)))
       solutionIdx += 1
     print2(HR)
 
@@ -98,7 +99,7 @@ def analyzeProblemType(problemType, problemSizeGroups, inputParameters, libraryL
 
   ######################################
   # Remove least important solutions
-  if inputParameters["LibraryType"] == "FreeSize" or inputParameters["LibraryType"] == "Prediction":
+  if inputParameters["LibraryType"] == "FreeSize":
     logicAnalyzer.deReferenceSolutions()
   elif globalParameters["SolutionSelectionAlg"] == 0:
     logicAnalyzer.removeLeastImportantSolutions()
@@ -127,9 +128,9 @@ def analyzeProblemType(problemType, problemSizeGroups, inputParameters, libraryL
   for i in range(0, len(logicAnalyzer.solutions)):
     s = logicAnalyzer.solutions[i]
     s["SolutionIndex"] = i
-    s["SolutionNameMin"] = getSolutionNameMin(s, splitGSU)
-    s["KernelNameMin"]   = getKernelNameMin(s, splitGSU)
-    print1("(%2u) %s : %s" % (i, s["SolutionNameMin"], getSolutionNameFull(s, splitGSU)))
+    s["SolutionNameMin"] = getNameMin(s, solutionMinNaming, splitGSU)
+    s["KernelNameMin"]   = getNameMin(s, solutionMinNaming, splitGSU, True)
+    print1("(%2u) %s : %s" % (i, getNameMin(s, solutionMinNaming, splitGSU), getNameFull(s, splitGSU)))
 
   if enableTileSelection:
     validSelectionSolutions = SolutionSelectionLibrary.analyzeSolutionSelection(problemType, selectionFileNameList, \
@@ -161,8 +162,8 @@ def analyzeProblemType(problemType, problemSizeGroups, inputParameters, libraryL
       (validSolution, validSolutionInfo) = validSelectionSolution
       selectionSolutionIndex = solutionsStartIndex + i
       selectionSolutionsIds.add(selectionSolutionIndex)
-      validSolution["SolutionNameMin"] = getSolutionNameMin(validSolution, splitGSU)
-      validSolution["KernelNameMin"]   = getKernelNameMin(validSolution, splitGSU)
+      validSolution["SolutionNameMin"] = getNameMin(validSolution, solutionMinNaming, splitGSU)
+      validSolution["KernelNameMin"]   = getNameMin(validSolution, solutionMinNaming, splitGSU, True)
       validSolution["Ideals"] = validSolutionInfo
       selectionSolutions.append(validSolution)
 
@@ -197,14 +198,14 @@ def analyzeProblemType(problemType, problemSizeGroups, inputParameters, libraryL
 
   ######################################
   # Range Logic
-  if inputParameters["LibraryType"] != "FreeSize" and inputParameters["LibraryType"] != "Prediction":
+  if inputParameters["LibraryType"] != "FreeSize":
     indexOrder = logicAnalyzer.indexOrder
   else:
     indexOrder = None
 
   ######################################
   # Range Logic
-  if inputParameters["LibraryType"] != "FreeSize" and inputParameters["LibraryType"] != "Prediction":
+  if inputParameters["LibraryType"] != "FreeSize":
     rangeLogic = logicAnalyzer.enRule(0, logicAnalyzer.globalIndexRange)
     print2("# Final Range Logic:")
     print2(rangeLogic)
@@ -220,7 +221,7 @@ def analyzeProblemType(problemType, problemSizeGroups, inputParameters, libraryL
 
   ######################################
   # Exact Logic
-  if inputParameters["LibraryType"] != "FreeSize" and inputParameters["LibraryType"] != "Prediction":
+  if inputParameters["LibraryType"] != "FreeSize":
     exactLogic = logicAnalyzer.exactWinners
     print1("# Exact Logic:\n")
     print1("%s"%exactLogic)
@@ -292,11 +293,14 @@ class LogicAnalyzer:
         self.solutionGroupMap[solutionGroupIdx][solutionIdx] = sIdx
         progressBar.increment()
     self.numSolutions = len(self.solutions)
+    self.solutionMinNaming = getMinNaming(self.solutions)
     self.solutionNames = []
     self.solutionTiles = []
     for solution in self.solutions:
-      self.solutionNames.append(getSolutionNameMin(solution, self.splitGSU))
-      self.solutionTiles.append("%ux%u"%(solution["MacroTile0"], solution["MacroTile1"]))
+      self.solutionNames.append(getNameMin(solution, \
+          self.solutionMinNaming, self.splitGSU))
+      self.solutionTiles.append("%ux%u"%(solution["MacroTile0"], \
+          solution["MacroTile1"]))
     self.flopsPerMac = self.problemType["DataType"].flopsPerMac()
 
     # merge problem sizes from size groups
@@ -1116,10 +1120,12 @@ class LogicAnalyzer:
     for i in range(0, oldNumSolutions):
       if i != removeSolutionIdx:
         self.solutions.append(oldSolutions[i])
+    self.solutionMinNaming = getMinNaming(self.solutions)
     self.solutionNames = []
     self.solutionTiles = []
     for solution in self.solutions:
-      self.solutionNames.append(getSolutionNameMin(solution, self.splitGSU))
+      self.solutionNames.append(getNameMin(solution, \
+          self.solutionMinNaming, self.splitGSU))
       self.solutionTiles.append("%ux%u"%(solution["MacroTile0"], \
           solution["MacroTile1"]))
     self.numSolutions = len(self.solutions)
@@ -1165,10 +1171,12 @@ class LogicAnalyzer:
       else:
         removeSolutionIdxList.append(i)
 
+    self.solutionMinNaming = getMinNaming(self.solutions)
     self.solutionNames = []
     self.solutionTiles = []
     for solution in self.solutions:
-      self.solutionNames.append(getSolutionNameMin(solution, self.splitGSU))
+      self.solutionNames.append(getNameMin(solution, \
+          self.solutionMinNaming, self.splitGSU))
       self.solutionTiles.append("%ux%u"%(solution["MacroTile0"], \
           solution["MacroTile1"]))
     self.numSolutions = len(self.solutions)
@@ -1432,6 +1440,7 @@ def generateLogic(
     splitGSU: bool,
     printSolutionRejectionReason: bool,
     printIndexAssignmentInfo: bool,
+    depthUConfig: DepthUConfig,
     isaInfoMap: Dict[str, IsaInfo]
   ):
 
@@ -1464,58 +1473,51 @@ def generateLogic(
     printExit("Path doesn't exist: %s" % benchmarkDataPath)
   fileNames = os.listdir(benchmarkDataPath)
   fileNames = sorted(fileNames)
-  with timing_context("python_logic_parse_solutions"):
-    for fileName in fileNames:
-      if os.path.splitext(fileName)[1] == ".csv":
-        fileBase = os.path.splitext( \
-            os.path.join(benchmarkDataPath, \
-            fileName))[0]
-        dataFileName = fileBase + ".csv"
-        solutionsFileName = fileBase + ".yaml"
-        selectionFileName = fileBase + ".gsp"
-        if not os.path.exists(dataFileName):
-          printExit("%s doesn't exist for %s" % (dataFileName, fileBase) )
-        if not os.path.exists(solutionsFileName):
-          printExit("%s doesn't exist for %s" % (solutionsFileName, fileBase) )
-        (problemSizes, solutions) = LibraryIO.parseSolutionsFile(
-                                        solutionsFileName,
-                                        cxxCompiler,
-                                        splitGSU,
-                                        printSolutionRejectionReason,
-                                        printIndexAssignmentInfo,
-                                        isaInfoMap
-                                    )
-        if len(solutions) == 0:
-          printExit("%s doesn't contains any solutions." % (solutionsFileName) )
-        problemType = solutions[0]["ProblemType"]
-        if problemType not in problemTypes:
-          problemTypes[problemType] = []
-        problemTypes[problemType].append( (problemSizes, \
-            dataFileName, solutionsFileName, selectionFileName, solutions) )
+  for fileName in fileNames:
+    if os.path.splitext(fileName)[1] == ".csv":
+      fileBase = os.path.splitext( \
+          os.path.join(benchmarkDataPath, \
+          fileName))[0]
+      dataFileName = fileBase + ".csv"
+      solutionsFileName = fileBase + ".yaml"
+      selectionFileName = fileBase + ".gsp"
+      if not os.path.exists(dataFileName):
+        printExit("%s doesn't exist for %s" % (dataFileName, fileBase) )
+      if not os.path.exists(solutionsFileName):
+        printExit("%s doesn't exist for %s" % (solutionsFileName, fileBase) )
+      (problemSizes, solutions) = LibraryIO.parseSolutionsFile(
+                                      solutionsFileName,
+                                      cxxCompiler,
+                                      splitGSU,
+                                      printSolutionRejectionReason,
+                                      printIndexAssignmentInfo,
+                                      depthUConfig,
+                                      isaInfoMap
+                                  )
+      if len(solutions) == 0:
+        printExit("%s doesn't contains any solutions." % (solutionsFileName) )
+      problemType = solutions[0]["ProblemType"]
+      if problemType not in problemTypes:
+        problemTypes[problemType] = []
+      problemTypes[problemType].append( (problemSizes, \
+          dataFileName, solutionsFileName, selectionFileName, solutions) )
 
-  with timing_context("python_logic_analyze"):
-    for problemType in problemTypes:
-      logicTuple = analyzeProblemType(problemType, problemTypes[problemType], analysisParameters, libraryLogicPath, splitGSU)
+  for problemType in problemTypes:
+    logicTuple = analyzeProblemType(problemType, problemTypes[problemType], analysisParameters, libraryLogicPath, splitGSU)
 
-      filename = os.path.join(libraryLogicPath, \
-          "{}_{}".format(analysisParameters["ScheduleName"], str(problemType)))
+    filename = os.path.join(libraryLogicPath, \
+        "{}_{}".format(analysisParameters["ScheduleName"], str(problemType)))
 
-      problemTypes[problemType] = (logicTuple, filename)
+    print2("# writing library logic YAML {}".format(filename))
+    data = LibraryIO.createLibraryLogic(analysisParameters["ScheduleName"], \
+        analysisParameters["ArchitectureName"], analysisParameters["DeviceNames"], analysisParameters["LibraryType"], logicTuple)
 
-  with timing_context("python_logic_write"):
-    for problemType in problemTypes:
-      logicTuple, filename = problemTypes[problemType]
-
-      print2("# writing library logic YAML {}".format(filename))
-      data = LibraryIO.createLibraryLogic(analysisParameters["ScheduleName"], \
-          analysisParameters["ArchitectureName"], analysisParameters["DeviceNames"], analysisParameters["LibraryType"], logicTuple)
-
-      if globalParameters["LogicFormat"] == "yaml":
-        LibraryIO.writeYAML(filename + ".yaml", data, explicit_start=False, explicit_end=False)
-      elif globalParameters["LogicFormat"] == "json":
-        LibraryIO.write(filename, data, "json")
-      else:
-        printExit("Unrecognized LogicFormat", globalParameters["LogicFormat"])
+    if globalParameters["LogicFormat"] == "yaml":
+      LibraryIO.writeYAML(filename + ".yaml", data, explicit_start=False, explicit_end=False)
+    elif globalParameters["LogicFormat"] == "json":
+      LibraryIO.write(filename, data, "json")
+    else:
+      printExit("Unrecognized LogicFormat", globalParameters["LogicFormat"])
 
   currentTime = time.time()
   elapsedTime = currentTime - startTime
@@ -1571,6 +1573,7 @@ def main(
       splitGSU: bool,
       printSolutionRejectionReason: bool,
       printIndexAssignmentInfo: bool,
+      depthUConfig: DepthUConfig,
       isaInfoMap: Dict[str, IsaInfo]
     ):
   benchmarkDataPath = outputPath / BENCHMARK_DATA_DIR
@@ -1583,5 +1586,6 @@ def main(
     splitGSU,
     printSolutionRejectionReason,
     printIndexAssignmentInfo,
+    depthUConfig,
     isaInfoMap
   )

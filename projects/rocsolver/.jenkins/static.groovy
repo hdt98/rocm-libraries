@@ -21,7 +21,7 @@ def runCI =
     prj.defaults.ccache = true
 
     // customize for project
-    prj.paths.build_command = 'VERBOSE=1 ./install.sh -c --cmake-arg -DWERROR=ON --static'
+    prj.paths.build_command = './install.sh -c --cmake-arg -DWERROR=ON --static'
 
     // Define test architectures, optional rocm version argument is available
     def nodes = new dockerNodes(nodeDetails, jobName, prj)
@@ -75,13 +75,17 @@ ci: {
     {
         jobName, nodeDetails->
         if (urlJobName == jobName)
-            runCI(nodeDetails, jobName)
+            stage(jobName) {
+                runCI(nodeDetails, jobName)
+            }
     }
 
     // For url job names that are not listed by the jobNameList i.e. compute-rocm-dkms-no-npi-1901
     if(!jobNameList.keySet().contains(urlJobName))
     {
         properties(auxiliary.addCommonProperties([pipelineTriggers([cron('0 1 * * *')])]))
-        runCI([ubuntu22:['gfx90a']], urlJobName)
+        stage(urlJobName) {
+            runCI([ubuntu22:['gfx90a']], urlJobName)
+        }
     }
 }

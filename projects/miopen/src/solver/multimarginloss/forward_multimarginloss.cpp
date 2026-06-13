@@ -56,13 +56,7 @@ bool MultiMarginLossForward::IsImprovementOverROCm(
         case miopenFloat: return C <= 33;
         case miopenHalf: return C <= 43;
         case miopenBFloat16: return C <= 44;
-
-        case miopenInt32:
-        case miopenInt8:
-        case miopenDouble:
-        case miopenFloat8_fnuz:
-        case miopenBFloat8_fnuz:
-        case miopenInt64: return true;
+        default: return true;
         }
     }
     else
@@ -72,13 +66,7 @@ bool MultiMarginLossForward::IsImprovementOverROCm(
         case miopenFloat: return C <= 31;
         case miopenHalf: return C <= 38;
         case miopenBFloat16: return C <= 40;
-
-        case miopenInt32:
-        case miopenInt8:
-        case miopenDouble:
-        case miopenFloat8_fnuz:
-        case miopenBFloat8_fnuz:
-        case miopenInt64: return true;
+        default: return true;
         }
     }
 }
@@ -253,7 +241,7 @@ ConvSolution MultiMarginLossForward::GetSolution(
                     handle_.EnableProfiling(false);
                     start = miopen::make_hip_event();
                     stop  = miopen::make_hip_event();
-                    (void)hipEventRecord(start.get(), handle_.GetStream());
+                    hipEventRecord(start.get(), handle_.GetStream());
                 }
                 /* Phase 1: Calc loss for each element. */
                 {
@@ -281,7 +269,7 @@ ConvSolution MultiMarginLossForward::GetSolution(
                                                       wt.GetOffset(1));
 
                 int kernelCnt = 1;
-                for(; kernelCnt < kernels.size() - 1; kernelCnt++)
+                for(kernelCnt; kernelCnt < kernels.size() - 1; kernelCnt++)
                 {
                     decltype(auto) kernel = handle_.Run(kernels[kernelCnt]);
                     kernel(reduce_in, reduce_out, size);
@@ -294,13 +282,13 @@ ConvSolution MultiMarginLossForward::GetSolution(
 
                 if(profiling)
                 {
-                    (void)hipEventRecord(stop.get(), handle_.GetStream());
-                    (void)hipEventSynchronize(stop.get());
-                    (void)hipEventElapsedTime(&elapsed, start.get(), stop.get());
+                    hipEventRecord(stop.get(), handle_.GetStream());
+                    hipEventSynchronize(stop.get());
+                    hipEventElapsedTime(&elapsed, start.get(), stop.get());
 
                     // Clean up
-                    (void)hipEventDestroy(start.get());
-                    (void)hipEventDestroy(stop.get());
+                    hipEventDestroy(start.get());
+                    hipEventDestroy(stop.get());
                     handle_.ResetKernelTime();
                     handle_.AccumKernelTime(elapsed);
 

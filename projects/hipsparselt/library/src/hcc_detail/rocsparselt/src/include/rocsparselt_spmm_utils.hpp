@@ -113,14 +113,10 @@ inline int64_t rocsparselt_metadata_offset_in_compressed_matrix(int64_t     num_
         case HIP_R_16F:
         case HIP_R_16BF:
             return 2;
-#if HIP_FP8_TYPE_OCP
-        case HIP_R_8F_E4M3:
-        case HIP_R_8F_E5M2:
-#endif
-#if HIP_FP8_TYPE_FNUZ
         case HIP_R_8F_E4M3_FNUZ:
         case HIP_R_8F_E5M2_FNUZ:
-#endif
+        case HIP_R_8F_E4M3:
+        case HIP_R_8F_E5M2:
         case HIP_R_8I:
             return 1;
         default:
@@ -199,6 +195,10 @@ inline rocsparselt_status validateMatrixArgs(const _rocsparselt_handle* handle,
                                              rocsparselt_order          order,
                                              rocsparselt_matrix_type    matrixType)
 {
+    // handle must be valid
+    if(!check_is_init_handle(handle))
+        return rocsparselt_status_invalid_handle;
+
     if(num_rows == 0 || num_cols == 0)
     {
         hipsparselt_cerr << "row and col cannot be zero, current are " << num_rows << " and "
@@ -211,14 +211,10 @@ inline rocsparselt_status validateMatrixArgs(const _rocsparselt_handle* handle,
     switch(valueType)
     {
     case HIP_R_8I:
-#if HIP_FP8_TYPE_OCP
-    case HIP_R_8F_E4M3:
-    case HIP_R_8F_E5M2:
-#endif
-#if HIP_FP8_TYPE_FNUZ
     case HIP_R_8F_E4M3_FNUZ:
     case HIP_R_8F_E5M2_FNUZ:
-#endif
+    case HIP_R_8F_E4M3:
+    case HIP_R_8F_E5M2:
         num_elements = 16;
         break;
     default:
@@ -267,7 +263,6 @@ inline rocsparselt_status validateMatrixArgs(const _rocsparselt_handle* handle,
     case HIP_R_16F:
     case HIP_R_16BF:
     case HIP_R_8I:
-    case HIP_R_32I:
         break;
 #if HIP_FP8_TYPE_OCP
     case HIP_R_8F_E4M3:
@@ -275,14 +270,8 @@ inline rocsparselt_status validateMatrixArgs(const _rocsparselt_handle* handle,
         if(handle->has_fp8_ocp)
             break;
 #endif
-#if HIP_FP8_TYPE_FNUZ
-    case HIP_R_8F_E4M3_FNUZ:
-    case HIP_R_8F_E5M2_FNUZ:
-        if(handle->has_fp8_fnuz)
-            break;
-#endif
     default:
-        hipsparselt_cerr << "datatype (" << hip_datatype_to_string(valueType) << ") is not supported"
+        hipsparselt_cerr << "datatype (" << hipDataType_to_string(valueType) << ") is not supported"
                          << std::endl;
         log_error(handle, __func__, "datatype is not supported");
         return rocsparselt_status_not_implemented;
@@ -320,6 +309,10 @@ inline rocsparselt_status validateMatmulDescrArgs(const _rocsparselt_handle* han
                                                   rocsparselt_order          order_c,
                                                   rocsparselt_order          order_d)
 {
+    // handle must be valid
+    if(!check_is_init_handle(handle))
+        return rocsparselt_status_invalid_handle;
+
     auto is_op_valid = [](rocsparselt_operation op) {
         switch(op)
         {
@@ -362,28 +355,43 @@ inline rocsparselt_status validateMatmulDescrArgs(const _rocsparselt_handle* han
         return rocsparselt_status_invalid_size;
     }
 
-    switch(is_matmul_datatype_valid(type_a, type_b, type_c, type_d, compute_type))
+    switch(type_a)
     {
-    case MATMUL_DATATYPE_UNKNOWN:
-        if(type_a == HIP_R_8I && compute_type != rocsparselt_compute_i32)
-            log_error(handle, __func__, "computType must be i32");
-        else if(type_a != HIP_R_8I && compute_type != rocsparselt_compute_f32)
-            log_error(handle, __func__, "computType must be f32");
-        else
+    case HIP_R_16BF:
+    case HIP_R_16F:
+        if(!(type_a == type_b && type_a == type_c && type_a == type_d))
         {
-            std::ostringstream stringStream;
-            stringStream << "datatype A=" << hip_datatype_to_string(type_a);
-            stringStream << " B=" << hip_datatype_to_string(type_b);
-            stringStream << " C=" << hip_datatype_to_string(type_c);
-            stringStream << " D=" << hip_datatype_to_string(type_d);
-            stringStream << " computeType=" << rocsparselt_compute_type_to_string(compute_type);
-            stringStream << " is not supported";
-            auto msg = stringStream.str();
-            log_error(handle, __func__, msg);
+            log_error(handle, __func__, "datatype of matrices are inconsistent");
+            return rocsparselt_status_not_implemented;
         }
-        return rocsparselt_status_not_implemented;
-    default:
+    case HIP_R_8F_E4M3_FNUZ:
+    case HIP_R_8F_E5M2_FNUZ:
+    case HIP_R_8F_E4M3:
+    case HIP_R_8F_E5M2:
+        if(compute_type != rocsparselt_compute_f32)
+        {
+            log_error(handle, __func__, "computType must be f32");
+            return rocsparselt_status_not_implemented;
+        }
         break;
+    case HIP_R_8I:
+        // I8/I8/I and I8/H/I
+        if(type_a != type_b || type_c != type_d
+           || (type_a != type_d && !((type_d == HIP_R_16F) || (type_d == HIP_R_16BF))))
+
+        {
+            log_error(handle, __func__, "datatype of matrices are inconsistent");
+            return rocsparselt_status_not_implemented;
+        }
+        if(compute_type != rocsparselt_compute_i32)
+        {
+            log_error(handle, __func__, "computType must be i32");
+            return rocsparselt_status_not_implemented;
+        }
+        break;
+    default:
+        log_error(handle, __func__, "datatype", hipDataType_to_string(type_a), "is not supported");
+        return rocsparselt_status_not_implemented;
     }
 
     if((matrix_type_a != rocsparselt_matrix_type_structured

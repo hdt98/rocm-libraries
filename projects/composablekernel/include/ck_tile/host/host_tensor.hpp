@@ -1,32 +1,26 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
+
+#include <algorithm>
+#include <cassert>
+#include <iostream>
+#include <iomanip>
+#include <numeric>
+#include <utility>
+#include <vector>
+#include <functional>
+#include <fstream>
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/joinable_thread.hpp"
 #include "ck_tile/host/ranges.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cassert>
-#include <cstddef>
-#include <fstream>
-#include <functional>
-#include <initializer_list>
-#include <iomanip>
-#include <iostream>
-#include <numeric>
-#include <stdexcept>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 namespace ck_tile {
 
 template <typename Range>
-CK_TILE_HOST std::ostream& LogRange([[clang::lifetimebound]] std::ostream& os,
+CK_TILE_HOST std::ostream& LogRange(std::ostream& os,
                                     Range&& range,
                                     std::string delim,
                                     int precision = std::cout.precision(),
@@ -45,7 +39,7 @@ CK_TILE_HOST std::ostream& LogRange([[clang::lifetimebound]] std::ostream& os,
 }
 
 template <typename T, typename Range>
-CK_TILE_HOST std::ostream& LogRangeAsType([[clang::lifetimebound]] std::ostream& os,
+CK_TILE_HOST std::ostream& LogRangeAsType(std::ostream& os,
                                           Range&& range,
                                           std::string delim,
                                           int precision = std::cout.precision(),
@@ -91,19 +85,6 @@ CK_TILE_HOST auto construct_f_unpack_args(F, T args)
     return construct_f_unpack_args_impl<F>(args, std::make_index_sequence<N>{});
 }
 
-/**
- * @brief Descriptor for tensors in host memory.
- *
- * HostTensorDescriptor manages the shape (dimensions) and memory layout (strides)
- * of a tensor in host memory. It provides functionality to:
- * - Store tensor dimensions and strides
- * - Calculate default strides for contiguous memory layout
- * - Convert multi-dimensional indices to linear memory offsets
- * - Query tensor metadata (dimensions, element counts, etc.)
- *
- * The class supports both automatic stride calculation for contiguous memory layout
- * and custom strides for more complex memory patterns.
- */
 struct HostTensorDescriptor
 {
     HostTensorDescriptor() = default;
@@ -157,35 +138,12 @@ struct HostTensorDescriptor
     }
 
     std::size_t get_num_of_dimension() const { return mLens.size(); }
-    /**
-     * @brief Calculates the total number of elements in the tensor.
-     *
-     * Computes the product of all dimension lengths to determine the
-     * total element count in the tensor.
-     *
-     * @pre The lengths array (mLens) and strides array (mStrides) must have
-     *      the same size.
-     *
-     * @return The total number of elements in the tensor.
-     */
     std::size_t get_element_size() const
     {
         assert(mLens.size() == mStrides.size());
         return std::accumulate(
             mLens.begin(), mLens.end(), std::size_t{1}, std::multiplies<std::size_t>());
     }
-    /**
-     * @brief Calculates the total element space required for the tensor in memory.
-     *
-     * This method computes the minimum size of contiguous memory needed to store
-     * all elements of the tensor, taking into account the tensor's dimensions and
-     * strides. The calculation is based on the formula: 1 + max((length_i - 1) * stride_i)
-     * across all dimensions.
-     *
-     * Dimensions with length 0 are skipped in this calculation.
-     *
-     * @return The size of the tensor's element space (number of elements).
-     */
     std::size_t get_element_space_size() const
     {
         std::size_t space = 1;
@@ -201,27 +159,12 @@ struct HostTensorDescriptor
 
     std::size_t get_length(std::size_t dim) const { return mLens[dim]; }
 
-    const std::vector<std::size_t>& get_lengths() const [[clang::lifetimebound]] { return mLens; }
+    const std::vector<std::size_t>& get_lengths() const { return mLens; }
 
     std::size_t get_stride(std::size_t dim) const { return mStrides[dim]; }
 
-    const std::vector<std::size_t>& get_strides() const [[clang::lifetimebound]]
-    {
-        return mStrides;
-    }
+    const std::vector<std::size_t>& get_strides() const { return mStrides; }
 
-    /**
-     * @brief Calculates the linear offset from multi-dimensional indices.
-     *
-     * Converts a set of N-dimensional indices into a single linear offset by computing
-     * the inner product of the indices with the tensor's strides.
-     *
-     * @tparam Is Parameter pack of index types (should be convertible to std::size_t)
-     * @param is Variable number of indices, one for each dimension of the tensor
-     * @return std::size_t Linear offset corresponding to the given multi-dimensional indices
-     *
-     * @pre The number of indices must match the number of dimensions in the tensor
-     */
     template <typename... Is>
     std::size_t GetOffsetFromMultiIndex(Is... is) const
     {
@@ -230,22 +173,12 @@ struct HostTensorDescriptor
         return std::inner_product(iss.begin(), iss.end(), mStrides.begin(), std::size_t{0});
     }
 
-    /**
-     * @brief Calculates the linear memory offset from a multi-dimensional index
-     *
-     * Computes the linear offset by performing an inner product between the provided
-     * multi-dimensional indices and the tensor's strides.
-     *
-     * @param iss Vector containing the multi-dimensional indices
-     * @return The calculated linear offset as a size_t
-     */
-    std::size_t GetOffsetFromMultiIndex(const std::vector<std::size_t>& iss) const
+    std::size_t GetOffsetFromMultiIndex(std::vector<std::size_t> iss) const
     {
         return std::inner_product(iss.begin(), iss.end(), mStrides.begin(), std::size_t{0});
     }
 
-    friend std::ostream& operator<<([[clang::lifetimebound]] std::ostream& os,
-                                    const HostTensorDescriptor& desc)
+    friend std::ostream& operator<<(std::ostream& os, const HostTensorDescriptor& desc)
     {
         os << "dim " << desc.get_num_of_dimension() << ", ";
 
@@ -261,8 +194,8 @@ struct HostTensorDescriptor
     }
 
     private:
-    std::vector<std::size_t> mLens;    ///< Lengths of each dimension
-    std::vector<std::size_t> mStrides; ///< Strides for each dimension
+    std::vector<std::size_t> mLens;
+    std::vector<std::size_t> mStrides;
 };
 
 template <typename New2Old>
@@ -388,7 +321,7 @@ struct HostTensor
     ~HostTensor() = default;
 
     HostTensor& operator=(const HostTensor&) = default;
-    HostTensor& operator=(HostTensor&&)      = default;
+    HostTensor& operator=(HostTensor&&) = default;
 
     template <typename FromT>
     explicit HostTensor(const HostTensor<FromT>& other) : HostTensor(other.template CopyAsType<T>())
@@ -397,11 +330,11 @@ struct HostTensor
 
     std::size_t get_length(std::size_t dim) const { return mDesc.get_length(dim); }
 
-    decltype(auto) get_lengths() const [[clang::lifetimebound]] { return mDesc.get_lengths(); }
+    decltype(auto) get_lengths() const { return mDesc.get_lengths(); }
 
     std::size_t get_stride(std::size_t dim) const { return mDesc.get_stride(dim); }
 
-    decltype(auto) get_strides() const [[clang::lifetimebound]] { return mDesc.get_strides(); }
+    decltype(auto) get_strides() const { return mDesc.get_strides(); }
 
     std::size_t get_num_of_dimension() const { return mDesc.get_num_of_dimension(); }
 
@@ -418,15 +351,8 @@ struct HostTensor
         return sizeof(T) * get_element_space_size();
     }
 
-    void SetZero()
-    {
-        if constexpr(std::is_same_v<T, e8m0_t>)
-            std::fill(mData.begin(), mData.end(), e8m0_t{1.f});
-        else if constexpr(std::is_same_v<T, tf32_t>)
-            std::fill(mData.begin(), mData.end(), tf32_t{0.0f});
-        else
-            std::fill(mData.begin(), mData.end(), 0);
-    }
+    // void SetZero() { ck_tile::ranges::fill<T>(mData, 0); }
+    void SetZero() { std::fill(mData.begin(), mData.end(), 0); }
 
     template <typename F>
     void ForEach_impl(F&& f, std::vector<size_t>& idx, size_t rank)
@@ -546,23 +472,20 @@ struct HostTensor
     }
 
     template <typename... Is>
-    T& operator()(Is... is) [[clang::lifetimebound]]
+    T& operator()(Is... is)
     {
         return mData[GetOffsetFromMultiIndex(is...)];
     }
 
     template <typename... Is>
-    const T& operator()(Is... is) const [[clang::lifetimebound]]
+    const T& operator()(Is... is) const
     {
         return mData[GetOffsetFromMultiIndex(is...)];
     }
 
-    T& operator()(const std::vector<std::size_t>& idx) [[clang::lifetimebound]]
-    {
-        return mData[GetOffsetFromMultiIndex(idx)];
-    }
+    T& operator()(std::vector<std::size_t> idx) { return mData[GetOffsetFromMultiIndex(idx)]; }
 
-    const T& operator()(const std::vector<std::size_t>& idx) const [[clang::lifetimebound]]
+    const T& operator()(std::vector<std::size_t> idx) const
     {
         return mData[GetOffsetFromMultiIndex(idx)];
     }
@@ -595,23 +518,19 @@ struct HostTensor
         return const_cast<HostTensor<T> const*>(this)->transpose(axes);
     }
 
-    typename Data::iterator begin() [[clang::lifetimebound]] { return mData.begin(); }
+    typename Data::iterator begin() { return mData.begin(); }
 
-    typename Data::iterator end() [[clang::lifetimebound]] { return mData.end(); }
+    typename Data::iterator end() { return mData.end(); }
 
-    typename Data::pointer data() [[clang::lifetimebound]] { return mData.data(); }
+    typename Data::pointer data() { return mData.data(); }
 
-    typename Data::const_iterator begin() const [[clang::lifetimebound]] { return mData.begin(); }
+    typename Data::const_iterator begin() const { return mData.begin(); }
 
-    typename Data::const_iterator end() const [[clang::lifetimebound]] { return mData.end(); }
+    typename Data::const_iterator end() const { return mData.end(); }
 
-    typename Data::const_pointer data() const [[clang::lifetimebound]] { return mData.data(); }
+    typename Data::const_pointer data() const { return mData.data(); }
 
     typename Data::size_type size() const { return mData.size(); }
-
-    bool empty() const { return mData.empty(); }
-
-    T max() const { return *std::max_element(mData.begin(), mData.end()); }
 
     // return a slice of this tensor
     // for simplicity we just copy the data and return a new tensor
@@ -636,7 +555,7 @@ struct HostTensor
     }
 
     template <typename U = T>
-    auto AsSpan() const [[clang::lifetimebound]]
+    auto AsSpan() const
     {
         constexpr std::size_t FromSize = sizeof(T);
         constexpr std::size_t ToSize   = sizeof(U);
@@ -647,7 +566,7 @@ struct HostTensor
     }
 
     template <typename U = T>
-    auto AsSpan() [[clang::lifetimebound]]
+    auto AsSpan()
     {
         constexpr std::size_t FromSize = sizeof(T);
         constexpr std::size_t ToSize   = sizeof(U);
@@ -657,53 +576,7 @@ struct HostTensor
                                       size() * FromSize / ToSize};
     }
 
-    /**
-     * @brief Print only the first N elements of the tensor
-     *
-     * @param os Output stream to write to
-     * @param n Number of elements to print (default: 5)
-     * @return std::ostream& Reference to the output stream
-     */
-    std::ostream& print_first_n([[clang::lifetimebound]] std::ostream& os, std::size_t n = 5) const
-    {
-        os << mDesc;
-        os << "[";
-        for(typename Data::size_type idx = 0; idx < std::min(n, mData.size()); ++idx)
-        {
-            if(0 < idx)
-            {
-                os << ", ";
-            }
-            if constexpr(std::is_same_v<T, bf16_t> || std::is_same_v<T, fp16_t> ||
-                         std::is_same_v<T, fp8_t> || std::is_same_v<T, bf8_t>)
-            {
-                os << type_convert<float>(mData[idx]);
-            }
-            else if constexpr(std::is_same_v<T, ck_tile::pk_int4_t>)
-            {
-                auto unpacked = pk_int4_t_to_int8x2_t(mData[idx]);
-                os << "pk(" << static_cast<int>(unpacked[0]) << ", "
-                   << static_cast<int>(unpacked[1]) << ")";
-            }
-            else if constexpr(std::is_same_v<T, int8_t>)
-            {
-                os << static_cast<int>(mData[idx]);
-            }
-            else
-            {
-                os << mData[idx];
-            }
-        }
-        if(mData.size() > n)
-        {
-            os << ", ...";
-        }
-        os << "]";
-        return os;
-    }
-
-    friend std::ostream& operator<<([[clang::lifetimebound]] std::ostream& os,
-                                    const HostTensor<T>& t)
+    friend std::ostream& operator<<(std::ostream& os, const HostTensor<T>& t)
     {
         os << t.mDesc;
         os << "[";
@@ -713,16 +586,9 @@ struct HostTensor
             {
                 os << ", ";
             }
-            if constexpr(std::is_same_v<T, bf16_t> || std::is_same_v<T, fp16_t> ||
-                         std::is_same_v<T, fp8_t> || std::is_same_v<T, bf8_t>)
+            if constexpr(std::is_same_v<T, bf16_t> || std::is_same_v<T, fp16_t>)
             {
                 os << type_convert<float>(t.mData[idx]) << " #### ";
-            }
-            else if constexpr(std::is_same_v<T, ck_tile::pk_int4_t>)
-            {
-                auto unpacked = pk_int4_t_to_int8x2_t(t.mData[idx]);
-                os << "pk(" << static_cast<int>(unpacked[0]) << ", "
-                   << static_cast<int>(unpacked[1]) << ") #### ";
             }
             else
             {
@@ -733,28 +599,88 @@ struct HostTensor
         return os;
     }
 
+    // read data from a file, as dtype
+    // the file could dumped from torch as (targeting tensor is t here)
+    // numpy.savetxt("f.txt", t.view(-1).numpy())
+    // numpy.savetxt("f.txt", t.cpu().view(-1).numpy()) # from cuda to cpu to save
+    // numpy.savetxt("f.txt", t.cpu().view(-1).numpy(), fmt="%d")   # save as int
+    // will output f.txt, each line is a value
+    // dtype=float or int, internally will cast to real type
+    void loadtxt(std::string file_name, std::string dtype = "float")
+    {
+        std::ifstream file(file_name);
+
+        if(file.is_open())
+        {
+            std::string line;
+
+            index_t cnt = 0;
+            while(std::getline(file, line))
+            {
+                if(cnt >= static_cast<index_t>(mData.size()))
+                {
+                    throw std::runtime_error(std::string("data read from file:") + file_name +
+                                             " is too big");
+                }
+
+                if(dtype == "float")
+                {
+                    mData[cnt] = type_convert<T>(std::stof(line));
+                }
+                else if(dtype == "int" || dtype == "int32")
+                {
+                    mData[cnt] = type_convert<T>(std::stoi(line));
+                }
+                cnt++;
+            }
+            file.close();
+            if(cnt < static_cast<index_t>(mData.size()))
+            {
+                std::cerr << "Warning! reading from file:" << file_name
+                          << ", does not match the size of this tensor" << std::endl;
+            }
+        }
+        else
+        {
+            // Print an error message to the standard error
+            // stream if the file cannot be opened.
+            throw std::runtime_error(std::string("unable to open file:") + file_name);
+        }
+    }
+
+    // can save to a txt file and read from torch as:
+    // torch.from_numpy(np.loadtxt('f.txt', dtype=np.int32/np.float32...)).view([...]).contiguous()
+    void savetxt(std::string file_name, std::string dtype = "float")
+    {
+        std::ofstream file(file_name);
+
+        if(file.is_open())
+        {
+            for(auto& itm : mData)
+            {
+                if(dtype == "float")
+                    file << type_convert<float>(itm) << std::endl;
+                else if(dtype == "int")
+                    file << type_convert<int>(itm) << std::endl;
+                else
+                    // TODO: we didn't implement operator<< for all custom
+                    // data types, here fall back to float in case compile error
+                    file << type_convert<float>(itm) << std::endl;
+            }
+            file.close();
+        }
+        else
+        {
+            // Print an error message to the standard error
+            // stream if the file cannot be opened.
+            throw std::runtime_error(std::string("unable to open file:") + file_name);
+        }
+    }
+
     Descriptor mDesc;
     Data mData;
 };
 
-/**
- * @brief Creates a host tensor descriptor with specified dimensions and layout
- *
- * Constructs a HostTensorDescriptor with appropriate strides based on whether the tensor
- * layout is row-major or column-major. This is determined via the compile-time template
- * parameter `is_row_major`.
- *
- * @tparam is_row_major Compile-time flag indicating if the layout is row-major (true) or
- * column-major (false)
- *
- * @param row Number of rows in the tensor
- * @param col Number of columns in the tensor
- * @param stride Stride between adjacent rows (for row-major) or columns (for column-major)
- *
- * @return HostTensorDescriptor with shape {row, col} and strides:
- *         - For row-major: {stride, 1}
- *         - For column-major: {1, stride}
- */
 template <bool is_row_major>
 auto host_tensor_descriptor(std::size_t row,
                             std::size_t col,
@@ -772,7 +698,6 @@ auto host_tensor_descriptor(std::size_t row,
         return HostTensorDescriptor({row, col}, {1_uz, stride});
     }
 }
-
 template <bool is_row_major>
 auto get_default_stride(std::size_t row,
                         std::size_t col,
@@ -793,4 +718,5 @@ auto get_default_stride(std::size_t row,
     else
         return stride;
 }
+
 } // namespace ck_tile

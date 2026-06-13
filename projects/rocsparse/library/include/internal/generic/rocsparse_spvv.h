@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the Software), to deal
@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 /*! \ingroup generic_module
-*  \brief Sparse vector inner dot product.
+*  \brief Sparse vector inner dot product
 *
 *  \details
 *  \p rocsparse_spvv computes the inner dot product of the sparse vector \f$x\f$ with the
@@ -59,13 +59,13 @@ extern "C" {
 *      }
 *  \endcode
 *
-*  Performing the above operation involves two steps. First, call \p rocsparse_spvv with \p temp_buffer set to \p nullptr,
-*  which will return the required temporary buffer size in the parameter \p buffer_size. Then allocate this buffer. Finally,
-*  complete the computation by calling \p rocsparse_spvv a second time with the newly allocated buffer. After the
-*  computation is complete, deallocate the buffer.
+*  Performing the above operation involves two steps. First, the user calls \p rocsparse_spvv with \p temp_buffer set to \p nullptr 
+*  which will return the required temporary buffer size in the parameter \p buffer_size. The user then allocates this buffer. Finally, 
+*  the user then completes the computation by calling \p rocsparse_spvv a second time with the newly allocated buffer. Once the 
+*  computation is complete, the user is free to deallocate the buffer. 
 *
-*  \p rocsparse_spvv supports the following uniform and mixed-precision data types for the sparse and dense vectors \f$x\f$ and
-*  \f$y\f$ and compute types for the scalar \p result.
+*  \p rocsparse_spvv supports the following uniform and mixed precision data types for the sparse and dense vectors \f$x\f$ and 
+*  \f$y\f$ and compute types for the scalar \f$result\f$.
 *
 *  \par Uniform Precisions:
 *  <table>
@@ -77,19 +77,18 @@ extern "C" {
 *  <tr><td>rocsparse_datatype_f64_c
 *  </table>
 *
-*  \par Mixed Precisions:
+*  \par Mixed precisions:
 *  <table>
 *  <caption id="spvv_mixed">Mixed Precisions</caption>
-*  <tr><th>X / Y                     <th>compute_type / result
-*  <tr><td>rocsparse_datatype_i8_r   <td>rocsparse_datatype_i32_r
-*  <tr><td>rocsparse_datatype_i8_r   <td>rocsparse_datatype_f32_r
-*  <tr><td>rocsparse_datatype_f16_r  <td>rocsparse_datatype_f32_r
-*  <tr><td>rocsparse_datatype_bf16_r <td>rocsparse_datatype_f32_r
+*  <tr><th>X / Y                    <th>compute_type / result
+*  <tr><td>rocsparse_datatype_i8_r  <td>rocsparse_datatype_i32_r
+*  <tr><td>rocsparse_datatype_i8_r  <td>rocsparse_datatype_f32_r
+*  <tr><td>rocsparse_datatype_f16_r <td>rocsparse_datatype_f32_r
 *  </table>
 *
 *  \note
 *  This function writes the required allocation size (in bytes) to \p buffer_size and
-*  returns without performing the SpVV operation when a nullptr is passed for
+*  returns without performing the SpVV operation, when a nullptr is passed for
 *  \p temp_buffer.
 *
 *  \note
@@ -98,11 +97,8 @@ extern "C" {
 *  \note
 *  This routine does not support execution in a hipGraph context.
 *
-*  \note
-*  This routine does not support batched computation.
-*
 *  @param[in]
-*  handle       handle to the rocSPARSE library context queue.
+*  handle       handle to the rocsparse library context queue.
 *  @param[in]
 *  trans        sparse vector operation type.
 *  @param[in]
@@ -110,7 +106,7 @@ extern "C" {
 *  @param[in]
 *  y            dense vector descriptor.
 *  @param[out]
-*  result       pointer to the result, which can be in host or device memory.
+*  result       pointer to the result, can be host or device memory
 *  @param[in]
 *  compute_type floating point precision for the SpVV computation.
 *  @param[out]
@@ -118,18 +114,111 @@ extern "C" {
 *               \p temp_buffer is nullptr.
 *  @param[in]
 *  temp_buffer  temporary storage buffer allocated by the user. When a nullptr is passed,
-*               the required allocation size (in bytes) is written to \p buffer_size and the
+*               the required allocation size (in bytes) is written to \p buffer_size and
 *               function returns without performing the SpVV operation.
 *
 *  \retval      rocsparse_status_success the operation completed successfully.
 *  \retval      rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval      rocsparse_status_invalid_pointer \p x, \p y, \p result, or \p buffer_size
+*  \retval      rocsparse_status_invalid_pointer \p x, \p y, \p result or \p buffer_size
 *               pointer is invalid.
 *  \retval      rocsparse_status_not_implemented \p compute_type is currently not
 *               supported.
 *
 *  \par Example
-*  \snippet example_rocsparse_spvv.cpp doc example
+*  \code{.c}
+*   // Number of non-zeros of the sparse vector
+*   int nnz = 3;
+*
+*   // Size of sparse and dense vector
+*   int size = 9;
+*
+*   // Sparse index vector
+*   std::vector<int> hx_ind = {0, 3, 5};
+*
+*   // Sparse value vector
+*   std::vector<float> hx_val = {1.0f, 2.0f, 3.0f};
+*
+*   // Dense vector
+*   std::vector<float> hy = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
+*
+*   // Offload data to device
+*   int* dx_ind;
+*   float* dx_val;
+*   float* dy;
+*   hipMalloc((void**)&dx_ind, sizeof(int) * nnz);
+*   hipMalloc((void**)&dx_val, sizeof(float) * nnz);
+*   hipMalloc((void**)&dy, sizeof(float) * size);
+*
+*   hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice);
+*   hipMemcpy(dx_val, hx_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice);
+*   hipMemcpy(dy, hy.data(), sizeof(float) * size, hipMemcpyHostToDevice);
+*
+*   rocsparse_handle     handle;
+*   rocsparse_spvec_descr vecX;
+*   rocsparse_dnvec_descr vecY;
+*
+*   rocsparse_indextype idx_type = rocsparse_indextype_i32;
+*   rocsparse_datatype  data_type = rocsparse_datatype_f32_r;
+*   rocsparse_datatype  compute_type = rocsparse_datatype_f32_r;
+*   rocsparse_operation trans = rocsparse_operation_none;
+*   rocsparse_index_base idx_base = rocsparse_index_base_zero;
+*
+*   rocsparse_create_handle(&handle);
+*
+*   // Create sparse vector X
+*   rocsparse_create_spvec_descr(&vecX,
+*                                size,
+*                                nnz,
+*                                dx_ind,
+*                                dx_val,
+*                                idx_type,
+*                                idx_base,
+*                                data_type);
+*
+*   // Create dense vector Y
+*   rocsparse_create_dnvec_descr(&vecY,
+*                                size,
+*                                dy,
+*                                data_type);
+*
+*   // Obtain buffer size
+*   float hresult = 0.0f;
+*   size_t buffer_size;
+*   rocsparse_spvv(handle,
+*                  trans,
+*                  vecX,
+*                  vecY,
+*                  &hresult,
+*                  compute_type,
+*                  &buffer_size,
+*                  nullptr);
+*
+*   void* temp_buffer;
+*   hipMalloc(&temp_buffer, buffer_size);
+*
+*   // SpVV
+*   rocsparse_spvv(handle,
+*                  trans,
+*                  vecX,
+*                  vecY,
+*                  &hresult,
+*                  compute_type,
+*                  &buffer_size,
+*                  temp_buffer);
+*
+*   hipDeviceSynchronize();
+*
+*   // Clear rocSPARSE
+*   rocsparse_destroy_spvec_descr(vecX);
+*   rocsparse_destroy_dnvec_descr(vecY);
+*   rocsparse_destroy_handle(handle);
+*
+*   // Clear device memory
+*   hipFree(dx_ind);
+*   hipFree(dx_val);
+*   hipFree(dy);
+*   hipFree(temp_buffer);
+*  \endcode
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_spvv(rocsparse_handle            handle,

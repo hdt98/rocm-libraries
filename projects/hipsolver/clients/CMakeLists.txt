@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -76,7 +76,7 @@ endif()
 if(BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS)
   if(BUILD_FORTRAN_BINDINGS)
     add_library(hipsolver_fortran_client STATIC ${hipsolver_f90_source_clients})
-    target_link_libraries(hipsolver_fortran_client hipsolver_fortran)
+    add_dependencies(hipsolver_fortran_client hipsolver_fortran)
     include_directories(${CMAKE_BINARY_DIR}/include/hipsolver)
     include_directories(${CMAKE_BINARY_DIR}/include/hipsolver/internal)
     target_compile_definitions(hipsolver_fortran_client INTERFACE HAVE_HIPSOLVER_FORTRAN_CLIENT)

@@ -34,7 +34,7 @@ THRUST_NAMESPACE_BEGIN
  */
 namespace system
 {
-} // namespace system
+} // end system
 
 THRUST_NAMESPACE_END
 

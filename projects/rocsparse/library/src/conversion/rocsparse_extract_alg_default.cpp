@@ -22,7 +22,7 @@
  * ************************************************************************ */
 
 #include "rocsparse_extract_alg_default.hpp"
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 namespace rocsparse
 {
@@ -355,12 +355,6 @@ namespace rocsparse
             RETURN_IF_ROCSPARSE_ERROR((internal_extract_analysis_dispatch_I<_Float16>)(p...));
             return rocsparse_status_success;
         }
-        case rocsparse_datatype_bf16_r:
-        {
-            RETURN_IF_ROCSPARSE_ERROR(
-                (internal_extract_analysis_dispatch_I<rocsparse_bfloat16>)(p...));
-            return rocsparse_status_success;
-        }
         case rocsparse_datatype_f32_r:
         {
             RETURN_IF_ROCSPARSE_ERROR((internal_extract_analysis_dispatch_I<float>)(p...));
@@ -624,12 +618,6 @@ namespace rocsparse
             RETURN_IF_ROCSPARSE_ERROR((internal_extract_compute_dispatch_I<_Float16>)(p...));
             return rocsparse_status_success;
         }
-        case rocsparse_datatype_bf16_r:
-        {
-            RETURN_IF_ROCSPARSE_ERROR(
-                (internal_extract_compute_dispatch_I<rocsparse_bfloat16>)(p...));
-            return rocsparse_status_success;
-        }
         case rocsparse_datatype_f32_r:
         {
             RETURN_IF_ROCSPARSE_ERROR((internal_extract_compute_dispatch_I<float>)(p...));
@@ -710,7 +698,6 @@ rocsparse_extract_descr_default_t::rocsparse_extract_descr_default_t(
     case rocsparse_format_coo_aos:
     case rocsparse_format_bsr:
     case rocsparse_format_bell:
-    case rocsparse_format_sell:
     {
         THROW_WITH_MESSAGE_IF_ROCSPARSE_ERROR(
             rocsparse_status_not_implemented,
@@ -803,7 +790,6 @@ rocsparse_status rocsparse_extract_descr_default_t::run(rocsparse_handle        
     case rocsparse_format_coo_aos:
     case rocsparse_format_bsr:
     case rocsparse_format_bell:
-    case rocsparse_format_sell:
     {
         THROW_WITH_MESSAGE_IF_ROCSPARSE_ERROR(
             rocsparse_status_not_implemented,

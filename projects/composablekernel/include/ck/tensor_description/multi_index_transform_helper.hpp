@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -92,60 +92,6 @@ __host__ __device__ constexpr auto make_unmerge_transform(
     integral_constant<bool, Use24BitIntegerCalculation> = integral_constant<bool, false>{})
 {
     return UnMerge<UpLengths, Use24BitIntegerCalculation>{up_lengths};
-}
-
-template <typename IndexType = index_t>
-__host__ __device__ constexpr auto make_conv_bwd_data_out_transform(IndexType N,
-                                                                    IndexType Ho,
-                                                                    IndexType Wo,
-                                                                    IndexType K,
-                                                                    [[maybe_unused]] IndexType YDot,
-                                                                    IndexType XDot,
-                                                                    IndexType HTilde,
-                                                                    IndexType WTilde,
-                                                                    IndexType ConvDilationH,
-                                                                    IndexType ConvDilationW,
-                                                                    IndexType HTildeSlice,
-                                                                    IndexType WTildeSlice,
-                                                                    IndexType YDotSlice,
-                                                                    IndexType XDotSlice,
-                                                                    IndexType IHTildeSliceBegin,
-                                                                    IndexType IWTildeSliceBegin,
-                                                                    IndexType GcdStrideDilationH,
-                                                                    IndexType GcdStrideDilationW,
-                                                                    IndexType K0,
-                                                                    IndexType K1,
-                                                                    IndexType MPerBlock,
-                                                                    IndexType GemmKPerBlock)
-{
-    // Calculate padding
-    const auto MRaw    = N * HTildeSlice * WTildeSlice;
-    const auto MPadded = math::integer_divide_ceil(MRaw, MPerBlock) * MPerBlock;
-    const auto MPad    = MPadded - MRaw;
-
-    const auto KRaw    = YDotSlice * XDotSlice * K;
-    const auto KPadded = math::integer_divide_ceil(KRaw, GemmKPerBlock) * GemmKPerBlock;
-    const auto KPad    = KPadded - KRaw;
-
-    return ConvBwdDataImplicitGemmOutTransform<IndexType>{N,
-                                                          Ho,
-                                                          Wo,
-                                                          K,
-                                                          XDot,
-                                                          HTilde,
-                                                          WTilde,
-                                                          WTildeSlice,
-                                                          HTildeSlice * WTildeSlice,
-                                                          IHTildeSliceBegin,
-                                                          IWTildeSliceBegin,
-                                                          -ConvDilationH / GcdStrideDilationH,
-                                                          -ConvDilationW / GcdStrideDilationW,
-                                                          XDotSlice * K,
-                                                          K0,
-                                                          MPadded,
-                                                          K1,
-                                                          MPad,
-                                                          KPad};
 }
 
 template <typename LowerIndex>

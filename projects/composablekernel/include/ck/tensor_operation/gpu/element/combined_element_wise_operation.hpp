@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -13,8 +13,6 @@ namespace element_wise {
 template <typename... UnaryOpsSet>
 struct UnaryCombinedOp
 {
-    static constexpr const char* name = "UnaryCombinedOp";
-
     __host__ __device__ UnaryCombinedOp() : unary_ops_() {}
 
     __host__ __device__ UnaryCombinedOp(UnaryOpsSet... unary_ops) : unary_ops_(unary_ops...) {}
@@ -35,8 +33,6 @@ struct UnaryCombinedOp
 template <typename BinaryOp, typename UnaryOp0, typename UnaryOp1>
 struct BinaryWithUnaryCombinedOp
 {
-    static constexpr const char* name = "BinaryWithUnaryCombinedOp";
-
     __host__ __device__ BinaryWithUnaryCombinedOp() : binary_op_(), unary_op0_(), unary_op1_() {}
 
     __host__ __device__ BinaryWithUnaryCombinedOp(BinaryOp binary_op,
@@ -70,8 +66,6 @@ template <typename BinaryOp0,
           typename UnaryOp2>
 struct TrinaryWithUnaryCombinedOp
 {
-    static constexpr const char* name = "TrinaryWithUnaryCombinedOp";
-
     __host__ __device__ TrinaryWithUnaryCombinedOp()
         : binary_op0_(), binary_op1_(), unary_op0_(), unary_op1_(), unary_op2_()
     {

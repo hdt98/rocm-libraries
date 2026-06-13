@@ -28,7 +28,7 @@ shutil.copy2('../library/src/fortran/README.md', './fortran-api-reference.md')
 # for PDF output on Read the Docs
 project = "rocRAND Documentation"
 author = "Advanced Micro Devices, Inc."
-copyright = "Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved."
+copyright = "Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved."
 version = version_number
 release = version_number
 
@@ -49,4 +49,4 @@ for sphinx_var in ROCmDocs.SPHINX_VARS:
 # Ideally suppression wouldn't be needed; see sphinx-external-toc#36
 suppress_warnings = ["etoc.toctree"]
 
-cpp_id_attributes = ["__forceinline__", "__device__", "__host__", "ROCRANDAPI"]
+cpp_id_attributes = ["__forceinline__", "__device__", "__host__", "rocrand_status"]

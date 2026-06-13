@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,7 @@ endfunction()
 # ########################################################################
 prepend_path(".." hipsolver_headers_public relative_hipsolver_headers_public)
 
-if(NOT "${HIP_PLATFORM}" STREQUAL "nvidia")
+if(NOT USE_CUDA)
   set(hipsolver_source
     "${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipsolver_conversions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipsolver.cpp"
@@ -75,17 +75,6 @@ set(hipsolver_f90_source
 if(BUILD_FORTRAN_BINDINGS)
   # Create hipSOLVER Fortran module
   add_library(hipsolver_fortran ${hipsolver_f90_source})
-  rocm_set_soversion(hipsolver_fortran ${hipsolver_SOVERSION})
-  if(EXPORT_FORTRAN_BINDINGS)
-    rocm_install(TARGETS hipsolver_fortran)
-  else()
-    # Install the shared object without adding it to the
-    # hipsolver-targets export set, so find_package(hipsolver)
-    # does not reference roc::hipsolver_fortran.
-    install(TARGETS hipsolver_fortran
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-            COMPONENT runtime)
-  endif()
 endif()
 
 add_library(hipsolver
@@ -97,11 +86,6 @@ add_library(roc::hipsolver ALIAS hipsolver)
 target_link_libraries(hipsolver PRIVATE
   $<BUILD_INTERFACE:hipsolver-common> # https://gitlab.kitware.com/cmake/cmake/-/issues/15415
 )
-
-if(BUILD_CODE_COVERAGE)
-  target_compile_options(hipsolver PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-  target_link_options(hipsolver PUBLIC -fprofile-instr-generate)
-endif()
 
 add_armor_flags(hipsolver "${ARMOR_LEVEL}")
 
@@ -127,7 +111,7 @@ if(NOT BUILD_WITH_SPARSE)
 endif()
 
 # Build hipsolver from source on AMD platform
-if(NOT "${HIP_PLATFORM}" STREQUAL "nvidia")
+if(NOT USE_CUDA)
   # Find rocBLAS
   if(NOT TARGET rocblas)
     if(CUSTOM_ROCBLAS)
@@ -148,12 +132,6 @@ if(NOT "${HIP_PLATFORM}" STREQUAL "nvidia")
       find_package(rocsolver REQUIRED CONFIG PATHS /opt/rocm /opt/rocm/rocsolver /usr/local/rocsolver)
     endif()
     list(APPEND static_depends PACKAGE rocsolver)
-  endif()
-
-  # TODO: This LAPACK dependency is only required to support geev
-  # It should be removed once geev is implemented in rocSOLVER
-  if(NOT "${HIP_PLATFORM}" STREQUAL "nvidia")
-      target_link_libraries(hipsolver PRIVATE lapack_libraries)
   endif()
 
   target_link_libraries(hipsolver PRIVATE roc::rocblas roc::rocsolver)
@@ -248,7 +226,7 @@ rocm_install_targets(
     ${CMAKE_BINARY_DIR}/include
 )
 
-if(NOT "${HIP_PLATFORM}" STREQUAL "nvidia")
+if(NOT USE_CUDA)
   rocm_export_targets(
     TARGETS roc::hipsolver
     DEPENDS PACKAGE hip

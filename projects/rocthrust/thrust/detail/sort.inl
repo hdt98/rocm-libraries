@@ -401,3 +401,4 @@ template<typename ForwardIterator,
 
 
 THRUST_NAMESPACE_END
+

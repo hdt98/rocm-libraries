@@ -1,5 +1,5 @@
 /* ************************************************************************
-* Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
+* Copyright (C) 2018-2022 Advanced Micro Devices, Inc. All rights Reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -20,8 +20,6 @@
 * THE SOFTWARE.
 *
 * ************************************************************************ */
-
-#include <vector>
 
 #define TO_STR2(x) #x
 #define TO_STR(x) TO_STR2(x)
@@ -445,8 +443,6 @@ namespace hipsparse
             return rocsparse_datatype_i32_r;
         case HIP_R_16F:
             return rocsparse_datatype_f16_r;
-        case HIP_R_16BF:
-            return rocsparse_datatype_bf16_r;
         case HIP_R_32F:
             return rocsparse_datatype_f32_r;
         case HIP_R_64F:
@@ -470,8 +466,6 @@ namespace hipsparse
             return HIP_R_32I;
         case rocsparse_datatype_f16_r:
             return HIP_R_16F;
-        case rocsparse_datatype_bf16_r:
-            return HIP_R_16BF;
         case rocsparse_datatype_f32_r:
             return HIP_R_32F;
         case rocsparse_datatype_f64_r:
@@ -501,13 +495,7 @@ namespace hipsparse
             return rocsparse_spmv_alg_csr_adaptive;
         // case HIPSPARSE_CSRMV_ALG2:
         case HIPSPARSE_SPMV_CSR_ALG2:
-            return rocsparse_spmv_alg_csr_rowsplit;
-        case HIPSPARSE_SPMV_SELL_ALG1:
-            return rocsparse_spmv_alg_sell;
-#ifdef HIPSPARSE_WITH_SPMV_BSR
-        case HIPSPARSE_SPMV_BSR_ALG1:
-            return rocsparse_spmv_alg_bsr;
-#endif
+            return rocsparse_spmv_alg_csr_stream;
         default:
             throw "Non existent hipsparseSpMVAlg_t";
         }
@@ -538,8 +526,6 @@ namespace hipsparse
             return rocsparse_spmm_alg_csr;
         case HIPSPARSE_SPMM_BLOCKED_ELL_ALG1:
             return rocsparse_spmm_alg_bell;
-        case HIPSPARSE_SPMM_BSR_ALG1:
-            return rocsparse_spmm_alg_bsr;
         default:
             throw "Non existent hipsparseSpMMAlg_t";
         }
@@ -656,12 +642,6 @@ namespace hipsparse
             return rocsparse_format_coo_aos;
         case HIPSPARSE_FORMAT_BLOCKED_ELL:
             return rocsparse_format_bell;
-        case HIPSPARSE_FORMAT_SLICED_ELL:
-            return rocsparse_format_sell;
-#ifdef HIPSPARSE_WITH_SPMV_BSR
-        case HIPSPARSE_FORMAT_BSR:
-            return rocsparse_format_bsr;
-#endif
         default:
             throw "Non existent hipsparseFormat_t";
         }
@@ -681,94 +661,8 @@ namespace hipsparse
             return HIPSPARSE_FORMAT_COO_AOS;
         case rocsparse_format_bell:
             return HIPSPARSE_FORMAT_BLOCKED_ELL;
-        case rocsparse_format_sell:
-            return HIPSPARSE_FORMAT_SLICED_ELL;
-#ifdef HIPSPARSE_WITH_SPMV_BSR
-        case rocsparse_format_bsr:
-            return HIPSPARSE_FORMAT_BSR;
-#endif
         default:
             throw "Non existent rocsparse_format";
         }
     }
 }
-
-struct hipsparseSpMVDescr_st
-{
-public:
-    // Per-configuration cache entry. Each entry holds the rocsparse_spmv_descr,
-    // analysis state, and compute-stage buffer for one unique combination of
-    // (operation, algorithm, scalar datatype, compute datatype). Callers that
-    // alternate among several configurations (e.g. NON_TRANSPOSE and TRANSPOSE
-    // in an iterative solver) get a separate entry per configuration, so
-    // switching back and forth does not invalidate any analysis or force any
-    // buffer reallocation.
-    struct Entry
-    {
-        rocsparse_operation  operation{};
-        rocsparse_spmv_alg   alg{};
-        rocsparse_datatype   scalar_datatype{};
-        rocsparse_datatype   compute_datatype{};
-        rocsparse_spmv_descr spmv_descr{};
-        size_t               buffer_size_stage_analysis{};
-        size_t               buffer_size_stage_compute{};
-        void*                compute_buffer{};
-        bool                 is_buffer_size_called{};
-        bool                 is_stage_analysis_called{};
-        bool                 is_implicit_stage_analysis_called{};
-        bool                 is_stage_compute_subsequent{};
-
-        Entry()             = default;
-        Entry(const Entry&) = delete;
-        Entry& operator=(const Entry&) = delete;
-        Entry(Entry&& other) noexcept;
-        Entry& operator=(Entry&&) = delete;
-        ~Entry();
-    };
-
-protected:
-    std::vector<Entry> m_entries;
-
-public:
-    // Look up an entry matching (operation, alg, scalar_datatype,
-    // compute_datatype); returns nullptr if none exists.
-    Entry* find_entry(rocsparse_operation operation,
-                      rocsparse_spmv_alg  alg,
-                      rocsparse_datatype  scalar_datatype,
-                      rocsparse_datatype  compute_datatype);
-
-    // Create a new entry for (operation, alg, scalar_datatype,
-    // compute_datatype), allocate its rocsparse_spmv_descr, push the four
-    // set_input values, and store it in m_entries. Returns the new entry via
-    // *out_entry.
-    hipsparseStatus_t add_entry(hipsparseHandle_t   handle,
-                                rocsparse_operation operation,
-                                rocsparse_spmv_alg  alg,
-                                rocsparse_datatype  scalar_datatype,
-                                rocsparse_datatype  compute_datatype,
-                                Entry**             out_entry);
-
-    hipsparseSpMVDescr_st()  = default;
-    ~hipsparseSpMVDescr_st() = default;
-};
-
-struct hipsparseSpMatDescr_st
-{
-protected:
-    rocsparse_spmat_descr         m_spmat_descr{};
-    mutable hipsparseSpMVDescr_st m_hip_spmv_descr{};
-
-public:
-    hipsparseSpMatDescr_st()  = default;
-    ~hipsparseSpMatDescr_st() = default;
-    hipsparseSpMVDescr_st*       get_hip_spmv_descr();
-    hipsparseSpMVDescr_st*       get_hip_spmv_descr() const;
-    rocsparse_spmat_descr        get_spmat_descr();
-    rocsparse_const_spmat_descr  get_const_spmat_descr() const;
-    rocsparse_spmat_descr*       get_spmat_descr_reference();
-    rocsparse_const_spmat_descr* get_const_spmat_descr_reference() const;
-    void                         set_spmat_descr(rocsparse_spmat_descr value);
-};
-
-rocsparse_spmat_descr       to_rocsparse_spmat_descr(const hipsparseSpMatDescr_t source);
-rocsparse_const_spmat_descr to_rocsparse_const_spmat_descr(const hipsparseConstSpMatDescr_t source);

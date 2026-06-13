@@ -29,11 +29,9 @@ Enable this feature using these commands:
 
 .. code:: bash
 
+  export MIOPEN_FIND_MODE=3
   export MIOPEN_FIND_ENFORCE=3
   export MIOPEN_USER_DB_PATH="/user/specified/directory"
-
-Note that the ``miopenSetTuningPolicy()`` API method can be used instead of the ``MIOPEN_FIND_ENFORCE``
-environment variable.
 
 Exhaustive tuning
 ----------------------------------------------------------------------------------------------------------
@@ -50,6 +48,7 @@ Enable this feature using these commands:
 
 .. code:: bash
 
+  export MIOPEN_FIND_MODE=3
   export MIOPEN_FIND_ENFORCE=3
   export MIOPEN_USER_DB_PATH="/user/specified/directory"
   export MIOPEN_SYSTEM_DB_PATH="$MIOPEN_USER_DB_PATH"
@@ -65,6 +64,7 @@ Then enable exhaustive tuning and run the unique commands.
 
 .. code:: bash
 
+  export MIOPEN_FIND_MODE=1
   export MIOPEN_FIND_ENFORCE=4
   export MIOPEN_USER_DB_PATH="/user/specified/directory"
 
@@ -96,3 +96,4 @@ Unset these variables using these commands:
   unset MIOPEN_FIND_MODE
   unset MIOPEN_FIND_ENFORCE
   unset MIOPEN_SYSTEM_DB_PATH
+

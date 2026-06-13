@@ -1,5 +1,6 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -18,21 +19,16 @@ template <index_t NDimSpatial,
           typename ADataType       = float,
           typename CDataType       = float,
           index_t NumGroupsToMerge = 1,
-          typename IndexType       = index_t,
-          bool CTranspose          = false>
+          typename IndexType       = index_t>
 struct TransformConvFwdToGemm
 {
     private:
-    template <index_t N>
-    using NumberType =
-        std::conditional_t<std::is_same_v<IndexType, index_t>, Number<N>, LongNumber<N>>;
-
-    static constexpr auto I0 = NumberType<0>{};
-    static constexpr auto I1 = NumberType<1>{};
-    static constexpr auto I2 = NumberType<2>{};
-    static constexpr auto I3 = NumberType<3>{};
-    static constexpr auto I4 = NumberType<4>{};
-    static constexpr auto I5 = NumberType<5>{};
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+    static constexpr auto I2 = Number<2>{};
+    static constexpr auto I3 = Number<3>{};
+    static constexpr auto I4 = Number<4>{};
+    static constexpr auto I5 = Number<5>{};
 
     template <typename ConvDimsType>
     static long_index_t calculate_element_space_size_impl(const ConvDimsType& lengths,
@@ -61,7 +57,7 @@ struct TransformConvFwdToGemm
             calculate_element_space_size_impl(c_g_n_k_wos_lengths, c_g_n_k_wos_strides, I1);
         const long_index_t element_space_size = math::max(a_element_space_size * sizeof(ADataType),
                                                           c_element_space_size * sizeof(CDataType));
-        constexpr long_index_t TwoGB          = (long_index_t{1} << 31); // 2GB threshold
+        constexpr long_index_t TwoGB          = (long_index_t{1} << 31);
 
         const IndexType N = a_g_n_c_wis_lengths[I1];
 
@@ -392,9 +388,7 @@ struct TransformConvFwdToGemm
         return is_a_descriptor_smaller_than_2GB && is_c_descriptor_smaller_than_2GB;
     }
 
-    template <typename DsPointer>
     __host__ auto SplitConvProblem(const ADataType* a_grid_ptr_base,
-                                   DsPointer& ds_grid_ptr_base,
                                    CDataType* c_grid_ptr_base) const
     {
         // Create copies
@@ -485,17 +479,11 @@ struct TransformConvFwdToGemm
             a_right_offset = ((Wo_ / 2) * ConvStrideW_ - InLeftPadW_) * WiStride_;
             c_right_offset = (Wo_ / 2) * WoStride_;
         }
-
-        static constexpr index_t NumDTensor = DsPointer::Size();
-        const auto ds_grid_right_ptr        = generate_tuple(
-            [&](auto i) { return ds_grid_ptr_base(i) + c_right_offset; }, Number<NumDTensor>{});
-
         // Return left transform, right transformer, right offset to Input and right offset to
         // Output
         return ck::make_tuple(conv_to_gemm_transformer_left,
                               conv_to_gemm_transformer_right,
                               a_grid_ptr_base + a_right_offset,
-                              ds_grid_right_ptr,
                               c_grid_ptr_base + c_right_offset);
     }
 
@@ -557,7 +545,7 @@ struct TransformConvFwdToGemm
                 const auto in_n_x_wo_c_desc = transform_tensor_descriptor(
                     in_n_wip_c_desc,
                     make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Wo_),
+                               make_embed_transform(make_tuple(Number<3>{}, Wo_),
                                                     make_tuple(ConvDilationW_, ConvStrideW_))),
                     make_tuple(Sequence<0>{}, Sequence<1>{}),
                     make_tuple(Sequence<0>{}, Sequence<1, 2>{}));
@@ -565,7 +553,7 @@ struct TransformConvFwdToGemm
                 return transform_tensor_descriptor(
                     in_n_x_wo_c_desc,
                     make_tuple(make_merge_transform(make_tuple(N_, Wo_)),
-                               make_pass_through_transform(NumberType<3>{})),
+                               make_pass_through_transform(Number<3>{})),
                     make_tuple(Sequence<0, 2>{}, Sequence<1>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
             }
@@ -586,7 +574,7 @@ struct TransformConvFwdToGemm
                 const auto in_n_x_wo_c_desc = transform_tensor_descriptor(
                     in_n_wip_c_desc,
                     make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Wo_),
+                               make_embed_transform(make_tuple(Number<3>{}, Wo_),
                                                     make_tuple(ConvDilationW_, ConvStrideW_)),
                                make_pass_through_transform(NumGroupsToMerge)),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
@@ -595,7 +583,7 @@ struct TransformConvFwdToGemm
                 return transform_tensor_descriptor(
                     in_n_x_wo_c_desc,
                     make_tuple(make_merge_transform(make_tuple(N_, Wo_, NumGroupsToMerge)),
-                               make_pass_through_transform(NumberType<3>{})),
+                               make_pass_through_transform(Number<3>{})),
                     make_tuple(Sequence<0, 2, 3>{}, Sequence<1>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
             }
@@ -773,9 +761,9 @@ struct TransformConvFwdToGemm
                 const auto in_n_y_ho_x_wo_c_desc = transform_tensor_descriptor(
                     in_n_hip_wip_c_desc,
                     make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Ho_),
+                               make_embed_transform(make_tuple(Number<3>{}, Ho_),
                                                     make_tuple(ConvDilationH_, ConvStrideH_)),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Wo_),
+                               make_embed_transform(make_tuple(Number<3>{}, Wo_),
                                                     make_tuple(ConvDilationW_, ConvStrideW_))),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
                     make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3, 4>{}));
@@ -783,7 +771,7 @@ struct TransformConvFwdToGemm
                 return transform_tensor_descriptor(
                     in_n_y_ho_x_wo_c_desc,
                     make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
-                               make_merge_transform(make_tuple(NumberType<3>{}, NumberType<3>{}))),
+                               make_merge_transform(make_tuple(Number<3>{}, Number<3>{}))),
                     make_tuple(Sequence<0, 2, 4>{}, Sequence<1, 3>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
             }
@@ -805,9 +793,9 @@ struct TransformConvFwdToGemm
                 const auto in_n_y_ho_x_wo_groups_c_desc = transform_tensor_descriptor(
                     in_n_hip_wip_groups_c_desc,
                     make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Ho_),
+                               make_embed_transform(make_tuple(Number<3>{}, Ho_),
                                                     make_tuple(ConvDilationH_, ConvStrideH_)),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Wo_),
+                               make_embed_transform(make_tuple(Number<3>{}, Wo_),
                                                     make_tuple(ConvDilationW_, ConvStrideW_)),
                                make_pass_through_transform(NumGroupsToMerge)),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
@@ -816,7 +804,7 @@ struct TransformConvFwdToGemm
                 return transform_tensor_descriptor(
                     in_n_y_ho_x_wo_groups_c_desc,
                     make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_, NumGroupsToMerge)),
-                               make_merge_transform(make_tuple(NumberType<3>{}, NumberType<3>{}))),
+                               make_merge_transform(make_tuple(Number<3>{}, Number<3>{}))),
                     make_tuple(Sequence<0, 2, 4, 5>{}, Sequence<1, 3>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
             }
@@ -1021,11 +1009,11 @@ struct TransformConvFwdToGemm
                 const auto in_n_z_do_y_ho_x_wo_c_desc = transform_tensor_descriptor(
                     in_n_hip_wip_c_desc,
                     make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Do_),
+                               make_embed_transform(make_tuple(Number<3>{}, Do_),
                                                     make_tuple(ConvDilationD_, ConvStrideD_)),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Ho_),
+                               make_embed_transform(make_tuple(Number<3>{}, Ho_),
                                                     make_tuple(ConvDilationH_, ConvStrideH_)),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Wo_),
+                               make_embed_transform(make_tuple(Number<3>{}, Wo_),
                                                     make_tuple(ConvDilationW_, ConvStrideW_))),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
                     make_tuple(
@@ -1033,9 +1021,9 @@ struct TransformConvFwdToGemm
 
                 return transform_tensor_descriptor(
                     in_n_z_do_y_ho_x_wo_c_desc,
-                    make_tuple(make_merge_transform(make_tuple(N_, Do_, Ho_, Wo_)),
-                               make_merge_transform(
-                                   make_tuple(NumberType<3>{}, NumberType<3>{}, NumberType<3>{}))),
+                    make_tuple(
+                        make_merge_transform(make_tuple(N_, Do_, Ho_, Wo_)),
+                        make_merge_transform(make_tuple(Number<3>{}, Number<3>{}, Number<3>{}))),
                     make_tuple(Sequence<0, 2, 4, 6>{}, Sequence<1, 3, 5>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
             }
@@ -1060,11 +1048,11 @@ struct TransformConvFwdToGemm
                 const auto in_n_z_do_y_ho_x_wo_c_desc = transform_tensor_descriptor(
                     in_n_hip_wip_c_desc,
                     make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Do_),
+                               make_embed_transform(make_tuple(Number<3>{}, Do_),
                                                     make_tuple(ConvDilationD_, ConvStrideD_)),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Ho_),
+                               make_embed_transform(make_tuple(Number<3>{}, Ho_),
                                                     make_tuple(ConvDilationH_, ConvStrideH_)),
-                               make_embed_transform(make_tuple(NumberType<3>{}, Wo_),
+                               make_embed_transform(make_tuple(Number<3>{}, Wo_),
                                                     make_tuple(ConvDilationW_, ConvStrideW_)),
                                make_pass_through_transform(NumGroupsToMerge)),
                     make_tuple(
@@ -1079,8 +1067,7 @@ struct TransformConvFwdToGemm
                     in_n_z_do_y_ho_x_wo_c_desc,
                     make_tuple(
                         make_merge_transform(make_tuple(N_, Do_, Ho_, Wo_, NumGroupsToMerge)),
-                        make_merge_transform(
-                            make_tuple(NumberType<3>{}, NumberType<3>{}, NumberType<3>{}))),
+                        make_merge_transform(make_tuple(Number<3>{}, Number<3>{}, Number<3>{}))),
                     make_tuple(Sequence<0, 2, 4, 6, 7>{}, Sequence<1, 3, 5>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
             }
@@ -1266,83 +1253,6 @@ struct TransformConvFwdToGemm
         }
     }
 
-    template <typename ALayout,
-              typename ck::enable_if<NDimSpatial == 1 &&
-                                         is_same_v<ALayout, tensor_layout::convolution::NGCW>,
-                                     bool>::type = false>
-    __host__ __device__ auto MakeADescriptor_M_K() const
-    {
-        static_assert(NumGroupsToMerge == 1);
-        static_assert(ConvForwardSpecialization ==
-                      device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0);
-
-        const auto in_gemmm_gemmk_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, Wo_, C_), make_tuple(NStrideTensorA_, I1, CStrideTensorA_));
-
-        return transform_tensor_descriptor(
-            in_gemmm_gemmk_desc,
-            make_tuple(make_merge_transform(make_tuple(N_, Wo_)), make_pass_through_transform(C_)),
-            make_tuple(Sequence<0, 1>{}, Sequence<2>{}),
-            make_tuple(Sequence<0>{}, Sequence<1>{}));
-    }
-
-    template <typename ALayout,
-              typename ck::enable_if<NDimSpatial == 2 &&
-                                         is_same_v<ALayout, tensor_layout::convolution::NGCHW>,
-                                     bool>::type = false>
-    __host__ __device__ auto MakeADescriptor_M_K() const
-    {
-        static_assert(NumGroupsToMerge == 1);
-        static_assert(ConvForwardSpecialization ==
-                      device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0);
-
-        const auto in_gemmm_gemmk_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, Ho_ * Wo_, C_), make_tuple(NStrideTensorA_, I1, CStrideTensorA_));
-
-        return transform_tensor_descriptor(
-            in_gemmm_gemmk_desc,
-            make_tuple(make_merge_transform(make_tuple(N_, Ho_ * Wo_)),
-                       make_pass_through_transform(C_)),
-            make_tuple(Sequence<0, 1>{}, Sequence<2>{}),
-            make_tuple(Sequence<0>{}, Sequence<1>{}));
-    }
-
-    template <typename ALayout,
-              typename ck::enable_if<NDimSpatial == 3 &&
-                                         is_same_v<ALayout, tensor_layout::convolution::NGCDHW>,
-                                     bool>::type = false>
-    __host__ __device__ auto MakeADescriptor_M_K() const
-    {
-        static_assert(NumGroupsToMerge == 1);
-        static_assert(ConvForwardSpecialization ==
-                      device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0);
-
-        const auto in_gemmm_gemmk_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, Do_ * Ho_ * Wo_, C_), make_tuple(NStrideTensorA_, I1, CStrideTensorA_));
-
-        return transform_tensor_descriptor(
-            in_gemmm_gemmk_desc,
-            make_tuple(make_merge_transform(make_tuple(N_, Do_ * Ho_ * Wo_)),
-                       make_pass_through_transform(C_)),
-            make_tuple(Sequence<0, 1>{}, Sequence<2>{}),
-            make_tuple(Sequence<0>{}, Sequence<1>{}));
-    }
-
-    template <typename BLayout,
-              typename ck::enable_if<is_same_v<BLayout, tensor_layout::convolution::GKCX> ||
-                                         is_same_v<BLayout, tensor_layout::convolution::GKCYX> ||
-                                         is_same_v<BLayout, tensor_layout::convolution::GKCZYX>,
-                                     bool>::type = false>
-    __host__ __device__ auto MakeBDescriptor_N_K() const
-    {
-        static_assert(ConvForwardSpecialization ==
-                          device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
-                      ConvForwardSpecialization ==
-                          device::ConvolutionForwardSpecialization::Filter1x1Pad0);
-        static_assert(NumGroupsToMerge == 1);
-        return make_naive_tensor_descriptor_packed(make_tuple(K_, C_));
-    }
-
     template <typename BLayout,
               typename ck::enable_if<is_same_v<BLayout, tensor_layout::convolution::GKXC> ||
                                          is_same_v<BLayout, tensor_layout::convolution::GKYXC> ||
@@ -1353,10 +1263,10 @@ struct TransformConvFwdToGemm
         if constexpr(ConvForwardSpecialization ==
                      device::ConvolutionForwardSpecialization::Filter3x3)
         {
-            using FilterSizeNumType = ck::conditional_t<
-                NDimSpatial == 1,
-                NumberType<3>,
-                ck::conditional_t<NDimSpatial == 2, NumberType<9>, NumberType<27>>>;
+            using FilterSizeNumType =
+                ck::conditional_t<NDimSpatial == 1,
+                                  Number<3>,
+                                  ck::conditional_t<NDimSpatial == 2, Number<9>, Number<27>>>;
 
             if constexpr(NumGroupsToMerge == 1)
             {
@@ -1366,11 +1276,11 @@ struct TransformConvFwdToGemm
             {
 
                 const auto wei_gemmn_groups_gemmk_desc = make_naive_tensor_descriptor(
-                    make_tuple(NumGroupsToMerge, K_, FilterSizeNumType{}),
-                    make_tuple(GStrideTensorB_, KStrideTensorB_, CStrideTensorB_));
+                    make_tuple(K_, NumGroupsToMerge, FilterSizeNumType{}),
+                    make_tuple(KStrideTensorB_, GStrideTensorB_, CStrideTensorB_));
                 return transform_tensor_descriptor(
                     wei_gemmn_groups_gemmk_desc,
-                    make_tuple(make_merge_transform(make_tuple(NumGroupsToMerge, K_)),
+                    make_tuple(make_merge_transform(make_tuple(K_, NumGroupsToMerge)),
                                make_pass_through_transform(FilterSizeNumType{})),
                     make_tuple(Sequence<0, 1>{}, Sequence<2>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
@@ -1385,11 +1295,11 @@ struct TransformConvFwdToGemm
             else
             {
                 const auto wei_gemmn_groups_gemmk_desc = make_naive_tensor_descriptor(
-                    make_tuple(NumGroupsToMerge, K_, ZYX_ * C_),
-                    make_tuple(GStrideTensorB_, KStrideTensorB_, CStrideTensorB_));
+                    make_tuple(K_, NumGroupsToMerge, ZYX_ * C_),
+                    make_tuple(KStrideTensorB_, GStrideTensorB_, CStrideTensorB_));
                 return transform_tensor_descriptor(
                     wei_gemmn_groups_gemmk_desc,
-                    make_tuple(make_merge_transform(make_tuple(NumGroupsToMerge, K_)),
+                    make_tuple(make_merge_transform(make_tuple(K_, NumGroupsToMerge)),
                                make_pass_through_transform(ZYX_ * C_)),
                     make_tuple(Sequence<0, 1>{}, Sequence<2>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}));
@@ -1428,16 +1338,8 @@ struct TransformConvFwdToGemm
                                bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        if constexpr(CTranspose)
-        {
-            return make_naive_tensor_descriptor(make_tuple(K_, N_ * Wo_),
-                                                make_tuple(KStrideTensorC_, I0));
-        }
-        else
-        {
-            return make_naive_tensor_descriptor(make_tuple(N_ * Wo_, K_),
-                                                make_tuple(I0, KStrideTensorC_));
-        }
+        return make_naive_tensor_descriptor(make_tuple(N_ * Wo_, K_),
+                                            make_tuple(I0, KStrideTensorC_));
     }
 
     template <
@@ -1448,16 +1350,8 @@ struct TransformConvFwdToGemm
                                bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        if constexpr(CTranspose)
-        {
-            return make_naive_tensor_descriptor(make_tuple(K_, N_ * Ho_ * Wo_),
-                                                make_tuple(KStrideTensorC_, I0));
-        }
-        else
-        {
-            return make_naive_tensor_descriptor(make_tuple(N_ * Ho_ * Wo_, K_),
-                                                make_tuple(I0, KStrideTensorC_));
-        }
+        return make_naive_tensor_descriptor(make_tuple(N_ * Ho_ * Wo_, K_),
+                                            make_tuple(I0, KStrideTensorC_));
     }
 
     template <
@@ -1468,21 +1362,12 @@ struct TransformConvFwdToGemm
                                bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        if constexpr(CTranspose)
-        {
-            return make_naive_tensor_descriptor(make_tuple(K_, N_ * Do_ * Ho_ * Wo_),
-                                                make_tuple(KStrideTensorC_, I0));
-        }
-        else
-        {
-            return make_naive_tensor_descriptor(make_tuple(N_ * Do_ * Ho_ * Wo_, K_),
-                                                make_tuple(I0, KStrideTensorC_));
-        }
+        return make_naive_tensor_descriptor(make_tuple(N_ * Do_ * Ho_ * Wo_, K_),
+                                            make_tuple(I0, KStrideTensorC_));
     }
 
     template <typename CLayout,
-              index_t NDimSp = NDimSpatial,
-
+              index_t NDimSp                     = NDimSpatial,
               typename ck::enable_if<NDimSp == 1 &&
                                          (is_same_v<CLayout, tensor_layout::convolution::G_NW_K> ||
                                           is_same_v<CLayout, tensor_layout::convolution::NWGK> ||
@@ -1490,7 +1375,6 @@ struct TransformConvFwdToGemm
                                      bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        static_assert(CTranspose == false);
         const IndexType NDoHoWo = N_ * Wo_;
         if constexpr(NumGroupsToMerge == 1)
         {
@@ -1500,16 +1384,16 @@ struct TransformConvFwdToGemm
         else
         {
             const auto nhwo_groups_k_1_desc = make_naive_tensor_descriptor(
-                make_tuple(N_, Wo_, NumGroupsToMerge, 1, K_),
+                make_tuple(N_, Wo_, NumGroupsToMerge, K_, 1),
                 make_tuple(
-                    NStrideTensorC_, WoStride_, GStrideTensorC_, GStrideTensorC_, KStrideTensorC_));
+                    NStrideTensorC_, WoStride_, GStrideTensorC_, KStrideTensorC_, GStrideTensorC_));
             // Padd 1 to NumGroupsToMerge
             const auto padded_desc = transform_tensor_descriptor(
                 nhwo_groups_k_1_desc,
                 make_tuple(make_merge_transform(make_tuple(N_, Wo_)),
                            make_pass_through_transform(NumGroupsToMerge),
-                           make_pad_transform(1, 0, NumGroupsToMerge - 1),
-                           make_pass_through_transform(K_)),
+                           make_pass_through_transform(K_),
+                           make_pad_transform(1, 0, NumGroupsToMerge - 1)),
                 make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
             // We need only matrices from diagonal. X_or returns 0 for the same
@@ -1523,13 +1407,13 @@ struct TransformConvFwdToGemm
                 make_tuple(make_pass_through_transform(NDoHoWo),
                            make_xor_transform(make_tuple(NumGroupsToMerge, NumGroupsToMerge)),
                            make_pass_through_transform(K_)),
-                make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}),
-                make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}));
+                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2>{}),
+                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2>{}));
             // Merge To M, N
             return transform_tensor_descriptor(
                 unmerged_padded_desc,
                 make_tuple(make_merge_transform(make_tuple(NDoHoWo, NumGroupsToMerge)),
-                           make_merge_transform(make_tuple(NumGroupsToMerge, K_))),
+                           make_merge_transform(make_tuple(K_, NumGroupsToMerge))),
                 make_tuple(Sequence<0, 1>{}, Sequence<2, 3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}));
         }
@@ -1545,7 +1429,6 @@ struct TransformConvFwdToGemm
                                      bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        static_assert(CTranspose == false);
         const IndexType NDoHoWo = N_ * Ho_ * Wo_;
         if constexpr(NumGroupsToMerge == 1)
         {
@@ -1555,20 +1438,20 @@ struct TransformConvFwdToGemm
         else
         {
             const auto nhwo_groups_k_1_desc =
-                make_naive_tensor_descriptor(make_tuple(N_, Ho_, Wo_, NumGroupsToMerge, 1, K_),
+                make_naive_tensor_descriptor(make_tuple(N_, Ho_, Wo_, NumGroupsToMerge, K_, 1),
                                              make_tuple(NStrideTensorC_,
                                                         HoStride_,
                                                         WoStride_,
                                                         GStrideTensorC_,
-                                                        GStrideTensorC_,
-                                                        KStrideTensorC_));
+                                                        KStrideTensorC_,
+                                                        GStrideTensorC_));
             // Padd 1 to NumGroupsToMerge
             const auto padded_desc = transform_tensor_descriptor(
                 nhwo_groups_k_1_desc,
                 make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                            make_pass_through_transform(NumGroupsToMerge),
-                           make_pad_transform(1, 0, NumGroupsToMerge - 1),
-                           make_pass_through_transform(K_)),
+                           make_pass_through_transform(K_),
+                           make_pad_transform(1, 0, NumGroupsToMerge - 1)),
                 make_tuple(Sequence<0, 1, 2>{}, Sequence<3>{}, Sequence<4>{}, Sequence<5>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
             // We need only matrices from diagonal. X_or returns 0 for the same
@@ -1582,13 +1465,13 @@ struct TransformConvFwdToGemm
                 make_tuple(make_pass_through_transform(NDoHoWo),
                            make_xor_transform(make_tuple(NumGroupsToMerge, NumGroupsToMerge)),
                            make_pass_through_transform(K_)),
-                make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}),
-                make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}));
+                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2>{}),
+                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2>{}));
             // Merge To M, N
             return transform_tensor_descriptor(
                 unmerged_padded_desc,
                 make_tuple(make_merge_transform(make_tuple(NDoHoWo, NumGroupsToMerge)),
-                           make_merge_transform(make_tuple(NumGroupsToMerge, K_))),
+                           make_merge_transform(make_tuple(K_, NumGroupsToMerge))),
                 make_tuple(Sequence<0, 1>{}, Sequence<2, 3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}));
         }
@@ -1603,7 +1486,7 @@ struct TransformConvFwdToGemm
                   bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N() const
     {
-        static_assert(CTranspose == false);
+
         const IndexType NDoHoWo = N_ * Do_ * Ho_ * Wo_;
         if constexpr(NumGroupsToMerge == 1)
         {
@@ -1613,21 +1496,21 @@ struct TransformConvFwdToGemm
         else
         {
             const auto nhwo_groups_k_1_desc =
-                make_naive_tensor_descriptor(make_tuple(N_, Do_, Ho_, Wo_, NumGroupsToMerge, 1, K_),
+                make_naive_tensor_descriptor(make_tuple(N_, Do_, Ho_, Wo_, NumGroupsToMerge, K_, 1),
                                              make_tuple(NStrideTensorC_,
                                                         DoStride_,
                                                         HoStride_,
                                                         WoStride_,
                                                         GStrideTensorC_,
-                                                        GStrideTensorC_,
-                                                        KStrideTensorC_));
+                                                        KStrideTensorC_,
+                                                        GStrideTensorC_));
             // Padd 1 to NumGroupsToMerge
             const auto padded_desc = transform_tensor_descriptor(
                 nhwo_groups_k_1_desc,
                 make_tuple(make_merge_transform(make_tuple(N_, Do_, Ho_, Wo_)),
                            make_pass_through_transform(NumGroupsToMerge),
-                           make_pad_transform(1, 0, NumGroupsToMerge - 1),
-                           make_pass_through_transform(K_)),
+                           make_pass_through_transform(K_),
+                           make_pad_transform(1, 0, NumGroupsToMerge - 1)),
                 make_tuple(Sequence<0, 1, 2, 3>{}, Sequence<4>{}, Sequence<5>{}, Sequence<6>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
             // We need only matrices from diagonal. X_or returns 0 for the same
@@ -1641,113 +1524,18 @@ struct TransformConvFwdToGemm
                 make_tuple(make_pass_through_transform(NDoHoWo),
                            make_xor_transform(make_tuple(NumGroupsToMerge, NumGroupsToMerge)),
                            make_pass_through_transform(K_)),
-                make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}),
-                make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}));
+                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2>{}),
+                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2>{}));
             // Merge To M, N
             return transform_tensor_descriptor(
                 unmerged_padded_desc,
                 make_tuple(make_merge_transform(make_tuple(NDoHoWo, NumGroupsToMerge)),
-                           make_merge_transform(make_tuple(NumGroupsToMerge, K_))),
+                           make_merge_transform(make_tuple(K_, NumGroupsToMerge))),
                 make_tuple(Sequence<0, 1>{}, Sequence<2, 3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}));
         }
     }
 
-    template <typename CLayout,
-              index_t NDimSp = NDimSpatial,
-
-              typename ck::enable_if<NDimSp == 1 &&
-                                         (is_same_v<CLayout, tensor_layout::convolution::GNKW> ||
-                                          is_same_v<CLayout, tensor_layout::convolution::NGKW>),
-                                     bool>::type = false>
-    __host__ __device__ auto MakeCDescriptor_M_N() const
-    {
-        static_assert(NumGroupsToMerge == 1);
-        auto n_k_wo_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, K_, Wo_), make_tuple(NStrideTensorC_, KStrideTensorC_, I1));
-        if constexpr(CTranspose)
-        {
-            return transform_tensor_descriptor(
-                n_k_wo_desc,
-                make_tuple(make_pass_through_transform(K_),
-                           make_merge_transform(make_tuple(N_, Wo_))),
-                make_tuple(Sequence<1>{}, Sequence<0, 2>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-        else
-        {
-            return transform_tensor_descriptor(n_k_wo_desc,
-                                               make_tuple(make_merge_transform(make_tuple(N_, Wo_)),
-                                                          make_pass_through_transform(K_)),
-                                               make_tuple(Sequence<0, 2>{}, Sequence<1>{}),
-                                               make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-    }
-
-    template <typename CLayout,
-              index_t NDimSp = NDimSpatial,
-
-              typename ck::enable_if<NDimSp == 2 &&
-                                         (is_same_v<CLayout, tensor_layout::convolution::GNKHW> ||
-                                          is_same_v<CLayout, tensor_layout::convolution::NGKHW>),
-                                     bool>::type = false>
-    __host__ __device__ auto MakeCDescriptor_M_N() const
-    {
-        static_assert(NumGroupsToMerge == 1);
-        auto n_k_howo_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, K_, Ho_ * Wo_), make_tuple(NStrideTensorC_, KStrideTensorC_, I1));
-        if constexpr(CTranspose)
-        {
-            return transform_tensor_descriptor(
-                n_k_howo_desc,
-                make_tuple(make_pass_through_transform(K_),
-                           make_merge_transform(make_tuple(N_, Ho_ * Wo_))),
-                make_tuple(Sequence<1>{}, Sequence<0, 2>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-        else
-        {
-            return transform_tensor_descriptor(
-                n_k_howo_desc,
-                make_tuple(make_merge_transform(make_tuple(N_, Ho_ * Wo_)),
-                           make_pass_through_transform(K_)),
-                make_tuple(Sequence<0, 2>{}, Sequence<1>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-    }
-
-    template <typename CLayout,
-              index_t NDimSp = NDimSpatial,
-
-              typename ck::enable_if<NDimSp == 3 &&
-                                         (is_same_v<CLayout, tensor_layout::convolution::GNKDHW> ||
-                                          is_same_v<CLayout, tensor_layout::convolution::NGKDHW>),
-                                     bool>::type = false>
-    __host__ __device__ auto MakeCDescriptor_M_N() const
-    {
-        static_assert(NumGroupsToMerge == 1);
-        auto n_k_dohowo_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, K_, Do_ * Ho_ * Wo_), make_tuple(NStrideTensorC_, KStrideTensorC_, I1));
-
-        if constexpr(CTranspose)
-        {
-            return transform_tensor_descriptor(
-                n_k_dohowo_desc,
-                make_tuple(make_pass_through_transform(K_),
-                           make_merge_transform(make_tuple(N_, Do_ * Ho_ * Wo_))),
-                make_tuple(Sequence<1>{}, Sequence<0, 2>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-        else
-        {
-            return transform_tensor_descriptor(
-                n_k_dohowo_desc,
-                make_tuple(make_merge_transform(make_tuple(N_, Do_ * Ho_ * Wo_)),
-                           make_pass_through_transform(K_)),
-                make_tuple(Sequence<0, 2>{}, Sequence<1>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}));
-        }
-    }
     IndexType N_;
     IndexType Di_, Hi_, Wi_;
     IndexType Do_, Ho_, Wo_;

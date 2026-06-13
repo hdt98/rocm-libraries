@@ -18,24 +18,12 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
 #include <thrust/detail/type_traits.h>
-
-#if !_THRUST_HAS_DEVICE_SYSTEM_STD
-#  include <type_traits>
-#endif
 
 THRUST_NAMESPACE_BEGIN
 
 namespace detail
-{
+{ 
 
 namespace minimum_type_detail
 {
@@ -44,38 +32,41 @@ namespace minimum_type_detail
 // Returns the minimum type or is empty
 // if T1 and T2 are unrelated.
 //
-template <typename T1, typename T2, bool GreaterEqual, bool LessEqual>
-struct minimum_type_impl
-{};
-
+template <typename T1, typename T2, bool GreaterEqual, bool LessEqual> struct minimum_type_impl {};
+  
 template <typename T1, typename T2>
-struct minimum_type_impl<T1, T2, true, false>
+struct minimum_type_impl<T1,T2,true,false>
 {
   using type = T2;
 }; // end minimum_type_impl
 
 template <typename T1, typename T2>
-struct minimum_type_impl<T1, T2, false, true>
+struct minimum_type_impl<T1,T2,false,true>
 {
   using type = T1;
 }; // end minimum_type_impl
 
 template <typename T1, typename T2>
-struct minimum_type_impl<T1, T2, true, true>
+struct minimum_type_impl<T1,T2,true,true>
 {
   using type = T1;
 }; // end minimum_type_impl
 
 template <typename T1, typename T2>
 struct primitive_minimum_type
-    : minimum_type_detail::
-        minimum_type_impl<T1, T2, _THRUST_STD::is_convertible<T1, T2>::value, _THRUST_STD::is_convertible<T2, T1>::value>
-{}; // end primitive_minimum_type
+  : minimum_type_detail::minimum_type_impl<
+      T1,
+      T2,
+      THRUST_NS_QUALIFIER::detail::is_convertible<T1,T2>::value,
+      THRUST_NS_QUALIFIER::detail::is_convertible<T2,T1>::value
+    >
+{
+}; // end primitive_minimum_type
 
 // because some types are not convertible (even to themselves)
 // specialize primitive_minimum_type for when both types are identical
 template <typename T>
-struct primitive_minimum_type<T, T>
+struct primitive_minimum_type<T,T>
 {
   using type = T;
 }; // end primitive_minimum_type
@@ -83,63 +74,90 @@ struct primitive_minimum_type<T, T>
 // XXX this belongs somewhere more general
 struct any_conversion
 {
-  template <typename T>
-  THRUST_HOST_DEVICE operator T();
+  template<typename T> operator T (void);
 };
 
-} // namespace minimum_type_detail
+} // end minimum_type_detail
 
-template <typename T1,
-          typename T2  = minimum_type_detail::any_conversion,
-          typename T3  = minimum_type_detail::any_conversion,
-          typename T4  = minimum_type_detail::any_conversion,
-          typename T5  = minimum_type_detail::any_conversion,
-          typename T6  = minimum_type_detail::any_conversion,
-          typename T7  = minimum_type_detail::any_conversion,
-          typename T8  = minimum_type_detail::any_conversion,
-          typename T9  = minimum_type_detail::any_conversion,
-          typename T10 = minimum_type_detail::any_conversion,
-          typename T11 = minimum_type_detail::any_conversion,
-          typename T12 = minimum_type_detail::any_conversion,
-          typename T13 = minimum_type_detail::any_conversion,
-          typename T14 = minimum_type_detail::any_conversion,
-          typename T15 = minimum_type_detail::any_conversion,
-          typename T16 = minimum_type_detail::any_conversion>
-struct minimum_type;
+template<typename T1,
+         typename T2  = minimum_type_detail::any_conversion,
+         typename T3  = minimum_type_detail::any_conversion,
+         typename T4  = minimum_type_detail::any_conversion,
+         typename T5  = minimum_type_detail::any_conversion,
+         typename T6  = minimum_type_detail::any_conversion,
+         typename T7  = minimum_type_detail::any_conversion,
+         typename T8  = minimum_type_detail::any_conversion,
+         typename T9  = minimum_type_detail::any_conversion,
+         typename T10 = minimum_type_detail::any_conversion,
+         typename T11 = minimum_type_detail::any_conversion,
+         typename T12 = minimum_type_detail::any_conversion,
+         typename T13 = minimum_type_detail::any_conversion,
+         typename T14 = minimum_type_detail::any_conversion,
+         typename T15 = minimum_type_detail::any_conversion,
+         typename T16 = minimum_type_detail::any_conversion>
+  struct minimum_type;
 
 // base case
-template <typename T1, typename T2>
-struct minimum_type<T1, T2> : minimum_type_detail::primitive_minimum_type<T1, T2>
+template<typename T1, typename T2>
+  struct minimum_type<T1,T2>
+    : minimum_type_detail::primitive_minimum_type<T1,T2>
 {};
 
-template <typename T1, typename T2>
-struct lazy_minimum_type : minimum_type<typename T1::type, typename T2::type>
+template<typename T1, typename T2>
+  struct lazy_minimum_type
+    : minimum_type<
+        typename T1::type,
+        typename T2::type
+      >
 {};
 
 // carefully avoid referring to a nested ::type which may not exist
-template <typename T1,
-          typename T2,
-          typename T3,
-          typename T4,
-          typename T5,
-          typename T6,
-          typename T7,
-          typename T8,
-          typename T9,
-          typename T10,
-          typename T11,
-          typename T12,
-          typename T13,
-          typename T14,
-          typename T15,
-          typename T16>
-struct minimum_type
-    : lazy_minimum_type<lazy_minimum_type<lazy_minimum_type<minimum_type<T1, T2>, minimum_type<T3, T4>>,
-                                          lazy_minimum_type<minimum_type<T5, T6>, minimum_type<T7, T8>>>,
-                        lazy_minimum_type<lazy_minimum_type<minimum_type<T9, T10>, minimum_type<T11, T12>>,
-                                          lazy_minimum_type<minimum_type<T13, T14>, minimum_type<T15, T16>>>>
+template<typename T1,  typename T2,  typename T3,  typename T4,
+         typename T5,  typename T6,  typename T7,  typename T8,
+         typename T9,  typename T10, typename T11, typename T12,
+         typename T13, typename T14, typename T15, typename T16>
+  struct minimum_type
+    : lazy_minimum_type<
+        lazy_minimum_type<
+          lazy_minimum_type<
+            minimum_type<
+              T1,T2
+            >,
+            minimum_type<
+              T3,T4
+            >
+          >,
+          lazy_minimum_type<
+            minimum_type<
+              T5,T6
+            >,
+            minimum_type<
+              T7,T8
+            >
+          >
+        >,
+        lazy_minimum_type<
+          lazy_minimum_type<
+            minimum_type<
+              T9,T10
+            >,
+            minimum_type<
+              T11,T12
+            >
+          >,
+          lazy_minimum_type<
+            minimum_type<
+              T13,T14
+            >,
+            minimum_type<
+              T15,T16
+            >
+          >
+        >
+      >
 {};
 
-} // namespace detail
+} // end detail
 
 THRUST_NAMESPACE_END
+

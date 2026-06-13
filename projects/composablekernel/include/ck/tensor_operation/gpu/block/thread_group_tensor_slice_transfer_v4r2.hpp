@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -40,8 +40,7 @@ template <typename ThreadGroup,
           typename DstsScalarStrideInVector,                  // Sequence
           typename ThreadTransferSrcsResetCoordinateAfterRun, // Sequence
           typename ThreadTransferDstsResetCoordinateAfterRun, // Sequence
-          index_t NumThreadScratch = 1,
-          typename IndexType       = index_t>
+          index_t NumThreadScratch = 1>
 struct ThreadGroupTensorSliceTransfer_v4r2
 {
     static constexpr index_t nDim =
@@ -186,8 +185,7 @@ struct ThreadGroupTensorSliceTransfer_v4r2
                                            DstsScalarStrideInVector,
                                            ThreadTransferSrcsResetCoordinateAfterRun,
                                            ThreadTransferDstsResetCoordinateAfterRun,
-                                           NumThreadScratch,
-                                           IndexType>;
+                                           NumThreadScratch>;
 
     ThreadwiseTransfer threadwise_transfer_;
 };

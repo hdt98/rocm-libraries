@@ -50,11 +50,6 @@ bool BnFwdInference::IsApplicable(const ExecutionContext&,
     if(!IsOCLInferTypeValid(bn_problem))
         return false;
 
-    int activ_mode = bn_problem.GetActivationDesc().GetMode();
-    if(activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
-       activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP)
-        return false;
-
     return true;
 }
 
@@ -65,8 +60,15 @@ ConvSolution BnFwdInference::GetSolution(const ExecutionContext& context,
 
     bool bfpmixparm   = false;
     bool bbfpmixparam = false;
+    bool bfp16parm    = false;
     bool bfp32parm    = true;
-    if(problem.GetXDesc().GetType() == miopenHalf && problem.GetBnScale().GetType() == miopenFloat)
+    if(problem.GetXDesc().GetType() == miopenHalf && problem.GetBnScale().GetType() == miopenHalf)
+    {
+        bfp16parm = true;
+        bfp32parm = false;
+    }
+    else if(problem.GetXDesc().GetType() == miopenHalf &&
+            problem.GetBnScale().GetType() == miopenFloat)
     {
         bfpmixparm = true;
         bfp32parm  = false;
@@ -88,44 +90,27 @@ ConvSolution BnFwdInference::GetSolution(const ExecutionContext& context,
     {
         size_t xlocalsize, xgridsize, ylocalsize, ygridsize, zlocalsize, zgridsize;
         size_t max_localsize = 256;
-        size_t vectorsize    = problem.IsLayoutNHWC()
-                                   ? (c % 4 == 0 ? 4 : (c % 2 == 0 ? 2 : 1))
-                                   : (in_cstride % 4 == 0 ? 4 : (in_cstride % 2 == 0 ? 2 : 1));
-
-        if(problem.GetXDesc().GetLayoutEnum() == miopenTensorNHWC)
+        bool vectorize;
+        if(problem.GetXDesc().GetLayout_t() == miopenTensorNHWC)
         {
-            xlocalsize = std::min(size_t{c / vectorsize}, max_localsize);
-            xgridsize  = AlignUp(size_t{c / vectorsize}, xlocalsize);
-
-            ylocalsize = max_localsize / xlocalsize;
-            ygridsize  = AlignUp(size_t{in_cstride}, ylocalsize);
+            vectorize       = c % 4 == 0;
+            int vector_size = vectorize ? 4 : 1;
+            xlocalsize      = std::min(size_t{c / vector_size}, max_localsize);
+            xgridsize       = xlocalsize * ((c / vector_size + xlocalsize - 1) / xlocalsize);
+            ylocalsize      = max_localsize / xlocalsize;
+            ygridsize       = ylocalsize * ((in_cstride + ylocalsize - 1) / ylocalsize);
         }
         else
         {
-            xlocalsize = 1;
-            xgridsize  = AlignUp(size_t{c}, xlocalsize);
-
-            ylocalsize = max_localsize;
-            ygridsize  = AlignUp(size_t{in_cstride / vectorsize}, ylocalsize);
+            vectorize       = in_cstride % 4 == 0;
+            int vector_size = vectorize ? 4 : 1;
+            xlocalsize      = 1;
+            xgridsize       = c;
+            ylocalsize      = max_localsize;
+            ygridsize = ylocalsize * ((in_cstride / vector_size + ylocalsize - 1) / ylocalsize);
         }
-
-        // HIP runtime does not support non-uniform blocks
-        // Adjust the global worker sizes accordingly
-        xgridsize = AlignUp(xgridsize, xlocalsize);
-        ygridsize = AlignUp(ygridsize, ylocalsize);
-
-        zlocalsize                = 1;
-        size_t active_threads_xy  = xgridsize * ygridsize;
-        size_t max_active_threads = handle.GetMaxComputeUnits() * 32 *
-                                    handle.GetWavefrontWidth(); // considering max 32 waves per CU
-        if(active_threads_xy < max_active_threads)
-        {
-            zgridsize = std::min(size_t{(max_active_threads / active_threads_xy)}, size_t{n});
-        }
-        else
-        {
-            zgridsize = 1;
-        }
+        zlocalsize = 1;
+        zgridsize  = 1;
 
         auto kernel = KernelInfo{};
 
@@ -133,42 +118,31 @@ ConvSolution BnFwdInference::GetSolution(const ExecutionContext& context,
         kernel.kernel_name = "MIOpenBatchNormFwdInfer";
         if(problem.GetMode() == miopenBNSpatial)
         { // SPATIAL kernels
-            kernel.kernel_file += "Spatial.cpp";
+            kernel.kernel_file += "Spatial.cl";
             kernel.kernel_name += "SpatialEst";
-            if(problem.isInverseVariance())
-            {
-                kernel.kernel_name += "InvVar";
-            }
         }
         else
         { // PER ACTIVATION
-            kernel.kernel_file += "PerAct.cpp";
+            kernel.kernel_file += "PerAct.cl";
             kernel.kernel_name += "PerActivationEst";
-            if(problem.isInverseVariance())
-            {
-                kernel.kernel_name += "InvVar";
-            }
         }
 
         const auto build_params = KernelBuildParameters{
-            {"MIOPEN_USE_FP16", static_cast<int>(bfpmixparm)},
+            {"MIOPEN_USE_FP16", static_cast<int>(bfp16parm)},
             {"MIOPEN_USE_FP32", static_cast<int>(bfp32parm)},
-            {"MIOPEN_USE_BFP16", static_cast<int>(bbfpmixparam)},
+            {"MIOPEN_USE_FPMIX", static_cast<int>(bfpmixparm)},
             {"MIOPEN_USE_BFPMIX", static_cast<int>(bbfpmixparam)},
             {"MIO_BN_GRP0", xlocalsize},
             {"MIO_BN_GRP1", ylocalsize},
             {"MIO_BN_GRP2", zlocalsize},
             {"MIO_BN_GFX103X", (StartsWith(handle.GetDeviceName(), "gfx103") ? "1" : "0")},
             {"MIO_BN_GFX110X", (StartsWith(handle.GetDeviceName(), "gfx110") ? "1" : "0")},
-            {"MIO_BN_GFX115X", (StartsWith(handle.GetDeviceName(), "gfx115") ? "1" : "0")},
             {"MIO_BN_GFX120X", (StartsWith(handle.GetDeviceName(), "gfx120") ? "1" : "0")},
-            {"MIO_BN_GFX125X", (StartsWith(handle.GetDeviceName(), "gfx125") ? "1" : "0")},
             {"MIO_LAYOUT_NHWC", static_cast<int>(problem.IsLayoutNHWC())},
-            {"MIO_BN_VECTORIZE", static_cast<int>(vectorsize > 1)},
-            {"MIO_BN_VEC_SIZE", vectorsize},
-            {"MIOPEN_NRN_OP_ID", problem.GetActivationDesc().GetMode()}};
+            {"MIO_BN_VECTORIZE", static_cast<int>(vectorize)},
+        };
 
-        kernel.comp_options = build_params.GenerateFor(kbp::HIP{});
+        kernel.comp_options = build_params.GenerateFor(kbp::OpenCL{});
 
         kernel.l_wk.push_back(xlocalsize);
         kernel.l_wk.push_back(ylocalsize);
@@ -181,7 +155,7 @@ ConvSolution BnFwdInference::GetSolution(const ExecutionContext& context,
         result.construction_params.push_back(kernel);
     }
 
-    result.invoker_factory = [=](const std::vector<Kernel>& kernels) {
+    result.invoker_factory = [](const std::vector<Kernel>& kernels) {
         return [=](const Handle& handle_, const AnyInvokeParams& raw_params) {
             decltype(auto) kernel = handle_.Run(kernels.front());
             decltype(auto) params = raw_params.CastTo<miopen::batchnorm::InfInvokeParams>();
@@ -191,84 +165,37 @@ ConvSolution BnFwdInference::GetSolution(const ExecutionContext& context,
 
             unsigned int in_nstride_ = c_ * h_ * w_;
 
-            float alpha_activ = problem.GetActivationDesc().GetAlpha();
-            float beta_activ  = problem.GetActivationDesc().GetBeta();
-
-            if(params.xDesc->GetLayoutEnum() == miopenTensorNHWC)
+            if(params.xDesc->GetLayout_t() == miopenTensorNHWC)
             {
-                if(problem.isInverseVariance())
-                {
-                    kernel(params.x,
-                           params.y,
-                           params.estimatedMean,
-                           params.estimatedVariance,
-                           params.bnScale,
-                           params.bnBias,
-                           c_,
-                           h_ * w_,
-                           n_,
-                           1,           // cStride
-                           c_,          // hwStride
-                           in_nstride_, // batchStride
-                           alpha_activ,
-                           beta_activ);
-                }
-                else
-                {
-                    kernel(params.x,
-                           params.y,
-                           params.estimatedMean,
-                           params.estimatedVariance,
-                           params.bnScale,
-                           params.bnBias,
-                           params.epsilon,
-                           c_,
-                           h_ * w_,
-                           n_,
-                           1,           // cStride
-                           c_,          // hwStride
-                           in_nstride_, // batchStride
-                           alpha_activ,
-                           beta_activ);
-                }
+                kernel(params.x,
+                       params.y,
+                       params.estimatedMean,
+                       params.estimatedVariance,
+                       params.bnScale,
+                       params.bnBias,
+                       params.epsilon,
+                       c_,
+                       h_ * w_,
+                       n_,
+                       1,            // cStride
+                       c_,           // hwStride
+                       in_nstride_); // batchStride
             }
             else
             {
-                if(problem.isInverseVariance())
-                {
-                    kernel(params.x,
-                           params.y,
-                           params.estimatedMean,
-                           params.estimatedVariance,
-                           params.bnScale,
-                           params.bnBias,
-                           c_,
-                           h_ * w_,
-                           n_,
-                           h_ * w_,     // cStride
-                           1,           // hwStride
-                           in_nstride_, // batchStride
-                           alpha_activ,
-                           beta_activ);
-                }
-                else
-                {
-                    kernel(params.x,
-                           params.y,
-                           params.estimatedMean,
-                           params.estimatedVariance,
-                           params.bnScale,
-                           params.bnBias,
-                           params.epsilon,
-                           c_,
-                           h_ * w_,
-                           n_,
-                           h_ * w_,     // cStride
-                           1,           // hwStride
-                           in_nstride_, // batchStride
-                           alpha_activ,
-                           beta_activ);
-                }
+                kernel(params.x,
+                       params.y,
+                       params.estimatedMean,
+                       params.estimatedVariance,
+                       params.bnScale,
+                       params.bnBias,
+                       params.epsilon,
+                       c_,
+                       h_ * w_,
+                       n_,
+                       h_ * w_,      // cStride
+                       1,            // hwStride
+                       in_nstride_); // batchStride
             }
         };
     };

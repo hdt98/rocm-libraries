@@ -24,16 +24,17 @@
 
 from typing import Dict
 from copy import deepcopy
+from typing import List
 
 from .KernelWriterBase import KernelWriterBase
+from .TensileInstructions import DataType
 
 from Tensile.Common.Architectures import isaToGfx
 from Tensile.Common import INDEX_CHARS, IsaInfo
-from Tensile.Common.DataType import DataType
 
 class KernelWriterConversion(KernelWriterBase):
 
-  def __init__(self, state, load_vw, isaInfoMap: Dict[str, IsaInfo]):
+  def __init__(self, state, load_vw, supportedArchs: List[tuple], isaInfoMap: Dict[str, IsaInfo]):
     super().__init__()
 
     self.state["ProblemType"] = deepcopy(state["ProblemType"])
@@ -58,10 +59,10 @@ class KernelWriterConversion(KernelWriterBase):
     self.f8MacroGuardStart = "";
     self.f8MacroGuardEnd   = "";
     if (self.state["ProblemType"]["DestDataType"].isFloat8() or self.state["ProblemType"]["DestDataType"].isBFloat8()):
-      self.f8MacroGuardStart = "\n#if HIP_FP8_TYPE_OCP\n"
+      self.f8MacroGuardStart = "\n#if TENSILELITE_FP8_TYPE_OCP\n"
       self.f8MacroGuardEnd   = "\n#endif // F8 macro guard\n"
     if (self.state["ProblemType"]["DestDataType"].isFloat8_fnuz() or self.state["ProblemType"]["DestDataType"].isBFloat8_fnuz()):
-      self.f8MacroGuardStart = "\n#if HIP_FP8_TYPE_FNUZ\n"
+      self.f8MacroGuardStart = "\n#if TENSILELITE_FP8_TYPE_FNUZ\n"
       self.f8MacroGuardEnd   = "\n#endif // F8 macro guard\n"
 
     # derive parameter
@@ -81,6 +82,9 @@ class KernelWriterConversion(KernelWriterBase):
     self.indexChars[self.state["ProblemType"]["Index1"]] = "1" + self.indexChars[self.state["ProblemType"]["Index1"]]
     self.tileChar0 = self.indexChars[self.state["ProblemType"]["Index0"]]
     self.tileChar1 = self.indexChars[self.state["ProblemType"]["Index1"]]
+
+    # Get supported archs
+    self.supportedArchs = supportedArchs
 
     self.gsuKernels = [self.state["GlobalSplitU"]]
     if self.state["GenPGRPostKernels"]:
@@ -204,10 +208,7 @@ class KernelWriterConversion(KernelWriterBase):
     if self.state["ProblemType"]["GroupedGemm"]:
       kStr += "  uint32_t* wiTablePtr, void* deviceUserArgsPtr, argument_%s* argsPtr, uint32_t gemm_count)" % ( self.kernelName ) + self.endLine
     else:
-      # Additional argument batch_mode is added to distinguish between Strided Batch and General Batched GEMM
-      # batch_mode will dictate how the GLOBAL_C and GLOBAL_D macros are defined and used in the kernel body
-      # since the index calculation for Strided Batch and General Batch GEMM are different.
-      kStr += "  argument_%s arg, uint32_t batch_mode, uint32_t additionalPaddingPerBatch)" % ( self.kernelName ) + self.endLine
+      kStr += "  argument_%s arg)" % ( self.kernelName ) + self.endLine
 
     return kStr
 
@@ -301,10 +302,10 @@ class KernelWriterConversion(KernelWriterBase):
     self.num_dword_store = int(self.num_elements_load * self.state["ProblemType"]["DestDataType"].numBytes() / 4)
     if self.num_dword_store == 0:
       self.num_dword_store = self.num_elements_load * self.state["ProblemType"]["DestDataType"].numBytes() / 4
-    if self.state["ProblemType"]["DataType"].numBytes() > 4:
-      self.num_dword_load  = self.num_elements_load
-    if self.state["ProblemType"]["DestDataType"].numBytes() > 4:
-      self.num_dword_store = self.num_elements_load
+    if self.state["ProblemType"]["DataType"].isDouble():
+      self.num_dword_load  = self.num_dword_load // 2
+    if self.state["ProblemType"]["DestDataType"].isDouble():
+      self.num_dword_store = self.num_dword_store // 2
     kStr += "#define NUM_ELEMENT_LOAD %d%s" % ( self.num_elements_load, self.endLine)
     kStr += "#define NUM_GSU %d%s" % (self.state["GlobalSplitU"], self.endLine)
 
@@ -349,27 +350,11 @@ class KernelWriterConversion(KernelWriterBase):
     ########################################
     # kernel start
     kStr += self.endLine
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  if(batch_mode == 0)" + self.endLine
-      kStr += "  {" + self.endLine    
     kStr += "  if (id*NUM_ELEMENT_LOAD >= (arg.size%s" % self.indexChars[0]
     for i in range(1, problemType["NumIndicesC"]):
       kStr += " * arg.size%s" % self.indexChars[i]
     kStr += "))%s" % self.endLine
     kStr += "    return;%s" % self.endLine
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  }" + self.endLine
-      kStr += "  else" + self.endLine
-      kStr += "  {" + self.endLine
-      kStr += "    uint64_t index2 = ((id*NUM_ELEMENT_LOAD) / (arg.size%s" % self.indexChars[0]
-      for i in range(1, problemType["NumIndicesC"]-1):
-        kStr += " * arg.size%s" % self.indexChars[i]
-      kStr += " + additionalPaddingPerBatch));%s" % self.endLine
-      kStr += "    if (id*NUM_ELEMENT_LOAD >= ((index2+1) * (arg.size%s * arg.size%s)) + index2 * additionalPaddingPerBatch)%s" % (self.indexChars[0], self.indexChars[1], self.endLine)
-      kStr += "      return;%s" % self.endLine
-      kStr += "    if(index2 > 0)%s" % self.endLine
-      kStr += "      id = id - (index2 * additionalPaddingPerBatch) / NUM_ELEMENT_LOAD;%s" % self.endLine
-      kStr += "  }" + self.endLine
 
     kStr += self.endLine
     kStr += "  uint64_t id0"
@@ -414,25 +399,11 @@ class KernelWriterConversion(KernelWriterBase):
     ########################################
     # D index
     kStr += self.endLine
-    kStr += "%s idxD, idxC;" % self.uint64Str
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  if(batch_mode == 0)" + self.endLine
-      kStr += "  {" + self.endLine
-    kStr += "  idxD = GLOBAL_D( (%s)" % self.uint64Str
+    kStr += "  %s idxD = GLOBAL_D( (%s)" % (self.uint64Str, self.uint64Str)
     for i in range(problemType["NumIndicesC"]):
       kStr += ', ' if i else ''
       kStr += '0'  if i in nonTileFreeIndices else ('id%d' % i)
     kStr += ");%s" % (self.endLine)
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  }" + self.endLine
-      kStr += "  else" + self.endLine
-      kStr += "  {" + self.endLine
-      kStr += "  idxD = GLOBAL_D( (%s)" % self.uint64Str
-      for i in range(problemType["NumIndicesC"]-1):
-        kStr += ', ' if i else ''
-        kStr += '0'  if i in nonTileFreeIndices else ('id%d' % i)
-      kStr += ", 0);%s" % (self.endLine)
-      kStr += "}" + self.endLine
 
     # W index
     kStr += "  %s idxW = GLOBAL_W( (%s)" % (self.uint64Str, self.uint64Str)
@@ -442,24 +413,11 @@ class KernelWriterConversion(KernelWriterBase):
     kStr += ");%s" % (self.endLine)
 
     # C index
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  if(batch_mode == 0)" + self.endLine
-      kStr += "  {" + self.endLine    
-    kStr += "     idxC = GLOBAL_C( (%s)" % self.uint64Str
+    kStr += "  %s idxC = GLOBAL_C( (%s)" % (self.uint64Str, self.uint64Str)
     for i in range(problemType["NumIndicesC"]):
       kStr += ', ' if i else ''
       kStr += '0'  if i in nonTileFreeIndices else ('id%d' % i)
     kStr += ");%s" % (self.endLine)
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  }" + self.endLine
-      kStr += "  else" + self.endLine
-      kStr += "  {" + self.endLine
-      kStr += "     idxC = GLOBAL_C( (%s)" % self.uint64Str
-      for i in range(problemType["NumIndicesC"]-1):
-        kStr += ', ' if i else ''
-        kStr += '0'  if i in nonTileFreeIndices else ('id%d' % i)
-      kStr += ", 0);%s" % (self.endLine)
-      kStr += "  }" + self.endLine
 
     if self.state["ProblemType"]["UseBias"] and \
        (not self.state["ProblemType"]["Gradient"] or \
@@ -514,12 +472,8 @@ class KernelWriterConversion(KernelWriterBase):
 
     typeStr = "int" if self.state["ProblemType"]["DataType"].isInt8() or self.state["ProblemType"]["DataType"].isInt32() else ("double" if self.state["ProblemType"]["DataType"].isDouble() else "float")
     typeStr2 = "int16_t" if self.state["ProblemType"]["DestDataType"].isInt8() else ("tensile_half" if self.state["ProblemType"]["DestDataType"].isAnyFloat8() else "tensile_bfloat16")
-    if self.state["ProblemType"]["DataType"].isComplex():
-      loadTypeStr = "%s%s" % (self.datatype, "" if self.num_dword_load == 1 else self.num_dword_load)
-      storeTypeStr = "%s%s" % (self.datatype, "" if self.num_dword_store == 1 else self.num_dword_store)
-    else:
-      loadTypeStr = "%s%s" % (typeStr, "" if self.num_dword_load == 1 else self.num_dword_load)
-      storeTypeStr = "%s%s" % (typeStr, self.num_dword_store) if self.num_dword_store >= 1 else typeStr2 if self.num_dword_store == 0.5 else destTypeStr
+    loadTypeStr = "%s%s" % (typeStr, "" if self.num_dword_load == 1 else self.num_dword_load)
+    storeTypeStr = "%s%s" % (typeStr, self.num_dword_store) if self.num_dword_store >= 1 else typeStr2 if self.num_dword_store == 0.5 else destTypeStr
 
     #Bias A/B
     if self.state["ProblemType"]["UseBias"] and self.state["ProblemType"]["Gradient"] and (self.state["ProblemType"]["BiasSrc"] == "A" or self.state["ProblemType"]["BiasSrc"] == "B"):
@@ -574,8 +528,8 @@ class KernelWriterConversion(KernelWriterBase):
           if self.num_dword_load > 2:
             kStr += "  float2 accumVec2(accum[2], accum[3]);" + self.endLine
       canPKF32Arch = []
-      for isa in self.isaInfoMap.keys():
-        if self.isaInfoMap[isa].asmCaps['v_pk_add_f32']:
+      for isa in self.supportedArchs:
+        if self.isaInfoMap[isa].asmCaps['v_pk_add_f32']: 
           canPKF32Arch.append(isa)
       defineStr = []
       if len(canPKF32Arch) > 0:
@@ -717,19 +671,8 @@ class KernelWriterConversion(KernelWriterBase):
 
     #Beta
     kStr += "  if(arg.beta != (%s)0){%s" % (self.state["ProblemType"]["ComputeDataType"].toDevice(self.language), self.endLine)
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  if(batch_mode == 0)" + self.endLine
-      kStr += "  {" + self.endLine
     for vIdx in range(self.num_dword_load):
       kStr += "    %s[%d] += arg.beta * (%s)arg.C[idxC+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  }" + self.endLine
-      kStr += "  else" + self.endLine
-      kStr += "  {" + self.endLine
-      kStr += "    %s *ptr = *(reinterpret_cast<%s **>(((char *)arg.C) + (8*id2)));" % (destTypeStr, destTypeStr) + self.endLine
-      for vIdx in range(self.num_dword_load):
-        kStr += "    %s[%d] += arg.beta * (%s)ptr[idxC+%d];%s" % (accumStr, vIdx, intermediateDataType, vIdx, self.endLine)
-      kStr += "  }" + self.endLine
     kStr += "  }" + self.endLine
     kStr += self.endLine
 
@@ -818,15 +761,8 @@ class KernelWriterConversion(KernelWriterBase):
       kStr += "  %s[%d] = (%s)%s[%d];%s" % (resultStr, vIdx, destTypeStr, accumStr, vIdx, self.endLine)
 
     # kStr += "  *(%s *)(arg.D+idxD) = *(%s *)%s;%s" % (storeTypeStr, storeTypeStr, resultStr, self.endLine)
-    if not self.state["ProblemType"]["GroupedGemm"]:
-      kStr += "  if(batch_mode == 0) {" + self.endLine
-      kStr += "    buffer_store<%s, sizeof(%s), CacheOperation::Kind::Always>(*(%s *)%s, arg.D, idxD * sizeof(%s), 0);%s" % (storeTypeStr, storeTypeStr, storeTypeStr, resultStr, destTypeStr, self.endLine)
-      kStr += "  } else {" + self.endLine
-      kStr += "    %s *ptr = *(reinterpret_cast<%s **>(((char *)arg.D) + (8*id2)));" % (destTypeStr, destTypeStr) + self.endLine
-      kStr += "    buffer_store<%s, sizeof(%s), CacheOperation::Kind::Always>(*(%s *)%s, ptr, idxD * sizeof(%s), 0);%s" % (storeTypeStr, storeTypeStr, storeTypeStr, resultStr, destTypeStr, self.endLine)
-      kStr += "  }" + self.endLine
-    else:
-      kStr += "    buffer_store<%s, sizeof(%s), CacheOperation::Kind::Always>(*(%s *)%s, arg.D, idxD * sizeof(%s), 0);%s" % (storeTypeStr, storeTypeStr, storeTypeStr, resultStr, destTypeStr, self.endLine)      
+    kStr += "  buffer_store<%s, sizeof(%s), CacheOperation::Kind::Always>(*(%s *)%s, arg.D, idxD * sizeof(%s), 0);%s" % (storeTypeStr, storeTypeStr, storeTypeStr, resultStr, destTypeStr, self.endLine)
+
     ########################################
     # end
     kStr += "}%s" % self.endLine
@@ -849,68 +785,61 @@ class KernelWriterConversion(KernelWriterBase):
     return kStr
 
 
-  @staticmethod
-  def kernelName(solution, num_elements_load, btype=None):
-    state = solution._state if hasattr(solution, "_state") else solution.state
+  def getKernelName(self):
     indexChars = INDEX_CHARS
     # C dimensions
     name = "C"
-    for i in range(0, state["ProblemType"]["NumIndicesC"]):
+    for i in range(0, self.state["ProblemType"]["NumIndicesC"]):
       name += indexChars[i].lower()
     name += "_"
 
     # add input datatype into kernel name (the datatype of workspace)
-    inputTypeStr = DataType("I").toChar() if state["ProblemType"]["DataType"].isInt8() or state["ProblemType"]["DataType"].isInt32() else \
-                                  (DataType("D").toChar() if state["ProblemType"]["DataType"].isDouble() else DataType("S").toChar())
+    inputTypeStr = DataType("I").toChar() if self.state["ProblemType"]["DataType"].isInt8() or self.state["ProblemType"]["DataType"].isInt32() else \
+                                  (DataType("D").toChar() if self.state["ProblemType"]["DataType"].isDouble() else DataType("S").toChar())
 
-    name += (inputTypeStr + state["ProblemType"]["DestDataType"].toChar())
+    name += (inputTypeStr + self.state["ProblemType"]["DestDataType"].toChar())
 
-    if state["ProblemType"]["GroupedGemm"]:
+    if self.state["ProblemType"]["GroupedGemm"]:
       name += "_GG"
     else:
-      name += "" if state["ProblemType"]["StridedBatched"] else "_GB"
-    if btype:
-      if state["ProblemType"]["Gradient"]:
-        name += "_DBias%s"%(btype.toChar())
-        name += "_BiasSrc%s"%(state["ProblemType"]["BiasSrc"])
+      name += "" if self.state["ProblemType"]["StridedBatched"] else "_GB"
+    if self.state["ProblemType"]["UseBias"]:
+      if self.state["ProblemType"]["Gradient"]:
+        name += "_DBias%s"%(self.state["ProblemType"]["BiasDataType"].toChar())
+        name += "_BiasSrc%s"%(self.state["ProblemType"]["BiasSrc"])
       else:
-        name += "_Bias%s"%btype.toChar()
+        name += "_Bias%s"%self.state["ProblemType"]["BiasDataType"].toChar()
 
-    factorDim =  0 if state["ProblemType"]["Gradient"] else state["ProblemType"]["UseBias"]
-    factorDim =  max(factorDim, state["ProblemType"]["UseScaleAlphaVec"])
+    factorDim =  0 if self.state["ProblemType"]["Gradient"] else self.state["ProblemType"]["UseBias"]
+    factorDim =  max(factorDim, self.state["ProblemType"]["UseScaleAlphaVec"])
     if factorDim > 1:
         name += "_FD%s"%("N" if factorDim == 2 else "MN")
 
-    if state["ProblemType"]["UseE"]:
-      if state["ProblemType"]["Gradient"]:
-        name += "_Grad%s"%state["ProblemType"]["DataTypeE"].toChar()
+    if self.state["ProblemType"]["UseE"]:
+      if self.state["ProblemType"]["Gradient"]:
+        name += "_Grad%s"%self.state["ProblemType"]["DataTypeE"].toChar()
       else:
-        name += "_Aux%s"%state["ProblemType"]["DataTypeE"].toChar()
+        name += "_Aux%s"%self.state["ProblemType"]["DataTypeE"].toChar()
 
-    if ((state["ProblemType"]["ActivationType"] != 'none') and state["ActivationFused"]):
-      if state["ProblemType"]["ActivationType"] == 'all':
+    if ((self.state["ProblemType"]["ActivationType"] != 'none') and self.state["ActivationFused"]):
+      if self.state["ProblemType"]["ActivationType"] == 'all':
         name += "_A"
-      elif state["ProblemType"]["ActivationType"] == 'hipblaslt_all':
+      elif self.state["ProblemType"]["ActivationType"] == 'hipblaslt_all':
         name += "_HA"
       else:
-        name += "_%s"%str(state["ProblemType"]["ActivationType"]).upper()
-      name += state["ProblemType"]["ActivationComputeDataType"].toChar()
-      name += ("ng" if state["ProblemType"]["ActivationNoGuard"] else "")
-    if state["ProblemType"]["UseScaleAB"] == "Scalar":
+        name += "_%s"%str(self.state["ProblemType"]["ActivationType"]).upper()
+      name += self.state["ProblemType"]["ActivationComputeDataType"].toChar()
+      name += ("ng" if self.state["ProblemType"]["ActivationNoGuard"] else "")
+    if self.state["ProblemType"]["UseScaleAB"] == "Scalar":
       name += "_ScaleAB"
-    elif state["ProblemType"]["UseScaleAB"] == "Vector":
+    elif self.state["ProblemType"]["UseScaleAB"] == "Vector":
       name += "_ScaleABVec"
-    name += "_ScaleCD" if state["ProblemType"]["UseScaleCD"] else ""
-    name += "_ScaleAlphaVec" if state["ProblemType"]["UseScaleAlphaVec"] else ""
-    name += "_PostGSU" + str(state["GlobalSplitU"])
-    if num_elements_load != None:
-      name += "_VW" + str(num_elements_load)
+    name += "_ScaleCD" if self.state["ProblemType"]["UseScaleCD"] else ""
+    name += "_ScaleAlphaVec" if self.state["ProblemType"]["UseScaleAlphaVec"] else ""
+    name += "_PostGSU" + str(self.state["GlobalSplitU"])
+    if self.num_elements_load != None:
+      name += "_VW" + str(self.num_elements_load)
     return name
-
-
-  def getKernelName(self):
-    btype = self.state["ProblemType"]["BiasDataType"] if self.state["ProblemType"]["UseBias"] else None
-    return KernelWriterConversion.kernelName(self, self.num_elements_load, btype)
 
 
   def getHeaderFileString(self):
@@ -1015,7 +944,7 @@ class KernelWriterConversion(KernelWriterBase):
         kStr += defineStr + self.endLine
         kStr += space + "    \"v_pk_add_f32 %0, %2, %0 \\n\\t\"" + self.endLine
         kStr += space + "    \"v_pk_add_f32 %1, %3, %1 \\n\\t\"" + self.endLine
-        kStr += space + "    : \"+v\"(accumVec), \"+v\"(accumVec2): \"v\"(%smake_float2(temp[%d].x,temp[%d].y)), \"v\"(%smake_float2(temp[%d].z,temp[%d].w))"% (castToIntermidate, gsuIdx, gsuIdx, castToIntermidate, gsuIdx, gsuIdx) + self.endLine
+        kStr += space + "    : \"+v\"(accumVec), \"+v\"(accumVec2): \"v\"(%stemp[%d].data.xy), \"v\"(%stemp[%d].data.zw)"% (castToIntermidate, gsuIdx, castToIntermidate, gsuIdx) + self.endLine
         kStr += "#else" + self.endLine
         kStr += space + "    \"v_add_f32 %0, %4, %0 \\n\\t\"" + self.endLine
         kStr += space + "    \"v_add_f32 %1, %5, %1 \\n\\t\"" + self.endLine

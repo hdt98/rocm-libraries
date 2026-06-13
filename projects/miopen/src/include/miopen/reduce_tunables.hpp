@@ -1,6 +1,3 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
-
 #ifndef REDUCE_TUNABLES_HPP
 #define REDUCE_TUNABLES_HPP
 

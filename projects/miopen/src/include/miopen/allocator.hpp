@@ -1,6 +1,3 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
-
 #ifndef GUARD_MLOPEN_ALLOCATOR_HPP
 #define GUARD_MLOPEN_ALLOCATOR_HPP
 

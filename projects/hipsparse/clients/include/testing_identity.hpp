@@ -40,8 +40,7 @@
 using namespace hipsparse;
 using namespace hipsparse_test;
 
-template <typename T>
-void testing_identity_bad_arg(const Arguments& argus)
+void testing_identity_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION))
     int n         = 100;
@@ -60,8 +59,7 @@ void testing_identity_bad_arg(const Arguments& argus)
 #endif
 }
 
-template <typename T>
-void testing_identity(Arguments argus)
+hipsparseStatus_t testing_identity(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 13000)
     int n = argus.N;
@@ -127,6 +125,8 @@ void testing_identity(Arguments argus)
                             get_gpu_time_msec(gpu_time_used));
     }
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_IDENTITY_HPP

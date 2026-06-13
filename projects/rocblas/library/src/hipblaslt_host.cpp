@@ -53,6 +53,12 @@ namespace
     constexpr auto hipblaslt_datatype<int32_t> = HIP_R_32I;
 
     template <>
+    constexpr auto hipblaslt_datatype<rocblas_f8> = HIP_R_8F_E4M3_FNUZ;
+
+    template <>
+    constexpr auto hipblaslt_datatype<rocblas_bf8> = HIP_R_8F_E5M2_FNUZ;
+
+    template <>
     constexpr auto hipblaslt_datatype<rocblas_half> = HIP_R_16F;
 
     template <>
@@ -88,6 +94,24 @@ namespace
     template <>
     constexpr auto hipblaslt_compute_type<double> = HIPBLAS_COMPUTE_64F;
 
+    template <typename T>
+    auto convertScalarForHipblasLT(T num)
+    {
+        return static_cast<int8_t>(num);
+    }
+
+    template <>
+    auto convertScalarForHipblasLT(rocblas_float_complex num)
+    {
+        return static_cast<int8_t>(std::real(num));
+    }
+
+    template <>
+    auto convertScalarForHipblasLT(rocblas_double_complex num)
+    {
+        return static_cast<int8_t>(std::real(num));
+    }
+
     /**************************************************************************
     * We normally print error messages only once, to avoid excessive logging *
     **************************************************************************/
@@ -106,37 +130,42 @@ namespace
     /****************************************************************
      * Construct a HipBlasLT GEMM from a RocblasContractionProblem *
      ****************************************************************/
-    template <typename Ti, typename To, typename Tc>
-    auto ConstructHipBlasLTGemm(const RocblasContractionProblem<Ti, To, Tc>& prob)
+    template <typename TiA,
+              typename To,
+              typename Tc,
+              typename TiB = TiA,
+              typename TcA = TiA,
+              typename TcB = TiA>
+    auto ConstructHipBlasLTGemm(const RocblasContractionProblem<TiA, To, Tc, TiB, TcA, TcB>& prob)
     {
         hipblasLtHandle_t& handle = *(prob.handle->getHipblasLtHandle());
 
         hipblaslt_ext::Gemm gemm(handle,
                                  (hipblasOperation_t)prob.trans_a,
                                  (hipblasOperation_t)prob.trans_b,
-                                 hipblaslt_datatype<Ti>,
-                                 hipblaslt_datatype<Ti>,
+                                 hipblaslt_datatype<TiA>,
+                                 hipblaslt_datatype<TiB>,
                                  hipblaslt_datatype<To>,
                                  hipblaslt_datatype<To>,
                                  hipblaslt_compute_type<Tc>);
 
         hipblaslt_ext::GemmProblemType problemType;
-        problemType.setOpA((hipblasOperation_t)prob.trans_a);
-        problemType.setOpB((hipblasOperation_t)prob.trans_b);
-        problemType.setTypeA(hipblaslt_datatype<Ti>);
-        problemType.setTypeB(hipblaslt_datatype<Ti>);
-        problemType.setTypeC(hipblaslt_datatype<To>);
-        problemType.setTypeD(hipblaslt_datatype<To>);
-        problemType.setTypeCompute(hipblaslt_compute_type<Tc>);
+        problemType.op_a         = (hipblasOperation_t)prob.trans_a;
+        problemType.op_b         = (hipblasOperation_t)prob.trans_b;
+        problemType.type_a       = hipblaslt_datatype<TiA>;
+        problemType.type_b       = hipblaslt_datatype<TiB>;
+        problemType.type_c       = hipblaslt_datatype<To>;
+        problemType.type_d       = hipblaslt_datatype<To>;
+        problemType.type_compute = hipblaslt_compute_type<Tc>;
 
         hipblaslt_ext::GemmEpilogue epilogue;
         hipblaslt_ext::GemmInputs   inputs;
-        inputs.setA((void*)(prob.A + prob.buffer_offset_a));
-        inputs.setB((void*)(prob.B + prob.buffer_offset_b));
-        inputs.setC((void*)(prob.C + prob.buffer_offset_c));
-        inputs.setD((void*)(prob.D + prob.buffer_offset_d));
-        inputs.setAlpha((void*)prob.alpha);
-        inputs.setBeta((void*)prob.beta);
+        inputs.a     = (void*)(prob.A + prob.buffer_offset_a);
+        inputs.b     = (void*)(prob.B + prob.buffer_offset_b);
+        inputs.c     = (void*)(prob.C + prob.buffer_offset_c);
+        inputs.d     = (void*)(prob.D + prob.buffer_offset_d);
+        inputs.alpha = (void*)prob.alpha;
+        inputs.beta  = (void*)prob.beta;
 
         gemm.setProblem(prob.m,
                         prob.n,
@@ -159,125 +188,87 @@ namespace
     /****************************************************************
      * Construct a HipBlasLT Groupped GEMM from a RocblasContractionProblem *
      ****************************************************************/
-    template <typename Ti, typename To, typename Tc>
-    auto ConstructHipBlasLTGroupedGemm(const RocblasContractionProblem<Ti, To, Tc>& prob)
+    template <typename TiA,
+              typename To,
+              typename Tc,
+              typename TiB = TiA,
+              typename TcA = TiA,
+              typename TcB = TiA>
+    auto ConstructHipBlasLTGroupedGemm(
+        const RocblasContractionProblem<TiA, To, Tc, TiB, TcA, TcB>& prob)
     {
         hipblasLtHandle_t& handle = *(prob.handle->getHipblasLtHandle());
 
         hipblaslt_ext::GroupedGemm gemm(handle,
                                         (hipblasOperation_t)prob.trans_a,
                                         (hipblasOperation_t)prob.trans_b,
-                                        hipblaslt_datatype<Ti>,
-                                        hipblaslt_datatype<Ti>,
+                                        hipblaslt_datatype<TiA>,
+                                        hipblaslt_datatype<TiB>,
                                         hipblaslt_datatype<To>,
                                         hipblaslt_datatype<To>,
                                         hipblaslt_compute_type<Tc>);
 
-        try
+        hipblaslt_ext::GemmProblemType problemType;
+        problemType.op_a         = (hipblasOperation_t)prob.trans_a;
+        problemType.op_b         = (hipblasOperation_t)prob.trans_b;
+        problemType.type_a       = hipblaslt_datatype<TiA>;
+        problemType.type_b       = hipblaslt_datatype<TiB>;
+        problemType.type_c       = hipblaslt_datatype<To>;
+        problemType.type_d       = hipblaslt_datatype<To>;
+        problemType.type_compute = hipblaslt_compute_type<Tc>;
+
+        std::vector<int64_t>                     Ms(prob.batch_count);
+        std::vector<int64_t>                     Ns(prob.batch_count);
+        std::vector<int64_t>                     Ks(prob.batch_count);
+        std::vector<int64_t>                     ldas(prob.batch_count);
+        std::vector<int64_t>                     ldbs(prob.batch_count);
+        std::vector<int64_t>                     ldcs(prob.batch_count);
+        std::vector<int64_t>                     ldds(prob.batch_count);
+        std::vector<int64_t>                     strideas(prob.batch_count);
+        std::vector<int64_t>                     stridebs(prob.batch_count);
+        std::vector<int64_t>                     stridecs(prob.batch_count);
+        std::vector<int64_t>                     strideds(prob.batch_count);
+        std::vector<int64_t>                     batch_counts(prob.batch_count);
+        std::vector<hipblaslt_ext::GemmEpilogue> epilogues(prob.batch_count);
+        std::vector<hipblaslt_ext::GemmInputs>   inputs(prob.batch_count);
+
+        for(int batch = 0; batch < prob.batch_count; batch++)
         {
-            hipblaslt_ext::GemmProblemType problemType;
-            problemType.setOpA((hipblasOperation_t)prob.trans_a);
-            problemType.setOpB((hipblasOperation_t)prob.trans_b);
-            problemType.setTypeA(hipblaslt_datatype<Ti>);
-            problemType.setTypeB(hipblaslt_datatype<Ti>);
-            problemType.setTypeC(hipblaslt_datatype<To>);
-            problemType.setTypeD(hipblaslt_datatype<To>);
-            problemType.setTypeCompute(hipblaslt_compute_type<Tc>);
-
-            std::vector<int64_t>                     Ms(prob.batch_count);
-            std::vector<int64_t>                     Ns(prob.batch_count);
-            std::vector<int64_t>                     Ks(prob.batch_count);
-            std::vector<int64_t>                     ldas(prob.batch_count);
-            std::vector<int64_t>                     ldbs(prob.batch_count);
-            std::vector<int64_t>                     ldcs(prob.batch_count);
-            std::vector<int64_t>                     ldds(prob.batch_count);
-            std::vector<int64_t>                     strideas(prob.batch_count);
-            std::vector<int64_t>                     stridebs(prob.batch_count);
-            std::vector<int64_t>                     stridecs(prob.batch_count);
-            std::vector<int64_t>                     strideds(prob.batch_count);
-            std::vector<int64_t>                     batch_counts(prob.batch_count);
-            std::vector<hipblaslt_ext::GemmEpilogue> epilogues(prob.batch_count);
-            std::vector<hipblaslt_ext::GemmInputs>   inputs(prob.batch_count);
-
-            int batch_count = prob.batch_count;
-
-            std::vector<Ti const*> A(batch_count, nullptr);
-            std::vector<Ti const*> B(batch_count, nullptr);
-            std::vector<To*>       C(batch_count, nullptr);
-            std::vector<To*>       D(batch_count, nullptr);
-            if(prob.batch_A)
-            {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&A[0]),
-                                             prob.batch_A,
-                                             sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
-            }
-            if(prob.batch_B)
-            {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&B[0]),
-                                             prob.batch_B,
-                                             sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
-            }
-            if(prob.batch_C)
-            {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&C[0]),
-                                             prob.batch_C,
-                                             sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
-            }
-            if(prob.batch_D)
-            {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&D[0]),
-                                             prob.batch_D,
-                                             sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
-            }
-
-            for(int batch = 0; batch < batch_count; batch++)
-            {
-                Ms[batch]           = prob.m;
-                Ns[batch]           = prob.n;
-                Ks[batch]           = prob.k;
-                ldas[batch]         = prob.col_stride_a;
-                ldbs[batch]         = prob.col_stride_b;
-                ldcs[batch]         = prob.col_stride_c;
-                ldds[batch]         = prob.col_stride_d;
-                strideas[batch]     = prob.batch_stride_a;
-                stridebs[batch]     = prob.batch_stride_b;
-                stridecs[batch]     = prob.batch_stride_c;
-                strideds[batch]     = prob.batch_stride_d;
-                batch_counts[batch] = 1;
-                inputs[batch].setA((void*)(A[batch] + prob.buffer_offset_a));
-                inputs[batch].setB((void*)(B[batch] + prob.buffer_offset_b));
-                inputs[batch].setC((void*)(C[batch] + prob.buffer_offset_c));
-                inputs[batch].setD((void*)(D[batch] + prob.buffer_offset_d));
-                inputs[batch].setAlpha((void*)prob.alpha);
-                inputs[batch].setBeta((void*)prob.beta);
-            }
-
-            gemm.setProblem(Ms,
-                            Ns,
-                            Ks,
-                            batch_counts,
-                            ldas,
-                            ldbs,
-                            ldcs,
-                            ldds,
-                            strideas,
-                            stridebs,
-                            stridecs,
-                            strideds,
-                            epilogues,
-                            inputs,
-                            problemType);
+            Ms[batch]           = prob.m;
+            Ns[batch]           = prob.n;
+            Ks[batch]           = prob.k;
+            ldas[batch]         = prob.col_stride_a;
+            ldbs[batch]         = prob.col_stride_b;
+            ldcs[batch]         = prob.col_stride_c;
+            ldds[batch]         = prob.col_stride_d;
+            strideas[batch]     = prob.batch_stride_a;
+            stridebs[batch]     = prob.batch_stride_b;
+            stridecs[batch]     = prob.batch_stride_c;
+            strideds[batch]     = prob.batch_stride_d;
+            batch_counts[batch] = 1;
+            inputs[batch].a     = (void*)(prob.batch_A[batch] + prob.buffer_offset_a);
+            inputs[batch].b     = (void*)(prob.batch_B[batch] + prob.buffer_offset_b);
+            inputs[batch].c     = (void*)(prob.batch_C[batch] + prob.buffer_offset_c);
+            inputs[batch].d     = (void*)(prob.batch_D[batch] + prob.buffer_offset_d);
+            inputs[batch].alpha = (void*)prob.alpha;
+            inputs[batch].beta  = (void*)prob.beta;
         }
-        catch(...)
-        {
-            rocblas_internal_ostream msg;
-            print_if_verbose(
-                msg << "rocBLAS warning: hipBlasLT grouped gemm construction exception");
-        }
+
+        gemm.setProblem(Ms,
+                        Ns,
+                        Ks,
+                        batch_counts,
+                        ldas,
+                        ldbs,
+                        ldcs,
+                        ldds,
+                        strideas,
+                        stridebs,
+                        stridecs,
+                        strideds,
+                        epilogues,
+                        inputs,
+                        problemType);
         return gemm;
     }
 
@@ -304,8 +295,8 @@ namespace
         if(algo == rocblas_gemm_algo_solution_index && solution_index > 0)
         {
             hipblasLtHandle_t& handle = *(probHandle->getHipblasLtHandle());
-            // indx - 1 maps to zero based hipblasLt indices
-            std::vector<int> solution_index_vec(1, solution_index - 1);
+            std::vector<int>   solution_index_vec(1,
+                                                solution_index - 1); // -1 maps to hipblasLt indices
             if(hipblaslt_ext::getAlgosFromIndex(handle, solution_index_vec, heuristicResults)
                != HIPBLAS_STATUS_SUCCESS)
             {
@@ -341,8 +332,7 @@ namespace
                 if(!solution_query)
                 {
                     rocblas_internal_ostream msg;
-                    print_if_verbose(msg
-                                     << "rocBLAS error: hipBLASLt default heuristic fetch failed!");
+                    print_if_verbose(msg << "rocBLAS error: hipBLASLt heuristic fetch failed!");
                     return rocblas_status_internal_error;
                 }
                 else
@@ -354,7 +344,7 @@ namespace
                 if(!solution_query)
                 {
                     rocblas_internal_ostream msg;
-                    print_if_verbose(msg << "rocBLAS warning: No hipBLASLt default solution found");
+                    print_if_verbose(msg << "rocBLAS warning: No hipBLASLt solution found");
                     return rocblas_status_not_implemented;
                 }
                 else
@@ -408,22 +398,22 @@ namespace
         else
             return rocblas_status_success;
     }
-
 } // namespace
 
 /******************************************************************************
  * runContractionProblemHipBlasLT calls Hipblaslt to run a contraction problem described *
  * by RocblasContractionProblem                                               *
  ******************************************************************************/
-template <typename Ti, typename To, typename Tc>
-rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<Ti, To, Tc>& prob,
-                                              rocblas_gemm_algo                            algo,
-                                              int32_t solution_index)
+template <typename TiA, typename To, typename Tc, typename TiB, typename TcA, typename TcB>
+rocblas_status runContractionProblemHipBlasLT(
+    const RocblasContractionProblem<TiA, To, Tc, TiB, TcA, TcB>& prob,
+    rocblas_gemm_algo                                            algo,
+    int32_t                                                      solution_index)
 {
     bool solution_query = algo == rocblas_gemm_algo_solution_index
                           && prob.flags & rocblas_gemm_flags_check_solution_index;
 
-    if(prob.strided_batch)
+    if(prob.batch_A == 0)
     {
         auto gemm = ConstructHipBlasLTGemm(prob);
 
@@ -508,16 +498,41 @@ rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<Ti
             return rocblas_status_internal_error;
         }
 
+        auto h_alpha = *(prob.alpha);
+        auto h_beta  = *(prob.beta);
+
         hipblaslt_ext::UserArguments* userArgs;
-        RETURN_IF_HIP_ERROR(hipHostMalloc(&userArgs, userArgsSize));
+        hipHostMalloc(&userArgs, userArgsSize);
         gemm.getDefaultValueForDeviceUserArguments(userArgs);
+        for(int batch = 0; batch < prob.batch_count; batch++)
+        {
+            userArgs[batch].m        = prob.m;
+            userArgs[batch].n        = prob.n;
+            userArgs[batch].k        = prob.k;
+            userArgs[batch].strideA1 = prob.col_stride_a;
+            userArgs[batch].strideB1 = prob.col_stride_b;
+            userArgs[batch].strideC1 = prob.col_stride_c;
+            userArgs[batch].strideD1 = prob.col_stride_d;
+            userArgs[batch].strideA2 = prob.batch_stride_a;
+            userArgs[batch].strideB2 = prob.batch_stride_b;
+            userArgs[batch].strideC2 = prob.batch_stride_c;
+            userArgs[batch].strideD2 = prob.batch_stride_d;
+            userArgs[batch].batch    = 1;
+            userArgs[batch].a        = (void*)(prob.batch_A[batch] + prob.buffer_offset_a);
+            userArgs[batch].b        = (void*)(prob.batch_B[batch] + prob.buffer_offset_b);
+            userArgs[batch].c        = (void*)(prob.batch_C[batch] + prob.buffer_offset_c);
+            userArgs[batch].d        = (void*)(prob.batch_D[batch] + prob.buffer_offset_d);
+
+            userArgs[batch].alpha[0] = convertScalarForHipblasLT(h_alpha);
+            userArgs[batch].beta[0]  = convertScalarForHipblasLT(h_beta);
+        }
 
         // Copy them to device memory
         hipblaslt_ext::UserArguments* d_userArgs
             = (hipblaslt_ext::UserArguments*)((char*)(prob.handle->gsu_workspace)
                                               + (workspace_size - userArgsSize));
-        RETURN_IF_HIP_ERROR(hipMemcpy(d_userArgs, userArgs, userArgsSize, hipMemcpyHostToDevice));
-        RETURN_IF_HIP_ERROR(hipHostFree(userArgs));
+        hipMemcpy(d_userArgs, userArgs, userArgsSize, hipMemcpyHostToDevice);
+        hipFree(userArgs);
 
         if(gemm.run(d_userArgs, prob.handle->get_stream()) != HIPBLAS_STATUS_SUCCESS)
         {
@@ -529,16 +544,24 @@ rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<Ti
     return rocblas_status_success;
 }
 
-template <typename Ti, typename To, typename Tc>
-rocblas_status getAllSolutionsHipBlasLT(const RocblasContractionProblem<Ti, To, Tc>& prob,
-                                        rocblas_tensile_get_solution_option          option,
-                                        rocblas_int*                                 list_array,
-                                        rocblas_int*                                 list_size)
+template <typename TiA, typename To, typename Tc, typename TiB, typename TcA, typename TcB>
+rocblas_status
+    getAllSolutionsHipBlasLT(const RocblasContractionProblem<TiA, To, Tc, TiB, TcA, TcB>& prob,
+                             rocblas_tensile_get_solution_option                          option,
+                             rocblas_int* list_array,
+                             rocblas_int* list_size)
 {
 
-    constexpr bool is_complex = rocblas_is_complex<Ti> || rocblas_is_complex<Tc>;
+    if(list_size == nullptr)
+    {
+        return rocblas_status_invalid_pointer;
+    }
+
+    hipblasLtHandle_t& handle     = *(prob.handle->getHipblasLtHandle());
+    rocblas_int        added_sols = 0;
+
+    constexpr bool is_complex = rocblas_is_complex<TiA> || rocblas_is_complex<Tc>;
     rocblas_status status     = rocblas_status_success;
-    int            added_sols = 0;
 
     if(is_complex)
     {
@@ -548,151 +571,116 @@ rocblas_status getAllSolutionsHipBlasLT(const RocblasContractionProblem<Ti, To, 
             *list_size = 0;
         }
     }
-    else
+    else if(option == MATCHES_TYPE)
     {
-        hipblasLtHandle_t& handle = *(prob.handle->getHipblasLtHandle());
+        std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults;
+        std::vector<hipblasOperation_t> ops = {HIPBLAS_OP_N, HIPBLAS_OP_T, HIPBLAS_OP_C};
 
-        auto map_hipblaslt_to_rocblas_index = [](auto h) {
-            // -1 getIndexFromAlgo if index is less than zero
-            rocblas_int idx = hipblaslt_ext::getIndexFromAlgo(h.algo);
-            if(idx < 0)
-                return c_rocblas_bad_solution_index; // flag with bad index
-            return idx + 1; // convert to one based index
-        };
-
-        if(option == MATCHES_TYPE)
+        for(auto op1 : ops)
         {
-            std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults;
-            std::vector<hipblasOperation_t> ops = {HIPBLAS_OP_N, HIPBLAS_OP_T, HIPBLAS_OP_C};
-            hipblaslt_ext::GemmType         gemmType
-                = prob.strided_batch ? hipblaslt_ext::GemmType::HIPBLASLT_GEMM
-                                     : hipblaslt_ext::GemmType::HIPBLASLT_GROUPED_GEMM;
-            for(auto op1 : ops)
+            for(auto op2 : ops)
             {
-                for(auto op2 : ops)
-                {
-                    std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults_temp;
-                    auto fetch = hipblaslt_ext::getAllAlgos(handle,
-                                                            gemmType,
-                                                            op1,
-                                                            op2,
-                                                            hipblaslt_datatype<Ti>,
-                                                            hipblaslt_datatype<Ti>,
-                                                            hipblaslt_datatype<To>,
-                                                            hipblaslt_datatype<To>,
-                                                            hipblaslt_compute_type<Tc>,
-                                                            heuristicResults_temp);
+                std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults_temp;
+                auto fetch = hipblaslt_ext::getAllAlgos(handle,
+                                                        hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
+                                                        op1,
+                                                        op2,
+                                                        hipblaslt_datatype<TiA>,
+                                                        hipblaslt_datatype<TiB>,
+                                                        hipblaslt_datatype<To>,
+                                                        hipblaslt_datatype<To>,
+                                                        hipblaslt_compute_type<Tc>,
+                                                        heuristicResults_temp);
 
-                    heuristicResults.insert(heuristicResults.end(),
-                                            heuristicResults_temp.begin(),
-                                            heuristicResults_temp.end());
-                }
-            }
-
-            // Convert to indexes and remove duplicates.
-            std::vector<rocblas_int> heuristicIndexes(heuristicResults.size());
-            std::transform(heuristicResults.begin(),
-                           heuristicResults.end(),
-                           heuristicIndexes.begin(),
-                           map_hipblaslt_to_rocblas_index);
-            std::sort(heuristicIndexes.begin(), heuristicIndexes.end());
-            auto itr = std::unique(heuristicIndexes.begin(), heuristicIndexes.end());
-            heuristicIndexes.resize(std::distance(heuristicIndexes.begin(), itr));
-            if(!heuristicIndexes.empty() && heuristicIndexes.back() == c_rocblas_bad_solution_index)
-            {
-                heuristicIndexes.pop_back();
-            }
-
-            if(list_array == nullptr)
-            {
-                *list_size = heuristicIndexes.size();
-            }
-            else
-            {
-                auto it = heuristicIndexes.begin();
-                while(added_sols < *list_size && it != heuristicIndexes.end())
-                {
-                    list_array[added_sols++] = *it;
-                    ++it;
-                }
-                int i = added_sols;
-                while(i < *list_size)
-                {
-                    list_array[i++] = c_rocblas_default_solution;
-                }
+                heuristicResults.insert(heuristicResults.end(),
+                                        heuristicResults_temp.begin(),
+                                        heuristicResults_temp.end());
             }
         }
-        else if(option == CAN_SOLVE)
+
+        // Convert to indexes and remove duplicates.
+        std::vector<rocblas_int> heuristicIndexes(heuristicResults.size());
+        std::transform(heuristicResults.begin(),
+                       heuristicResults.end(),
+                       heuristicIndexes.begin(),
+                       [](auto x) { return hipblaslt_ext::getIndexFromAlgo(x.algo) + 1; });
+        std::sort(heuristicIndexes.begin(), heuristicIndexes.end());
+        auto itr = std::unique(heuristicIndexes.begin(), heuristicIndexes.end());
+        heuristicIndexes.resize(std::distance(heuristicIndexes.begin(), itr));
+
+        if(list_array == nullptr)
         {
-            hipblaslt_ext::GemmType gemmType
-                = prob.strided_batch ? hipblaslt_ext::GemmType::HIPBLASLT_GEMM
-                                     : hipblaslt_ext::GemmType::HIPBLASLT_GROUPED_GEMM;
-            std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults;
-            auto                                          fetch = hipblaslt_ext::getAllAlgos(handle,
-                                                    gemmType,
-                                                    (hipblasOperation_t)prob.trans_a,
-                                                    (hipblasOperation_t)prob.trans_b,
-                                                    hipblaslt_datatype<Ti>,
-                                                    hipblaslt_datatype<Ti>,
-                                                    hipblaslt_datatype<To>,
-                                                    hipblaslt_datatype<To>,
-                                                    hipblaslt_compute_type<Tc>,
-                                                    heuristicResults);
-
-            std::shared_ptr<hipblaslt_ext::GemmInstance> gemm;
-
-            if(prob.strided_batch)
-            {
-                gemm = std::make_shared<hipblaslt_ext::GemmInstance>(ConstructHipBlasLTGemm(prob));
-            }
-            else
-            {
-                gemm = std::make_shared<hipblaslt_ext::GemmInstance>(
-                    ConstructHipBlasLTGroupedGemm(prob));
-            }
-
-            size_t retSize   = heuristicResults.size();
-            size_t iter_size = list_array == nullptr ? retSize : *list_size;
-
-            auto   it = heuristicResults.begin();
-            size_t tmpWorkspaceSize;
-            while(added_sols < iter_size && it != heuristicResults.end())
-            {
-                if(gemm->isAlgoSupported(it->algo, tmpWorkspaceSize) == HIPBLAS_STATUS_SUCCESS)
-                {
-                    if(list_array != nullptr)
-                    {
-                        int solution_index = map_hipblaslt_to_rocblas_index(*it);
-                        if(solution_index != c_rocblas_bad_solution_index)
-                            list_array[added_sols++] = solution_index;
-                        else
-                            --retSize;
-                    }
-                }
-                else
-                {
-                    --retSize;
-                }
-                ++it;
-            }
-
-            if(list_array == nullptr)
-            {
-                *list_size = retSize;
-            }
-            else
-            {
-                int i = added_sols;
-                while(i < *list_size)
-                {
-                    list_array[i++] = c_rocblas_default_solution;
-                }
-            }
+            *list_size = heuristicIndexes.size();
         }
         else
         {
-            return rocblas_status_invalid_value;
+            auto it = heuristicIndexes.begin();
+            while(added_sols < *list_size && it != heuristicIndexes.end())
+            {
+                list_array[added_sols] = *it;
+                ++added_sols;
+                ++it;
+            }
         }
+
+        return rocblas_status_success;
+    }
+    else if(option == CAN_SOLVE)
+    {
+        std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults;
+        auto                                          fetch = hipblaslt_ext::getAllAlgos(handle,
+                                                hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
+                                                (hipblasOperation_t)prob.trans_a,
+                                                (hipblasOperation_t)prob.trans_b,
+                                                hipblaslt_datatype<TiA>,
+                                                hipblaslt_datatype<TiB>,
+                                                hipblaslt_datatype<To>,
+                                                hipblaslt_datatype<To>,
+                                                hipblaslt_compute_type<Tc>,
+                                                heuristicResults);
+
+        std::shared_ptr<hipblaslt_ext::GemmInstance> gemm;
+
+        if(prob.batch_A == 0)
+        {
+            gemm = std::make_shared<hipblaslt_ext::GemmInstance>(ConstructHipBlasLTGemm(prob));
+        }
+        else
+        {
+            gemm = std::make_shared<hipblaslt_ext::GemmInstance>(
+                ConstructHipBlasLTGroupedGemm(prob));
+        }
+
+        size_t retSize   = heuristicResults.size();
+        size_t iter_size = list_array == nullptr ? retSize : *list_size;
+
+        auto   it = heuristicResults.begin();
+        size_t tmpWorkspaceSize;
+        while(added_sols < iter_size && it != heuristicResults.end())
+        {
+            if(gemm->isAlgoSupported(it->algo, tmpWorkspaceSize) == HIPBLAS_STATUS_SUCCESS)
+            {
+                if(list_array != nullptr)
+                {
+                    list_array[added_sols] = hipblaslt_ext::getIndexFromAlgo(it->algo) + 1;
+                    ++added_sols;
+                }
+            }
+            else
+            {
+                --retSize;
+            }
+            ++it;
+        }
+
+        if(list_array == nullptr)
+        {
+            *list_size = retSize;
+        }
+    }
+    else
+    {
+        return rocblas_status_invalid_value;
     }
 
     // inject rocblas source-code gemv if applicable
@@ -732,6 +720,116 @@ template rocblas_status
     runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_double_complex>&,
                                    rocblas_gemm_algo algo,
                                    int32_t           solution_index);
+
+// EX types
+
+// f8 case0: Ti=f8 Tc=To=f32
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_f8, float, float>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(
+    const RocblasContractionProblem<rocblas_f8, rocblas_half, float>&,
+    rocblas_gemm_algo algo,
+    int32_t           solution_index);
+
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_f8, rocblas_f8, float>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_bf8, float, float>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(
+    const RocblasContractionProblem<rocblas_bf8, rocblas_half, float>&,
+    rocblas_gemm_algo algo,
+    int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(
+    const RocblasContractionProblem<rocblas_bf8, rocblas_bf8, float>&,
+    rocblas_gemm_algo algo,
+    int32_t           solution_index);
+
+//hybrid // Change of f8 parameter convention in order to support existing usage
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_f8,
+                                                                   float,
+                                                                   float,
+                                                                   rocblas_bf8,
+                                                                   rocblas_f8,
+                                                                   rocblas_bf8>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_f8,
+                                                                   rocblas_half,
+                                                                   float,
+                                                                   rocblas_bf8,
+                                                                   rocblas_f8,
+                                                                   rocblas_bf8>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_bf8,
+                                                                                       float,
+                                                                                       float,
+                                                                                       rocblas_f8,
+                                                                                       rocblas_bf8,
+                                                                                       rocblas_f8>&,
+                                                       rocblas_gemm_algo algo,
+                                                       int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_bf8,
+                                                                                       rocblas_half,
+                                                                                       float,
+                                                                                       rocblas_f8,
+                                                                                       rocblas_bf8,
+                                                                                       rocblas_f8>&,
+                                                       rocblas_gemm_algo algo,
+                                                       int32_t           solution_index);
+
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_f8,
+                                                                   rocblas_f8,
+                                                                   float,
+                                                                   rocblas_bf8,
+                                                                   rocblas_f8,
+                                                                   rocblas_bf8>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status
+    runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_f8,
+                                                                   rocblas_bf8,
+                                                                   float,
+                                                                   rocblas_bf8,
+                                                                   rocblas_f8,
+                                                                   rocblas_bf8>&,
+                                   rocblas_gemm_algo algo,
+                                   int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_bf8,
+                                                                                       rocblas_f8,
+                                                                                       float,
+                                                                                       rocblas_f8,
+                                                                                       rocblas_bf8,
+                                                                                       rocblas_f8>&,
+                                                       rocblas_gemm_algo algo,
+                                                       int32_t           solution_index);
+
+template rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<rocblas_bf8,
+                                                                                       rocblas_bf8,
+                                                                                       float,
+                                                                                       rocblas_f8,
+                                                                                       rocblas_bf8,
+                                                                                       rocblas_f8>&,
+                                                       rocblas_gemm_algo algo,
+                                                       int32_t           solution_index);
 
 // HPA types
 template rocblas_status runContractionProblemHipBlasLT(

@@ -43,8 +43,6 @@
 
 #include "rocrand/rocrand_common.h"
 
-#include <hip/hip_runtime.h>
-
 namespace rocrand_device {
 namespace detail {
 

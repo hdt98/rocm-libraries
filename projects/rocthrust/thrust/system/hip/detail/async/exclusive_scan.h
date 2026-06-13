@@ -30,32 +30,26 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/cpp_version_check.h>
+#if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP
 
-#if THRUST_CPP_DIALECT >= 2017
+#include <thrust/iterator/iterator_traits.h>
 
-#  if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP
+#include <thrust/system/hip/config.h>
+#include <thrust/system/hip/detail/async/customization.h>
+#include <thrust/system/hip/detail/util.h>
+#include <thrust/system/hip/future.h>
 
-#    include <thrust/system/hip/config.h>
+#include <thrust/type_traits/remove_cvref.h>
 
-#    include <thrust/distance.h>
-#    include <thrust/iterator/iterator_traits.h>
-#    include <thrust/system/hip/detail/async/customization.h>
-#    include <thrust/system/hip/detail/util.h>
-#    include <thrust/system/hip/future.h>
+#include <thrust/distance.h>
 
-#    include <type_traits>
+#include <type_traits>
 
 // TODO specialize for thrust::plus to use e.g. ExclusiveSum instead of ExcScan
+//  - Note that thrust::plus<> is transparent, cub::Sum is not. This should be
+//    fixed in CUB first).
+//  - Need to check if CUB actually optimizes for sums before putting in effort
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
 THRUST_NAMESPACE_BEGIN
 namespace system
 {
@@ -70,8 +64,13 @@ template <typename DerivedPolicy,
           typename OutputIt,
           typename InitialValueType,
           typename BinaryOp>
-unique_eager_event async_exclusive_scan_n(
-  execution_policy<DerivedPolicy>& policy, ForwardIt first, Size n, OutputIt out, InitialValueType init, BinaryOp op)
+unique_eager_event
+async_exclusive_scan_n(execution_policy<DerivedPolicy>& policy,
+                       ForwardIt first,
+                       Size n,
+                       OutputIt out,
+                       InitialValueType init,
+                       BinaryOp op)
 {
   auto const device_alloc = get_async_device_allocator(policy);
   unique_eager_event ev;
@@ -79,15 +78,25 @@ unique_eager_event async_exclusive_scan_n(
   // Determine temporary device storage requirements.
   size_t tmp_size = 0;
   {
-    thrust::hip_rocprim::throw_on_error(
-      thrust::hip_rocprim::__scan::invoke_exclusive_scan(
-        policy, nullptr, tmp_size, first, out, init, n, op, nullptr, THRUST_HIP_DEBUG_SYNC_FLAG),
-      "after determining tmp storage "
-      "requirements for exclusive_scan");
+      thrust::hip_rocprim::throw_on_error(
+          thrust::hip_rocprim::__scan::invoke_exclusive_scan(policy,
+                                                             nullptr,
+                                                             tmp_size,
+                                                             first,
+                                                             out,
+                                                             init,
+                                                             n,
+                                                             op,
+                                                             nullptr,
+                                                             THRUST_HIP_DEBUG_SYNC_FLAG),
+          "after determining tmp storage "
+          "requirements for exclusive_scan");
   }
 
   // Allocate temporary storage.
-  auto content        = uninitialized_allocate_unique_n<std::uint8_t>(device_alloc, tmp_size);
+  auto content = uninitialized_allocate_unique_n<std::uint8_t>(
+    device_alloc, tmp_size
+  );
   void* const tmp_ptr = raw_pointer_cast(content.get());
 
   // Set up stream with dependencies.
@@ -96,29 +105,41 @@ unique_eager_event async_exclusive_scan_n(
   if (thrust::hip_rocprim::default_stream() != user_raw_stream)
   {
     ev = make_dependent_event(
-      std::tuple_cat(std::make_tuple(std::move(content), unique_stream(nonowning, user_raw_stream)),
-                     extract_dependencies(std::move(thrust::detail::derived_cast(policy)))));
+      std::tuple_cat(
+        std::make_tuple(
+          std::move(content),
+          unique_stream(nonowning, user_raw_stream)
+        ),
+        extract_dependencies(std::move(thrust::detail::derived_cast(policy)))));
   }
   else
   {
-    ev = make_dependent_event(std::tuple_cat(
-      std::make_tuple(std::move(content)), extract_dependencies(std::move(thrust::detail::derived_cast(policy)))));
+    ev = make_dependent_event(
+      std::tuple_cat(
+        std::make_tuple(std::move(content)),
+        extract_dependencies(std::move(thrust::detail::derived_cast(policy)))));
   }
 
   // Run scan.
   {
-    thrust::hip_rocprim::throw_on_error(
-      thrust::hip_rocprim::__scan::invoke_exclusive_scan(
-        policy, tmp_ptr, tmp_size, first, out, init, n, op, user_raw_stream, THRUST_HIP_DEBUG_SYNC_FLAG),
-      "after dispatching exclusive_scan kernel");
+      thrust::hip_rocprim::throw_on_error(
+          thrust::hip_rocprim::__scan::invoke_exclusive_scan(policy,
+                                                             tmp_ptr,
+                                                             tmp_size,
+                                                             first,
+                                                             out,
+                                                             init,
+                                                             n,
+                                                             op,
+                                                             user_raw_stream,
+                                                             THRUST_HIP_DEBUG_SYNC_FLAG),
+          "after dispatching exclusive_scan kernel");
   }
 
   return ev;
 }
 
-} // namespace detail
-} // namespace hip
-} // namespace system
+}}} // namespace system::hip::detail
 
 namespace hip_rocprim
 {
@@ -130,21 +151,25 @@ template <typename DerivedPolicy,
           typename OutputIt,
           typename InitialValueType,
           typename BinaryOp>
-auto async_exclusive_scan(
-  execution_policy<DerivedPolicy>& policy,
-  ForwardIt first,
-  Sentinel&& last,
-  OutputIt&& out,
-  InitialValueType&& init,
-  BinaryOp&& op)
-  THRUST_RETURNS(thrust::system::hip::detail::async_exclusive_scan_n(
-    policy, first, thrust::distance(first, THRUST_FWD(last)), THRUST_FWD(out), THRUST_FWD(init), THRUST_FWD(op)))
+auto async_exclusive_scan(execution_policy<DerivedPolicy>& policy,
+                          ForwardIt first,
+                          Sentinel&& last,
+                          OutputIt&& out,
+                          InitialValueType &&init,
+                          BinaryOp&& op)
+THRUST_RETURNS(
+  thrust::system::hip::detail::async_exclusive_scan_n(
+    policy,
+    first,
+    distance(first, THRUST_FWD(last)),
+    THRUST_FWD(out),
+    THRUST_FWD(init),
+    THRUST_FWD(op)
+  )
+)
 
 } // namespace hip_rocprim
 
-THRUST_SUPPRESS_DEPRECATED_POP
 THRUST_NAMESPACE_END
 
-#  endif // THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP
-
-#endif // C++17
+#endif // THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_HIP

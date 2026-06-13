@@ -24,7 +24,7 @@
 
 #include "rocsparse_bsrgemm_multadd.hpp"
 #include "rocsparse_csrgemm_multadd.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 rocsparse_status
     rocsparse::bsrgemm_multadd_buffer_size_quickreturn(rocsparse_handle          handle,

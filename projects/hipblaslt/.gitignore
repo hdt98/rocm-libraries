@@ -37,19 +37,12 @@ tags
 
 # build-in-source directory and documentation artifacts
 build*/
-hipblaslt-install/
 _build/
-_deps/
 _images/
 _static/
 _templates/
 _toc.yml
 Tensile.egg-info
-CMakeCache.txt
-cmake_install.cmake
-*.make
-*.cmake
-*.o.d
 
 # matrices
 *.csr
@@ -59,8 +52,7 @@ cmake_install.cmake
 **/__pycache__
 *.egg-info/
 
-# clangd
+#clangd
 .cache
 
-# CMake user presets
-CMakeUserPresets.json
+build_*

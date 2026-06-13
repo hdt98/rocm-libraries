@@ -1,4 +1,4 @@
-// Copyright (C) 2021 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2021 - 2022 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,21 +25,9 @@
 
 std::vector<char> compile_inprocess(const std::string& kernel_src, const std::string& gpu_arch)
 {
-    struct RaiiState
-    {
-        hiprtcProgram prog = nullptr;
-        ~RaiiState()
-        {
-            if(prog)
-            {
-                hiprtcDestroyProgram(&prog);
-            }
-        }
-    };
-    RaiiState state;
-
+    hiprtcProgram prog;
     // give it a .hip extension so it'll be compiled as HIP code
-    if(hiprtcCreateProgram(&state.prog, kernel_src.c_str(), "rocfft_rtc.hip", 0, nullptr, nullptr)
+    if(hiprtcCreateProgram(&prog, kernel_src.c_str(), "rocfft_rtc.hip", 0, nullptr, nullptr)
        != HIPRTC_SUCCESS)
     {
         throw std::runtime_error("unable to create program");
@@ -49,34 +37,35 @@ std::vector<char> compile_inprocess(const std::string& kernel_src, const std::st
 
     std::vector<const char*> options;
     options.push_back("-O3");
-    options.push_back("-std=c++20");
+    options.push_back("-std=c++14");
     options.push_back(gpu_arch_arg.c_str());
     options.push_back("-mcumode");
 #ifdef ADDRESS_SANITIZER
     options.push_back("-fsanitize=address");
 #endif
 
-    auto compileResult = hiprtcCompileProgram(state.prog, options.size(), options.data());
+    auto compileResult = hiprtcCompileProgram(prog, options.size(), options.data());
     if(compileResult != HIPRTC_SUCCESS)
     {
         size_t logSize = 0;
-        hiprtcGetProgramLogSize(state.prog, &logSize);
+        hiprtcGetProgramLogSize(prog, &logSize);
 
         if(logSize)
         {
             std::vector<char> log(logSize, '\0');
-            if(hiprtcGetProgramLog(state.prog, log.data()) == HIPRTC_SUCCESS)
-                throw std::runtime_error(std::string(log.begin(), log.end()));
+            if(hiprtcGetProgramLog(prog, log.data()) == HIPRTC_SUCCESS)
+                throw std::runtime_error(log.data());
         }
         throw std::runtime_error("compile failed without log");
     }
 
     size_t codeSize;
-    if(hiprtcGetCodeSize(state.prog, &codeSize) != HIPRTC_SUCCESS)
+    if(hiprtcGetCodeSize(prog, &codeSize) != HIPRTC_SUCCESS)
         throw std::runtime_error("failed to get code size");
 
     std::vector<char> code(codeSize);
-    if(hiprtcGetCode(state.prog, code.data()) != HIPRTC_SUCCESS)
+    if(hiprtcGetCode(prog, code.data()) != HIPRTC_SUCCESS)
         throw std::runtime_error("failed to get code");
+    hiprtcDestroyProgram(&prog);
     return code;
 }

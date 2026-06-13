@@ -23,12 +23,12 @@
  * ************************************************************************ */
 
 #include "internal/conversion/rocsparse_csr2csr_compress.h"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_csr2csr_compress.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "csr2csr_compress_device.h"
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 template <typename T>
 rocsparse_status rocsparse::csr2csr_compress_template(rocsparse_handle          handle, //0

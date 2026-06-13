@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -42,6 +42,62 @@
 extern "C" {
 #endif
 
+//@TODO This is used to backward support hipsparseLtDatatype_t, should be deprecated in the later version.
+hipDataType HIPSparseLtDatatypeToHipDatatype(hipsparseLtDatatype_t type)
+{
+    switch(type)
+    {
+    case HIPSPARSELT_R_32F:
+        return HIP_R_32F;
+
+    case HIPSPARSELT_R_16BF:
+        return HIP_R_16BF;
+
+    case HIPSPARSELT_R_16F:
+        return HIP_R_16F;
+
+    case HIPSPARSELT_R_8I:
+        return HIP_R_8I;
+
+    case HIPSPARSELT_R_8F:
+        return HIP_R_8F_E4M3_FNUZ;
+
+    case HIPSPARSELT_R_8BF:
+        return HIP_R_8F_E5M2_FNUZ;
+
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
+//@TODO This is used to backward support hipsparseLtDatatype_t, should be deprecated in the later version.
+hipsparseLtDatatype_t HipDatatypeToHIPSparseLtDatatype(hipDataType type)
+{
+    switch(type)
+    {
+    case HIP_R_32F:
+        return HIPSPARSELT_R_32F;
+
+    case HIP_R_16BF:
+        return HIPSPARSELT_R_16BF;
+
+    case HIP_R_16F:
+        return HIPSPARSELT_R_16F;
+
+    case HIP_R_8I:
+        return HIPSPARSELT_R_8I;
+
+    case HIP_R_8F_E4M3_FNUZ:
+        return HIPSPARSELT_R_8F;
+
+    case HIP_R_8F_E5M2_FNUZ:
+        return HIPSPARSELT_R_8BF;
+
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
 /********************************************************************************
  * \brief rocsparselt_handle is a structure holding the rocsparselt library context.
  * It must be initialized using rocsparselt_init()
@@ -65,7 +121,7 @@ rocsparselt_status rocsparselt_init(rocsparselt_handle* handle)
         {
             auto                _handle = reinterpret_cast<_rocsparselt_handle*>(handle);
             _rocsparselt_handle tmpHandle;
-            memcpy((void*)_handle, &tmpHandle, sizeof(_rocsparselt_handle));
+            memcpy(_handle, &tmpHandle, sizeof(_rocsparselt_handle));
             _handle->init();
             log_api(_handle, __func__, "handle[out]", _handle);
         }
@@ -91,7 +147,7 @@ rocsparselt_status rocsparselt_destroy(const rocsparselt_handle* handle)
     auto _handle = reinterpret_cast<_rocsparselt_handle*>(const_cast<rocsparselt_handle*>(handle));
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -134,7 +190,7 @@ rocsparselt_status rocsparselt_dense_descr_init(const rocsparselt_handle* handle
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -148,23 +204,41 @@ rocsparselt_status rocsparselt_dense_descr_init(const rocsparselt_handle* handle
         // Allocate
         try
         {
+            /*
+             *  @TODO
+             *  This is used to backward support hipsparseLtDatatype_t, will be deprecated in the later version.
+             */
+            hipDataType vtype_;
+            bool        is_hipsparselt_datatype = false;
+            try
+            {
+                vtype_ = HIPSparseLtDatatypeToHipDatatype(
+                    static_cast<hipsparseLtDatatype_t>(valueType));
+                is_hipsparselt_datatype = true;
+            }
+            catch(...)
+            {
+                vtype_ = valueType;
+            }
+
             auto status = validateMatrixArgs(
-                _handle, rows, cols, ld, alignment, valueType, order, rocsparselt_matrix_type_dense);
+                _handle, rows, cols, ld, alignment, vtype_, order, rocsparselt_matrix_type_dense);
             if(status != rocsparselt_status_success)
                 throw status;
 
             auto                   _matDescr = reinterpret_cast<_rocsparselt_mat_descr*>(matDescr);
             _rocsparselt_mat_descr tmpMatDescr(_handle);
-            memcpy((void*)_matDescr, &tmpMatDescr, sizeof(_rocsparselt_mat_descr));
+            memcpy(_matDescr, &tmpMatDescr, sizeof(_rocsparselt_mat_descr));
             _matDescr->m_type       = rocsparselt_matrix_type_dense;
             _matDescr->m            = rows;
             _matDescr->n            = cols;
             _matDescr->ld           = ld;
             _matDescr->alignment    = alignment;
-            _matDescr->type         = valueType;
+            _matDescr->type         = vtype_;
             _matDescr->order        = order;
             _matDescr->num_batches  = 1;
             _matDescr->batch_stride = order == rocsparselt_order_column ? cols * ld : rows * ld;
+            _matDescr->is_hipsparselt_datatype = is_hipsparselt_datatype;
             log_api(_handle,
                     __func__,
                     "_matDescr[out]",
@@ -178,7 +252,7 @@ rocsparselt_status rocsparselt_dense_descr_init(const rocsparselt_handle* handle
                     "alignment[in]",
                     alignment,
                     "valueType[in]",
-                    hip_datatype_to_string(valueType),
+                    hipDataType_to_string(vtype_),
                     "order[in]",
                     rocsparselt_order_to_string(order));
         }
@@ -218,7 +292,7 @@ rocsparselt_status rocsparselt_structured_descr_init(const rocsparselt_handle* h
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -232,12 +306,30 @@ rocsparselt_status rocsparselt_structured_descr_init(const rocsparselt_handle* h
         // Allocate
         try
         {
+
+            /*
+             *  @TODO
+             *  This is used to backward support hipsparseLtDatatype_t, will be deprecated in the later version.
+             */
+            hipDataType vtype_;
+            bool        is_hipsparselt_datatype = false;
+            try
+            {
+                vtype_ = HIPSparseLtDatatypeToHipDatatype(
+                    static_cast<hipsparseLtDatatype_t>(valueType));
+                is_hipsparselt_datatype = true;
+            }
+            catch(...)
+            {
+                vtype_ = valueType;
+            }
+
             auto status = validateMatrixArgs(_handle,
                                              rows,
                                              cols,
                                              ld,
                                              alignment,
-                                             valueType,
+                                             vtype_,
                                              order,
                                              rocsparselt_matrix_type_structured);
             if(status != rocsparselt_status_success)
@@ -245,17 +337,18 @@ rocsparselt_status rocsparselt_structured_descr_init(const rocsparselt_handle* h
 
             auto                   _matDescr = reinterpret_cast<_rocsparselt_mat_descr*>(matDescr);
             _rocsparselt_mat_descr tmpMatDescr(_handle);
-            memcpy((void*)_matDescr, &tmpMatDescr, sizeof(_rocsparselt_mat_descr));
+            memcpy(_matDescr, &tmpMatDescr, sizeof(_rocsparselt_mat_descr));
             _matDescr->m_type       = rocsparselt_matrix_type_structured;
             _matDescr->m            = rows;
             _matDescr->n            = cols;
             _matDescr->ld           = ld;
             _matDescr->alignment    = alignment;
-            _matDescr->type         = valueType;
+            _matDescr->type         = vtype_;
             _matDescr->order        = order;
             _matDescr->sparsity     = sparsity;
             _matDescr->num_batches  = 1;
             _matDescr->batch_stride = order == rocsparselt_order_column ? cols * ld : rows * ld;
+            _matDescr->is_hipsparselt_datatype = is_hipsparselt_datatype;
             log_api(_handle,
                     __func__,
                     "_matDescr[out]",
@@ -269,7 +362,7 @@ rocsparselt_status rocsparselt_structured_descr_init(const rocsparselt_handle* h
                     "alignment[in]",
                     alignment,
                     "valueType[in]",
-                    hip_datatype_to_string(valueType),
+                    hipDataType_to_string(vtype_),
                     "order[in]",
                     rocsparselt_order_to_string(order),
                     "sparsity[in]",
@@ -301,7 +394,7 @@ rocsparselt_status rocsparselt_mat_descr_destroy(const rocsparselt_mat_descr* ma
 
     if(!check_is_init_mat_descr(_matDescr))
     {
-        hipsparselt_cerr << "matDescr=" << matDescr << " was not initialized or has already been destroyed"
+        hipsparselt_cerr << "matDescr=" << matDescr << " did not initialized or already destroyed"
                          << std::endl;
         return rocsparselt_status_success;
     }
@@ -339,7 +432,7 @@ rocsparselt_status rocsparselt_mat_descr_set_attribute(const rocsparselt_handle*
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -363,7 +456,7 @@ rocsparselt_status rocsparselt_mat_descr_set_attribute(const rocsparselt_handle*
 
             if(!check_is_init_mat_descr(_matDescr))
             {
-                log_error(_handle, __func__, "matDescr was not initialized or has already been destroyed");
+                log_error(_handle, __func__, "matDescr did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -461,7 +554,7 @@ rocsparselt_status rocsparselt_mat_descr_get_attribute(const rocsparselt_handle*
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -482,7 +575,7 @@ rocsparselt_status rocsparselt_mat_descr_get_attribute(const rocsparselt_handle*
 
             if(!check_is_init_mat_descr(_matDescr))
             {
-                log_error(_handle, __func__, "matDescr was not initialized or has already been destroyed");
+                log_error(_handle, __func__, "matDescr did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -557,7 +650,7 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -595,7 +688,7 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
                 const_cast<rocsparselt_mat_descr*>(matA));
             if(!check_is_init_mat_descr(_matA))
             {
-                log_error(_handle, __func__, "matA was not initialized or has already been destroyed");
+                log_error(_handle, __func__, "matA did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -603,7 +696,7 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
                 const_cast<rocsparselt_mat_descr*>(matB));
             if(!check_is_init_mat_descr(_matB))
             {
-                log_error(_handle, __func__, "matB was not initialized or has already been destroyed");
+                log_error(_handle, __func__, "matB did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -611,7 +704,7 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
                 const_cast<rocsparselt_mat_descr*>(matC));
             if(!check_is_init_mat_descr(_matC))
             {
-                log_error(_handle, __func__, "matC was not initialized or has already been destroyed");
+                log_error(_handle, __func__, "matC did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -619,7 +712,7 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
                 const_cast<rocsparselt_mat_descr*>(matD));
             if(!check_is_init_mat_descr(_matD))
             {
-                log_error(_handle, __func__, "matD was not initialized or has already been destroyed");
+                log_error(_handle, __func__, "matD did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -654,7 +747,7 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
 
             auto _matmulDescr = reinterpret_cast<_rocsparselt_matmul_descr*>(matmulDescr);
             _rocsparselt_matmul_descr tmpDescr(_handle);
-            memcpy((void*)_matmulDescr, &tmpDescr, sizeof(_rocsparselt_matmul_descr));
+            memcpy(_matmulDescr, &tmpDescr, sizeof(_rocsparselt_matmul_descr));
 
             log_api(_handle,
                     __func__,
@@ -718,6 +811,8 @@ rocsparselt_status rocsparselt_matmul_descr_init(const rocsparselt_handle*    ha
                 _matmulDescr->bias_type = HIP_R_32F;
                 break;
             }
+
+            _matmulDescr->bias_is_hipsparselt_datatype = _matA->is_hipsparselt_datatype;
 
             _matmulDescr->_op_A = _matmulDescr->op_A;
             if(_matA->order != _matC->order)
@@ -789,7 +884,7 @@ rocsparselt_status
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -814,7 +909,7 @@ rocsparselt_status
             if(!check_is_init_matmul_descr(_matmulDescr))
             {
                 log_error(
-                    _handle, __func__, "matmulDescr was not initialized or has already been destroyed");
+                    _handle, __func__, "matmulDescr did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
             rocsparselt_status status;
@@ -924,7 +1019,23 @@ rocsparselt_status
             }
             case rocsparselt_matmul_bias_type:
             {
-                assign_data(&_matmulDescr->bias_type);
+                /*
+                *  @TODO
+                *  This is used to backward support hipsparseLtDatatype_t, will be deprecated in the later version.
+                */
+                hipDataType vtype_;
+                assign_data(&vtype_);
+                try
+                {
+                    _matmulDescr->bias_type = HIPSparseLtDatatypeToHipDatatype(
+                        static_cast<hipsparseLtDatatype_t>(vtype_));
+                    _matmulDescr->bias_is_hipsparselt_datatype = true;
+                }
+                catch(...)
+                {
+                    _matmulDescr->bias_type                    = vtype_;
+                    _matmulDescr->bias_is_hipsparselt_datatype = false;
+                }
                 break;
             }
             case rocsparselt_matmul_alpha_vector_scaling:
@@ -981,7 +1092,7 @@ rocsparselt_status
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1004,7 +1115,7 @@ rocsparselt_status
             if(!check_is_init_matmul_descr(_matmulDescr))
             {
                 log_error(
-                    _handle, __func__, "matmulDescr was not initialized or has already been destroyed");
+                    _handle, __func__, "matmulDescr did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -1052,9 +1163,7 @@ rocsparselt_status
             case rocsparselt_matmul_activation_tanh_beta:
                 retrive_data(_matmulDescr->activation_tanh_beta);
                 break;
-            case rocsparselt_matmul_activation_gelu_scaling:
-                retrive_data(_matmulDescr->activation_gelu_scaling);
-                break;
+
             case rocsparselt_matmul_bias_pointer:
                 if((status = validateGetAttributeDataSize<void*>(dataSize))
                    != rocsparselt_status_success)
@@ -1070,7 +1179,25 @@ rocsparselt_status
                 break;
             case rocsparselt_matmul_bias_type:
             {
-                retrive_data(_matmulDescr->bias_type);
+                /*
+                *  @TODO
+                *  This is used to backward support hipsparseLtDatatype_t, will be deprecated in the later version.
+                */
+                if(_matmulDescr->bias_is_hipsparselt_datatype)
+                {
+                    try
+                    {
+                        hipsparseLtDatatype_t bias_type_
+                            = HipDatatypeToHIPSparseLtDatatype(_matmulDescr->bias_type);
+                        retrive_data(bias_type_);
+                    }
+                    catch(...)
+                    {
+                        retrive_data(_matmulDescr->bias_type);
+                    }
+                }
+                else
+                    retrive_data(_matmulDescr->bias_type);
                 break;
             }
             case rocsparselt_matmul_alpha_vector_scaling:
@@ -1123,7 +1250,7 @@ rocsparselt_status
     auto _handle = reinterpret_cast<_rocsparselt_handle*>(const_cast<rocsparselt_handle*>(handle));
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1147,12 +1274,15 @@ rocsparselt_status
             if(!check_is_init_matmul_descr(_matmulDescr))
             {
                 log_error(
-                    _handle, __func__, "matmulDescr was not initialized or has already been destroyed");
+                    _handle, __func__, "matmulDescr did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
             auto _algSelection = reinterpret_cast<_rocsparselt_matmul_alg_selection*>(algSelection);
-            _rocsparselt_matmul_datatype matmul_datatype = is_matmul_datatype_valid(_matmulDescr->matrix_A->type, _matmulDescr->matrix_B->type, _matmulDescr->matrix_C->type, _matmulDescr->matrix_D->type, _matmulDescr->compute_type);
+
+            auto in_type      = _matmulDescr->matrix_A->type;
+            auto out_type     = _matmulDescr->matrix_D->type;
+            auto compute_type = _matmulDescr->compute_type;
 
             int                               config_max_id = 0;
             _rocsparselt_matmul_alg_selection tmpAlgSelection(_handle);
@@ -1162,75 +1292,63 @@ rocsparselt_status
 
             rocsparselt_status status = rocsparselt_status_success;
 
-            switch(matmul_datatype)
+            if(in_type == HIP_R_16F && out_type == HIP_R_16F
+               && compute_type == rocsparselt_compute_f32)
             {
-            case MATMUL_DATATYPE_H_H_S:
                 status = findTopConfigs<__half, __half, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_B_B_S:
+            }
+            else if(in_type == HIP_R_16BF && out_type == HIP_R_16BF
+                    && compute_type == rocsparselt_compute_f32)
+            {
                 status = findTopConfigs<hip_bfloat16, hip_bfloat16, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_I8_I8_S:
+            }
+            else if(in_type == HIP_R_8I && out_type == HIP_R_8I
+                    && compute_type == rocsparselt_compute_i32)
+            {
                 status = findTopConfigs<int8_t, int8_t, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_I8_H_S:
+            }
+            else if(in_type == HIP_R_8I && out_type == HIP_R_16F
+                    && compute_type == rocsparselt_compute_i32)
+            {
                 status = findTopConfigs<int8_t, __half, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_I8_B_S:
+            }
+            else if(in_type == HIP_R_8I && out_type == HIP_R_16BF
+                    && compute_type == rocsparselt_compute_i32)
+            {
                 status = findTopConfigs<int8_t, hip_bfloat16, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_I8_I_S:
-                status = findTopConfigs<int8_t, int32_t, float>(
-                    _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;                
-#if HIP_FP8_TYPE_OCP
-            case MATMUL_DATATYPE_E4M3_S_S:
+            }
+            else if(in_type == HIP_R_8F_E4M3 && out_type == HIP_R_32F
+                    && compute_type == rocsparselt_compute_f32)
+            {
                 status = findTopConfigs<__hip_fp8_e4m3, float, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_E5M2_S_S:
+            }
+            else if(in_type == HIP_R_8F_E5M2 && out_type == HIP_R_32F
+                    && compute_type == rocsparselt_compute_f32)
+            {
                 status = findTopConfigs<__hip_fp8_e5m2, float, float>(
                     _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-#endif
-#if HIP_FP8_TYPE_FNUZ
-            case MATMUL_DATATYPE_E4M3_FNUZ_S_S:
-                status = findTopConfigs<__hip_fp8_e4m3_fnuz, float, float>(
-                    _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-            case MATMUL_DATATYPE_E5M2_FNUZ_S_S:
-                status = findTopConfigs<__hip_fp8_e5m2_fnuz, float, float>(
-                    _matmulDescr, &(tmpAlgSelection.configs[0]), &config_max_id, requestConfigs);
-                break;
-#endif
-            default:
-                status = rocsparselt_status_not_implemented;
             }
             if(status != rocsparselt_status_success)
                 return status;
 #else
-            switch(matmul_datatype)
-            {
-            case MATMUL_DATATYPE_H_H_S:
+            if(in_type == HIP_R_16F && out_type == HIP_R_16F
+               && compute_type == rocsparselt_compute_f32)
                 initSolutions<__half, __half, float>(
                     _handle, _matmulDescr->op_A, _matmulDescr->op_B, &config_max_id);
-                break;
-            case MATMUL_DATATYPE_B_B_S:
+            else if(in_type == HIP_R_16BF && out_type == HIP_R_16BF
+                    && compute_type == rocsparselt_compute_f32)
                 initSolutions<hip_bfloat16, hip_bfloat16, float>(
                     _handle, _matmulDescr->op_A, _matmulDescr->op_B, &config_max_id);
-                break;
-            case MATMUL_DATATYPE_I8_I8_S:
+            else if(in_type == HIP_R_8I && out_type == HIP_R_8I
+                    && compute_type == rocsparselt_compute_i32)
                 initSolutions<int8_t, int8_t, float>(
                     _handle, _matmulDescr->op_A, _matmulDescr->op_B, &config_max_id);
-                break;
-            default:
-                break;
-            }
             for(int i = 0; i < config_max_id; i++)
             {
                 configs[i].max_workspace_bytes = 0;
@@ -1242,7 +1360,7 @@ rocsparselt_status
                 log_error(_handle, __func__, "There are no solutions for this problem size");
                 return rocsparselt_status_not_implemented;
             }
-            memcpy((void*)_algSelection, &tmpAlgSelection, sizeof(_rocsparselt_matmul_alg_selection));
+            memcpy(_algSelection, &tmpAlgSelection, sizeof(_rocsparselt_matmul_alg_selection));
             _algSelection->alg           = alg;
             _algSelection->config_max_id = config_max_id;
             log_api(_handle,
@@ -1264,31 +1382,6 @@ rocsparselt_status
 }
 
 /********************************************************************************
- * \brief destroy algorithm selection descriptor
- *******************************************************************************/
-rocsparselt_status rocsparselt_matmul_alg_selection_destroy(const rocsparselt_matmul_alg_selection* algSelection)
-{
-    if(algSelection == nullptr)
-    {
-        hipsparselt_cerr << "algSelection is a NULL pointer" << std::endl;
-        return rocsparselt_status_invalid_handle;
-    }
-
-    auto _algSelection = reinterpret_cast<_rocsparselt_matmul_alg_selection*>(
-        const_cast<rocsparselt_matmul_alg_selection*>(algSelection));
-    if(!check_is_init_matmul_alg_selection(_algSelection))
-    {
-        hipsparselt_cerr << "algSelection was not initialized or has already been destroyed" << std::endl;
-        return rocsparselt_status_invalid_handle;
-    }
-
-    const auto* _log_handle = _algSelection->handle;
-    log_api(_log_handle, __func__, "algSelection[in]", algSelection);
-    _algSelection->clear();
-    return rocsparselt_status_success;
-}
-
-/********************************************************************************
  * \brief
  *******************************************************************************/
 rocsparselt_status
@@ -1307,7 +1400,7 @@ rocsparselt_status
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1330,7 +1423,7 @@ rocsparselt_status
             if(!check_is_init_matmul_alg_selection(_algSelection))
             {
                 log_error(
-                    _handle, __func__, "algSelection was not initialized or has already been destroyed");
+                    _handle, __func__, "algSelection did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
             rocsparselt_status status;
@@ -1427,7 +1520,7 @@ rocsparselt_status
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1450,7 +1543,7 @@ rocsparselt_status
             if(!check_is_init_matmul_alg_selection(_algSelection))
             {
                 log_error(
-                    _handle, __func__, "algSelection was not initialized or has already been destroyed");
+                    _handle, __func__, "algSelection did not initialized or already destroyed");
                 return rocsparselt_status_invalid_handle;
             }
 
@@ -1515,7 +1608,7 @@ rocsparselt_status
     auto _handle = reinterpret_cast<const _rocsparselt_handle*>(handle);
     if(!check_is_init_handle(_handle))
     {
-        hipsparselt_cerr << "handle was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "handle did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1538,7 +1631,7 @@ rocsparselt_status
     auto _matmulDescr = reinterpret_cast<const _rocsparselt_matmul_descr*>(matmulDescr);
     if(!check_is_init_matmul_descr(_matmulDescr))
     {
-        log_error(_handle, __func__, "matmulDescr was not initialized or has already been destroyed");
+        log_error(_handle, __func__, "matmulDescr did not initialized or already destroyed");
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1546,7 +1639,7 @@ rocsparselt_status
         = reinterpret_cast<const _rocsparselt_matmul_alg_selection*>(algSelection);
     if(!check_is_init_matmul_alg_selection(_algSelection))
     {
-        log_error(_handle, __func__, "algSelection was not initialized or has already been destroyed");
+        log_error(_handle, __func__, "algSelection did not initialized or already destroyed");
         return rocsparselt_status_invalid_handle;
     }
 
@@ -1568,7 +1661,7 @@ rocsparselt_status
 
         auto                     _plan = reinterpret_cast<_rocsparselt_matmul_plan*>(plan);
         _rocsparselt_matmul_plan tmpPlan(_handle);
-        memcpy((void*)_plan, &tmpPlan, sizeof(_rocsparselt_matmul_plan));
+        memcpy(_plan, &tmpPlan, sizeof(_rocsparselt_matmul_plan));
 
         _plan->matmul_descr  = new _rocsparselt_matmul_descr(*_matmulDescr);
         _plan->alg_selection = const_cast<_rocsparselt_matmul_alg_selection*>(_algSelection);
@@ -1604,7 +1697,7 @@ rocsparselt_status rocsparselt_matmul_plan_destroy(const rocsparselt_matmul_plan
         = reinterpret_cast<_rocsparselt_matmul_plan*>(const_cast<rocsparselt_matmul_plan*>(plan));
     if(!check_is_init_plan(_plan))
     {
-        hipsparselt_cerr << "plan was not initialized or has already been destroyed" << std::endl;
+        hipsparselt_cerr << "plan did not initialized or already destroyed" << std::endl;
         return rocsparselt_status_invalid_handle;
     }
 

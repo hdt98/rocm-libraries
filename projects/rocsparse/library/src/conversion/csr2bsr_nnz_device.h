@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
@@ -41,10 +41,6 @@ namespace rocsparse
                                                         rocsparse_index_base bsr_base,
                                                         I* __restrict__ bsr_row_ptr)
     {
-        static_assert(WFSIZE > 0 && (WFSIZE & (WFSIZE - 1)) == 0, "WFSIZE must be a power of two.");
-        static_assert(BLOCKSIZE > 0, "BLOCKSIZE must be positive.");
-        static_assert(BLOCKSIZE % WFSIZE == 0, "BLOCKSIZE must be a multiple of WFSIZE.");
-        static_assert(WFSIZE % BLOCKDIM == 0, "WFSIZE must be a multiple of BLOCKDIM.");
         int bid = hipBlockIdx_x;
         int tid = hipThreadIdx_x;
 
@@ -107,7 +103,7 @@ namespace rocsparse
             __threadfence_block();
 
             rocsparse::wfreduce_min<(WFSIZE / BLOCKDIM)>(&index_k);
-            next_k = rocsparse::shfl(index_k, (WFSIZE / BLOCKDIM) - 1, (WFSIZE / BLOCKDIM));
+            next_k = __shfl(index_k, (WFSIZE / BLOCKDIM) - 1, (WFSIZE / BLOCKDIM));
 
             if(found[wid] && lid == 0)
             {
@@ -115,7 +111,7 @@ namespace rocsparse
             }
 
             rocsparse::wfreduce_min<WFSIZE>(&min_block_col);
-            chunk_begin = rocsparse::shfl(min_block_col, WFSIZE - 1, WFSIZE);
+            chunk_begin = __shfl(min_block_col, WFSIZE - 1, WFSIZE);
 
             __threadfence_block();
         }
@@ -143,9 +139,6 @@ namespace rocsparse
                                                     rocsparse_index_base bsr_base,
                                                     I* __restrict__ bsr_row_ptr)
     {
-        static_assert(BLOCKSIZE > 0 && (BLOCKSIZE & (BLOCKSIZE - 1)) == 0,
-                      "BLOCKSIZE must be a power of two.");
-        static_assert(BLOCKSIZE % BLOCKDIM == 0, "BLOCKSIZE must be a multiple of BLOCKDIM.");
         int bid = hipBlockIdx_x;
         int tid = hipThreadIdx_x;
 
@@ -204,7 +197,7 @@ namespace rocsparse
             __syncthreads();
 
             rocsparse::wfreduce_min<BLOCKSIZE / BLOCKDIM>(&index_k);
-            next_k = rocsparse::shfl(index_k, (BLOCKSIZE / BLOCKDIM) - 1, BLOCKSIZE / BLOCKDIM);
+            next_k = __shfl(index_k, (BLOCKSIZE / BLOCKDIM) - 1, BLOCKSIZE / BLOCKDIM);
 
             if(found && tid == 0)
             {
@@ -242,8 +235,6 @@ namespace rocsparse
                                    I* __restrict__ bsr_row_ptr,
                                    I* __restrict__ temp1)
     {
-        static_assert(BLOCKSIZE > 0 && (BLOCKSIZE & (BLOCKSIZE - 1)) == 0,
-                      "BLOCKSIZE must be a power of two.");
         J block_id = hipBlockIdx_x;
         J lane_id  = hipThreadIdx_x;
 
@@ -299,7 +290,7 @@ namespace rocsparse
             rocsparse::wfreduce_min<BLOCKSIZE>(&min_block_col_index);
 
             // broadcast min_block_col_index from last thread in segment to all threads in segment
-            min_block_col_index = rocsparse::shfl(min_block_col_index, BLOCKSIZE - 1, BLOCKSIZE);
+            min_block_col_index = __shfl(min_block_col_index, BLOCKSIZE - 1, BLOCKSIZE);
 
             block_col = min_block_col_index + 1;
 

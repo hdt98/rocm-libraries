@@ -52,10 +52,7 @@ rocblas_reduction_kernel_part2_64(rocblas_int nblocks, To* workspace, Tr* result
         sum = rocblas_default_value<To>{}();
     }
 
-    if(warpSize == WARP_32)
-        sum = rocblas_dot_block_reduce<WARP_32, NB, To>(sum);
-    else
-        sum = rocblas_dot_block_reduce<WARP_64, NB, To>(sum);
+    sum = rocblas_dot_block_reduce<NB, To>(sum);
 
     // Store result on device or in workspace
     if(tx == 0)

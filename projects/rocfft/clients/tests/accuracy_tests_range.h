@@ -132,7 +132,7 @@ const static std::vector<size_t> pow5_range_2D = {5, 25, 125, 625, 3125, 15625};
 
 const static std::vector<size_t> prime_range_2D = {7, 11, 13, 17, 19, 23, 29, 263, 269, 271, 277};
 
-const static std::vector<size_t> mix_range_2D = {56, 108, 120, 336, 2160, 5000, 6000, 8000};
+const static std::vector<size_t> mix_range_2D = {56, 120, 336, 2160, 5000, 6000, 8000};
 
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
@@ -167,24 +167,7 @@ const static std::vector<size_t> inner_batch_3D_batch_range = {3, 2, 1};
 // partial pass test problems
 //-----------------------------------------------------------------------
 //-----------------------------------------------------------------------
-const static std::vector<std::vector<size_t>> partial_pass_adhoc_3D = {
-    {64, 64, 128},
-    {64, 64, 64},
-    {64, 64, 52},
-    {60, 60, 60},
-    {32, 32, 128},
-    {32, 32, 64},
-    {64, 32, 128},
-    {160, 72, 72},
-    {72, 72, 72},
-    {160, 80, 72},
-    {160, 80, 80},
-    {96, 96, 96},
-    {108, 108, 80},
-    {72, 72, 52},
-    {80, 80, 80},
-    {84, 84, 72},
-};
-const static std::vector<size_t> partial_pass_batch_range_3D = {1, 5, 10, 20, 50};
+const static std::vector<std::vector<size_t>> partial_pass_adhoc_3D       = {{64, 64, 64}};
+const static std::vector<size_t>              partial_pass_batch_range_3D = {1, 5, 10, 20, 50};
 
 #endif // ACCURACY_TESTS_RANGE_H

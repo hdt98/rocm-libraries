@@ -1,5 +1,5 @@
 .. meta::
-  :description: Introduction to the rocSOLVER documentation and API reference library
+  :description: rocSOLVER documentation and API reference library
   :keywords: rocSOLVER, ROCm, API, documentation
 
 .. _rocsolver:
@@ -8,55 +8,42 @@
 rocSOLVER documentation
 ********************************************************************
 
-rocSOLVER implements `LAPACK routines <https://www.netlib.org/lapack/index.html>`_
+rocSOLVER is an implementation of `LAPACK routines <https://www.netlib.org/lapack/index.html>`_
 on top of the :doc:`AMD ROCm platform <rocm:index>`. rocSOLVER is implemented in the
 :doc:`HIP programming language <hip:index>` and optimized for AMD GPUs.
 
-The rocSOLVER public repository is located at `<https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocsolver>`_.
+The code is open and hosted at: `<https://github.com/ROCm/rocSOLVER>`__
 
-The rocSOLVER repository for ROCm 7.0.2 and earlier is located at `<https://github.com/ROCm/rocSOLVER>`_.
-
-.. grid:: 2
-  :gutter: 3
-
-  .. grid-item-card:: Install
-
-    * :doc:`Install rocSOLVER <./installation/installlinux>`
-    * :doc:`Build from source <./installation/build>`
+The rocSOLVER documentation is structured as follows:
 
 .. grid:: 2
   :gutter: 3
 
-  .. grid-item-card:: Conceptual
+  .. grid-item-card:: Installation
 
-    * :doc:`Introduction to rocSOLVER <./conceptual/intro-rocsolver>`
+    * :ref:`install-linux`
 
   .. grid-item-card:: How to
 
-    * :doc:`Use rocSOLVER <./howto/using>`
-    * :doc:`Apply the memory model <./howto/memory>`
-    * :doc:`Use multi-level logging <./howto/logging>`
-    * :doc:`Run rocSOLVER clients <./howto/clients>`
+    * :ref:`using`
+    * :ref:`memory`
+    * :ref:`logging-label`
+    * :ref:`clients`
+    * :ref:`contribute`
 
-  .. grid-item-card:: Examples
+  .. grid-item-card:: Reference
 
-    * `Client samples <https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocsolver/clients/samples>`_
+    * :ref:`intro`
+    * :ref:`rocsolver-types`
+    * :ref:`rocsolver_auxiliary_functions`
+    * :ref:`lapackfunc`
+    * :ref:`lapack-like`
+    * :ref:`refactor`
+    * :ref:`helpers`
+    * :ref:`tuning_label`
+    * :ref:`deprecated`
 
-  .. grid-item-card:: API reference
+To contribute to the documentation refer to :doc:`Contributing to ROCm <rocm:contribute/contributing>`.
 
-    * :doc:`rocSOLVER API summary <./reference/intro>`
-    * :doc:`rocSOLVER types <./reference/types>`
-    * :doc:`rocSOLVER precision support <./reference/precision>`
-    * :doc:`rocSOLVER environment variables <./reference/env_variables>`
-    * :doc:`LAPACK auxiliary functions <./reference/auxiliary>`
-    * :doc:`LAPACK functions <./reference/lapack>`
-    * :doc:`LAPACK-like functions <./reference/lapacklike>`
-    * :doc:`Refactorization and direct solvers <./reference/refact>`
-    * :doc:`Library and logging functions <./reference/helpers>`
-    * :doc:`rocSOLVER performance tuning <./reference/tuning>`
-    * :doc:`Deprecated components <./reference/deprecated>`
+You can find licensing information on the :doc:`Licensing <rocm:about/license>` page.
 
-To contribute to the documentation, see `Contributing to ROCm <https://rocm.docs.amd.com/en/latest/contribute/contributing.html>`_.
-For information on contributing to the rocSOLVER code base, see :doc:`Contribute to rocSOLVER <./contribute>`.
-
-You can find licensing information on the `Licensing <https://rocm.docs.amd.com/en/latest/about/license.html>`_ page.

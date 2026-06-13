@@ -36,7 +36,7 @@ base csrilusv_idxbase_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE
 
 std::string csrilusv_bin[] = {"scircuit.bin",
 #if defined(__HIP_PLATFORM_AMD__)
-                              //                              "bmwcra_1.csr",
+                              //                              "bmwcra_1.bin",
                               "nos1.bin",
 #endif
                               "nos6.bin",
@@ -62,7 +62,7 @@ Arguments setup_csrilusv_arguments(csrilusv_bin_tuple tup)
     std::string bin_file = std::get<1>(tup);
 
     // Matrices are stored at the same path in matrices directory
-    arg.set_filename(bin_file);
+    arg.filename = get_filename(bin_file);
 
     return arg;
 }
@@ -72,14 +72,16 @@ TEST_P(parameterized_csrilusv_bin, csrilusv_bin_float)
 {
     Arguments arg = setup_csrilusv_arguments(GetParam());
 
-    testing_csrilusv<float>(arg);
+    hipsparseStatus_t status = testing_csrilusv<float>(arg);
+    EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 
 TEST_P(parameterized_csrilusv_bin, csrilusv_bin_double)
 {
     Arguments arg = setup_csrilusv_arguments(GetParam());
 
-    testing_csrilusv<double>(arg);
+    hipsparseStatus_t status = testing_csrilusv<double>(arg);
+    EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 
 INSTANTIATE_TEST_SUITE_P(csrilusv_bin,

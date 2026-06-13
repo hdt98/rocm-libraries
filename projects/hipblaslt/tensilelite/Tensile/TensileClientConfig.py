@@ -26,10 +26,8 @@ from . import ClientWriter
 from . import LibraryIO
 from .Contractions import ProblemType as ContractionsProblemType
 from Tensile.SolutionStructs.Problem import ProblemType, ProblemSizes
-from Tensile import __version__
-from Tensile.Common import HR, print1, printExit, printWarning
-from Tensile.Common.GlobalParameters import globalParameters, assignGlobalParameters, \
-        restoreDefaultGlobalParameters
+from .Common import globalParameters, print1, printExit, printWarning, assignGlobalParameters, \
+        restoreDefaultGlobalParameters, HR, __version__
 from .Tensile import addCommonArguments, argUpdatedGlobalParameters
 
 import argparse
@@ -183,16 +181,7 @@ def TensileClientConfig(userArgs):
         globalParameters[key] = value
 
     # write output
-    # TensileClientConfig is a standalone client-config generator with no
-    # build context, so we synthesize a libraryFile path relative to the
-    # output .ini's directory. This mirrors the prior implicit default of
-    # "library/TensileLibrary.yaml" (which originated from an empty sourceDir
-    # joined with the hardcoded default), but anchored to a real directory
-    # so the resulting .ini points somewhere meaningful. An empty string
-    # here would emit `library-file=` and produce an unusable .ini.
-    outputDir = os.path.dirname(args.OutputConfig) or "."
-    libraryFile = os.path.join(outputDir, "library", "TensileLibrary.yaml")
-    ClientWriter.writeClientConfigIni(True, sizes, "", "", "", "", conProblemType, outputDir, [], "", args.OutputConfig, 0, "", libraryFile=libraryFile)
+    ClientWriter.writeClientConfigIni(True, sizes, "", "", "", "", conProblemType, "", [], "", args.OutputConfig, None)
 
 
 def main():

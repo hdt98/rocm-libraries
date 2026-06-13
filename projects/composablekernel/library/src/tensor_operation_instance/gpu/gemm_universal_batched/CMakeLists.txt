@@ -1,6 +1,3 @@
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 # ONLY XDL_KERNELS
 set(GEMM_UNIVERSAL_BATCHED_INSTANCES)
 

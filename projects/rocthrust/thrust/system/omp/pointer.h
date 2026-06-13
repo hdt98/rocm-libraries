@@ -21,24 +21,13 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
+#include <type_traits>
+#include <thrust/system/omp/detail/execution_policy.h>
 #include <thrust/detail/pointer.h>
 #include <thrust/detail/reference.h>
-#include <thrust/system/omp/detail/execution_policy.h>
-
-#include <type_traits>
 
 THRUST_NAMESPACE_BEGIN
-namespace system
-{
-namespace omp
+namespace system { namespace omp
 {
 
 /*! \p omp::pointer stores a pointer to an object allocated in memory accessible
@@ -51,7 +40,7 @@ namespace omp
  *  \p omp::pointer can be created with the function \p omp::malloc, or by
  *  explicitly calling its constructor with a raw pointer.
  *
- *  The raw pointer encapsulated by a \p omp::pointer may be obtained by either its
+ *  The raw pointer encapsulated by a \p omp::pointer may be obtained by eiter its
  *  <tt>get</tt> member function or the \p raw_pointer_cast function.
  *
  *  \note \p omp::pointer is not a "smart" pointer; it is the programmer's
@@ -64,7 +53,11 @@ namespace omp
  *  \see raw_pointer_cast
  */
 template <typename T>
-using pointer = thrust::pointer<T, thrust::system::omp::tag, thrust::tagged_reference<T, thrust::system::omp::tag>>;
+using pointer = thrust::pointer<
+  T,
+  thrust::system::omp::tag,
+  thrust::tagged_reference<T, thrust::system::omp::tag>
+>;
 
 /*! \p omp::universal_pointer stores a pointer to an object allocated in memory
  * accessible by the \p omp system and host systems.
@@ -76,7 +69,7 @@ using pointer = thrust::pointer<T, thrust::system::omp::tag, thrust::tagged_refe
  *  or by explicitly calling its constructor with a raw pointer.
  *
  *  The raw pointer encapsulated by a \p omp::universal_pointer may be obtained
- *  by either its <tt>get</tt> member function or the \p raw_pointer_cast
+ *  by eiter its <tt>get</tt> member function or the \p raw_pointer_cast
  *  function.
  *
  *  \note \p omp::universal_pointer is not a "smart" pointer; it is the
@@ -89,7 +82,11 @@ using pointer = thrust::pointer<T, thrust::system::omp::tag, thrust::tagged_refe
  *  \see raw_pointer_cast
  */
 template <typename T>
-using universal_pointer = thrust::pointer<T, thrust::system::omp::tag, typename std::add_lvalue_reference<T>::type>;
+using universal_pointer = thrust::pointer<
+  T,
+  thrust::system::omp::tag,
+  typename std::add_lvalue_reference<T>::type
+>;
 
 /*! \p reference is a wrapped reference to an object stored in memory available
  *  to the \p omp system. \p reference is the type of the result of
@@ -100,8 +97,7 @@ using universal_pointer = thrust::pointer<T, thrust::system::omp::tag, typename 
 template <typename T>
 using reference = thrust::tagged_reference<T, thrust::system::omp::tag>;
 
-} // namespace omp
-} // namespace system
+}} // namespace system::omp
 
 /*! \addtogroup system_backends Systems
  *  \ingroup system
@@ -113,8 +109,9 @@ using reference = thrust::tagged_reference<T, thrust::system::omp::tag>;
 namespace omp
 {
 using thrust::system::omp::pointer;
-using thrust::system::omp::reference;
 using thrust::system::omp::universal_pointer;
+using thrust::system::omp::reference;
 } // namespace omp
 
 THRUST_NAMESPACE_END
+

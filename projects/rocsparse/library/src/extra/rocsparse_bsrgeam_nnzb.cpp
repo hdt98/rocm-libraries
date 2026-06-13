@@ -22,11 +22,11 @@
  *
  * ************************************************************************ */
 
+#include "common.h"
 #include "internal/extra/rocsparse_bsrgeam.h"
 #include "rocsparse_common.h"
-#include "rocsparse_common.hpp"
 #include "rocsparse_csrgeam.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -49,29 +49,25 @@ namespace rocsparse
     {
         ROCSPARSE_ROUTINE_TRACE;
 
-        const rocsparse_spgeam_descr descr       = nullptr;
-        void*                        temp_buffer = nullptr;
-        RETURN_IF_ROCSPARSE_ERROR(
-            (csrgeam_nnz_template<rocsparse_int, rocsparse_int>(handle,
-                                                                descr,
-                                                                rocsparse_operation_none,
-                                                                rocsparse_operation_none,
-                                                                mb,
-                                                                nb,
-                                                                descr_A,
-                                                                nnzb_A,
-                                                                bsr_row_ptr_A,
-                                                                bsr_col_ind_A,
-                                                                descr_B,
-                                                                nnzb_B,
-                                                                bsr_row_ptr_B,
-                                                                bsr_col_ind_B,
-                                                                descr_C,
-                                                                bsr_row_ptr_C,
-                                                                nnzb_C,
-                                                                temp_buffer,
-                                                                false)));
-
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrgeam_nnz_template(handle,
+                                                                  rocsparse_operation_none,
+                                                                  rocsparse_operation_none,
+                                                                  mb,
+                                                                  nb,
+                                                                  descr_A,
+                                                                  nnzb_A,
+                                                                  bsr_row_ptr_A,
+                                                                  bsr_col_ind_A,
+                                                                  descr_B,
+                                                                  nnzb_B,
+                                                                  bsr_row_ptr_B,
+                                                                  bsr_col_ind_B,
+                                                                  descr_C,
+                                                                  bsr_row_ptr_C,
+                                                                  nnzb_C,
+                                                                  nullptr,
+                                                                  nullptr,
+                                                                  false));
         return rocsparse_status_success;
     }
 

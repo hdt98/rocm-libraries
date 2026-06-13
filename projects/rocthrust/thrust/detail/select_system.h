@@ -18,19 +18,10 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/type_deduction.h>
-#include <thrust/system/detail/generic/select_system.h>
 
-#if _THRUST_HAS_DEVICE_SYSTEM_STD
-#  include _THRUST_STD_INCLUDE(type_traits)
-#endif
+#include <thrust/detail/type_deduction.h>
+#include <thrust/type_traits/remove_cvref.h>
+#include <thrust/system/detail/generic/select_system.h>
 
 THRUST_NAMESPACE_BEGIN
 
@@ -54,21 +45,36 @@ struct select_system_fn final
 {
   THRUST_EXEC_CHECK_DISABLE
   template <typename DerivedPolicy0>
-  THRUST_HOST_DEVICE auto operator()(thrust::detail::execution_policy_base<DerivedPolicy0> const& exec0) const
-    THRUST_DECLTYPE_RETURNS(select_system(thrust::detail::derived_cast(thrust::detail::strip_const(exec0))))
+  THRUST_HOST_DEVICE
+  auto operator()(
+    thrust::detail::execution_policy_base<DerivedPolicy0> const& exec0
+  ) const
+  THRUST_DECLTYPE_RETURNS(
+    select_system(
+      thrust::detail::derived_cast(thrust::detail::strip_const(exec0))
+    )
+  )
 
-      THRUST_EXEC_CHECK_DISABLE
+  THRUST_EXEC_CHECK_DISABLE
   template <typename DerivedPolicy0, typename DerivedPolicy1>
-  THRUST_HOST_DEVICE auto operator()(thrust::detail::execution_policy_base<DerivedPolicy0> const& exec0,
-                                     thrust::detail::execution_policy_base<DerivedPolicy1> const& exec1) const
-    THRUST_DECLTYPE_RETURNS(select_system(thrust::detail::derived_cast(thrust::detail::strip_const(exec0)),
-                                          thrust::detail::derived_cast(thrust::detail::strip_const(exec1))))
+  THRUST_HOST_DEVICE
+  auto operator()(
+    thrust::detail::execution_policy_base<DerivedPolicy0> const& exec0
+  , thrust::detail::execution_policy_base<DerivedPolicy1> const& exec1
+  ) const
+  THRUST_DECLTYPE_RETURNS(
+    select_system(
+      thrust::detail::derived_cast(thrust::detail::strip_const(exec0))
+    , thrust::detail::derived_cast(thrust::detail::strip_const(exec1))
+    )
+  )
 };
 
 } // namespace select_system_detail
 
 THRUST_INLINE_CONSTANT select_system_detail::select_system_fn select_system{};
 
-} // namespace detail
+} // detail
 
 THRUST_NAMESPACE_END
+

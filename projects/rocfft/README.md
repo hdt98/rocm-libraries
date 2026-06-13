@@ -1,18 +1,19 @@
 # rocFFT
 
 rocFFT is a software library for computing fast Fourier transforms (FFTs) written in the HIP
-programming language. It's part of the AMD software ecosystem based on
-[ROCm](https://github.com/ROCm/ROCm). The rocFFT library can be used with AMD GPUs.
+programming language. It's part of AMD's software ecosystem based on
+[ROCm](https://github.com/ROCm/ROCm). The rocFFT library can be used with AMD and
+NVIDIA GPUs.
 
 ## Documentation
 
 > [!NOTE]
-> The published rocFFT documentation is available at [rocFFT](https://rocm.docs.amd.com/projects/rocFFT/en/latest/index.html) in an organized, easy-to-read format, with search and a table of contents. The documentation source files reside in the projects/rocfft/docs folder of the rocm-libraries repository. As with all ROCm projects, the documentation is open source. For more information, see [Contribute to ROCm documentation](https://rocm.docs.amd.com/en/latest/contribute/contributing.html).
+> The published rocFFT documentation is available at [rocFFT](https://rocm.docs.amd.com/projects/rocFFT/en/latest/index.html) in an organized, easy-to-read format, with search and a table of contents. The documentation source files reside in the rocFFT/docs folder of this repository. As with all ROCm projects, the documentation is open source. For more information, see [Contribute to ROCm documentation](https://rocm.docs.amd.com/en/latest/contribute/contributing.html).
 
 To build our documentation locally, use the following code:
 
 ```Bash
-cd projects/rocfft/docs
+cd docs
 
 pip3 install -r sphinx/requirements.txt
 
@@ -35,7 +36,7 @@ You can install rocFFT using pre-built packages or building from source.
 * Building from source:
 
     rocFFT is compiled with AMD's clang++ and uses CMake. You can specify several options to customize your
-    build. The following commands build a shared library for supported AMD GPUs. Run these commands from the `rocm-libraries/projects/rocfft` directory:
+    build. The following commands build a shared library for supported AMD GPUs:
 
     ```bash
     mkdir build && cd build
@@ -60,7 +61,6 @@ You can install rocFFT using pre-built packages or building from source.
     | `rocfft-bench` | `-DBUILD_CLIENTS_BENCH=on` | hipRAND |
     | `rocfft-test` | `-DBUILD_CLIENTS_TESTS=on` | hipRAND, FFTW, GoogleTest |
     | samples | `-DBUILD_CLIENTS_SAMPLES=on` | None |
-    | coverage | `-DBUILD_CODE_COVERAGE=ON` | clang, llvm-cov |
 
     Clients are not built by default. To build them, use `-DBUILD_CLIENTS=on`. The build process
     downloads and builds GoogleTest and FFTW if they are not already installed.
@@ -77,17 +77,10 @@ You can install rocFFT using pre-built packages or building from source.
     To install client dependencies on Ubuntu, run:
 
     ```bash
-    sudo apt install libgtest-dev libfftw3-dev
+    sudo apt install libgtest-dev libfftw3-dev libboost-dev
     ```
 
-    rocFFT uses version 1.11 of GoogleTest.
-
-    You can generate a test coverage report with the following:
-    ```bash
-    cmake -DCMAKE_CXX_COMPILER=amdclang++ -DBUILD_CLIENTS_SAMPLES=ON -DBUILD_CLIENTS_TESTS=ON -DBUILD_CODE_COVERAGE=ON <optional: -DCOVERAGE_TEST_OPTIONS="cmdline args to pass to rocfft-test (default: --smoketest)"> ..
-    make -j coverage
-    ```
-    The above will output the coverage report to the terminal and also save an html coverage report to `$PWD/coverage-report`.
+    We use version 1.11 of GoogleTest.
 
 ## Examples
 
@@ -98,9 +91,9 @@ You can find additional examples in the `clients/samples` subdirectory.
 
 ## Support
 
-You can report bugs and feature requests through the rocm-libraries GitHub
-[issue tracker](https://github.com/ROCm/rocm-libraries/issues).
+You can report bugs and feature requests through the GitHub
+[issue tracker](https://github.com/ROCm/rocFFT/issues).
 
 ## Contribute
 
-If you want to contribute to rocFFT, you must follow the [contribution guidelines](https://github.com/ROCm/rocm-libraries/blob/develop/projects/rocfft/.github/CONTRIBUTING.md).
+If you want to contribute to rocFFT, you must follow our [contribution guidelines](https://github.com/ROCm/rocFFT/blob/develop/.github/CONTRIBUTING.md).

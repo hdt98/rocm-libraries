@@ -10,11 +10,7 @@ subtrees:
 - caption: Install
   entries:
   - file: install/install
-    title: Install hipSPARSE
-  - file: install/build-linux
-    title: Build from source on Linux
-  - file: install/build-windows
-    title: Build from source on Windows
+    title: Installation guide
 
 - caption: How to
   entries:
@@ -23,7 +19,7 @@ subtrees:
 
 - caption: Examples
   entries:
-  - url: https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsparse/clients/samples
+  - url: https://github.com/ROCm/hipSPARSE/tree/develop/clients/samples
     title: Client samples
 
 - caption: Examples
@@ -35,7 +31,7 @@ subtrees:
       - file: reference/api.rst
         title: Exported functions
       - file: reference/types.rst
-        title: hipSPARSE data types
+        title: hipSPARSE datatypes
       - file: reference/precision.rst
         title: hipSPARSE precision support
       - file: reference/auxiliary.rst

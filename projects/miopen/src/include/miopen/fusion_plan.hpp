@@ -1,15 +1,14 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
 
 #ifndef MIOPEN_GUARD_MLOPEN_FUSION_PLAN_HPP
 #define MIOPEN_GUARD_MLOPEN_FUSION_PLAN_HPP
 
+#include <miopen/config.hpp>
 #include <miopen/miopen.h>
 #include <miopen/tensor.hpp>
 #include <miopen/fusion.hpp>
 #include <miopen/search_options.hpp>
 
-#include <optional>
+#include <boost/optional.hpp>
 
 namespace miopen {
 
@@ -44,13 +43,12 @@ struct Exec_arg_t
 };
 
 struct FusionContext;
-struct FusionPlanDescriptor : miopenFusionPlanDescriptor
+struct MIOPEN_INTERNALS_EXPORT FusionPlanDescriptor : miopenFusionPlanDescriptor
 {
     FusionPlanDescriptor() {}
-    MIOPEN_INTERNALS_EXPORT FusionPlanDescriptor(miopenFusionDirection_t dir,
-                                                 const TensorDescriptor& inDesc);
+    FusionPlanDescriptor(miopenFusionDirection_t dir, const TensorDescriptor& inDesc);
     bool isValid() const { return is_valid; };
-    MIOPEN_INTERNALS_EXPORT miopenStatus_t AddOp(std::shared_ptr<FusionOpDescriptor> desc);
+    miopenStatus_t AddOp(std::shared_ptr<FusionOpDescriptor> desc);
     TensorDescriptor DeriveOutputDescriptor();
     miopenStatus_t GetWorkspaceSizeImmed(const Handle& handle,
                                          size_t& workSpaceSize,
@@ -60,14 +58,11 @@ struct FusionPlanDescriptor : miopenFusionPlanDescriptor
                            ConstData_t input,
                            const TensorDescriptor& outputDesc,
                            Data_t output,
-                           const OperatorArgs& op_args,
-                           Data_t workspace,
-                           size_t workspace_size);
-    MIOPEN_INTERNALS_EXPORT miopenStatus_t Compile(const Handle& handle);
-    std::vector<Solution>
-    Find(const Handle& handle,
-         const std::function<fusion::FusionInvokeParams(size_t)>& invoke_params,
-         const std::optional<FindOptions>& options = std::nullopt) const;
+                           const OperatorArgs& op_args);
+    miopenStatus_t Compile(const Handle& handle);
+    std::vector<Solution> Find(const Handle& handle,
+                               const std::function<fusion::FusionInvokeParams()>& invoke_params,
+                               const std::optional<FindOptions>& options = std::nullopt) const;
     friend std::ostream& operator<<(std::ostream& stream, const FusionPlanDescriptor& fpd);
 
     miopenStatus_t
@@ -88,8 +83,7 @@ struct FusionPlanDescriptor : miopenFusionPlanDescriptor
     bool fp_contains_bn;
     miopenDataType_t data_type;
     std::vector<Exec_arg_t> arg_list;
-    FindMode findMode{solver::Primitive::Fusion};
-    std::optional<std::pair<size_t, Invoker>> compiled_invoker;
+    std::vector<Invoker> invokers;
     std::optional<miopenConvFwdAlgorithm_t> conv_fwd_algo;
 };
 

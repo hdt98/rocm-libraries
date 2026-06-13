@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -19,10 +19,6 @@
 #include "ck/library/utility/literals.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_batched_gemm.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_softmax.hpp"
-
-using Row    = ck::tensor_layout::gemm::RowMajor;
-using Col    = ck::tensor_layout::gemm::ColumnMajor;
-using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
 namespace ck {
 namespace profiler {
@@ -49,10 +45,10 @@ bool profile_batched_gemm_bias_softmax_gemm_permute_impl(bool do_verification,
                                                          int O,
                                                          int G0,
                                                          int G1,
-                                                         float alpha        = -1.f,
-                                                         int instance_index = -1)
+                                                         float alpha = -1.f)
 
 {
+
     using PassThrough   = tensor_operation::element_wise::PassThrough;
     using ScaleAdd      = tensor_operation::element_wise::ScaleAdd;
     using AElementOp    = PassThrough;
@@ -111,12 +107,12 @@ bool profile_batched_gemm_bias_softmax_gemm_permute_impl(bool do_verification,
 
     const int BatchCount = G0 * G1;
 
-    Tensor<ADataType> a_gs_ms_ks(a_gs_ms_ks_lengths, a_gs_ms_ks_strides, Row{});
-    Tensor<B0DataType> b0_gs_ns_ks(b0_gs_ns_ks_lengths, b0_gs_ns_ks_strides, Row{});
-    Tensor<D0DataType> d0_gs_ms_ns(d0_gs_ms_ns_lengths, d0_gs_ms_ns_strides, Row{});
-    Tensor<B1DataType> b1_gs_os_ns(b1_gs_os_ns_lengths, b1_gs_os_ns_strides, Col{});
-    Tensor<CDataType> c_gs_ms_os_host_result(c_gs_ms_os_lengths, c_gs_ms_os_strides, Bypass{});
-    Tensor<CDataType> c_gs_ms_os_device_result(c_gs_ms_os_lengths, c_gs_ms_os_strides, Bypass{});
+    Tensor<ADataType> a_gs_ms_ks(a_gs_ms_ks_lengths, a_gs_ms_ks_strides);
+    Tensor<B0DataType> b0_gs_ns_ks(b0_gs_ns_ks_lengths, b0_gs_ns_ks_strides);
+    Tensor<D0DataType> d0_gs_ms_ns(d0_gs_ms_ns_lengths, d0_gs_ms_ns_strides);
+    Tensor<B1DataType> b1_gs_os_ns(b1_gs_os_ns_lengths, b1_gs_os_ns_strides);
+    Tensor<CDataType> c_gs_ms_os_host_result(c_gs_ms_os_lengths, c_gs_ms_os_strides);
+    Tensor<CDataType> c_gs_ms_os_device_result(c_gs_ms_os_lengths, c_gs_ms_os_strides);
 
     std::cout << "a_gs_ms_ks: " << a_gs_ms_ks.mDesc << std::endl;
     std::cout << "b0_gs_ns_ks: " << b0_gs_ns_ks.mDesc << std::endl;
@@ -151,12 +147,6 @@ bool profile_batched_gemm_bias_softmax_gemm_permute_impl(bool do_verification,
         b0_gs_ns_ks.GenerateTensorValue(GeneratorTensor_Diagonal<B0DataType>{});
         b1_gs_os_ns.GenerateTensorValue(GeneratorTensor_Diagonal<B1DataType>{});
         d0_gs_ms_ns.GenerateTensorValue(GeneratorTensor_1<D0DataType>{1});
-        break;
-    case 4:
-        a_gs_ms_ks.GenerateTensorValue(GeneratorTensor_3<ADataType>{0.0, 1.0});
-        b0_gs_ns_ks.GenerateTensorValue(GeneratorTensor_3<B0DataType>{0.0, 1.0});
-        b1_gs_os_ns.GenerateTensorValue(GeneratorTensor_3<B1DataType>{0.0, 0.5});
-        d0_gs_ms_ns.GenerateTensorValue(GeneratorTensor_3<D0DataType>{0.0, 0.5});
         break;
     default:
         a_gs_ms_ks.GenerateTensorValue(GeneratorTensor_1<ADataType>{1});
@@ -283,15 +273,10 @@ bool profile_batched_gemm_bias_softmax_gemm_permute_impl(bool do_verification,
     float best_ave_time   = 0;
     float best_tflops     = 0;
     float best_gb_per_sec = 0;
+
     // profile device op instances
-    for(size_t i = 0; i < op_ptrs.size(); i++)
+    for(auto& op_ptr : op_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& op_ptr      = op_ptrs[i];
         auto argument_ptr = op_ptr->MakeArgumentPointer(
             static_cast<ADataType*>(a_device_buf.GetDeviceBuffer()),
             static_cast<B0DataType*>(b0_device_buf.GetDeviceBuffer()),
@@ -366,16 +351,8 @@ bool profile_batched_gemm_bias_softmax_gemm_permute_impl(bool do_verification,
                    std::is_same_v<CDataType, ck::bhalf_t> &&
                    std::is_same_v<D0DataType, ck::bhalf_t>)
                 {
-                    if(ck::is_gfx11_supported())
-                    {
-                        rtol = 5e-2;
-                        atol = 5e-2;
-                    }
-                    else
-                    {
-                        rtol = 1e-2;
-                        atol = 1e-2;
-                    }
+                    rtol = 1e-2;
+                    atol = 1e-2;
                 }
 
                 pass = pass & ck::utils::check_err(c_gs_ms_os_device_result,
@@ -410,6 +387,7 @@ bool profile_batched_gemm_bias_softmax_gemm_permute_impl(bool do_verification,
 
     std::cout << "Best Perf: " << best_ave_time << " ms, " << best_tflops << " TFlops, "
               << best_gb_per_sec << " GB/s, " << best_op_name << std::endl;
+
     return pass;
 }
 

@@ -18,24 +18,15 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
 THRUST_NAMESPACE_BEGIN
 
 namespace detail
 {
 
-struct execution_policy_marker
-{};
+struct execution_policy_marker {};
 
 // execution_policy_base serves as a guard against
-// infinite recursion in thrust entry points:
+// inifinite recursion in thrust entry points:
 //
 // template<typename DerivedPolicy>
 // void foo(const thrust::detail::execution_policy_base<DerivedPolicy> &s)
@@ -48,33 +39,38 @@ struct execution_policy_marker
 // foo is not recursive when
 // 1. DerivedPolicy is derived from thrust::execution_policy below
 // 2. generic::foo takes thrust::execution_policy as a parameter
-template <typename DerivedPolicy>
-struct execution_policy_base : execution_policy_marker
-{};
+template<typename DerivedPolicy>
+struct execution_policy_base : execution_policy_marker {};
 
-template <typename DerivedPolicy>
-constexpr THRUST_HOST_DEVICE execution_policy_base<DerivedPolicy>&
-strip_const(const execution_policy_base<DerivedPolicy>& x)
+
+template<typename DerivedPolicy>
+constexpr THRUST_HOST_DEVICE
+execution_policy_base<DerivedPolicy> &strip_const(const execution_policy_base<DerivedPolicy> &x)
 {
   return const_cast<execution_policy_base<DerivedPolicy>&>(x);
 }
 
-template <typename DerivedPolicy>
-constexpr THRUST_HOST_DEVICE DerivedPolicy& derived_cast(execution_policy_base<DerivedPolicy>& x)
+
+template<typename DerivedPolicy>
+constexpr THRUST_HOST_DEVICE
+DerivedPolicy &derived_cast(execution_policy_base<DerivedPolicy> &x)
 {
   return static_cast<DerivedPolicy&>(x);
 }
 
-template <typename DerivedPolicy>
-constexpr THRUST_HOST_DEVICE const DerivedPolicy& derived_cast(const execution_policy_base<DerivedPolicy>& x)
+
+template<typename DerivedPolicy>
+constexpr THRUST_HOST_DEVICE
+const DerivedPolicy &derived_cast(const execution_policy_base<DerivedPolicy> &x)
 {
   return static_cast<const DerivedPolicy&>(x);
 }
 
-} // namespace detail
+} // end detail
 
-template <typename DerivedPolicy>
-struct execution_policy : thrust::detail::execution_policy_base<DerivedPolicy>
+template<typename DerivedPolicy>
+  struct execution_policy
+    : thrust::detail::execution_policy_base<DerivedPolicy>
 {};
 
 THRUST_NAMESPACE_END

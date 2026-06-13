@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -43,11 +43,7 @@ add_executable( rocblas-example-hip-complex-her2 example_hip_complex_her2.cpp )
 add_executable( rocblas-example-gemv-graph-capture example_gemv_graph_capture.cpp )
 add_executable( rocblas-example-header-check example_header_check.cpp)
 
-# test deprecated API without warnings until they are removed. Then this entire example can be deleted TODO
-target_compile_options( rocblas-example-solver PRIVATE -Wno-deprecated )
-
 set( sample_list_base rocblas-example-sscal rocblas-example-scal-template rocblas-example-scal-multiple-strided-batch rocblas-example-solver rocblas-example-hip-complex-her2 rocblas-example-gemv-graph-capture rocblas-example-header-check)
-
 
 if ( BUILD_FORTRAN_CLIENTS )
   # Fortran examples
@@ -74,13 +70,6 @@ set( sample_list_L3 rocblas-example-sgemm rocblas-example-sgemm-strided-batched 
 # device includes
 set( sample_list_hip_device ${sample_list_base} ${sample_list_tensile} ${sample_list_L3} )
 
-if ( (TARGET OpenMP::OpenMP_CXX) OR (TARGET OpenMP::omp) )
-  add_executable( rocblas-example-openmp example_openmp.cpp )
-  target_link_libraries( rocblas-example-openmp PRIVATE ${COMMON_LINK_LIBS} )
-  apply_omp_settings( rocblas-example-openmp )
-  list(APPEND sample_list_base rocblas-example-openmp) # OpenMP not supported with hip device compilation
-endif()
-
 # combined list
 set( sample_list_all ${sample_list_c} ${sample_list_base} ${sample_list_fortran} ${sample_list_tensile} ${sample_list_L3} )
 
@@ -98,9 +87,6 @@ foreach( exe ${sample_list_all} )
     set_target_properties( ${exe} PROPERTIES
     CXX_STANDARD 14
     )
-    # We widely use extensions and AMD Clang warnings are too noisy
-    target_compile_options( ${exe} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wno-c++17-extensions> )
-
     rocm_install(TARGETS ${exe} COMPONENT samples)
   else()
     set_target_properties( ${exe} PROPERTIES

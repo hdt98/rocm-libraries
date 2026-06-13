@@ -1,28 +1,7 @@
-// Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 #include <thrust/device_vector.h>
-#include <thrust/iterator/discard_iterator.h>
 #include <thrust/merge.h>
 #include <thrust/set_operations.h>
-
+#include <thrust/iterator/discard_iterator.h>
 #include <iostream>
 
 // This example illustrates use of the set operation algorithms
@@ -51,15 +30,14 @@
 //     through to the output in a algorithm-specific manner.  Refer
 //     to the full documentation for precise semantics.
 
+
 // helper routine
 template <typename String, typename Vector>
 void print(const String& s, const Vector& v)
 {
   std::cout << s << " [";
-  for (size_t i = 0; i < v.size(); i++)
-  {
+  for(size_t i = 0; i < v.size(); i++)
     std::cout << " " << v[i];
-  }
   std::cout << " ]\n";
 }
 
@@ -82,9 +60,9 @@ void SetUnion(const Vector& A, const Vector& B)
 
   // set_union returns an iterator C_end denoting the end of input
   typename Vector::iterator C_end;
-
+  
   C_end = thrust::set_union(A.begin(), A.end(), B.begin(), B.end(), C.begin());
-
+  
   // shrink C to exactly fit output
   C.erase(C_end, C.end());
 
@@ -99,9 +77,9 @@ void SetIntersection(const Vector& A, const Vector& B)
 
   // set_union returns an iterator C_end denoting the end of input
   typename Vector::iterator C_end;
-
+  
   C_end = thrust::set_intersection(A.begin(), A.end(), B.begin(), B.end(), C.begin());
-
+  
   // shrink C to exactly fit output
   C.erase(C_end, C.end());
 
@@ -116,9 +94,9 @@ void SetDifference(const Vector& A, const Vector& B)
 
   // set_union returns an iterator C_end denoting the end of input
   typename Vector::iterator C_end;
-
+  
   C_end = thrust::set_difference(A.begin(), A.end(), B.begin(), B.end(), C.begin());
-
+  
   // shrink C to exactly fit output
   C.erase(C_end, C.end());
 
@@ -133,9 +111,9 @@ void SetSymmetricDifference(const Vector& A, const Vector& B)
 
   // set_union returns an iterator C_end denoting the end of input
   typename Vector::iterator C_end;
-
+  
   C_end = thrust::set_symmetric_difference(A.begin(), A.end(), B.begin(), B.end(), C.begin());
-
+  
   // shrink C to exactly fit output
   C.erase(C_end, C.end());
 
@@ -153,10 +131,11 @@ void SetIntersectionSize(const Vector& A, const Vector& B)
   std::cout << "SetIntersectionSize(A,B) " << (C_end - C_begin) << std::endl;
 }
 
+
 int main(void)
 {
-  int a[] = {0, 2, 4, 5, 6, 8, 9};
-  int b[] = {0, 1, 2, 3, 5, 7, 8};
+  int a[] = {0,2,4,5,6,8,9};
+  int b[] = {0,1,2,3,5,7,8};
 
   thrust::device_vector<int> A(a, a + sizeof(a) / sizeof(int));
   thrust::device_vector<int> B(b, b + sizeof(b) / sizeof(int));
@@ -164,13 +143,14 @@ int main(void)
   print("Set A", A);
   print("Set B", B);
 
-  Merge(A, B);
-  SetUnion(A, B);
-  SetIntersection(A, B);
-  SetDifference(A, B);
-  SetSymmetricDifference(A, B);
+  Merge(A,B);
+  SetUnion(A,B);
+  SetIntersection(A,B);
+  SetDifference(A,B);
+  SetSymmetricDifference(A,B);
 
-  SetIntersectionSize(A, B);
+  SetIntersectionSize(A,B);
 
   return 0;
 }
+

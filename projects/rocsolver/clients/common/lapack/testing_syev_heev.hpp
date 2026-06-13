@@ -34,7 +34,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <bool STRIDED, typename T, typename S, typename U>
 void syev_heev_checkBadArgs(const rocblas_handle handle,
@@ -355,7 +354,7 @@ void syev_heev_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -371,12 +370,12 @@ void syev_heev_getPerfData(const rocblas_handle handle,
     {
         syev_heev_initData<false, true, T>(handle, evect, n, dA, lda, bc, hA, A, 0);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_syev_heev(STRIDED, handle, evect, uplo, n, dA.data(), lda, stA, dD.data(), stD,
                             dE.data(), stE, dinfo.data(), bc);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <bool BATCHED, bool STRIDED, typename T>
@@ -402,17 +401,14 @@ void testing_syev_heev(Arguments& argus)
     if(argus.alg_mode == 1)
     {
         EXPECT_ROCBLAS_STATUS(
-            rocsolver_set_alg_mode(handle, rocsolver_function_syev_heev, rocsolver_alg_mode_hybrid),
+            rocsolver_set_alg_mode(handle, rocsolver_function_sterf, rocsolver_alg_mode_hybrid),
             rocblas_status_success);
 
-        rocsolver_alg_mode sterf_mode, steqr_mode;
-        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_sterf, &sterf_mode),
-                              rocblas_status_success);
-        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_steqr, &steqr_mode),
+        rocsolver_alg_mode alg_mode;
+        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_sterf, &alg_mode),
                               rocblas_status_success);
 
-        EXPECT_EQ(sterf_mode, rocsolver_alg_mode_hybrid);
-        EXPECT_EQ(steqr_mode, rocsolver_alg_mode_hybrid);
+        EXPECT_EQ(alg_mode, rocsolver_alg_mode_hybrid);
     }
 
     // check non-supported values
@@ -466,7 +462,7 @@ void testing_syev_heev(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         if(BATCHED)
@@ -480,9 +476,13 @@ void testing_syev_heev(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // memory allocations (all cases)
@@ -532,7 +532,7 @@ void testing_syev_heev(Arguments& argus)
         }
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
         {
             syev_heev_getPerfData<STRIDED, T>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
                                               stE, dinfo, bc, hA, hD, hinfo, &gpu_time_used,
@@ -572,7 +572,7 @@ void testing_syev_heev(Arguments& argus)
         }
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
         {
             syev_heev_getPerfData<STRIDED, T>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
                                               stE, dinfo, bc, hA, hD, hinfo, &gpu_time_used,

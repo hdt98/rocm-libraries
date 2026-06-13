@@ -17,7 +17,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/detail/type_traits.h>
 #include <thrust/iterator/discard_iterator.h>
 
@@ -26,12 +25,15 @@ namespace detail
 {
 
 template <typename Iterator>
-struct is_discard_iterator : public thrust::detail::false_type
+struct is_discard_iterator
+  : public thrust::detail::false_type
 {};
 
 template <typename System>
-struct is_discard_iterator<thrust::discard_iterator<System>> : public thrust::detail::true_type
+struct is_discard_iterator< thrust::discard_iterator<System> >
+ : public thrust::detail::true_type
 {};
 
 } // end namespace detail
 THRUST_NAMESPACE_END
+

@@ -31,11 +31,10 @@
 #define HIPCUB_ROCPRIM_UTIL_TYPE_HPP_
 
 #include "../../config.hpp"
-#include "../../util_deprecated.hpp"
 
-#include <rocprim/detail/various.hpp> // IWYU pragma: export
-#include <rocprim/type_traits.hpp> // IWYU pragma: export
-#include <rocprim/types/future_value.hpp> // IWYU pragma: export
+#include <rocprim/detail/various.hpp>
+#include <rocprim/thread/radix_key_codec.hpp>
+#include <rocprim/types/future_value.hpp>
 
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
@@ -147,8 +146,8 @@ struct DoubleBuffer
     }
 };
 
-template<int A>
-struct HIPCUB_DEPRECATED_BECAUSE("Use ::std::integral_constant instead") Int2Type
+template <int A>
+struct Int2Type
 {
     enum {VALUE = A};
 };
@@ -196,12 +195,9 @@ using is_integral_or_enum =
 
 }
 
-// CUB deprecated this API, and suggests to use `::cuda::ceil_div` instead,
-// which is implemented in file `libcudacxx/include/cuda/__cmath/ceil_div.h`.
-template<typename NumeratorT, typename DenominatorT>
-HIPCUB_DEPRECATED_BECAUSE("Use hip::ceil_div instead from 'libhipcxx'")
+template <typename NumeratorT, typename DenominatorT>
 HIPCUB_HOST_DEVICE __forceinline__ constexpr NumeratorT
-    DivideAndRoundUp(NumeratorT n, DenominatorT d)
+DivideAndRoundUp(NumeratorT n, DenominatorT d)
 {
   static_assert(hipcub::detail::is_integral_or_enum<NumeratorT>::value &&
                 hipcub::detail::is_integral_or_enum<DenominatorT>::value,
@@ -483,16 +479,21 @@ struct Uninitialized
 
 /******************************************************************************
  * Simple type traits utilities.
+ *
+ * For example:
+ *     Traits<int>::CATEGORY             // SIGNED_INTEGER
+ *     Traits<NullType>::nullptr_TYPE       // true
+ *     Traits<uint4>::CATEGORY           // NOT_A_NUMBER
+ *     Traits<uint4>::PRIMITIVE;         // false
+ *
  ******************************************************************************/
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS // Do not document
 
 /**
- * \brief Basic type traits categories.
- * This enum is deprecated, please use <rocprim/type_traits> instead. Or if you have
- * libhipcxx, please use the type_traits system in libhipcxx.
+ * \brief Basic type traits categories
  */
-enum HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.") Category
+enum Category
 {
     NOT_A_NUMBER,
     SIGNED_INTEGER,
@@ -500,10 +501,10 @@ enum HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.") Category
     FLOATING_POINT
 };
 
+
 /**
  * \brief Basic type traits
  */
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
 template<Category _CATEGORY,
          bool     _PRIMITIVE,
          bool     _nullptr_TYPE,
@@ -512,37 +513,34 @@ template<Category _CATEGORY,
 struct BaseTraits
 {
     /// Category
-    HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.")
-    static constexpr Category CATEGORY = _CATEGORY;
+    static const Category CATEGORY      = _CATEGORY;
     enum
     {
-        PRIMITIVE HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.") = _PRIMITIVE,
-        nullptr_TYPE                                                              = _nullptr_TYPE,
+        PRIMITIVE    = _PRIMITIVE,
+        nullptr_TYPE = _nullptr_TYPE,
     };
 };
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
+
 
 /**
  * Basic type traits (unsigned primitive specialization)
  */
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
 template <typename _UnsignedBits, typename T>
 struct BaseTraits<UNSIGNED_INTEGER, true, false, _UnsignedBits, T>
 {
     using UnsignedBits = _UnsignedBits;
 
-    HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.")
-    static constexpr Category     CATEGORY   = UNSIGNED_INTEGER;
-    static constexpr UnsignedBits LOWEST_KEY = UnsignedBits(0);
-    static constexpr UnsignedBits MAX_KEY    = UnsignedBits(-1);
+    static const Category       CATEGORY    = UNSIGNED_INTEGER;
+    static const UnsignedBits   LOWEST_KEY  = UnsignedBits(0);
+    static const UnsignedBits   MAX_KEY     = UnsignedBits(-1);
 
     enum
     {
-        PRIMITIVE HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.") = true,
-        nullptr_TYPE                                                              = false,
+        PRIMITIVE    = true,
+        nullptr_TYPE = false,
     };
 
-    using key_codec = decltype(::rocprim::traits::get<T>().template radix_key_codec<false>());
+    using key_codec = rocprim::radix_key_codec<T>;
 
     static HIPCUB_HOST_DEVICE __forceinline__ UnsignedBits TwiddleIn(UnsignedBits key)
     {
@@ -570,30 +568,28 @@ struct BaseTraits<UNSIGNED_INTEGER, true, false, _UnsignedBits, T>
         return retval;
     }
 };
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
+
 
 /**
  * Basic type traits (signed primitive specialization)
  */
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
 template <typename _UnsignedBits, typename T>
 struct BaseTraits<SIGNED_INTEGER, true, false, _UnsignedBits, T>
 {
     using UnsignedBits = _UnsignedBits;
 
-    HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.")
-    static constexpr Category     CATEGORY   = SIGNED_INTEGER;
-    static constexpr UnsignedBits HIGH_BIT   = UnsignedBits(1) << ((sizeof(UnsignedBits) * 8) - 1);
-    static constexpr UnsignedBits LOWEST_KEY = HIGH_BIT;
-    static constexpr UnsignedBits MAX_KEY    = UnsignedBits(-1) ^ HIGH_BIT;
+    static const Category       CATEGORY    = SIGNED_INTEGER;
+    static const UnsignedBits   HIGH_BIT    = UnsignedBits(1) << ((sizeof(UnsignedBits) * 8) - 1);
+    static const UnsignedBits   LOWEST_KEY  = HIGH_BIT;
+    static const UnsignedBits   MAX_KEY     = UnsignedBits(-1) ^ HIGH_BIT;
 
     enum
     {
-        PRIMITIVE HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.") = true,
-        nullptr_TYPE                                                              = false,
+        PRIMITIVE    = true,
+        nullptr_TYPE = false,
     };
 
-    using key_codec = decltype(::rocprim::traits::get<T>().template radix_key_codec<false>());
+    using key_codec = rocprim::radix_key_codec<T>;
 
     static HIPCUB_HOST_DEVICE __forceinline__ UnsignedBits TwiddleIn(UnsignedBits key)
     {
@@ -617,13 +613,10 @@ struct BaseTraits<SIGNED_INTEGER, true, false, _UnsignedBits, T>
         return reinterpret_cast<T&>(retval);
     }
 };
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
 
-// This API needs to be deprecated once libhipcxx is available.
 template <typename _T>
 struct FpLimits;
 
-// This API needs to be deprecated once libhipcxx is available.
 template <>
 struct FpLimits<float>
 {
@@ -636,7 +629,6 @@ struct FpLimits<float>
     }
 };
 
-// This API needs to be deprecated once libhipcxx is available.
 template <>
 struct FpLimits<double>
 {
@@ -649,7 +641,6 @@ struct FpLimits<double>
     }
 };
 
-// This API needs to be deprecated once libhipcxx is available.
 template <>
 struct FpLimits<__half>
 {
@@ -664,7 +655,6 @@ struct FpLimits<__half>
     }
 };
 
-// This API needs to be deprecated once libhipcxx is available.
 template <>
 struct FpLimits<hip_bfloat16>
 {
@@ -682,24 +672,22 @@ struct FpLimits<hip_bfloat16>
 /**
  * Basic type traits (fp primitive specialization)
  */
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
 template <typename _UnsignedBits, typename T>
 struct BaseTraits<FLOATING_POINT, true, false, _UnsignedBits, T>
 {
     using UnsignedBits = _UnsignedBits;
 
-    HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.")
-    static constexpr Category     CATEGORY   = FLOATING_POINT;
-    static constexpr UnsignedBits HIGH_BIT   = UnsignedBits(1) << ((sizeof(UnsignedBits) * 8) - 1);
-    static constexpr UnsignedBits LOWEST_KEY = UnsignedBits(-1);
-    static constexpr UnsignedBits MAX_KEY    = UnsignedBits(-1) ^ HIGH_BIT;
+    static const Category       CATEGORY    = FLOATING_POINT;
+    static const UnsignedBits   HIGH_BIT    = UnsignedBits(1) << ((sizeof(UnsignedBits) * 8) - 1);
+    static const UnsignedBits   LOWEST_KEY  = UnsignedBits(-1);
+    static const UnsignedBits   MAX_KEY     = UnsignedBits(-1) ^ HIGH_BIT;
 
-    using key_codec = decltype(::rocprim::traits::get<T>().template radix_key_codec<false>());
+    using key_codec = rocprim::radix_key_codec<T>;
 
     enum
     {
-        PRIMITIVE HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.") = true,
-        nullptr_TYPE                                                              = false,
+        PRIMITIVE    = true,
+        nullptr_TYPE = false,
     };
 
     static HIPCUB_HOST_DEVICE __forceinline__ UnsignedBits TwiddleIn(UnsignedBits key)
@@ -722,12 +710,11 @@ struct BaseTraits<FLOATING_POINT, true, false, _UnsignedBits, T>
         return FpLimits<T>::Lowest();
     }
 };
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
+
 
 /**
  * \brief Numeric type traits
  */
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
 template <typename T> struct NumericTraits :            BaseTraits<NOT_A_NUMBER, false, false, T, T> {};
 
 template <> struct NumericTraits<NullType> :            BaseTraits<NOT_A_NUMBER, false, true, NullType, NullType> {};
@@ -756,11 +743,10 @@ struct NumericTraits<__uint128_t>
     static constexpr UnsignedBits LOWEST_KEY = UnsignedBits(0);
     static constexpr UnsignedBits MAX_KEY    = UnsignedBits(-1);
 
-    HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.")
-    static constexpr bool PRIMITIVE    = false;
+    static constexpr bool PRIMITIVE = false;
     static constexpr bool nullptr_TYPE = false;
 
-    using key_codec = decltype(::rocprim::traits::get<T>().template radix_key_codec<false>());
+    using key_codec = rocprim::radix_key_codec<T>;
 
     static __host__ __device__ __forceinline__ UnsignedBits TwiddleIn(UnsignedBits key)
     {
@@ -794,11 +780,10 @@ struct NumericTraits<__int128_t>
     static constexpr UnsignedBits LOWEST_KEY = HIGH_BIT;
     static constexpr UnsignedBits MAX_KEY    = UnsignedBits(-1) ^ HIGH_BIT;
 
-    HIPCUB_DEPRECATED_BECAUSE("Use <rocprim/type_traits> instead.")
     static constexpr bool PRIMITIVE = false;
     static constexpr bool nullptr_TYPE = false;
 
-    using key_codec = decltype(::rocprim::traits::get<T>().template radix_key_codec<false>());
+    using key_codec = rocprim::radix_key_codec<T>;
 
     static __host__ __device__ __forceinline__ UnsignedBits TwiddleIn(UnsignedBits key)
     {
@@ -830,194 +815,14 @@ template <> struct NumericTraits<__half> :              BaseTraits<FLOATING_POIN
 template <> struct NumericTraits<hip_bfloat16 > :       BaseTraits<FLOATING_POINT, true, false, unsigned short, hip_bfloat16 > {};
 
 template <> struct NumericTraits<bool> :                BaseTraits<UNSIGNED_INTEGER, true, false, typename UnitWord<bool>::VolatileWord, bool> {};
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
 
 /**
  * \brief Type traits
  */
-template<typename T>
-struct Traits : NumericTraits<typename std::remove_cv<T>::type>
-{};
-
-namespace detail
-{
-// __uint128_t and __int128_t are not primitive
-
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_PUSH
-template<typename T>
-struct is_primitive : ::std::bool_constant<Traits<T>::PRIMITIVE>
-{};
-
-template<typename T>
-inline constexpr bool is_primitive_v = is_primitive<T>::value;
-
-HIPCUB_CLANG_SUPPRESS_DEPRECATED_POP
-
-} // namespace detail
-
-/**
- * \brief Common type of zero types.
- */
-template<class...>
-struct common_type
-{};
-
-/**
- * \brief Common type of a single type.
- */
-template<class T>
-struct common_type<T> : common_type<T, T>
-{};
-
-// Common type of a pair of types.
-namespace detail
-{
-
-// Determines if type is half or bfloat16 (extended fp).
-template<class T>
-struct is_extended_fp
-    : std::integral_constant<
-          bool,
-          std::is_same<__half, typename std::remove_cv<T>::type>::value
-              || std::is_same<hip_bfloat16, typename std::remove_cv<T>::type>::value>
-{};
-
-// Gets "raw" type: drops reference and const qualifier.
-template<typename T>
-struct remove_cvref
-{
-    using type = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
-};
-template<typename T>
-using remove_cvref_t = typename remove_cvref<T>::type;
-
-template<template<typename...> class MFn, bool condition, typename T>
-using apply_if_t = std::conditional_t<condition, MFn<T>, T>;
-
-template<typename From, typename To>
-using copy_cv_t
-    = apply_if_t<std::add_volatile_t,
-                 std::is_volatile_v<From>,
-                 apply_if_t<std::add_const_t, std::is_const_v<From>, std::remove_cv_t<To>>>;
-
-template<typename From, typename To>
-using copy_ref_t = apply_if_t<std::add_rvalue_reference_t,
-                              std::is_rvalue_reference_v<From>,
-                              apply_if_t<std::add_lvalue_reference_t,
-                                         std::is_lvalue_reference_v<From>,
-                                         std::remove_reference_t<To>>>;
-
-template<typename From, typename To>
-using copy_cvref_t = copy_ref_t<From, copy_cv_t<std::remove_reference_t<From>, remove_cvref_t<To>>>;
-
-// Captures non extended fp types.
-template<class T1, class T2, class = void>
-struct common_type_extended_fp
-{
-    using type = typename std::common_type<T1, T2>::type;
-};
-
-// Captures first type arithmetic, second one extended FP.
-template<class T1, class T2>
-struct common_type_extended_fp<
-    T1,
-    T2,
-    typename std::enable_if_t<std::is_arithmetic<remove_cvref_t<T1>>::value
-                              && is_extended_fp<remove_cvref_t<T2>>::value>>
-{
-    using type = typename std::common_type<T1, copy_cvref_t<T2, float>>::type;
-};
-
-// Captures first type extended FP, second one arithmetic.
-template<class T1, class T2>
-struct common_type_extended_fp<
-    T1,
-    T2,
-    typename std::enable_if_t<is_extended_fp<remove_cvref_t<T1>>::value
-                              && std::is_arithmetic<remove_cvref_t<T2>>::value>>
-{
-    using type = typename std::common_type<copy_cvref_t<T1, float>, T2>::type;
-};
-
-template<class...>
-using void_t = void;
-
-template<int Value>
-using int_constant_t = ::std::integral_constant<int, Value>;
-
-// Common type of more than two types.
-
-template<class AlwaysVoid, class T1, class T2, class... Rest>
-struct common_type_multi_impl
-{};
-
-template<class T1, class T2, class... Rest>
-struct common_type_multi_impl<void_t<typename common_type<T1, T2>::type>, T1, T2, Rest...>
-    : common_type<typename common_type<T1, T2>::type, Rest...>
-{};
-} // namespace detail
-
-/**
- * \brief Common type of a pair of types
- */
-template<class T1, class T2>
-struct common_type<T1, T2> : detail::common_type_extended_fp<T1, T2>
-{};
-
-/**
- * \brief Common type of more than two types
- */
-template<class T1, class T2, class... Rest>
-struct common_type<T1, T2, Rest...> : detail::common_type_multi_impl<void, T1, T2, Rest...>
-{};
-
-/**
- * \brief Common type helper
- */
-template<class... Ts>
-using common_type_t = typename common_type<Ts...>::type;
+template <typename T>
+struct Traits : NumericTraits<typename std::remove_cv<T>::type> {};
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
-
-namespace detail
-{
-
-template<typename T, typename = void>
-struct is_fixed_size_random_access_range : ::std::false_type
-{};
-
-template<typename T, size_t N>
-struct is_fixed_size_random_access_range<T[N], void> : ::std::true_type
-{};
-
-template<typename T>
-struct is_fixed_size_random_access_range<T, void_t<decltype(std::declval<T&>()[0])>>
-    : ::std::true_type
-{};
-
-// TODO: for is_fixed_size_random_access_range we also need to support array span and extents after we can use libhipcxx.
-template<typename T>
-using is_fixed_size_random_access_range_t = typename is_fixed_size_random_access_range<T>::type;
-
-template<typename T, typename = void>
-struct static_size
-{
-    static_assert(false, "static_size not supported for this type");
-};
-
-template<typename T, size_t N>
-struct static_size<T[N], void> : ::std::integral_constant<int, N>
-{};
-
-template<typename T>
-[[nodiscard]]
-__host__ __device__ __forceinline__
-constexpr size_t static_size_v()
-{
-    return static_size<T>::value;
-}
-
-} // namespace detail
 
 END_HIPCUB_NAMESPACE
 

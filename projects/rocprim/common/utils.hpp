@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,6 @@
     // The lambda is invoked immediately as assertions that generate a fatal failure can
     // only be used in void-returning functions.
     #define HIP_CHECK(condition)                                                            \
-        do                                                                                  \
         {                                                                                   \
             hipError_t error = condition;                                                   \
             if(error != hipSuccess)                                                         \
@@ -39,11 +38,9 @@
                 { FAIL() << "HIP error " << error << ": " << hipGetErrorString(error); }(); \
                 exit(error);                                                                \
             }                                                                               \
-        }                                                                                   \
-        while(0)
+        }
 #else
     #define HIP_CHECK(condition)                                                                \
-        do                                                                                      \
         {                                                                                       \
             hipError_t error = condition;                                                       \
             if(error != hipSuccess)                                                             \
@@ -52,15 +49,15 @@
                           << " line: " << __LINE__ << std::endl;                                \
                 exit(error);                                                                    \
             }                                                                                   \
-        }                                                                                       \
-        while(0)
+        }
 #endif
 
 namespace common
 {
 template<unsigned int LogicalWarpSize>
-__device__ constexpr bool device_test_enabled_for_warp_size_v
-    = ::rocprim::arch::wavefront::max_size() >= LogicalWarpSize;
+__device__
+constexpr bool device_test_enabled_for_warp_size_v
+    = ::rocprim::arch::wavefront::min_size() >= LogicalWarpSize;
 
 inline char* __get_env(const char* name)
 {

@@ -47,60 +47,66 @@ inline bool reduction_requires_near(const Arguments& arg, int64_t n)
            || (std::is_same_v<T, rocblas_half> && n > 10000);
 }
 
-// Sum error tolerance for large sums. If multiplied by the number of items
-// in the sum you get an expected a normalized upper bound on error.
-// The sum exponent needs to also be considered for the error tolerance
+// Sum error tolerance for large sums. Multiplied by the number of items
+// in the sum to get an expected absolute error bound.
 
 template <class T>
-inline constexpr double sum_error_tolerance = get_epsilon<T>();
+static constexpr double sum_error_tolerance = get_epsilon<T>();
 
 template <>
-inline constexpr double sum_error_tolerance<rocblas_bfloat16> = 1 / 100.0;
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance<rocblas_f8> = 1 / 16.0; // computed epsilon_f8=0.0625, epsilon_bf8=0.125
 
 template <>
-inline constexpr double sum_error_tolerance<rocblas_half> = 1 / 900.0;
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance<rocblas_bf8> = 1 / 8.0; // computed epsilon_f8=0.0625, epsilon_bf8=0.125
 
 template <>
-inline constexpr double sum_error_tolerance<rocblas_float_complex> = 1 / 10000.0;
+ROCBLAS_CLANG_STATIC constexpr double sum_error_tolerance<rocblas_bfloat16> = 1 / 100.0;
 
 template <>
-inline constexpr double sum_error_tolerance<rocblas_double_complex> = 1 / 1000000.0;
+ROCBLAS_CLANG_STATIC constexpr double sum_error_tolerance<rocblas_half> = 1 / 900.0;
+
+template <>
+ROCBLAS_CLANG_STATIC constexpr double sum_error_tolerance<rocblas_float_complex> = 1 / 10000.0;
+
+template <>
+ROCBLAS_CLANG_STATIC constexpr double sum_error_tolerance<rocblas_double_complex> = 1 / 1000000.0;
 
 template <class Tc, class Ti, class To>
-inline constexpr double sum_error_tolerance_for_gfx11 = get_epsilon<Tc>();
+static constexpr double sum_error_tolerance_for_gfx11 = get_epsilon<Tc>();
 
 template <>
-inline constexpr double sum_error_tolerance_for_gfx11<float, rocblas_bfloat16, float> = 1 / 10.0;
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance_for_gfx11<float, rocblas_bfloat16, float> = 1 / 10.0;
 
 template <>
-inline constexpr double
+ROCBLAS_CLANG_STATIC constexpr double
     sum_error_tolerance_for_gfx11<float, rocblas_bfloat16, rocblas_bfloat16> = 1 / 10.0;
 
 template <>
-inline constexpr double sum_error_tolerance_for_gfx11<float, rocblas_half, float> = 1 / 100.0;
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance_for_gfx11<float, rocblas_half, float> = 1 / 100.0;
 
 template <>
-inline constexpr double sum_error_tolerance_for_gfx11<float, rocblas_half, rocblas_half> = 1
-                                                                                           / 100.0;
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance_for_gfx11<float, rocblas_half, rocblas_half> = 1 / 100.0;
+
 template <>
-inline constexpr double
+ROCBLAS_CLANG_STATIC constexpr double
     sum_error_tolerance_for_gfx11<rocblas_half, rocblas_half, rocblas_half> = 1 / 100.0;
 
-template <> // syrk_ex use
-inline constexpr double sum_error_tolerance_for_gfx11<double, float, float> = get_epsilon<float>();
-
-template <> // syrk_ex use
-inline constexpr double sum_error_tolerance_for_gfx11<double, float, double> = get_epsilon<float>();
+template <>
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance_for_gfx11<rocblas_float_complex,
+                                  rocblas_float_complex,
+                                  rocblas_float_complex> = 1 / 10000.0;
 
 template <>
-inline constexpr double sum_error_tolerance_for_gfx11<rocblas_float_complex,
-                                                      rocblas_float_complex,
-                                                      rocblas_float_complex> = 1 / 10000.0;
-
-template <>
-inline constexpr double sum_error_tolerance_for_gfx11<rocblas_double_complex,
-                                                      rocblas_double_complex,
-                                                      rocblas_double_complex> = 1 / 1000000.0;
+ROCBLAS_CLANG_STATIC constexpr double
+    sum_error_tolerance_for_gfx11<rocblas_double_complex,
+                                  rocblas_double_complex,
+                                  rocblas_double_complex> = 1 / 1000000.0;
 
 template <typename T>
 double sum_near_tolerance(int64_t n, real_t<T> sum)
@@ -194,6 +200,10 @@ double dot_near_tolerance(int arch_major, int64_t n, To sum)
 
 #define NEAR_ASSERT_BF16(a, b, err) ASSERT_NEAR(double(rocblas_bfloat16(a)), double(b), err)
 
+#define NEAR_ASSERT_F8(a, b, err) ASSERT_NEAR(double(float(a)), double(float(b)), err)
+
+#define NEAR_ASSERT_BF8(a, b, err) ASSERT_NEAR(double(float(a)), double(float(b)), err)
+
 #define NEAR_ASSERT_COMPLEX(a, b, err)                  \
     do                                                  \
     {                                                   \
@@ -224,6 +234,28 @@ inline void near_check_general(int64_t             M,
                                double              abs_error)
 {
     NEAR_CHECK(M, N, lda, 0, hCPU, hGPU, 1, abs_error, NEAR_ASSERT_HALF);
+}
+
+template <>
+inline void near_check_general(int64_t           M,
+                               int64_t           N,
+                               int64_t           lda,
+                               const rocblas_f8* hCPU,
+                               const rocblas_f8* hGPU,
+                               double            abs_error)
+{
+    NEAR_CHECK(M, N, lda, 0, hCPU, hGPU, 1, abs_error, NEAR_ASSERT_F8);
+}
+
+template <>
+inline void near_check_general(int64_t            M,
+                               int64_t            N,
+                               int64_t            lda,
+                               const rocblas_bf8* hCPU,
+                               const rocblas_bf8* hGPU,
+                               double             abs_error)
+{
+    NEAR_CHECK(M, N, lda, 0, hCPU, hGPU, 1, abs_error, NEAR_ASSERT_BF8);
 }
 
 template <>
@@ -285,6 +317,32 @@ inline void near_check_general(int64_t             M,
                                double              abs_error)
 {
     NEAR_CHECK(M, N, lda, strideA, hCPU, hGPU, batch_count, abs_error, NEAR_ASSERT_HALF);
+}
+
+template <>
+inline void near_check_general(int64_t           M,
+                               int64_t           N,
+                               int64_t           lda,
+                               rocblas_stride    strideA,
+                               const rocblas_f8* hCPU,
+                               const rocblas_f8* hGPU,
+                               int64_t           batch_count,
+                               double            abs_error)
+{
+    NEAR_CHECK(M, N, lda, strideA, hCPU, hGPU, batch_count, abs_error, NEAR_ASSERT_F8);
+}
+
+template <>
+inline void near_check_general(int64_t            M,
+                               int64_t            N,
+                               int64_t            lda,
+                               rocblas_stride     strideA,
+                               const rocblas_bf8* hCPU,
+                               const rocblas_bf8* hGPU,
+                               int64_t            batch_count,
+                               double             abs_error)
+{
+    NEAR_CHECK(M, N, lda, strideA, hCPU, hGPU, batch_count, abs_error, NEAR_ASSERT_BF8);
 }
 
 template <>
@@ -411,6 +469,30 @@ inline void near_check_general(int64_t                   M,
                                double                    abs_error)
 {
     NEAR_CHECK_B(M, N, lda, hCPU, hGPU, batch_count, abs_error, NEAR_ASSERT_HALF);
+}
+
+template <>
+inline void near_check_general(int64_t                 M,
+                               int64_t                 N,
+                               int64_t                 lda,
+                               const rocblas_f8* const hCPU[],
+                               const rocblas_f8* const hGPU[],
+                               int64_t                 batch_count,
+                               double                  abs_error)
+{
+    NEAR_CHECK_B(M, N, lda, hCPU, hGPU, batch_count, abs_error, NEAR_ASSERT_F8);
+}
+
+template <>
+inline void near_check_general(int64_t                  M,
+                               int64_t                  N,
+                               int64_t                  lda,
+                               const rocblas_bf8* const hCPU[],
+                               const rocblas_bf8* const hGPU[],
+                               int64_t                  batch_count,
+                               double                   abs_error)
+{
+    NEAR_CHECK_B(M, N, lda, hCPU, hGPU, batch_count, abs_error, NEAR_ASSERT_BF8);
 }
 
 template <>

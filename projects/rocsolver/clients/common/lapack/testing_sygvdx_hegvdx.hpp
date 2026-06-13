@@ -36,7 +36,6 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
-#include "common/misc/rocsolver_timer.hpp"
 
 template <bool STRIDED, typename T, typename S, typename U>
 void sygvdx_hegvdx_checkBadArgs(const rocblas_handle handle,
@@ -516,7 +515,7 @@ void sygvdx_hegvdx_getError(const rocblas_handle handle,
     // calls to the solver should look for computed eigenvalues in the range
     // (vl - tol, vu + tol], where `tol = C * n * ulp * ||A||`.
     //
-    S C = 10;
+    S C = 4;
     std::vector<S> tols(bc, 0);
     std::vector<S> norms(bc, 0);
     S tol = 0;
@@ -847,7 +846,7 @@ void sygvdx_hegvdx_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
+    double start;
 
     if(profile > 0)
     {
@@ -864,13 +863,13 @@ void sygvdx_hegvdx_getPerfData(const rocblas_handle handle,
         sygvdx_hegvdx_initData<false, true, T>(handle, itype, evect, n, dA, lda, stA, dB, ldb, stB,
                                                bc, hA, hB, A, B, false, singular);
 
-        timer.start(stream);
+        start = get_time_us_sync(stream);
         rocsolver_sygvdx_hegvdx(STRIDED, handle, itype, evect, erange, uplo, n, dA.data(), lda, stA,
                                 dB.data(), ldb, stB, vl, vu, il, iu, dNev.data(), dW.data(), stW,
                                 dZ.data(), ldz, stZ, dInfo.data(), bc);
-        timer.end(stream);
+        *gpu_time_used += get_time_us_sync(stream) - start;
     }
-    *gpu_time_used = timer.get_combined();
+    *gpu_time_used /= hot_calls;
 }
 
 template <bool BATCHED, bool STRIDED, typename T>
@@ -972,7 +971,7 @@ void testing_sygvdx_hegvdx(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query)
+    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         if(BATCHED)
@@ -988,9 +987,13 @@ void testing_sygvdx_hegvdx(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
+        if(argus.mem_query)
+        {
+            rocsolver_bench_inform(inform_mem_query, size);
+            return;
+        }
 
-        rocsolver_bench_inform(inform_mem_query, size);
-        return;
+        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
     }
 
     // memory allocations (all cases)
@@ -1049,7 +1052,7 @@ void testing_sygvdx_hegvdx(Arguments& argus)
                 hInfo, hInfoRes, &max_error, argus.singular, hashA, hashB, hashW, hashZ);
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
             sygvdx_hegvdx_getPerfData<STRIDED, T>(
                 handle, itype, evect, erange, uplo, n, dA, lda, stA, dB, ldb, stB, vl, vu, il, iu,
                 dNev, dW, stW, dZ, ldz, stZ, dInfo, bc, hA, hB, hNev, hW, hZ, hInfo, &gpu_time_used,
@@ -1096,7 +1099,7 @@ void testing_sygvdx_hegvdx(Arguments& argus)
                 hInfo, hInfoRes, &max_error, argus.singular, hashA, hashB, hashW, hashZ);
 
         // collect performance data
-        if(argus.timing && hot_calls > 0)
+        if(argus.timing)
             sygvdx_hegvdx_getPerfData<STRIDED, T>(
                 handle, itype, evect, erange, uplo, n, dA, lda, stA, dB, ldb, stB, vl, vu, il, iu,
                 dNev, dW, stW, dZ, ldz, stZ, dInfo, bc, hA, hB, hNev, hW, hZ, hInfo, &gpu_time_used,

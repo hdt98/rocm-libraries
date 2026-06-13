@@ -1,4 +1,4 @@
-// Copyright (C) 2020 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2020 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -30,9 +30,6 @@
 
 #include <limits>
 #include <sstream>
-
-SchemeTreeVec EmptySchemeTreeVec;
-SchemeVec     EmptySchemeVec;
 
 struct rocfft_mp_request_t
 {
@@ -71,11 +68,11 @@ NodeMetaData::NodeMetaData(TreeNode* refNode)
 {
     if(refNode != nullptr)
     {
-        precision         = refNode->precision;
-        batch             = refNode->batch;
-        direction         = refNode->direction;
-        rootTransformType = refNode->GetRootPlanTransformType();
-        deviceProp        = refNode->deviceProp;
+        precision  = refNode->precision;
+        batch      = refNode->batch;
+        direction  = refNode->direction;
+        rootIsC2C  = refNode->IsRootPlanC2CTransform();
+        deviceProp = refNode->deviceProp;
     }
 }
 
@@ -107,59 +104,44 @@ FMKey LeafNode::GetKernelKey() const
 
 void LeafNode::GetKernelFactors()
 {
-    auto kernel   = GetKernel();
-    kernelFactors = kernel.factors;
+    FMKey key     = GetKernelKey();
+    kernelFactors = pool.get_kernel(key).factors;
+
+    // Hard-coded kernel factors for len 64x64x64 partial-pass
+    // TODO: Remove this hard-coded logic once
+    // partial-pass is integrated into the stockham generators.
+    if(scheme == CS_KERNEL_STOCKHAM && applyPartialPass)
+        kernelFactors = {8, 8};
+    if(scheme == CS_KERNEL_STOCKHAM_BLOCK_CC && applyPartialPass)
+        kernelFactors = {8, 8};
 }
 
 void LeafNode::GetKernelPartialPassFactors()
 {
-    auto kernel     = GetKernel();
-    kernelFactorsPP = std::vector<size_t>(kernel.pp_params.pp_factors_curr.begin(),
-                                          kernel.pp_params.pp_factors_curr.end());
-
-    switch(ppOffDim)
+    // Hard-coded kernel partial-pass factors for len 64x64x64.
+    // TODO: Remove this hard-coded logic once
+    // partial-pass is integrated into the Stockham generators.
+    if(scheme == CS_KERNEL_STOCKHAM && applyPartialPass)
     {
-    case 0: // work along x will be split between y and z
-    {
-        throw std::runtime_error(
-            "GetKernelPartialPassFactors: partial-passes along x not currently supported");
-        break;
+        kernelFactorsPP = {16};
+        std::stringstream msg;
+        msg << "work in the off-dimension:" << std::endl;
+        msg << "\t     radix: [";
+        for(const auto factor : kernelFactorsPP)
+            msg << " " << factor;
+        msg << " ] pass(es) + Hadamard product with twiddle factors. \n";
+        comments.push_back(msg.str());
     }
-    case 1: // work along y will be split between x and z
+    if(scheme == CS_KERNEL_STOCKHAM_BLOCK_CC && applyPartialPass)
     {
-        if(scheme == CS_KERNEL_STOCKHAM_PP)
-        {
-            std::stringstream msg;
-            msg << "work in the off-dimension:" << std::endl;
-            msg << "\t     radix: [";
-            for(const auto factor : kernelFactorsPP)
-                msg << " " << factor;
-            msg << " ] pass(es) + Hadamard product with twiddle factors. \n";
-            comments.push_back(msg.str());
-        }
-        if(scheme == CS_KERNEL_STOCKHAM_PP_BLOCK_CC)
-        {
-            std::stringstream msg;
-            msg << "work in the off-dimension:" << std::endl;
-            msg << "\t     local data transposition + radix: [";
-            for(const auto factor : kernelFactorsPP)
-                msg << " " << factor;
-            msg << " ] pass(es). \n";
-            comments.push_back(msg.str());
-        }
-
-        break;
-    }
-    case 2: // work along z will be split between x and y
-    {
-        // x row fft + partial pass along z
-        // partial pass along z + y col fft
-        throw std::runtime_error(
-            "GetKernelPartialPassFactors: partial-passes along z not currently supported");
-        break;
-    }
-    default:
-        throw std::runtime_error("Invalid off-dimension for partial pass");
+        kernelFactorsPP = {4};
+        std::stringstream msg;
+        msg << "work in the off-dimension:" << std::endl;
+        msg << "\t     local data transposition + radix: [";
+        for(const auto factor : kernelFactorsPP)
+            msg << " " << factor;
+        msg << " ] pass(es). \n";
+        comments.push_back(msg.str());
     }
 }
 
@@ -215,17 +197,23 @@ bool LeafNode::KernelCheck(std::vector<FMKey>& kernel_keys)
     // get the final key and check if we have the kernel.
     // Note that the check is trivial if we are using "specified_key"
     // since we definitly have the kernel, but not trivial if it's the auto-gen key
-    if(!HasKernel())
+    FMKey key = GetKernelKey();
+    if(!pool.has_function(key))
+    {
+        if(LOG_TRACE_ENABLED())
+            (*LogSingleton::GetInstance().GetTraceOS()) << PrintMissingKernelInfo(key);
+
         return false;
+    }
+
+    dir2regMode = (pool.get_kernel(key).direct_to_from_reg)
+                      ? DirectRegType::TRY_ENABLE_IF_SUPPORT
+                      : DirectRegType::FORCE_OFF_OR_NOT_SUPPORT;
 
     GetKernelFactors();
 
-    if(isPartialPassEnabled())
+    if(applyPartialPass)
         GetKernelPartialPassFactors();
-
-    auto kernel = GetKernel();
-    dir2regMode = (kernel.direct_to_from_reg) ? DirectRegType::TRY_ENABLE_IF_SUPPORT
-                                              : DirectRegType::FORCE_OFF_OR_NOT_SUPPORT;
 
     return true;
 }
@@ -301,6 +289,8 @@ void LeafNode::SetupGridParam(GridParam& gp)
     {
         if(pool.has_function(key))
         {
+            auto kernel = pool.get_kernel(key);
+
             // NB:
             // Special case on specific arch:
             // For some cases using hald_lds, finer tuning(enlarge) dynamic
@@ -314,7 +304,6 @@ void LeafNode::SetupGridParam(GridParam& gp)
                 double_half_lds_alloc = true;
             }
 
-            auto kernel = pool.get_kernel(key);
             if(kernel.half_lds && (!double_half_lds_alloc))
                 gp.lds_bytes /= 2;
         }
@@ -329,14 +318,12 @@ void LeafNode::SetupGridParam(GridParam& gp)
             if(kernel.half_lds)
                 gp.lds_bytes /= 2;
         }
-    }
 
-    if(scheme == CS_KERNEL_STOCKHAM_BLOCK_CC || scheme == CS_KERNEL_STOCKHAM_PP_BLOCK_CC)
-    {
         auto apply_large_twd = (largeTwdBase > 0 && ltwdSteps > 0);
         if(apply_large_twd && largeTwdBase < 8)
         {
             // append twiddle table to dynamic lds
+            auto kernel = pool.get_kernel(key);
             gp.lds_bytes += twiddles_large_size;
         }
     }
@@ -413,8 +400,6 @@ void TreeNode::CollapseContiguousDims()
         auto curStride = dist;
         for(auto i = collapsibleDims.rbegin(); i != collapsibleDims.rend(); ++i)
         {
-            if(stride[*i] == 0)
-                break;
             if(curStride % stride[*i] != 0)
                 break;
             if(curStride / stride[*i] != length[*i])
@@ -534,22 +519,11 @@ void MultiPlanItem::WaitCommRequests()
 #endif
 }
 
-#ifdef ROCFFT_MPI_ENABLE
-MPI_Comm MultiPlanItem::ActiveMPIComm(rocfft_plan plan) const
-{
-    if(subcomm)
-        return *subcomm;
-    else
-        return plan->desc.mpi_comm;
-}
-#endif
-
-void CommPointToPoint::ExecuteAsync(const rocfft_plan                     plan,
-                                    void*                                 in_buffer[],
-                                    void*                                 out_buffer[],
-                                    const rocfft_execution_info_internal& info,
-                                    size_t                                multiPlanIdx,
-                                    const std::map<int, device_callback_t>&)
+void CommPointToPoint::ExecuteAsync(const rocfft_plan     plan,
+                                    void*                 in_buffer[],
+                                    void*                 out_buffer[],
+                                    rocfft_execution_info info,
+                                    size_t                multiPlanIdx)
 {
     rocfft_scoped_device dev(srcLocation.device);
 
@@ -559,11 +533,9 @@ void CommPointToPoint::ExecuteAsync(const rocfft_plan                     plan,
     }
 
     auto srcWithOffset = ptr_offset(
-        srcPtr.get(in_buffer, out_buffer, local_comm_rank, info), srcOffset, precision, arrayType);
-    auto destWithOffset = ptr_offset(destPtr.get(in_buffer, out_buffer, local_comm_rank, info),
-                                     destOffset,
-                                     precision,
-                                     arrayType);
+        srcPtr.get(in_buffer, out_buffer, local_comm_rank), srcOffset, precision, arrayType);
+    auto destWithOffset = ptr_offset(
+        destPtr.get(in_buffer, out_buffer, local_comm_rank), destOffset, precision, arrayType);
 
     if(srcLocation.comm_rank == destLocation.comm_rank)
     {
@@ -660,12 +632,11 @@ void CommPointToPoint::Print(rocfft_ostream& os, const int indent) const
     os << std::endl;
 }
 
-void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
-                               void*                                 in_buffer[],
-                               void*                                 out_buffer[],
-                               const rocfft_execution_info_internal& info,
-                               size_t                                multiPlanIdx,
-                               const std::map<int, device_callback_t>&)
+void CommScatter::ExecuteAsync(const rocfft_plan     plan,
+                               void*                 in_buffer[],
+                               void*                 out_buffer[],
+                               rocfft_execution_info info,
+                               size_t                multiPlanIdx)
 {
     rocfft_scoped_device dev(srcLocation.device);
 
@@ -678,15 +649,12 @@ void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
     {
         const auto& op = ops[opIdx];
 
-        auto srcWithOffset = ptr_offset(srcPtr.get(in_buffer, out_buffer, local_comm_rank, info),
-                                        op.srcOffset,
-                                        precision,
-                                        arrayType);
-        auto destWithOffset
-            = ptr_offset(op.destPtr.get(in_buffer, out_buffer, local_comm_rank, info),
-                         op.destOffset,
-                         precision,
-                         arrayType);
+        auto srcWithOffset = ptr_offset(
+            srcPtr.get(in_buffer, out_buffer, local_comm_rank), op.srcOffset, precision, arrayType);
+        auto destWithOffset = ptr_offset(op.destPtr.get(in_buffer, out_buffer, local_comm_rank),
+                                         op.destOffset,
+                                         precision,
+                                         arrayType);
 
         hipError_t err = hipSuccess;
         if(op.destLocation.comm_rank == srcLocation.comm_rank)
@@ -711,7 +679,7 @@ void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
         }
         else
         {
-            // Inter-process communication
+            // Inter-proccess communication
 #if !defined ROCFFT_MPI_ENABLE
             throw std::runtime_error("MPI communication not enabled");
 #else
@@ -792,12 +760,11 @@ void CommScatter::Print(rocfft_ostream& os, const int indent) const
     }
 }
 
-void CommGather::ExecuteAsync(const rocfft_plan                     plan,
-                              void*                                 in_buffer[],
-                              void*                                 out_buffer[],
-                              const rocfft_execution_info_internal& info,
-                              size_t                                multiPlanIdx,
-                              const std::map<int, device_callback_t>&)
+void CommGather::ExecuteAsync(const rocfft_plan     plan,
+                              void*                 in_buffer[],
+                              void*                 out_buffer[],
+                              rocfft_execution_info info,
+                              size_t                multiPlanIdx)
 {
     if(LOG_PLAN_ENABLED())
     {
@@ -812,11 +779,11 @@ void CommGather::ExecuteAsync(const rocfft_plan                     plan,
 
         rocfft_scoped_device dev(op.srcLocation.device);
 
-        auto srcWithOffset = ptr_offset(op.srcPtr.get(in_buffer, out_buffer, local_comm_rank, info),
+        auto srcWithOffset  = ptr_offset(op.srcPtr.get(in_buffer, out_buffer, local_comm_rank),
                                         op.srcOffset,
                                         precision,
                                         arrayType);
-        auto destWithOffset = ptr_offset(destPtr.get(in_buffer, out_buffer, local_comm_rank, info),
+        auto destWithOffset = ptr_offset(destPtr.get(in_buffer, out_buffer, local_comm_rank),
                                          op.destOffset,
                                          precision,
                                          arrayType);
@@ -848,7 +815,7 @@ void CommGather::ExecuteAsync(const rocfft_plan                     plan,
         }
         else
         {
-            // Inter-process communication
+            // Inter-proccess communication
 #if !defined ROCFFT_MPI_ENABLE
             throw std::runtime_error("MPI communication not enabled");
 #else
@@ -927,144 +894,72 @@ void CommGather::Print(rocfft_ostream& os, const int indent) const
     }
 }
 
-void CommAllToAll::ExecuteAsync(const rocfft_plan                     plan,
-                                void*                                 in_buffer[],
-                                void*                                 out_buffer[],
-                                const rocfft_execution_info_internal& info,
-                                size_t                                multiPlanIdx,
-                                const std::map<int, device_callback_t>&)
+void CommAllToAllv::ExecuteAsync(const rocfft_plan     plan,
+                                 void*                 in_buffer[],
+                                 void*                 out_buffer[],
+                                 rocfft_execution_info info,
+                                 size_t                multiPlanIdx)
 {
+    // check that we have as many elems in our count/offset buffers as
+    // we have ranks
+    const size_t num_ranks = plan->get_local_comm_size();
+    if(sendOffsets.size() != num_ranks || sendCounts.size() != num_ranks
+       || recvOffsets.size() != num_ranks || recvCounts.size() != num_ranks)
+        throw std::runtime_error(
+            "CommAllToAllv: number of counts/offsets does not match number of ranks");
+
     if(LOG_PLAN_ENABLED())
     {
-        log_plan("CommAllToAll: deciding between MPI_Ialltoall and MPI_Ialltoallv\n");
+        log_plan("MPI_Ialltoallv\n");
     }
 
 #ifdef ROCFFT_MPI_ENABLE
-    auto mpi_comm = ActiveMPIComm(plan);
 
-    MPI_Request  request;
-    MPI_Datatype elem_type       = rocfft_type_to_mpi_type(precision, arrayType);
-    const int    local_comm_rank = plan->desc.get_local_comm_rank();
-
-    if(uniform_counts)
-    {
-        if(LOG_PLAN_ENABLED())
-            log_plan("Using MPI_Ialltoall\n");
-
-        size_t send_count_elems = sendCounts[0];
-        if(send_count_elems > static_cast<size_t>(std::numeric_limits<int>::max()))
+    // MPI takes ints for everything, convert our size_t elements to int bytes
+    auto convertToInt = [](const std::vector<size_t>& src, std::vector<int>& dest) {
+        dest.reserve(src.size());
+        for(auto i : src)
         {
-            comm_status   = COMM_MPI_ERROR;
-            error_message = "send count too large to fit in MPI int on rank "
-                            + std::to_string(local_comm_rank);
-            return;
+            if(i > std::numeric_limits<int>::max())
+                throw std::runtime_error("MPI integer limit exceeded");
+            dest.push_back(i);
         }
+    };
 
-        const int send_count = static_cast<int>(send_count_elems);
+    std::vector<int> intSendOffsets;
+    std::vector<int> intSendCounts;
+    std::vector<int> intRecvOffsets;
+    std::vector<int> intRecvCounts;
+    convertToInt(sendOffsets, intSendOffsets);
+    convertToInt(sendCounts, intSendCounts);
+    convertToInt(recvOffsets, intRecvOffsets);
+    convertToInt(recvCounts, intRecvCounts);
 
-        const auto mpiret = MPI_Ialltoall(sendBuf.get(in_buffer, out_buffer, local_comm_rank, info),
-                                          send_count,
-                                          elem_type,
-                                          recvBuf.get(in_buffer, out_buffer, local_comm_rank, info),
-                                          send_count,
-                                          elem_type,
-                                          mpi_comm,
-                                          &request);
-
-        if(mpiret != MPI_SUCCESS)
-        {
-            char errmsg[MPI_MAX_ERROR_STRING];
-            int  errlen = 0;
-            MPI_Error_string(mpiret, errmsg, &errlen);
-
-            comm_status   = COMM_MPI_ERROR;
-            error_message = "MPI_Ialltoall failed on rank " + std::to_string(local_comm_rank) + ": "
-                            + std::string(errmsg);
-
-            return;
-        }
-    }
-    else
-    {
-        if(LOG_PLAN_ENABLED())
-            log_plan("Using MPI_Ialltoallv\n");
-
-        // non-uniform exchange case (default)
-
-        // MPI takes ints for everything, safely convert our size_t elements to int bytes
-        // prevent overflow for large batched transforms
-        auto convertToInt = [&](const std::vector<size_t>& src, std::vector<int>& dest) -> bool {
-            dest.clear();
-            dest.reserve(src.size());
-            for(size_t v : src)
-            {
-                if(v > static_cast<size_t>(std::numeric_limits<int>::max()))
-                    return false; // overflow
-                dest.push_back(static_cast<int>(v));
-            }
-            return true;
-        };
-
-        std::vector<int> intSendOffsets;
-        std::vector<int> intSendCounts;
-        std::vector<int> intRecvOffsets;
-        std::vector<int> intRecvCounts;
-
-        if(!convertToInt(sendOffsets, intSendOffsets) || !convertToInt(sendCounts, intSendCounts)
-           || !convertToInt(recvOffsets, intRecvOffsets)
-           || !convertToInt(recvCounts, intRecvCounts))
-        {
-            comm_status   = COMM_MPI_ERROR;
-            error_message = "send/recv counts or offsets too large to fit in MPI int on rank "
-                            + std::to_string(local_comm_rank);
-            return;
-        }
-
-        const auto mpiret
-            = MPI_Ialltoallv(sendBuf.get(in_buffer, out_buffer, local_comm_rank, info),
-                             intSendCounts.data(),
-                             intSendOffsets.data(),
-                             elem_type,
-                             recvBuf.get(in_buffer, out_buffer, local_comm_rank, info),
-                             intRecvCounts.data(),
-                             intRecvOffsets.data(),
-                             elem_type,
-                             mpi_comm,
-                             &request);
-
-        if(mpiret != MPI_SUCCESS)
-        {
-            char errmsg[MPI_MAX_ERROR_STRING];
-            int  errlen = 0;
-            MPI_Error_string(mpiret, errmsg, &errlen);
-
-            comm_status   = COMM_MPI_ERROR;
-            error_message = "MPI_Ialltoallv failed on rank " + std::to_string(local_comm_rank)
-                            + ": " + std::string(errmsg);
-
-            return;
-        }
-    }
-
+    MPI_Request request;
+    const auto  mpiret = MPI_Ialltoallv(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                       intSendCounts.data(),
+                                       intSendOffsets.data(),
+                                       rocfft_type_to_mpi_type(precision, arrayType),
+                                       recvBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                       intRecvCounts.data(),
+                                       intRecvOffsets.data(),
+                                       rocfft_type_to_mpi_type(precision, arrayType),
+                                       plan->desc.mpi_comm,
+                                       &request);
+    if(mpiret != MPI_SUCCESS)
+        throw std::runtime_error("MPI_Ialltoallv failed: " + std::to_string(mpiret));
     comm_requests.push_back(request);
-
 #else
-    throw std::runtime_error("CommAllToAll not implemented");
+    throw std::runtime_error("CommAllToAllv not implemented");
 #endif
 }
 
-void CommAllToAll::Wait()
+void CommAllToAllv::Wait()
 {
     WaitCommRequests();
-
-    if(comm_status == COMM_MPI_ERROR)
-    {
-        // Now it's safe to throw or return error
-        throw std::runtime_error(error_message);
-    }
 }
 
-void CommAllToAll::Print(rocfft_ostream& os, const int indent) const
+void CommAllToAllv::Print(rocfft_ostream& os, const int indent) const
 {
     std::string indentStr;
     int         i = indent;
@@ -1078,23 +973,12 @@ void CommAllToAll::Print(rocfft_ostream& os, const int indent) const
         os << "\n";
     };
 
-    os << indentStr << "CommAllToAll " << precision_name(precision) << " "
-       << PrintArrayType(arrayType) << (uniform_counts ? " (MPI_Ialltoall)" : " (MPI_Ialltoallv)")
-       << ":\n";
-
-    if(uniform_counts)
-    {
-        // alltoall: just print the count once
-        os << indentStr << " count_per_rank: " << sendCounts[0] << "\n";
-    }
-    else
-    {
-        // alltoallv: print full arrays
-        printVec("sendOffsets", sendOffsets);
-        printVec("sendCounts", sendCounts);
-        printVec("recvOffsets", recvOffsets);
-        printVec("recvCounts", recvCounts);
-    }
+    os << indentStr << "CommAllToAllv " << precision_name(precision) << " "
+       << PrintArrayType(arrayType) << ":\n";
+    printVec("sendOffsets", sendOffsets);
+    printVec("sendCounts", sendCounts);
+    printVec("recvOffsets", recvOffsets);
+    printVec("recvCounts", recvCounts);
 }
 
 void ExecPlan::Print(rocfft_ostream& os, const int indent) const
@@ -1112,8 +996,6 @@ void ExecPlan::Print(rocfft_ostream& os, const int indent) const
         os << indentStr << "  inputPtr: " << inputPtr.str() << std::endl;
     if(outputPtr)
         os << indentStr << "  outputPtr: " << outputPtr.str() << std::endl;
-    if(workPtr)
-        os << indentStr << "  workPtr: " << workPtr.str() << std::endl;
 
     PrintNode(os, *this, indent);
 }

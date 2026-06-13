@@ -25,13 +25,13 @@
  *******************************************************************************/
 #pragma once
 
-#include <miopen/config.hpp>
 #include <miopen/db.hpp>
 #include <miopen/db_record.hpp>
 
+#include <boost/optional.hpp>
+
 #include <chrono>
 #include <map>
-#include <optional>
 #include <string>
 #include <sstream>
 
@@ -45,7 +45,7 @@ using ramdb_clock = std::chrono::steady_clock;
 
 class LockFile;
 
-class RamDb : protected PlainTextDb
+class MIOPEN_INTERNALS_EXPORT RamDb : protected PlainTextDb
 {
 public:
     RamDb(DbKinds db_kind_,
@@ -57,16 +57,15 @@ public:
     {
     }
 
-    MIOPEN_INTERNALS_EXPORT RamDb(DbKinds db_kind_, const fs::path& path, bool is_system = false);
+    RamDb(DbKinds db_kind_, const fs::path& path, bool is_system = false);
 
-    RamDb(const RamDb&)            = delete;
-    RamDb(RamDb&&)                 = delete;
+    RamDb(const RamDb&) = delete;
+    RamDb(RamDb&&)      = delete;
     RamDb& operator=(const RamDb&) = delete;
-    RamDb& operator=(RamDb&&)      = delete;
+    RamDb& operator=(RamDb&&) = delete;
 
     static fs::path GetTimeFilePath(const fs::path& path);
-    MIOPEN_INTERNALS_EXPORT static RamDb&
-    GetCached(DbKinds db_kind_, const fs::path& path, bool is_system);
+    static RamDb& GetCached(DbKinds db_kind_, const fs::path& path, bool is_system);
 
     static RamDb& GetCached(DbKinds db_kind_,
                             const fs::path& path,
@@ -77,10 +76,10 @@ public:
         return GetCached(db_kind_, path, is_system);
     }
 
-    MIOPEN_INTERNALS_EXPORT std::optional<DbRecord> FindRecord(const std::string& problem);
+    boost::optional<DbRecord> FindRecord(const std::string& problem);
 
     template <class TProblem>
-    std::optional<DbRecord> FindRecord(const TProblem& problem)
+    boost::optional<DbRecord> FindRecord(const TProblem& problem)
     {
         const auto key = DbRecord::SerializeKey(db_kind, problem);
         return FindRecord(key);
@@ -95,10 +94,10 @@ public:
         return record->GetValues(id, value);
     }
 
-    MIOPEN_INTERNALS_EXPORT bool StoreRecord(const DbRecord& record);
-    MIOPEN_INTERNALS_EXPORT bool UpdateRecord(DbRecord& record);
-    MIOPEN_INTERNALS_EXPORT bool RemoveRecord(const std::string& key);
-    MIOPEN_INTERNALS_EXPORT bool Remove(const std::string& key, const std::string& id);
+    bool StoreRecord(const DbRecord& record);
+    bool UpdateRecord(DbRecord& record);
+    bool RemoveRecord(const std::string& key);
+    bool Remove(const std::string& key, const std::string& id);
 
     template <class T>
     inline bool Remove(const T& problem_config, const std::string& id)
@@ -115,7 +114,7 @@ public:
     }
 
     template <class T, class V>
-    inline std::optional<DbRecord>
+    inline boost::optional<DbRecord>
     Update(const T& problem_config, const std::string& id, const V& values)
     {
         DbRecord record(db_kind, problem_config);
@@ -124,7 +123,7 @@ public:
         if(ok)
             return record;
         else
-            return {};
+            return boost::none;
     }
 
 private:
@@ -137,7 +136,7 @@ private:
     ramdb_clock::time_point file_read_time;
     std::map<std::string, CacheItem> cache;
 
-    std::optional<miopen::DbRecord> FindRecordUnsafe(const std::string& problem);
+    boost::optional<miopen::DbRecord> FindRecordUnsafe(const std::string& problem);
 
     bool ValidateUnsafe();
     void Prefetch();
@@ -157,17 +156,14 @@ class DbTimer<RamDb>
     template <class TFunc>
     static auto Measure(const std::string& funcName, TFunc&& func)
     {
-        const bool logging = miopen::IsLogging(LoggingLevel::Info2);
-        const auto start   = logging ? std::chrono::high_resolution_clock::now()
-                                     : std::chrono::high_resolution_clock::time_point{};
-        auto ret           = func();
-        if(logging)
-        {
-            const auto end = std::chrono::high_resolution_clock::now();
-            MIOPEN_LOG_I2("Db::" << funcName << " time: " << (end - start).count() * .000001f
-                                 << " ms");
-        }
-        return std::move(ret); // NOLINT(clang-analyzer-cplusplus.Move)
+        if(!miopen::IsLogging(LoggingLevel::Info2))
+            return func();
+
+        const auto start = std::chrono::high_resolution_clock::now();
+        auto ret         = func();
+        const auto end   = std::chrono::high_resolution_clock::now();
+        MIOPEN_LOG_I2("Db::" << funcName << " time: " << (end - start).count() * .000001f << " ms");
+        return ret;
     }
 
 public:

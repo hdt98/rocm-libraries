@@ -17,12 +17,11 @@
 
 #include <thrust/detail/config.h>
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
+#if THRUST_CPP_DIALECT >= 2014
 
-#if THRUST_CPP_DIALECT >= 2017
+#include <async/test_policy_overloads.h>
 
-#  include <async/exclusive_scan/mixin.h>
-#  include <async/test_policy_overloads.h>
+#include <async/exclusive_scan/mixin.h>
 
 // Test using mixed int/float types for:
 // - input_value_type       | (int, float)
@@ -47,13 +46,12 @@ struct mixed_type_input_generator
   static input_type generate_input(std::size_t num_values)
   {
     input_type input(num_values);
-    thrust::sequence(
-      input.begin(),
-      input.end(),
-      // fractional values are chosen deliberately to test
-      // casting orders and accumulator types:
-      static_cast<value_type>(1.5),
-      static_cast<value_type>(1));
+    thrust::sequence(input.begin(),
+                     input.end(),
+                     // fractional values are chosen deliberately to test
+                     // casting orders and accumulator types:
+                     static_cast<value_type>(1.5),
+                     static_cast<value_type>(1));
     return input;
   }
 };
@@ -63,11 +61,11 @@ struct mixed_type_input_generator
 template <typename value_type>
 struct mixed_types_postfix_args
 {
-  using postfix_args_type = std::tuple< // Overloads to test:
-    std::tuple<>, // - no extra args
-    std::tuple<value_type>, // - initial_value
-    std::tuple<value_type, thrust::plus<>>, // - initial_value, plus<>
-    std::tuple<value_type, thrust::plus<int>>, // - initial_value, plus<int>
+  using postfix_args_type = std::tuple<         // Overloads to test:
+    std::tuple<>,                               // - no extra args
+    std::tuple<value_type>,                     // - initial_value
+    std::tuple<value_type, thrust::plus<>>,     // - initial_value, plus<>
+    std::tuple<value_type, thrust::plus<int>>,  // - initial_value, plus<int>
     std::tuple<value_type, thrust::plus<float>> // - initial_value, plus<float>
     >;
 
@@ -82,12 +80,15 @@ struct mixed_types_postfix_args
   }
 };
 
-template <typename input_value_type, typename output_value_type, typename initial_value_type>
+template <typename input_value_type,
+          typename output_value_type,
+          typename initial_value_type>
 struct invoker
     : mixed_type_input_generator<input_value_type>
     , testing::async::mixin::output::device_vector<output_value_type>
     , mixed_types_postfix_args<initial_value_type>
-    , testing::async::exclusive_scan::mixin::invoke_reference::host_synchronous<input_value_type, output_value_type>
+    , testing::async::exclusive_scan::mixin::invoke_reference::
+        host_synchronous<input_value_type, output_value_type>
     , testing::async::exclusive_scan::mixin::invoke_async::simple
     // Use almost_equal instead of almost_equal_if_fp because floating point
     // addition may be hidden in the scan_op (thrust::plus<float> is always
@@ -133,9 +134,4 @@ void test_scan_mixed_types(size_t num_values)
 }
 DECLARE_SIZED_UNITTEST(test_scan_mixed_types);
 
-#endif // C++17
-
-// we need to leak the suppression on clang/MSVC to suppresses warnings from the cudafe1.stub.c file
-#if THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
-THRUST_SUPPRESS_DEPRECATED_POP
-#endif // THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_CLANG && THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_MSVC
+#endif // C++14

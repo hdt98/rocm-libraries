@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2010-2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2017-2025, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2017-2020, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,7 +32,7 @@
 
 #include "../../../config.hpp"
 
-#include <rocprim/block/block_exchange.hpp> // IWYU pragma: export
+#include <rocprim/block/block_exchange.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
@@ -210,7 +210,7 @@ public:
         OffsetT     (&ranks)[ITEMS_PER_THREAD],        ///< [in] Corresponding scatter ranks
         ValidFlag   (&is_valid)[ITEMS_PER_THREAD])     ///< [in] Corresponding flag denoting item validity
     {
-        ScatterToStripedFlagged(items, items, ranks, is_valid);
+        ScatterToStriped(items, items, ranks, is_valid);
     }
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS

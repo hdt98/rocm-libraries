@@ -76,9 +76,9 @@ def run(tuner,
             cmd += ['-t', 1]
 
     cmd = [str(x) for x in cmd]
-    logging.info('tuning: ' + ' '.join(cmd))
+    logging.info('tunning: ' + ' '.join(cmd))
     if verbose:
-        print('tuning: ' + ' '.join(cmd))
+        print('tunning: ' + ' '.join(cmd))
 
     tokenToken = "Token: "
     outFileToken = "[OUTPUT_FILE]: "

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,9 @@
  * ************************************************************************ */
 
 #include "rocsparse_gell2csr.hpp"
-#include "rocsparse_control.hpp"
+#include "control.h"
+#include "handle.h"
 #include "rocsparse_ell2csr.hpp"
-#include "rocsparse_handle.hpp"
 
 rocsparse_status rocsparse::gell2csr_nnz(rocsparse_handle          handle,
                                          int64_t                   m,
@@ -97,12 +97,10 @@ rocsparse_status rocsparse::gell2csr_nnz(rocsparse_handle          handle,
             return rocsparse_status_success;
         }
 
-        // LCOV_EXCL_START
         case rocsparse_indextype_u16:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-            // LCOV_EXCL_STOP
         }
         // LCOV_EXCL_START
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -142,24 +140,20 @@ rocsparse_status rocsparse::gell2csr_nnz(rocsparse_handle          handle,
             return rocsparse_status_success;
         }
 
-        // LCOV_EXCL_START
         case rocsparse_indextype_u16:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-            // LCOV_EXCL_STOP
         }
         // LCOV_EXCL_START
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
         // LCOV_EXCL_STOP
     }
 
-    // LCOV_EXCL_START
     case rocsparse_indextype_u16:
     {
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
     }
-        // LCOV_EXCL_STOP
     }
 }
 
@@ -212,7 +206,6 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
     case rocsparse_datatype_i8_r:
     case rocsparse_datatype_u8_r:
     case rocsparse_datatype_f16_r:
-    case rocsparse_datatype_bf16_r:
     {
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
     }
@@ -232,12 +225,10 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(float, int32_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -255,23 +246,19 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(float, int64_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
             // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_START
         case rocsparse_indextype_u16:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-            // LCOV_EXCL_STOP
         }
         // LCOV_EXCL_START
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -294,12 +281,10 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(rocsparse_float_complex, int32_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -317,23 +302,19 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(rocsparse_float_complex, int64_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
             // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_START
         case rocsparse_indextype_u16:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-            // LCOV_EXCL_STOP
         }
         // LCOV_EXCL_START
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -356,12 +337,10 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(double, int32_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -379,23 +358,19 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(double, int64_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
             // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_START
         case rocsparse_indextype_u16:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-            // LCOV_EXCL_STOP
         }
         // LCOV_EXCL_START
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -418,12 +393,10 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(rocsparse_double_complex, int32_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
@@ -441,23 +414,19 @@ rocsparse_status rocsparse::gell2csr(rocsparse_handle          handle,
             {
                 CALL(rocsparse_double_complex, int64_t, int64_t);
             }
-            // LCOV_EXCL_START
             case rocsparse_indextype_u16:
             {
                 RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
             }
-                // LCOV_EXCL_STOP
             }
             // LCOV_EXCL_START
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
             // LCOV_EXCL_STOP
         }
-        // LCOV_EXCL_START
         case rocsparse_indextype_u16:
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         }
-            // LCOV_EXCL_STOP
         }
         // LCOV_EXCL_START
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);

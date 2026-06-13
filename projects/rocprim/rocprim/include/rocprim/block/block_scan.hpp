@@ -60,29 +60,20 @@ struct select_block_scan_impl;
 template<>
 struct select_block_scan_impl<block_scan_algorithm::using_warp_scan>
 {
-    template<class T,
-             unsigned int            BlockSizeX,
-             unsigned int            BlockSizeY,
-             unsigned int            BlockSizeZ,
-             arch::wavefront::target TargetWaveSize>
-    using type = block_scan_warp_scan<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>;
+    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
+    using type = block_scan_warp_scan<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
 };
 
 template<>
 struct select_block_scan_impl<block_scan_algorithm::reduce_then_scan>
 {
-    template<class T,
-             unsigned int            BlockSizeX,
-             unsigned int            BlockSizeY,
-             unsigned int            BlockSizeZ,
-             arch::wavefront::target TargetWaveSize>
+    template<class T, unsigned int BlockSizeX, unsigned int BlockSizeY, unsigned int BlockSizeZ>
     // When BlockSize is less than hardware warp size block_scan_warp_scan performs better than
     // block_scan_reduce_then_scan by specializing for warps
     using type = typename std::conditional<
-        (BlockSizeX * BlockSizeY * BlockSizeZ
-         <= (arch::wavefront::size_from_target<TargetWaveSize>())),
-        block_scan_warp_scan<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>,
-        block_scan_reduce_then_scan<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>>::type;
+        (BlockSizeX * BlockSizeY * BlockSizeZ <= ::rocprim::arch::wavefront::min_size()),
+        block_scan_warp_scan<T, BlockSizeX, BlockSizeY, BlockSizeZ>,
+        block_scan_reduce_then_scan<T, BlockSizeX, BlockSizeY, BlockSizeZ>>::type;
 };
 
 } // end namespace detail
@@ -114,8 +105,6 @@ struct select_block_scan_impl<block_scan_algorithm::reduce_then_scan>
 /// In the examples scan operation is performed on block of 192 threads, each provides
 /// one \p int value, result is returned using the same variable as for input.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/block/example_block_scan.cpp).
-///
 /// \code{.cpp}
 /// __global__ void example_kernel(...)
 /// {
@@ -135,21 +124,19 @@ struct select_block_scan_impl<block_scan_algorithm::reduce_then_scan>
 /// }
 /// \endcode
 /// \endparblock
-template<class T,
-         unsigned int            BlockSizeX,
-         block_scan_algorithm    Algorithm      = block_scan_algorithm::default_algorithm,
-         unsigned int            BlockSizeY     = 1,
-         unsigned int            BlockSizeZ     = 1,
-         arch::wavefront::target TargetWaveSize = arch::wavefront::get_target()>
+template<
+    class T,
+    unsigned int BlockSizeX,
+    block_scan_algorithm Algorithm = block_scan_algorithm::default_algorithm,
+    unsigned int BlockSizeY = 1,
+    unsigned int BlockSizeZ = 1
+>
 class block_scan
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
-    : private detail::select_block_scan_impl<
-          Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>
+    : private detail::select_block_scan_impl<Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ>
 #endif
 {
-    using base_type = typename detail::select_block_scan_impl<
-        Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ, TargetWaveSize>;
-
+    using base_type = typename detail::select_block_scan_impl<Algorithm>::template type<T, BlockSizeX, BlockSizeY, BlockSizeZ>;
 public:
     /// \brief Struct used to allocate a temporary memory that is required for thread
     /// communication during operations provided by related parallel primitive.
@@ -214,7 +201,7 @@ public:
                         storage_type& storage,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, output, storage, scan_op);
+        base_type::inclusive_scan(input, output, storage, scan_op);
     }
 
     /// \overload
@@ -238,7 +225,7 @@ public:
                         T& output,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, output, scan_op);
+        base_type::inclusive_scan(input, output, scan_op);
     }
 
     /// \brief Performs inclusive scan and reduction across threads in a block.
@@ -299,7 +286,7 @@ public:
                         storage_type& storage,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, output, reduction, storage, scan_op);
+        base_type::inclusive_scan(input, output, reduction, storage, scan_op);
     }
 
     /// \overload
@@ -325,7 +312,7 @@ public:
                         T& reduction,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, output, reduction, scan_op);
+        base_type::inclusive_scan(input, output, reduction, scan_op);
     }
 
     /// \brief Performs inclusive scan across threads in a block, and uses
@@ -415,7 +402,7 @@ public:
                         PrefixCallback& prefix_callback_op,
                         BinaryFunction scan_op)
     {
-        base_type{}.inclusive_scan(input, output, storage, prefix_callback_op, scan_op);
+        base_type::inclusive_scan(input, output, storage, prefix_callback_op, scan_op);
     }
 
     /// \brief Performs inclusive scan across threads in a block.
@@ -477,11 +464,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.inclusive_scan(input[0], output[0], storage, scan_op);
+            base_type::inclusive_scan(input[0], output[0], storage, scan_op);
         }
         else
         {
-            base_type{}.inclusive_scan(input, output, storage, scan_op);
+            base_type::inclusive_scan(input, output, storage, scan_op);
         }
     }
 
@@ -512,11 +499,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.inclusive_scan(input[0], output[0], scan_op);
+            base_type::inclusive_scan(input[0], output[0], scan_op);
         }
         else
         {
-            base_type{}.inclusive_scan(input, output, scan_op);
+            base_type::inclusive_scan(input, output, scan_op);
         }
     }
 
@@ -578,7 +565,7 @@ public:
                         storage_type&  storage,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, init, output, storage, scan_op);
+        base_type::inclusive_scan(input, init, output, storage, scan_op);
     }
 
     /// \overload
@@ -608,7 +595,7 @@ public:
                         T (&output)[ItemsPerThread],
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, init, output, scan_op);
+        base_type::inclusive_scan(input, init, output, scan_op);
     }
 
     /// \brief Performs inclusive scan and reduction across threads in a block.
@@ -674,11 +661,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.inclusive_scan(input[0], output[0], reduction, storage, scan_op);
+            base_type::inclusive_scan(input[0], output[0], reduction, storage, scan_op);
         }
         else
         {
-            base_type{}.inclusive_scan(input, output, reduction, storage, scan_op);
+            base_type::inclusive_scan(input, output, reduction, storage, scan_op);
         }
     }
 
@@ -711,11 +698,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.inclusive_scan(input[0], output[0], reduction, scan_op);
+            base_type::inclusive_scan(input[0], output[0], reduction, scan_op);
         }
         else
         {
-            base_type{}.inclusive_scan(input, output, reduction, scan_op);
+            base_type::inclusive_scan(input, output, reduction, scan_op);
         }
     }
 
@@ -728,8 +715,7 @@ public:
     /// \param [in] input reference to an array containing thread input values.
     /// \param [in] init initial value to seed the inclusive scan.
     /// \param [out] output reference to a thread output array. May be aliased with \p input.
-    /// \param [out] reduction result of reducing of all \p input values in a block. This does
-    /// not include \p init.
+    /// \param [out] reduction result of reducing of all \p input values in a block.
     /// \param [in] storage reference to a temporary storage object of type storage_type.
     /// \param [in] scan_op binary operation function object that will be used for scan.
     /// The signature of the function should be equivalent to the following:
@@ -783,7 +769,7 @@ public:
                         storage_type&  storage,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, init, output, reduction, storage, scan_op);
+        base_type::inclusive_scan(input, init, output, reduction, storage, scan_op);
     }
 
     /// \overload
@@ -799,8 +785,7 @@ public:
     /// \param [in] input reference to an array containing thread input values.
     /// \param [in] init initial value to seed the inclusive scan.
     /// \param [out] output reference to a thread output array. May be aliased with \p input.
-    /// \param [out] reduction result of reducing of all \p input values in a block. This does
-    /// not include \p init.
+    /// \param [out] reduction result of reducing of all \p input values in a block.
     /// \param [in] scan_op binary operation function object that will be used for scan.
     /// The signature of the function should be equivalent to the following:
     /// <tt>T f(const T &a, const T &b);</tt>. The signature does not need to have
@@ -816,7 +801,7 @@ public:
                         T& reduction,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.inclusive_scan(input, init, output, reduction, scan_op);
+        base_type::inclusive_scan(input, init, output, reduction, scan_op);
     }
 
     /// \brief Performs inclusive scan across threads in a block, and uses
@@ -910,11 +895,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.inclusive_scan(input[0], output[0], storage, prefix_callback_op, scan_op);
+            base_type::inclusive_scan(input[0], output[0], storage, prefix_callback_op, scan_op);
         }
         else
         {
-            base_type{}.inclusive_scan(input, output, storage, prefix_callback_op, scan_op);
+            base_type::inclusive_scan(input, output, storage, prefix_callback_op, scan_op);
         }
     }
 
@@ -976,7 +961,7 @@ public:
                         storage_type& storage,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.exclusive_scan(input, output, init, storage, scan_op);
+        base_type::exclusive_scan(input, output, init, storage, scan_op);
     }
 
     /// \overload
@@ -1003,7 +988,7 @@ public:
                         T init,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.exclusive_scan(input, output, init, scan_op);
+        base_type::exclusive_scan(input, output, init, scan_op);
     }
 
     /// \brief Performs exclusive scan and reduction across threads in a block.
@@ -1069,7 +1054,7 @@ public:
                         storage_type& storage,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.exclusive_scan(input, output, init, reduction, storage, scan_op);
+        base_type::exclusive_scan(input, output, init, reduction, storage, scan_op);
     }
 
     /// \overload
@@ -1098,7 +1083,7 @@ public:
                         T& reduction,
                         BinaryFunction scan_op = BinaryFunction())
     {
-        base_type{}.exclusive_scan(input, output, init, reduction, scan_op);
+        base_type::exclusive_scan(input, output, init, reduction, scan_op);
     }
 
     /// \brief Performs exclusive scan across threads in a block, and uses
@@ -1188,7 +1173,7 @@ public:
                         PrefixCallback& prefix_callback_op,
                         BinaryFunction scan_op)
     {
-        base_type{}.exclusive_scan(input, output, storage, prefix_callback_op, scan_op);
+        base_type::exclusive_scan(input, output, storage, prefix_callback_op, scan_op);
     }
 
     /// \brief Performs exclusive scan across threads in a block.
@@ -1255,11 +1240,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.exclusive_scan(input[0], output[0], init, storage, scan_op);
+            base_type::exclusive_scan(input[0], output[0], init, storage, scan_op);
         }
         else
         {
-            base_type{}.exclusive_scan(input, output, init, storage, scan_op);
+            base_type::exclusive_scan(input, output, init, storage, scan_op);
         }
     }
 
@@ -1293,11 +1278,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.exclusive_scan(input[0], output[0], init, scan_op);
+            base_type::exclusive_scan(input[0], output[0], init, scan_op);
         }
         else
         {
-            base_type{}.exclusive_scan(input, output, init, scan_op);
+            base_type::exclusive_scan(input, output, init, scan_op);
         }
     }
 
@@ -1370,11 +1355,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.exclusive_scan(input[0], output[0], init, reduction, storage, scan_op);
+            base_type::exclusive_scan(input[0], output[0], init, reduction, storage, scan_op);
         }
         else
         {
-            base_type{}.exclusive_scan(input, output, init, reduction, storage, scan_op);
+            base_type::exclusive_scan(input, output, init, reduction, storage, scan_op);
         }
     }
 
@@ -1410,11 +1395,11 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.exclusive_scan(input[0], output[0], init, reduction, scan_op);
+            base_type::exclusive_scan(input[0], output[0], init, reduction, scan_op);
         }
         else
         {
-            base_type{}.exclusive_scan(input, output, init, reduction, scan_op);
+            base_type::exclusive_scan(input, output, init, reduction, scan_op);
         }
     }
 
@@ -1509,57 +1494,14 @@ public:
     {
         if(ItemsPerThread == 1)
         {
-            base_type{}.exclusive_scan(input[0], output[0], storage, prefix_callback_op, scan_op);
+            base_type::exclusive_scan(input[0], output[0], storage, prefix_callback_op, scan_op);
         }
         else
         {
-            base_type{}.exclusive_scan(input, output, storage, prefix_callback_op, scan_op);
+            base_type::exclusive_scan(input, output, storage, prefix_callback_op, scan_op);
         }
     }
 };
-
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-template<class T,
-         unsigned int         BlockSizeX,
-         block_scan_algorithm Algorithm,
-         unsigned int         BlockSizeY,
-         unsigned int         BlockSizeZ>
-class block_scan<T, BlockSizeX, Algorithm, BlockSizeY, BlockSizeZ, arch::wavefront::target::dynamic>
-{
-private:
-    using block_scan_wave32 = block_scan<T,
-                                         BlockSizeX,
-                                         Algorithm,
-                                         BlockSizeY,
-                                         BlockSizeZ,
-                                         arch::wavefront::target::size32>;
-    using block_scan_wave64 = block_scan<T,
-                                         BlockSizeX,
-                                         Algorithm,
-                                         BlockSizeY,
-                                         BlockSizeZ,
-                                         arch::wavefront::target::size64>;
-
-    using dispatch = detail::dispatch_wave_size<block_scan_wave32, block_scan_wave64>;
-
-public:
-    using storage_type = typename dispatch::storage_type;
-
-    template<typename... Args>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    auto inclusive_scan(Args&&... args)
-    {
-        dispatch{}([](auto impl, auto&&... args) { impl.inclusive_scan(args...); }, args...);
-    }
-
-    template<typename... Args>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    auto exclusive_scan(Args&&... args)
-    {
-        dispatch{}([](auto impl, auto&&... args) { impl.exclusive_scan(args...); }, args...);
-    }
-};
-#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 END_ROCPRIM_NAMESPACE
 

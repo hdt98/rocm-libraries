@@ -1,6 +1,3 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #include "ck_tile/host.hpp"
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
@@ -18,14 +15,13 @@ auto create_args(int argc, char* argv[])
         .insert("v", "1", "cpu validation or not")
         .insert("prec", "fp16", "precision")
         .insert("warmup", "0", "cold iter")
-        .insert("repeat", "1", "hot iter")
-        .insert("s", "0", "sensitive model mode, 0: for no specific model, 1: for T5-like model");
+        .insert("repeat", "1", "hot iter");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
 }
 
-template <typename DataType, int USEModelSensitive>
+template <typename DataType>
 bool run(const ck_tile::ArgParser& arg_parser)
 {
     ck_tile::index_t m      = arg_parser.get_int("m");
@@ -74,21 +70,19 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     constexpr bool kTwoPass = true;
 
-    using BlockTile      = ck_tile::sequence<2, 128>;
-    using Vector         = ck_tile::sequence<1, 1>;
-    using ThreadPerBlock = ck_tile::sequence<2, 128>;
-
-    using Shape = ck_tile::Generic2dBlockShape<BlockTile, ThreadPerBlock, Vector>;
+    using BlockWarps = ck_tile::sequence<2, 2>;
+    using BlockTile  = ck_tile::sequence<2, 128>;
+    using WarpTile   = ck_tile::sequence<1, 64>;
+    using Vector     = ck_tile::sequence<1, 1>;
+    using Shape      = ck_tile::Generic2dBlockShape<BlockTile, BlockWarps, WarpTile, Vector>;
 
     using PipelineTraits =
         ck_tile::Rmsnorm2dFwdTraits<true,  // kPadN
                                     false, // kSaveInvRms
                                     false, // kSaveUnquant
                                     kTwoPass,
-                                    ck_tile::Rmsnorm2dFusedAddEnum::NO_ADD,     // fuse add
-                                    ck_tile::Rmsnorm2dFusedQuantEnum::NO_SWEEP, // fuse quant
-                                    static_cast<ck_tile::Rmsnorm2dSensitiveEnum>(
-                                        USEModelSensitive)>;
+                                    ck_tile::Rmsnorm2dFusedAddEnum::NO_ADD,      // fuse add
+                                    ck_tile::Rmsnorm2dFusedQuantEnum::NO_SWEEP>; // fuse quant
 
     using Problem = ck_tile::Rmsnorm2dFwdPipelineProblem<XDataType,
                                                          GammaDataType,
@@ -103,17 +97,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     using OnePassPipeline = ck_tile::Rmsnorm2dFwdPipelineOnePass<Problem>;
     using TwoPassPipeline = ck_tile::Rmsnorm2dFwdPipelineTwoPass<Problem>;
-    using T5PassPipeline  = ck_tile::Rmsnorm2dFwdPipelineModelSensitiveT5Pass<Problem>;
-
-    using Pipeline =
-        std::conditional_t<(PipelineTraits::kUseModelSensitiveRMSNorm ==
-                                ck_tile::Rmsnorm2dSensitiveEnum::NO_SPECIFIC_MODEL ||
-                            PipelineTraits::kTwoPass), // TODO: consider TwoPass for T5PassPipeline
-                           std::conditional_t<PipelineTraits::kTwoPass,
-                                              TwoPassPipeline,
-                                              OnePassPipeline>, // kUseModelSensitiveRMSNorm
-                                                                // == 0
-                           T5PassPipeline>;
+    using Pipeline        = std::conditional_t<kTwoPass, TwoPassPipeline, OnePassPipeline>;
 
     using Default2DEpilogueProblem = ck_tile::
         Default2DEpilogueProblem<ComputeDataType, YDataType, false, PipelineTraits::kPadN, false>;
@@ -141,11 +125,12 @@ bool run(const ck_tile::ArgParser& arg_parser)
     auto kargs = Kernel::MakeKargs(args);
 
     const dim3 grids                       = Kernel::GridSize(args);
-    const dim3 blocks                      = Kernel::BlockSize();
+    constexpr dim3 blocks                  = Kernel::BlockSize();
     constexpr ck_tile::index_t kBlockPerCu = 1;
     auto s = ck_tile::stream_config{nullptr, true, 0, warmup, repeat};
 
-    ck_tile::launch_kernel(s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+    ck_tile::launch_kernel(
+        s, ck_tile::make_kernel<blocks.x, kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
 
     bool pass = true;
 
@@ -185,9 +170,9 @@ bool run(const ck_tile::ArgParser& arg_parser)
             }
         }
 
-        std::cout << "[" << data_type << "]" << " m:" << m << ", n:" << n << ", stride:" << stride
-                  << ", s:" << USEModelSensitive << ", valid:" << (pass ? "y" : "n") << std::flush
-                  << std::endl;
+        std::cout << "[" << data_type << "]"
+                  << " m:" << m << ", n:" << n << ", stride:" << stride
+                  << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
     }
 
     return pass;
@@ -199,19 +184,10 @@ int main(int argc, char* argv[])
     if(!result)
         return -1;
 
-    const std::string data_type           = arg_parser.get_str("prec");
-    const int use_model_sensitive_rmsnorm = arg_parser.get_int("s");
-
+    const std::string data_type = arg_parser.get_str("prec");
     if(data_type == "fp16")
     {
-        if(use_model_sensitive_rmsnorm == 0) // 0: for no specific RMSNorm
-        {
-            return run<ck_tile::half_t, 0>(arg_parser) ? 0 : -2;
-        }
-        else if(use_model_sensitive_rmsnorm == 1) // 1: for T5-like RMSNorm
-        {
-            return run<ck_tile::half_t, 1>(arg_parser) ? 0 : -2;
-        }
+        return run<ck_tile::half_t>(arg_parser) ? 0 : -2;
     }
 
     return -3;

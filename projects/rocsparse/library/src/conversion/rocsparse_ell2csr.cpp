@@ -23,12 +23,12 @@
  * ************************************************************************ */
 
 #include "internal/conversion/rocsparse_ell2csr.h"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_ell2csr.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "ell2csr_device.h"
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 rocsparse_status rocsparse::ell2csr_quickreturn(rocsparse_handle          handle,
                                                 int64_t                   m,

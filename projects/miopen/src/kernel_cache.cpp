@@ -81,7 +81,7 @@ bool KernelCache::HasProgram(const fs::path& name, const std::string& params) co
     ReadLock readLock(lock);
 
     const auto key = std::make_pair(name, params);
-    return program_map.contains(key);
+    return program_map.count(key) > 0;
 }
 
 void KernelCache::ClearProgram(const fs::path& name, const std::string& params)
@@ -125,25 +125,25 @@ Kernel KernelCache::AddKernel(const Handle& h,
         auto program_it = program_map.find(std::make_pair(program_name, params));
         if(program_it != program_map.end())
         {
-            auto& program_ = program_it->second;
+            auto& program = program_it->second;
 
-            if(program_out != nullptr && !program_.IsCodeObjectInMemory() &&
-               !program_.IsCodeObjectInFile())
+            if(program_out != nullptr && !program.IsCodeObjectInMemory() &&
+               !program.IsCodeObjectInFile())
             {
                 // We need the binaries attached to the program.
                 // This may happen if someone calls immediate mode and then find 2.0 with request
                 // for binaries.
-                program_ = h.LoadProgram(program_name, params, kernel_src, true);
+                program = h.LoadProgram(program_name, params, kernel_src, true);
             }
 
-            return program_;
+            return program;
         }
         else
         {
-            auto program_ = h.LoadProgram(program_name, params, kernel_src, program_out != nullptr);
+            auto program = h.LoadProgram(program_name, params, kernel_src, program_out != nullptr);
 
-            program_map[std::make_pair(program_name, params)] = program_;
-            return program_;
+            program_map[std::make_pair(program_name, params)] = program;
+            return program;
         }
     }();
 

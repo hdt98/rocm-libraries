@@ -1,5 +1,5 @@
 # ##########################################################################
-# Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,9 +50,6 @@ set(rocsolver_lapack_source
   lapack/roclapack_getrs.cpp
   lapack/roclapack_getrs_batched.cpp
   lapack/roclapack_getrs_strided_batched.cpp
-  lapack/roclapack_getrs_npvt.cpp
-  lapack/roclapack_getrs_npvt_batched.cpp
-  lapack/roclapack_getrs_npvt_strided_batched.cpp
   lapack/roclapack_gesv.cpp
   lapack/roclapack_gesv_batched.cpp
   lapack/roclapack_gesv_strided_batched.cpp
@@ -64,13 +61,6 @@ set(rocsolver_lapack_source
   lapack/roclapack_posv.cpp
   lapack/roclapack_posv_batched.cpp
   lapack/roclapack_posv_strided_batched.cpp
-  #- symmetric indefinite matrices
-  lapack/roclapack_sytrs.cpp
-  lapack/roclapack_sytrs_batched.cpp
-  lapack/roclapack_sytrs_strided_batched.cpp
-  lapack/roclapack_sytrs2.cpp
-  lapack/roclapack_sytrs2_batched.cpp
-  lapack/roclapack_sytrs2_strided_batched.cpp
   #- block-tridiagonal systems
   lapack/roclapack_geblttrs_npvt.cpp
   lapack/roclapack_geblttrs_npvt_batched.cpp
@@ -247,9 +237,6 @@ set(rocsolver_auxiliary_source
   auxiliary/rocauxiliary_larf.cpp
   auxiliary/rocauxiliary_larft.cpp
   auxiliary/rocauxiliary_larfb.cpp
-  # norm and condition number
-  auxiliary/rocauxiliary_lange.cpp
-  auxiliary/rocauxiliary_gecon.cpp
   # plane rotations
   auxiliary/rocauxiliary_lasr.cpp
   # orthonormal/unitary matrices
@@ -282,7 +269,6 @@ set(rocsolver_auxiliary_source
   auxiliary/rocauxiliary_stedcx.cpp
   auxiliary/rocauxiliary_stein.cpp
   auxiliary/rocauxiliary_latrd.cpp
-  auxiliary/rocauxiliary_latrd_forsytrd.cpp
   # symmetric matrices
   auxiliary/rocauxiliary_lasyf.cpp
   # triangular matrices
@@ -363,17 +349,6 @@ if(OPTIMAL)
   )
 endif()
 
-# Asynchronous logger option
-# Note: this does not mean abolsutely asynchronous, just less synchronous
-option(ROCSOLVER_USE_ASYNC_LOGGER "Enable asynchronous HIP event-based logger (reduces GPU synchronizations)" ON)
-
-# Configure asynchronous logger compile definition
-if(ROCSOLVER_USE_ASYNC_LOGGER)
-  set(ROCSOLVER_ASYNC_LOGGER_DEFINITION "ROCSOLVER_USE_ASYNC_LOGGER=1")
-else()
-  set(ROCSOLVER_ASYNC_LOGGER_DEFINITION "ROCSOLVER_USE_ASYNC_LOGGER=0")
-endif()
-
 set(auxiliaries
   common/buildinfo.cpp
   common/rocsolver_handle.cpp
@@ -381,25 +356,7 @@ set(auxiliaries
   common/rocsparse.cpp
 )
 
-set(common_source
-  ${PROJECT_SOURCE_DIR}/common/src/common_host_helpers.cpp
-)
-
-if(USE_HIPCXX)
-  set_source_files_properties(
-    ${common_source}
-    ${auxiliaries}
-    ${rocsolver_specialized_source}
-    ${rocsolver_auxiliary_source}
-    ${rocsolver_lapack_source}
-    ${rocsolver_refact_source}
-    PROPERTIES
-      LANGUAGE HIP
-  )
-endif()
-
 add_library(rocsolver
-  ${common_source}
   ${auxiliaries}
   ${rocsolver_specialized_source}
   ${rocsolver_auxiliary_source}
@@ -415,12 +372,10 @@ target_link_libraries(rocsolver
   PRIVATE
     $<BUILD_INTERFACE:rocsolver-common> # https://gitlab.kitware.com/cmake/cmake/-/issues/15415
     roc::rocprim
+    hip::device
     $<$<PLATFORM_ID:Linux>:--rtlib=compiler-rt>
     $<$<PLATFORM_ID:Linux>:--unwindlib=libgcc>
 )
-if(NOT USE_HIPCXX)
-  target_link_libraries(rocsolver PRIVATE hip::device)
-endif()
 
 if(NOT BUILD_WITH_SPARSE)
   target_link_libraries(rocsolver PRIVATE $<$<PLATFORM_ID:Linux>:${CMAKE_DL_LIBS}>)
@@ -445,24 +400,14 @@ else()
 endif()
 
 # In ROCm 4.0 and earlier, the default maximum threads per block is 256
-if(USE_HIPCXX)
-  target_compile_options(rocsolver PRIVATE
-    $<$<COMPILE_LANGUAGE:HIP>:--gpu-max-threads-per-block=1024>)
-else()
-  target_compile_options(rocsolver PRIVATE --gpu-max-threads-per-block=1024)
-endif()
+target_compile_options(rocsolver PRIVATE --gpu-max-threads-per-block=1024)
 
 # Ignore loop unrolling failures
 target_compile_options(rocsolver PRIVATE -Wno-pass-failed)
 
 # hipcc adds these options automatically. These options might have an effect
 # on performance, so add them when building with clang directly, just in case.
-if(USE_HIPCXX)
-  target_compile_options(rocsolver PRIVATE
-    "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-mllvm -amdgpu-early-inline-all=true>"
-    "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-mllvm -amdgpu-function-calls=false>"
-  )
-elseif(CMAKE_CXX_COMPILER MATCHES ".*clang\\+\\+.*")
+if(CMAKE_CXX_COMPILER MATCHES ".*clang\\+\\+.*")
   target_compile_options(rocsolver PRIVATE
     "SHELL:-mllvm -amdgpu-early-inline-all=true"
     "SHELL:-mllvm -amdgpu-function-calls=false"
@@ -495,6 +440,15 @@ set_target_properties(rocsolver PROPERTIES
 )
 generate_export_header(rocsolver EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/rocsolver/rocsolver-export.h)
 
+if (BUILD_FILE_REORG_BACKWARD_COMPATIBILITY)
+  rocm_wrap_header_file(
+    rocsolver-version.h rocsolver-export.h
+    GUARDS SYMLINK WRAPPER
+    WRAPPER_LOCATIONS ${CMAKE_INSTALL_INCLUDEDIR} rocsolver/${CMAKE_INSTALL_INCLUDEDIR}
+    ORIGINAL_FILES ${PROJECT_BINARY_DIR}/include/rocsolver/rocsolver-version.h
+  )
+endif( )
+
 if(NOT BUILD_SHARED_LIBS)
   # Following Boost conventions of prefixing 'lib' on static built libraries, across all platforms
   set_target_properties(rocsolver PROPERTIES PREFIX "lib")
@@ -509,15 +463,10 @@ if(ROCSOLVER_USE_INTERNAL_BLAS)
   target_compile_definitions(rocsolver PRIVATE USE_INTERNAL_GEMM USE_INTERNAL_TRSM)
 endif()
 
-if(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER)
-  target_compile_definitions(rocsolver PRIVATE ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER)
-endif()
-
 target_compile_definitions(rocsolver PRIVATE
   ROCM_USE_FLOAT16
   ROCBLAS_INTERNAL_API
   ROCSOLVER_LIBRARY
-  ${ROCSOLVER_ASYNC_LOGGER_DEFINITION}
 )
 
 add_armor_flags(rocsolver "${ARMOR_LEVEL}")
@@ -567,4 +516,12 @@ rocm_export_targets(
     ${static_depends}
   NAMESPACE roc::
 )
+
+if(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY)
+  rocm_install(
+    DIRECTORY
+       "${PROJECT_BINARY_DIR}/rocsolver"
+        DESTINATION "." )
+  message( STATUS "Backward Compatible Sym Link Created for include directories" )
+endif()
 

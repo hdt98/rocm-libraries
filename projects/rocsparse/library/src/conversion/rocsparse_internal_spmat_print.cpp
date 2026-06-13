@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,12 +24,17 @@
 // LCOV_EXCL_START
 #include "rocsparse_internal_spmat_print.hpp"
 #include "rocsparse_convert_array.hpp"
-#include "rocsparse_enum_utils.hpp"
-#include "rocsparse_float16.hpp"
-#include "rocsparse_utility.hpp"
+#include "to_string.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
+    inline std::ostream& operator<<(std::ostream& out, const _Float16& x)
+    {
+        out << (float)x;
+        return out;
+    }
+
     template <typename T>
     static rocsparse_status internal_dnvec_print(std::ostream& out, int64_t nmemb, const void* h)
     {
@@ -154,11 +159,6 @@ namespace rocsparse
             rocsparse::internal_dnvec_print<_Float16>(out, nmemb, hind);
             break;
         }
-        case rocsparse_datatype_bf16_r:
-        {
-            rocsparse::internal_dnvec_print<rocsparse_bfloat16>(out, nmemb, hind);
-            break;
-        }
         case rocsparse_datatype_f32_r:
         {
             rocsparse::internal_dnvec_print<float>(out, nmemb, hind);
@@ -225,11 +225,6 @@ namespace rocsparse
             rocsparse::internal_dnmat_print<_Float16>(out, m, n, hind, m);
             break;
         }
-        case rocsparse_datatype_bf16_r:
-        {
-            rocsparse::internal_dnmat_print<rocsparse_bfloat16>(out, m, n, hind, m);
-            break;
-        }
         case rocsparse_datatype_f32_r:
         {
             rocsparse::internal_dnmat_print<float>(out, m, n, hind, m);
@@ -288,44 +283,6 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
     RETURN_IF_ROCSPARSE_ERROR(rocsparse_spmat_get_format(descr, &format));
     switch(format)
     {
-    case rocsparse_format_sell:
-    {
-        int64_t              m;
-        int64_t              n;
-        int64_t              nnz;
-        int64_t              sell_slice_size;
-        int64_t              sell_colval_size;
-        const void*          ptr;
-        const void*          ind;
-        const void*          val;
-        rocsparse_indextype  ptr_type;
-        rocsparse_indextype  ind_type;
-        rocsparse_index_base base;
-        rocsparse_datatype   val_type;
-        RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_sell_get(descr,
-                                                           &m,
-                                                           &n,
-                                                           &nnz,
-                                                           &sell_slice_size,
-                                                           &sell_colval_size,
-                                                           &ptr,
-                                                           &ind,
-                                                           &val,
-                                                           &ptr_type,
-                                                           &ind_type,
-                                                           &base,
-                                                           &val_type));
-        out << "- format           : " << rocsparse::enum_utils::to_string(format) << std::endl;
-        out << "- m                : " << m << std::endl;
-        out << "- n                : " << n << std::endl;
-        out << "- nnz              : " << nnz << std::endl;
-        out << "- sell_slice_size  : " << sell_slice_size << std::endl;
-        out << "- sell_colval_size : " << sell_colval_size << std::endl;
-        out << "- ptr_type  : " << rocsparse::enum_utils::to_string(ptr_type) << std::endl;
-        out << "- ind_type  : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
-        break;
-    }
     case rocsparse_format_bell:
     {
         int64_t              m;
@@ -340,13 +297,13 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         int64_t              dimb;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_bell_get(
             descr, &m, &n, &dirb, &dimb, &ell_widthb, &ind, &val, &ind_type, &base, &val_type));
-        out << "- format     : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format     : " << rocsparse::to_string(format) << std::endl;
         out << "- m         : " << m << std::endl;
         out << "- n         : " << n << std::endl;
         out << "- width     : " << ell_widthb << std::endl;
-        out << "- ind_type  : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
-        out << "- dirb       : " << rocsparse::enum_utils::to_string(dirb) << std::endl;
+        out << "- ind_type  : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type : " << rocsparse::to_string(val_type) << std::endl;
+        out << "- dirb       : " << rocsparse::to_string(dirb) << std::endl;
         out << "- dimb       : " << dimb << std::endl;
         if(print_symbolic)
         {
@@ -361,6 +318,7 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         break;
     }
     case rocsparse_format_ell:
+
     {
         int64_t              m;
         int64_t              n;
@@ -372,12 +330,12 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         int64_t              ell_width;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_ell_get(
             descr, &m, &n, &ind, &val, &ell_width, &ind_type, &base, &val_type));
-        out << "- format    : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format    : " << rocsparse::to_string(format) << std::endl;
         out << "- m         : " << m << std::endl;
         out << "- n         : " << n << std::endl;
         out << "- ell width : " << ell_width << std::endl;
-        out << "- ind_type  : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
+        out << "- ind_type  : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type : " << rocsparse::to_string(val_type) << std::endl;
         if(print_symbolic)
         {
             RETURN_IF_ROCSPARSE_ERROR(
@@ -418,18 +376,18 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
                                                           &ind_type,
                                                           &base,
                                                           &val_type));
-        out << "- format     : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format     : " << rocsparse::to_string(format) << std::endl;
         out << "- mb         : " << mb << std::endl;
         out << "- nb         : " << nb << std::endl;
         out << "- nnzb       : " << nnzb << std::endl;
-        out << "- dirb       : " << rocsparse::enum_utils::to_string(dirb) << std::endl;
+        out << "- dirb       : " << rocsparse::to_string(dirb) << std::endl;
         out << "- dimb       : " << dimb << std::endl;
         out << "- m          : " << mb * dimb << std::endl;
         out << "- n          : " << nb * dimb << std::endl;
         out << "- nnz        : " << nnzb * dimb * dimb << std::endl;
-        out << "- ptr_type   : " << rocsparse::enum_utils::to_string(ptr_type) << std::endl;
-        out << "- ind_type   : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type  : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
+        out << "- ptr_type   : " << rocsparse::to_string(ptr_type) << std::endl;
+        out << "- ind_type   : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type  : " << rocsparse::to_string(val_type) << std::endl;
         if(print_symbolic)
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse::internal_dnvec_print(out, ptr_type, mb + 1, ptr));
@@ -456,13 +414,13 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         rocsparse_datatype   val_type;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_csr_get(
             descr, &m, &n, &nnz, &ptr, &ind, &val, &ptr_type, &ind_type, &base, &val_type));
-        out << "- format     : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format     : " << rocsparse::to_string(format) << std::endl;
         out << "- m          : " << m << std::endl;
         out << "- n          : " << n << std::endl;
         out << "- nnz        : " << nnz << std::endl;
-        out << "- ptr_type   : " << rocsparse::enum_utils::to_string(ptr_type) << std::endl;
-        out << "- ind_type   : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type  : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
+        out << "- ptr_type   : " << rocsparse::to_string(ptr_type) << std::endl;
+        out << "- ind_type   : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type  : " << rocsparse::to_string(val_type) << std::endl;
         out << "- base       : " << base << std::endl;
         if(print_symbolic)
         {
@@ -489,13 +447,13 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         rocsparse_datatype   val_type;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_csc_get(
             descr, &m, &n, &nnz, &ptr, &ind, &val, &ptr_type, &ind_type, &base, &val_type));
-        out << "- format     : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format     : " << rocsparse::to_string(format) << std::endl;
         out << "- m          : " << m << std::endl;
         out << "- n          : " << n << std::endl;
         out << "- nnz        : " << nnz << std::endl;
-        out << "- ptr_type   : " << rocsparse::enum_utils::to_string(ptr_type) << std::endl;
-        out << "- ind_type   : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type  : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
+        out << "- ptr_type   : " << rocsparse::to_string(ptr_type) << std::endl;
+        out << "- ind_type   : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type  : " << rocsparse::to_string(val_type) << std::endl;
         out << "- base       : " << base << std::endl;
         if(print_symbolic)
         {
@@ -521,13 +479,13 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         rocsparse_datatype   val_type;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_coo_get(
             descr, &m, &n, &nnz, &row_ind, &col_ind, &val, &ind_type, &base, &val_type));
-        out << "- format     : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format     : " << rocsparse::to_string(format) << std::endl;
         out << "- m          : " << m << std::endl;
         out << "- n          : " << n << std::endl;
         out << "- nnz        : " << nnz << std::endl;
-        out << "- row_type   : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- col_type   : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type  : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
+        out << "- row_type   : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- col_type   : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type  : " << rocsparse::to_string(val_type) << std::endl;
         out << "- base       : " << base << std::endl;
         if(print_symbolic)
         {
@@ -553,12 +511,12 @@ rocsparse_status rocsparse::internal_spmat_print(std::ostream&               out
         rocsparse_datatype   val_type;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_const_coo_aos_get(
             descr, &m, &n, &nnz, &ind, &val, &ind_type, &base, &val_type));
-        out << "- format     : " << rocsparse::enum_utils::to_string(format) << std::endl;
+        out << "- format     : " << rocsparse::to_string(format) << std::endl;
         out << "- m          : " << m << std::endl;
         out << "- n          : " << n << std::endl;
         out << "- nnz        : " << nnz << std::endl;
-        out << "- ind_type   : " << rocsparse::enum_utils::to_string(ind_type) << std::endl;
-        out << "- data_type  : " << rocsparse::enum_utils::to_string(val_type) << std::endl;
+        out << "- ind_type   : " << rocsparse::to_string(ind_type) << std::endl;
+        out << "- data_type  : " << rocsparse::to_string(val_type) << std::endl;
         out << "- base       : " << base << std::endl;
         if(print_symbolic)
         {

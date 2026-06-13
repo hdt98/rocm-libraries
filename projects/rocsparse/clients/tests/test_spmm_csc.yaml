@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights Reserved.
+# Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -28,8 +28,10 @@ include: rocsparse_common.yaml
 Definitions:
   - &alpha_beta_range_quick
     - { alpha:   1.0, beta: -1.0, alphai:  1.0, betai: -0.5 }
+    - { alpha:  -0.5, beta:  0.5, alphai: -0.5, betai:  1.0 }
 
   - &alpha_beta_range_checkin
+    - { alpha:   0.0, beta:  1.0,  alphai:  1.5, betai:  0.5 }
     - { alpha:   3.0, beta:  1.0,  alphai:  2.0, betai: -0.5 }
 
   - &alpha_beta_range_nightly
@@ -52,14 +54,14 @@ Tests:
 - name: spmm_csc
   category: quick
   function: spmm_csc
-  indextype: *i32
+  indextype: *i32i32_i64i32_i64i64
   precision: *double_only_precisions
-  M: [300]
+  M: [223, 485, 647]
   N: [223]
-  K: [647]
+  K: [223, 485, 647]
   alpha_beta: *alpha_beta_range_quick
-  transA: [rocsparse_operation_none]
-  transB: [rocsparse_operation_transpose]
+  transA: [rocsparse_operation_none, rocsparse_operation_transpose]
+  transB: [rocsparse_operation_none, rocsparse_operation_transpose]
   baseA: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_random]
   spmm_alg: [rocsparse_spmm_alg_csr]
@@ -69,13 +71,13 @@ Tests:
 - name: spmm_csc
   category: quick
   function: spmm_csc
-  indextype: *i64
+  indextype: *i32i32_i64i32_i64i64
   precision: *single_double_precisions_complex_real
-  M: [300]
-  N: [300]
-  K: [223]
+  M: [0, 485]
+  N: [0, 647]
+  K: [0, 223]
   alpha_beta: *alpha_beta_range_quick
-  transA: [rocsparse_operation_transpose]
+  transA: [rocsparse_operation_none]
   transB: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_random]
@@ -86,14 +88,14 @@ Tests:
 - name: spmm_csc_file
   category: quick
   function: spmm_csc
-  indextype: *i64i32
+  indextype: *i32i32_i64i32_i64i64
   precision: *double_only_precisions
   M: 1
   N: [64]
   K: 1
   alpha_beta: *alpha_beta_range_quick
   transA: [rocsparse_operation_transpose]
-  transB: [rocsparse_operation_none]
+  transB: [rocsparse_operation_none, rocsparse_operation_transpose]
   baseA: [rocsparse_index_base_one]
   matrix: [rocsparse_matrix_file_rocalution]
   spmm_alg: [rocsparse_spmm_alg_csr, rocsparse_spmm_alg_csr_row_split]
@@ -105,7 +107,7 @@ Tests:
 - name: spmm_csc_file
   category: quick
   function: spmm_csc
-  indextype: *i32
+  indextype: *i32i32_i64i32_i64i64
   precision: *single_double_precisions
   M: 1
   N: [256]
@@ -124,7 +126,7 @@ Tests:
 - name: spmm_csc_file
   category: quick
   function: spmm_csc
-  indextype: *i64
+  indextype: *i32i32_i64i32_i64i64
   precision: *double_only_precisions
   M: 1
   N: [128]
@@ -164,7 +166,7 @@ Tests:
 - name: spmm_csc_file
   category: quick
   function: spmm_csc
-  indextype: *i64i32
+  indextype: *i32i32_i64i32_i64i64
   precision: *single_double_precisions_complex
   M: 1
   N: [7]
@@ -182,9 +184,9 @@ Tests:
 - name: spmm_csc
   category: quick
   function: spmm_csc
-  indextype: *i32
+  indextype: *i32i32_i64i32_i64i64
   precision: *int8_int8_int32_int32_abct_precision
-  M: [300]
+  M: [346]
   N: [219]
   K: [614]
   alpha_beta: *alpha_beta_range_quick
@@ -195,17 +197,14 @@ Tests:
   spmm_alg: [rocsparse_spmm_alg_csr]
   orderB: [rocsparse_order_row]
   orderC: [rocsparse_order_row]
-  rand_gen_min: -128.0
-  rand_gen_max: 127.0
-  convert_to_int: true
 
 - name: spmm_csc
   category: quick
   function: spmm_csc
-  indextype: *i64
+  indextype: *i32i32_i64i32_i64i64
   precision: *int8_int8_float32_float32_abct_precision
-  M: [300]
-  N: [300]
+  M: [445]
+  N: [310]
   K: [278]
   alpha_beta: *alpha_beta_range_quick
   transA: [rocsparse_operation_none, rocsparse_operation_transpose]
@@ -215,17 +214,14 @@ Tests:
   spmm_alg: [rocsparse_spmm_alg_csr_row_split]
   orderB: [rocsparse_order_column]
   orderC: [rocsparse_order_row]
-  rand_gen_min: -128.0
-  rand_gen_max: 127.0
-  convert_to_int: true
 
 - name: spmm_csc
   category: quick
   function: spmm_csc
   indextype: *i32
   precision: *float16_float16_float32_float32_abct_precision
-  M: [300]
-  N: [19, 47]
+  M: [73645]
+  N: [19, 47, 64]
   K: [48364]
   alpha_beta: *alpha_beta_range_quick
   transA: [rocsparse_operation_none]
@@ -235,40 +231,6 @@ Tests:
   spmm_alg: [rocsparse_spmm_alg_csr_row_split]
   orderB: [rocsparse_order_row]
   orderC: [rocsparse_order_row]
-
-- name: spmm_csc
-  category: quick
-  function: spmm_csc
-  indextype: *i32
-  precision: *bfloat16_bfloat16_float32_float32_abct_precision
-  M: [300]
-  N: [35]
-  K: [80000]
-  alpha_beta: *alpha_beta_range_quick
-  transA: [rocsparse_operation_transpose]
-  transB: [rocsparse_operation_none]
-  baseA: [rocsparse_index_base_zero]
-  matrix: [rocsparse_matrix_random]
-  spmm_alg: [rocsparse_spmm_alg_csr_row_split]
-  orderB: [rocsparse_order_row, rocsparse_order_column]
-  orderC: [rocsparse_order_row]
-
-- name: spmm_csc
-  category: quick
-  function: spmm_csc
-  indextype: *i32
-  precision: [*float16_float16_float32_float32_abct_precision, *bfloat16_bfloat16_float32_float32_abct_precision]
-  M: [300]
-  N: [16, 32]
-  K: [512]
-  alpha_beta: *alpha_beta_range_quick
-  transA: [rocsparse_operation_none]
-  transB: [rocsparse_operation_none, rocsparse_operation_transpose]
-  baseA: [rocsparse_index_base_zero]
-  matrix: [rocsparse_matrix_random]
-  spmm_alg: [rocsparse_spmm_alg_csr_row_split, rocsparse_spmm_alg_csr_nnz_split, rocsparse_spmm_alg_csr_merge_path]
-  orderB: [rocsparse_order_column]
-  orderC: [rocsparse_order_column]
 
 ##############################
 # Precheckin
@@ -471,16 +433,13 @@ Tests:
   orderC: [rocsparse_order_column]
   filename: [nos2,
              nos5]
-  rand_gen_min: -128.0
-  rand_gen_max: 127.0
-  convert_to_int: true
 
 - name: spmm_csc
   category: pre_checkin
   function: spmm_csc
   indextype: *i32
   precision: *float16_float16_float32_float32_abct_precision
-  M: [2000]
+  M: [56473]
   N: [27, 51]
   K: [29856]
   alpha_beta: *alpha_beta_range_checkin
@@ -492,29 +451,12 @@ Tests:
   orderB: [rocsparse_order_column]
   orderC: [rocsparse_order_column]
 
-- name: spmm_csc
-  category: pre_checkin
-  function: spmm_csc
-  indextype: *i32
-  precision: [*float16_float16_float32_float32_abct_precision, *bfloat16_bfloat16_float32_float32_abct_precision]
-  M: [1024]
-  N: [32, 64]
-  K: [1024]
-  alpha_beta: *alpha_beta_range_checkin
-  transA: [rocsparse_operation_none]
-  transB: [rocsparse_operation_none, rocsparse_operation_transpose]
-  baseA: [rocsparse_index_base_zero]
-  matrix: [rocsparse_matrix_random]
-  spmm_alg: [rocsparse_spmm_alg_csr_row_split, rocsparse_spmm_alg_csr_nnz_split, rocsparse_spmm_alg_csr_merge_path]
-  orderB: [rocsparse_order_column]
-  orderC: [rocsparse_order_column]
-
 - name: spmm_csc_graph_test
   category: pre_checkin
   function: spmm_csc
   indextype: *i32i32_i64i32_i64i64
   precision: *double_only_precisions
-  M: [223, 485]
+  M: [223, 485, 647]
   N: [223]
   K: [223, 485, 647]
   alpha_beta: *alpha_beta_range_quick
@@ -694,16 +636,13 @@ Tests:
   orderB: [rocsparse_order_column]
   orderC: [rocsparse_order_column]
   filename: [scircuit]
-  rand_gen_min: -128.0
-  rand_gen_max: 127.0
-  convert_to_int: true
 
 - name: spmm_csc
   category: nightly
   function: spmm_csc
   indextype: *i32
   precision: *float16_float16_float32_float32_abct_precision
-  M: [5881]
+  M: [29405]
   N: [20, 58]
   K: [31546]
   alpha_beta: *alpha_beta_range_nightly
@@ -724,7 +663,7 @@ Tests:
   function: spmm_csc
   indextype: *i32
   precision: *single_only_precisions
-  M: [30000000]
+  M: [300000000]
   N: [2]
   K: [300000000]
   alpha_beta: *alpha_beta_range_stress
@@ -755,31 +694,8 @@ Tests:
   spmm_alg: [rocsparse_spmm_alg_csr]
   orderB: [rocsparse_order_row, rocsparse_order_column]
   orderC: [rocsparse_order_row, rocsparse_order_column]
-  filename: [sme3Dc]
-
-- name: spmm_csc_file
-  category: stress
-  hardware: [gfx90a]
-  function: spmm_csc
-  indextype: *i32
-  precision: *double_only_precisions
-  M: 1
-  N: [2]
-  K: 1
-  ld_multiplier_B: [9354]
-  ld_multiplier_C: [7523]
-  alpha_beta: *alpha_beta_range_stress
-  transA: [rocsparse_operation_none]
-  transB: [rocsparse_operation_none]
-  baseA: [rocsparse_index_base_zero]
-  matrix: [rocsparse_matrix_file_rocalution]
-  spmm_alg: [rocsparse_spmm_alg_csr]
-  orderB: [rocsparse_order_row, rocsparse_order_column]
-  orderC: [rocsparse_order_row, rocsparse_order_column]
-  filename: [bmwcra_1]
-  rand_gen_min: -100.0
-  rand_gen_max: 100.0
-  convert_to_int: true
+  filename: [sme3Dc,
+             bmwcra_1]
 
 - name: spmm_csc_file
   category: stress

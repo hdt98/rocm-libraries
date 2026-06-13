@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights Reserved.
+* Copyright (C) 2020 Advanced Micro Devices, Inc. All rights Reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,7 @@ using namespace hipsparse;
 using namespace hipsparse_test;
 
 template <typename T>
-void testing_prune_csr2csr_by_percentage_bad_arg(const Arguments& argus)
+void testing_prune_csr2csr_by_percentage_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION))
     size_t safe_size = 1;
@@ -614,7 +614,7 @@ void testing_prune_csr2csr_by_percentage_bad_arg(const Arguments& argus)
 }
 
 template <typename T>
-void testing_prune_csr2csr_by_percentage(Arguments argus)
+hipsparseStatus_t testing_prune_csr2csr_by_percentage(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 13000)
     int                  M              = argus.M;
@@ -640,6 +640,13 @@ void testing_prune_csr2csr_by_percentage(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseSetMatIndexBase(descr_A, csr_idx_base_A));
     CHECK_HIPSPARSE_ERROR(hipsparseSetMatIndexBase(descr_C, csr_idx_base_C));
 
+    if(M == 0 || N == 0)
+    {
+#ifdef __HIP_PLATFORM_NVIDIA__
+        return HIPSPARSE_STATUS_SUCCESS;
+#endif
+    }
+
     srand(12345ULL);
 
     // Host structures
@@ -649,8 +656,12 @@ void testing_prune_csr2csr_by_percentage(Arguments argus)
 
     // Read or construct CSR matrix
     int nnz_A = 0;
-    CHECK_GENERATE_MATRIX_ERROR(generate_csr_matrix(
-        filename, M, N, nnz_A, h_csr_row_ptr_A, h_csr_col_ind_A, h_csr_val_A, csr_idx_base_A));
+    if(!generate_csr_matrix(
+           filename, M, N, nnz_A, h_csr_row_ptr_A, h_csr_col_ind_A, h_csr_val_A, csr_idx_base_A))
+    {
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
 
     // Allocate device memory
     auto d_nnz_total_dev_host_ptr_managed
@@ -884,6 +895,8 @@ void testing_prune_csr2csr_by_percentage(Arguments argus)
                             get_gpu_time_msec(gpu_time_used));
     }
 #endif
+
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 #endif // TESTING_PRUNE_CSR2CSR_BY_PERCENTAGE_HPP

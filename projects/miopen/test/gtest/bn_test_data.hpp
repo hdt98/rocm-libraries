@@ -35,8 +35,6 @@
 #include "tensor_util.hpp"
 #include "get_handle.hpp"
 
-#define WORKAROUND_SWDEV_549725 1
-
 struct BN2DTestCase
 {
     size_t N;
@@ -88,12 +86,6 @@ std::vector<T> Network3DBN();
 template <typename T>
 std::vector<T> Network3DSerialCase();
 
-template <typename T>
-std::vector<T> Network2DInvalidTraining();
-
-template <typename T>
-std::vector<T> Network3DInvalidTraining();
-
 template <>
 inline std::vector<BN2DTestCase> Network2DLarge()
 {
@@ -136,13 +128,9 @@ inline std::vector<BN2DTestCase> Network2DLarge()
         {768, 1, 23, 23, miopen::batchnorm::Direction::ForwardTraining, 1, 1},
         {832, 1, 14, 14, miopen::batchnorm::Direction::ForwardTraining, 1, 1},
         {832, 1, 28, 28, miopen::batchnorm::Direction::ForwardTraining, 1, 1},
-        // {1, 512, 7, 7, miopen::batchnorm::Direction::ForwardTraining, 1, 1},
-        // {1, 512, 7, 7, miopen::batchnorm::Direction::Backward, 1, 1},
         // edge cases
         {69328, 1, 22, 22, miopen::batchnorm::Direction::ForwardTraining, 1, 1},
-        {69328, 1, 13, 79, miopen::batchnorm::Direction::ForwardTraining, 1, 1},
-        // Forward passes that should select variant 3 according to the current heuristic in common_spatial.hpp:DefaultConfigSpatialSingle and layout NCHW
-        {16, 1, 32, 32, miopen::batchnorm::Direction::ForwardTraining, 1, 1}
+        {69328, 1, 13, 79, miopen::batchnorm::Direction::ForwardTraining, 1, 1}
         };
     // clang-format on
 }
@@ -154,15 +142,7 @@ inline std::vector<BN2DTestCase> Network2DLarge()
 template <>
 inline std::vector<BN3DTestCase> Network3DSerialCase()
 {
-    // clang-format off
-    return {
-        // TODO: fix numeric issues before re-enabling large test
-#ifndef WORKAROUND_SWDEV_549725
-        {2, 2048, 16, 128, 128, miopen::batchnorm::Direction::Backward, 0, 1},
-#endif
-        {2, 128, 16, 128, 128, miopen::batchnorm::Direction::Backward, 0, 1},
-    };
-    // clang-format on
+    return {{2, 2048, 16, 128, 128, miopen::batchnorm::Direction::Backward, 0, 1}};
 }
 
 template <>
@@ -176,9 +156,6 @@ inline std::vector<BN2DTestCase> Network2DSmall()
         {192, 2, 8, 8, miopen::batchnorm::Direction::Backward, 1, 0},
         {16, 8, 56, 56, miopen::batchnorm::Direction::Backward, 1, 0},
         {16, 8, 128, 256, miopen::batchnorm::Direction::ForwardTraining, 1, 0},
-        // Edge cases - minimum valid dimensions for Spatial BN training (N*H*W > 1)
-        {2, 256, 1, 1, miopen::batchnorm::Direction::ForwardTraining, 1, 0},  // N*H*W = 2 (min batch)
-        {2, 256, 1, 1, miopen::batchnorm::Direction::Backward, 1, 0},         // N*H*W = 2 (min spatial)
     };
     // clang-format on
 }
@@ -190,36 +167,7 @@ inline std::vector<BN3DTestCase> Network3DBN()
     return {
         {2, 2, 3, 224, 224, miopen::batchnorm::Direction::Backward, 1, 0},
         {16, 8, 132, 28, 28, miopen::batchnorm::Direction::Backward, 1, 0},
-        {16, 8, 16, 128, 128, miopen::batchnorm::Direction::ForwardTraining, 1, 0},
-        // Edge cases - minimum valid dimensions for Spatial BN training (N*D*H*W > 1)
-        {2, 256, 1, 1, 1, miopen::batchnorm::Direction::ForwardTraining, 1, 0},  // N*D*H*W = 2 (min batch)
-        {2, 256, 1, 1, 1, miopen::batchnorm::Direction::Backward, 1, 0},         // N*D*H*W = 2 (min spatial D)
-    };
-    // clang-format on
-}
-
-// Invalid training cases for validation testing (PyTorch rejects these)
-// These should only be used by validation tests that expect API rejection
-template <>
-inline std::vector<BN2DTestCase> Network2DInvalidTraining()
-{
-    // clang-format off
-    return {
-        // N*H*W = 1 cases (invalid for Spatial BN training)
-        {1, 256, 1, 1, miopen::batchnorm::Direction::ForwardTraining, 0, 0},  // Should be rejected
-        {1, 256, 1, 1, miopen::batchnorm::Direction::Backward, 0, 0},         // Should be rejected
-    };
-    // clang-format on
-}
-
-template <>
-inline std::vector<BN3DTestCase> Network3DInvalidTraining()
-{
-    // clang-format off
-    return {
-        // N*D*H*W = 1 cases (invalid for Spatial BN training)
-        {1, 256, 1, 1, 1, miopen::batchnorm::Direction::ForwardTraining, 0, 0},  // Should be rejected
-        {1, 256, 1, 1, 1, miopen::batchnorm::Direction::Backward, 0, 0},         // Should be rejected
+        {16, 8, 16, 128, 128, miopen::batchnorm::Direction::ForwardTraining, 1, 0}
     };
     // clang-format on
 }
@@ -286,14 +234,11 @@ template <typename XDataType,
           typename TConfig>
 struct BNInferTestData : public BNTestData<XDataType, YDataType, AccDataType, TConfig>
 {
-    void SetUpImpl(const TConfig& config,
-                   miopenBatchNormMode_t t_bnmode,
-                   miopenTensorLayout_t t_layout,
-                   bool useInverseVariance_)
+    void
+    SetUpImpl(const TConfig& config, miopenBatchNormMode_t t_bnmode, miopenTensorLayout_t t_layout)
     {
         BNTestData<XDataType, YDataType, AccDataType, TConfig>::SetUpImpl(
             config, t_bnmode, t_layout);
-        useInverseVariance = useInverseVariance_;
         CreateTensors();
         InitTensorsWithRandValue();
         WriteToGPU();
@@ -307,13 +252,12 @@ struct BNInferTestData : public BNTestData<XDataType, YDataType, AccDataType, TC
     miopen::Allocator::ManageDataPtr shift_dev;
     miopen::Allocator::ManageDataPtr estMean_dev;
     miopen::Allocator::ManageDataPtr estVariance_dev;
-    double epsilon{1.0e-5};
-    float alpha{1.0f};
-    float beta{0.0f};
-    double activ_alpha;
-    double activ_beta;
-    miopenActivationMode_t activ_mode;
-    bool useInverseVariance = false;
+    double epsilon          = 1.0e-5;
+    float alpha             = static_cast<float>(1.0f);
+    float beta              = static_cast<float>(0);
+    const float activ_alpha = static_cast<double>(0.5f);
+    const float activ_beta  = static_cast<double>(0.5f);
+    const float activ_gamma = static_cast<double>(0.5f);
 
 private:
     void CreateTensors()
@@ -344,19 +288,10 @@ private:
         shift.generate(uniform_signed_initializer<BiasDataType>(2e-3 /*scale*/, 1000 /*range*/));
         estMean.generate(
             uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        if(useInverseVariance)
-        {
-            // Given an epsilon of 1e-5, the max value is 1/sqrt(epsilon) ==> 316.228
-            // Given a max variance of 2, the min value is 1/sqrt(epsilon + 2.0) ==> 0.7
-            estVariance.generate(uniform_unsigned_initializer<MeanVarDataType>(0.7, 317));
-        }
-        else
-        {
-            // estVaraince has to be +ve number otherwise 1/sqrt(-ve) would
-            // give img number
-            estVariance.generate(
-                uniform_unsigned_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        }
+        // estVaraince has to be +ve number otherwise 1/sqrt(-ve) would
+        // give img number
+        estVariance.generate(
+            uniform_unsigned_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
     }
     void WriteToGPU()
     {
@@ -389,7 +324,6 @@ struct BNBwdTestData : public BNTestData<XDataType, DyDataType, AccDataType, TCo
     }
 
     tensor<ScaleDataType> bnScale;
-    tensor<ScaleDataType> bnBias;
 
     tensor<MeanVarDataType> savedMean;
     tensor<MeanVarDataType> savedInvVar;
@@ -401,7 +335,6 @@ struct BNBwdTestData : public BNTestData<XDataType, DyDataType, AccDataType, TCo
     tensor<AccDataType> dBias_ref;
 
     miopen::Allocator::ManageDataPtr bnScale_dev;
-    miopen::Allocator::ManageDataPtr bnBias_dev;
     miopen::Allocator::ManageDataPtr savedMean_dev;
     miopen::Allocator::ManageDataPtr savedInvVar_dev;
 
@@ -412,12 +345,8 @@ struct BNBwdTestData : public BNTestData<XDataType, DyDataType, AccDataType, TCo
     miopen::Allocator::ManageDataPtr dBias_ref_dev;
     double epsilon = std::numeric_limits<float>::epsilon();
 
-    float alphaDataDiff{1.0f}, betaDataDiff{0.0f};
-    float alphaParamDiff{1.0f}, betaParamDiff{0.0f};
-
-    double activ_alpha;
-    double activ_beta;
-    miopenActivationMode_t activ_mode;
+    float alphaDataDiff = static_cast<float>(1), betaDataDiff = static_cast<float>(0);
+    float alphaParamDiff = static_cast<float>(1), betaParamDiff = static_cast<float>(0);
 
 private:
     void CreateTensors()
@@ -432,9 +361,6 @@ private:
             BNTestData<XDataType, DyDataType, AccDataType, TConfig>::input.desc,
             BNTestData<XDataType, DyDataType, AccDataType, TConfig>::bn_mode);
         bnScale = tensor<ScaleDataType>{
-            BNTestData<XDataType, DyDataType, AccDataType, TConfig>::tensor_layout,
-            derivedBnDesc.GetLengths()};
-        bnBias = tensor<ScaleDataType>{
             BNTestData<XDataType, DyDataType, AccDataType, TConfig>::tensor_layout,
             derivedBnDesc.GetLengths()};
         savedMean = tensor<MeanVarDataType>{
@@ -461,7 +387,6 @@ private:
     {
         dy.generate(uniform_signed_initializer<DyDataType>(2e-3 /*scale*/, 1000 /*range*/));
         bnScale.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        bnBias.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
         savedMean.generate(
             uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
         savedInvVar.generate(
@@ -478,7 +403,6 @@ private:
         auto&& handle = get_handle();
 
         bnScale_dev     = handle.Write(bnScale.data);
-        bnBias_dev      = handle.Write(bnBias.data);
         savedMean_dev   = handle.Write(savedMean.data);
         savedInvVar_dev = handle.Write(savedInvVar.data);
         dy_dev          = handle.Write(dy.data);
@@ -513,11 +437,6 @@ struct BNFwdTrainTestData : public BNTestData<XDataType, YDataType, AccDataType,
     tensor<RunSaveDataType> saveVariance;
     tensor<RunSaveDataType> runMean;
     tensor<RunSaveDataType> runVariance;
-    // V3 API: separate prev/next buffers for ping-pong
-    tensor<RunSaveDataType> prevRunMean;
-    tensor<RunSaveDataType> prevRunVariance;
-    tensor<RunSaveDataType> nextRunMean;
-    tensor<RunSaveDataType> nextRunVariance;
 
     tensor<AccDataType> saveMean_ref;
     tensor<AccDataType> saveVariance_ref;
@@ -530,18 +449,13 @@ struct BNFwdTrainTestData : public BNTestData<XDataType, YDataType, AccDataType,
     miopen::Allocator::ManageDataPtr saveVariance_dev;
     miopen::Allocator::ManageDataPtr runMean_dev;
     miopen::Allocator::ManageDataPtr runVariance_dev;
-    // V3 API: separate prev/next device buffers
-    miopen::Allocator::ManageDataPtr prevRunMean_dev;
-    miopen::Allocator::ManageDataPtr prevRunVariance_dev;
-    miopen::Allocator::ManageDataPtr nextRunMean_dev;
-    miopen::Allocator::ManageDataPtr nextRunVariance_dev;
-    double epsilon       = 1.0e-5;
-    double averageFactor = 0.1;
-    float alpha          = 1.0f;
-    float beta           = 0.0f;
-    double activ_alpha;
-    double activ_beta;
-    miopenActivationMode_t activ_mode;
+    double epsilon          = 1.0e-5;
+    double averageFactor    = 0.1;
+    float alpha             = static_cast<float>(1.0f);
+    float beta              = static_cast<float>(0);
+    const float activ_alpha = static_cast<double>(0.5f);
+    const float activ_beta  = static_cast<double>(0.5f);
+    const float activ_gamma = static_cast<double>(0.5f);
 
 private:
     void CreateTensors()
@@ -569,19 +483,6 @@ private:
         runVariance = tensor<RunSaveDataType>{
             BNTestData<XDataType, YDataType, AccDataType, TConfig>::tensor_layout,
             derivedBnDesc.GetLengths()};
-        // V3 API: separate prev/next buffers
-        prevRunMean = tensor<RunSaveDataType>{
-            BNTestData<XDataType, YDataType, AccDataType, TConfig>::tensor_layout,
-            derivedBnDesc.GetLengths()};
-        prevRunVariance = tensor<RunSaveDataType>{
-            BNTestData<XDataType, YDataType, AccDataType, TConfig>::tensor_layout,
-            derivedBnDesc.GetLengths()};
-        nextRunMean = tensor<RunSaveDataType>{
-            BNTestData<XDataType, YDataType, AccDataType, TConfig>::tensor_layout,
-            derivedBnDesc.GetLengths()};
-        nextRunVariance = tensor<RunSaveDataType>{
-            BNTestData<XDataType, YDataType, AccDataType, TConfig>::tensor_layout,
-            derivedBnDesc.GetLengths()};
         // ref
         saveMean_ref = tensor<AccDataType>{
             BNTestData<XDataType, YDataType, AccDataType, TConfig>::tensor_layout,
@@ -606,12 +507,6 @@ private:
             uniform_signed_initializer<RunSaveDataType>(2e-3 /*scale*/, 1000 /*range*/));
         runVariance.generate(
             uniform_signed_initializer<RunSaveDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        // V3 API: initialize prev buffers with same values as runMean/runVariance
-        prevRunMean.generate(
-            uniform_signed_initializer<RunSaveDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        prevRunVariance.generate(
-            uniform_signed_initializer<RunSaveDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        // nextRunMean and nextRunVariance will be output buffers (don't need initialization)
 
         std::transform(saveMean.data.begin(),
                        saveMean.data.end(),
@@ -639,11 +534,5 @@ private:
         saveVariance_dev = handle.Write(saveVariance.data);
         runMean_dev      = handle.Write(runMean.data);
         runVariance_dev  = handle.Write(runVariance.data);
-        // V3 API: write prev buffers to GPU
-        prevRunMean_dev     = handle.Write(prevRunMean.data);
-        prevRunVariance_dev = handle.Write(prevRunVariance.data);
-        // Allocate next buffers (output only, no need to initialize data)
-        nextRunMean_dev     = handle.Create<RunSaveDataType>(prevRunMean.data.size());
-        nextRunVariance_dev = handle.Create<RunSaveDataType>(prevRunVariance.data.size());
     }
 };

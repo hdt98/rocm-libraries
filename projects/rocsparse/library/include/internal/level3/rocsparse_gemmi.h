@@ -33,12 +33,12 @@ extern "C" {
 #endif
 
 /*! \ingroup level3_module
-*  \brief Dense matrix sparse matrix multiplication using the CSR storage format.
+*  \brief Dense matrix sparse matrix multiplication using CSR storage format
 *
 *  \details
 *  \p rocsparse_gemmi multiplies the scalar \f$\alpha\f$ with a column-oriented dense \f$m \times k\f$
 *  matrix \f$op(A)\f$ and the sparse \f$k \times n\f$ matrix \f$op(B)\f$, defined in CSR
-*  storage format, and adds the result to the column-oriented dense \f$m \times n\f$ matrix \f$C\f$ that
+*  storage format and adds the result to the column-oriented dense \f$m \times n\f$ matrix \f$C\f$ that
 *  is multiplied by the scalar \f$\beta\f$, such that
 *  \f[
 *    C := \alpha \cdot op(A) \cdot op(B) + \beta \cdot C
@@ -71,14 +71,14 @@ extern "C" {
 *  Currently, only \p trans_B == \ref rocsparse_operation_transpose is supported.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle      handle to the rocSPARSE library context queue.
+*  handle      handle to the rocsparse library context queue.
 *  @param[in]
 *  trans_A     matrix \f$A\f$ operation type.
 *  @param[in]
@@ -120,14 +120,64 @@ extern "C" {
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, \p k, \p nnz, \p lda, or \p ldc
+*  \retval     rocsparse_status_invalid_size \p m, \p n, \p k, \p nnz, \p lda or \p ldc
 *              is invalid.
 *  \retval     rocsparse_status_invalid_pointer \p alpha, \p A, \p csr_val,
-*              \p csr_row_ptr, \p csr_col_ind, \p beta, or \p C pointer is invalid.
+*              \p csr_row_ptr, \p csr_col_ind, \p beta or \p C pointer is invalid.
 *
 *  \par Example
 *  This example multiplies a column-oriented dense matrix with a CSC matrix.
-*  \snippet example_rocsparse_gemmi.cpp doc example
+*  \code{.c}
+*      rocsparse_int m   = 2;
+*      rocsparse_int n   = 5;
+*      rocsparse_int k   = 3;
+*      rocsparse_int nnz = 8;
+*      rocsparse_int lda = m;
+*      rocsparse_int ldc = m;
+*
+*      // Matrix A (m x k)
+*      // (  9.0  10.0  11.0 )
+*      // ( 12.0  13.0  14.0 )
+*
+*      // Matrix B (k x n)
+*      // ( 1.0  2.0  0.0  3.0  0.0 )
+*      // ( 0.0  4.0  5.0  0.0  0.0 )
+*      // ( 6.0  0.0  0.0  7.0  8.0 )
+*
+*      // Matrix C (m x n)
+*      // ( 15.0  16.0  17.0  18.0  19.0 )
+*      // ( 20.0  21.0  22.0  23.0  24.0 )
+*
+*      A[lda * k]           = {9.0, 12.0, 10.0, 13.0, 11.0, 14.0};      // device memory
+*      csc_col_ptr_B[n + 1] = {0, 2, 4, 5, 7, 8};                       // device memory
+*      csc_row_ind_B[nnz]   = {0, 0, 1, 1, 2, 3, 3, 4};                 // device memory
+*      csc_val_B[nnz]       = {1.0, 6.0, 2.0, 4.0, 5.0, 3.0, 7.0, 8.0}; // device memory
+*      C[ldc * n]           = {15.0, 20.0, 16.0, 21.0, 17.0, 22.0,      // device memory
+*                              18.0, 23.0, 19.0, 24.0};
+*
+*      // alpha and beta
+*      float alpha = 1.0f;
+*      float beta  = 0.0f;
+*
+*      // Perform the matrix multiplication
+*      rocsparse_sgemmi(handle,
+*                       rocsparse_operation_none,
+*                       rocsparse_operation_transpose,
+*                       m,
+*                       n,
+*                       k,
+*                       nnz,
+*                       &alpha,
+*                       A,
+*                       lda,
+*                       descr_B,
+*                       csc_val_B,
+*                       csc_col_ptr_B,
+*                       csc_row_ind_B,
+*                       &beta,
+*                       C,
+*                       ldc);
+*  \endcode
 */
 /**@{*/
 ROCSPARSE_EXPORT

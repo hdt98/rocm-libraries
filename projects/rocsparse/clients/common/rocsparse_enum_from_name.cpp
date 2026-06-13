@@ -56,8 +56,7 @@ DEF(rocsparse_datatype,
     rocsparse_datatype_i8_r,
     rocsparse_datatype_u8_r,
     rocsparse_datatype_i32_r,
-    rocsparse_datatype_u32_r,
-    rocsparse_datatype_bf16_r);
+    rocsparse_datatype_u32_r);
 
 DEF(rocsparse_index_base, rocsparse_index_base_zero, rocsparse_index_base_one);
 
@@ -100,8 +99,7 @@ DEF(rocsparse_format,
     rocsparse_format_bsr,
     rocsparse_format_csc,
     rocsparse_format_ell,
-    rocsparse_format_bell,
-    rocsparse_format_sell);
+    rocsparse_format_bell);
 
 DEF(rocsparse_sddmm_alg, rocsparse_sddmm_alg_default, rocsparse_sddmm_alg_dense);
 
@@ -119,18 +117,14 @@ DEF(rocsparse_spmv_alg,
     rocsparse_spmv_alg_csr_adaptive,
     rocsparse_spmv_alg_csr_rowsplit,
     rocsparse_spmv_alg_ell,
-    rocsparse_spmv_alg_sell,
     rocsparse_spmv_alg_coo_atomic,
-    rocsparse_spmv_alg_csr_lrb,
-    rocsparse_spmv_alg_csr_nnzsplit);
+    rocsparse_spmv_alg_csr_lrb);
 
 DEF(rocsparse_spsv_alg, rocsparse_spsv_alg_default);
-DEF(rocsparse_sptrsv_alg, rocsparse_sptrsv_alg_default);
 
 DEF(rocsparse_spitsv_alg, rocsparse_spitsv_alg_default);
 
 DEF(rocsparse_spsm_alg, rocsparse_spsm_alg_default);
-DEF(rocsparse_sptrsm_alg, rocsparse_sptrsm_alg_default);
 
 DEF(rocsparse_spmm_alg,
     rocsparse_spmm_alg_default,
@@ -203,7 +197,6 @@ bool rocsparse_datatype_from_name(rocsparse_datatype value, const char* name)
             CASE(rocsparse_datatype_u8_r);
             CASE(rocsparse_datatype_i32_r);
             CASE(rocsparse_datatype_u32_r);
-            CASE(rocsparse_datatype_bf16_r);
         }
     }
     return false;
@@ -381,7 +374,6 @@ bool rocsparse_format_from_name(rocsparse_format value, const char* name)
             CASE(rocsparse_format_csc);
             CASE(rocsparse_format_ell);
             CASE(rocsparse_format_bell);
-            CASE(rocsparse_format_sell);
         }
     }
     return false;
@@ -428,10 +420,8 @@ bool rocsparse_spmv_alg_from_name(rocsparse_spmv_alg value, const char* name)
             CASE(rocsparse_spmv_alg_csr_adaptive);
             CASE(rocsparse_spmv_alg_csr_rowsplit);
             CASE(rocsparse_spmv_alg_ell);
-            CASE(rocsparse_spmv_alg_sell);
             CASE(rocsparse_spmv_alg_coo_atomic);
             CASE(rocsparse_spmv_alg_csr_lrb);
-            CASE(rocsparse_spmv_alg_csr_nnzsplit);
         }
     }
     return false;
@@ -444,18 +434,6 @@ bool rocsparse_spsv_alg_from_name(rocsparse_spsv_alg value, const char* name)
         switch(v)
         {
             CASE(rocsparse_spsv_alg_default);
-        }
-    }
-    return false;
-}
-
-bool rocsparse_sptrsv_alg_from_name(rocsparse_sptrsv_alg value, const char* name)
-{
-    for(auto v : rocsparse_sptrsv_alg_st::all)
-    {
-        switch(v)
-        {
-            CASE(rocsparse_sptrsv_alg_default);
         }
     }
     return false;
@@ -480,18 +458,6 @@ bool rocsparse_spsm_alg_from_name(rocsparse_spsm_alg value, const char* name)
         switch(v)
         {
             CASE(rocsparse_spsm_alg_default);
-        }
-    }
-    return false;
-}
-
-bool rocsparse_sptrsm_alg_from_name(rocsparse_sptrsm_alg value, const char* name)
-{
-    for(auto v : rocsparse_sptrsm_alg_st::all)
-    {
-        switch(v)
-        {
-            CASE(rocsparse_sptrsm_alg_default);
         }
     }
     return false;
@@ -635,10 +601,8 @@ bool convert(int& v, const char* enum_type, const char* value)
     DEF(rocsparse_itilu0_alg);
     DEF(rocsparse_spmv_alg);
     DEF(rocsparse_spsv_alg);
-    DEF(rocsparse_sptrsv_alg);
     DEF(rocsparse_spitsv_alg);
     DEF(rocsparse_spsm_alg);
-    DEF(rocsparse_sptrsm_alg);
     DEF(rocsparse_spmm_alg);
     DEF(rocsparse_spgemm_alg);
     DEF(rocsparse_spgeam_alg);
@@ -682,10 +646,8 @@ bool get_size(uint64_t& v, const char* enum_type)
     DEF(rocsparse_itilu0_alg);
     DEF(rocsparse_spmv_alg);
     DEF(rocsparse_spsv_alg);
-    DEF(rocsparse_sptrsv_alg);
     DEF(rocsparse_spitsv_alg);
     DEF(rocsparse_spsm_alg);
-    DEF(rocsparse_sptrsm_alg);
     DEF(rocsparse_spmm_alg);
     DEF(rocsparse_spgemm_alg);
     DEF(rocsparse_spgeam_alg);
@@ -728,10 +690,8 @@ const char* get_name(const char* enum_type, uint64_t index)
     DEF(rocsparse_itilu0_alg);
     DEF(rocsparse_spmv_alg);
     DEF(rocsparse_spsv_alg);
-    DEF(rocsparse_sptrsv_alg);
     DEF(rocsparse_spitsv_alg);
     DEF(rocsparse_spsm_alg);
-    DEF(rocsparse_sptrsm_alg);
     DEF(rocsparse_spmm_alg);
     DEF(rocsparse_spgemm_alg);
     DEF(rocsparse_spgeam_alg);

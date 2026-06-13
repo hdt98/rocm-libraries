@@ -1,11 +1,11 @@
 .. meta::
-  :description: hipSPARSE data types documentation
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, data types
+  :description: hipSPARSE documentation and API reference library
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
 
 .. _hipsparse-types:
 
 ********************************************************************
-hipSPARSE data types
+hipSPARSE datatypes
 ********************************************************************
 
 hipsparseHandle_t

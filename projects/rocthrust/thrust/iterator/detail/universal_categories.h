@@ -17,109 +17,70 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
 #include <thrust/iterator/iterator_categories.h>
 
-#if THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_NVRTC
-THRUST_SUPPRESS_DEPRECATED_PUSH
+// XXX eliminate this file
+
 THRUST_NAMESPACE_BEGIN
 
 // define these types without inheritance to avoid ambiguous conversion to base classes
 
-// deprecated [Since 2.8]
-struct THRUST_DEPRECATED input_universal_iterator_tag
+struct input_universal_iterator_tag
 {
-  operator input_host_iterator_tag()
-  {
-    return input_host_iterator_tag();
-  }
+  operator input_host_iterator_tag () {return input_host_iterator_tag();}
 
-  operator input_device_iterator_tag()
-  {
-    return input_device_iterator_tag();
-  }
+  operator input_device_iterator_tag () {return input_device_iterator_tag();}
 };
 
-// deprecated [Since 2.8]
-struct THRUST_DEPRECATED output_universal_iterator_tag
+struct output_universal_iterator_tag
 {
-  operator output_host_iterator_tag()
-  {
-    return output_host_iterator_tag();
-  }
+  operator output_host_iterator_tag () {return output_host_iterator_tag();}
 
-  operator output_device_iterator_tag()
-  {
-    return output_device_iterator_tag();
-  }
+  operator output_device_iterator_tag () {return output_device_iterator_tag();}
 };
 
-// deprecated [Since 2.8]
-struct THRUST_DEPRECATED forward_universal_iterator_tag : input_universal_iterator_tag
+struct forward_universal_iterator_tag
+  : input_universal_iterator_tag
 {
-  operator forward_host_iterator_tag()
-  {
-    return forward_host_iterator_tag();
-  };
+  operator forward_host_iterator_tag () {return forward_host_iterator_tag();};
 
-  operator forward_device_iterator_tag()
-  {
-    return forward_device_iterator_tag();
-  };
+  operator forward_device_iterator_tag () {return forward_device_iterator_tag();};
 };
 
-// deprecated [Since 2.8]
-struct THRUST_DEPRECATED bidirectional_universal_iterator_tag : forward_universal_iterator_tag
+struct bidirectional_universal_iterator_tag
+  : forward_universal_iterator_tag
 {
-  operator bidirectional_host_iterator_tag()
-  {
-    return bidirectional_host_iterator_tag();
-  };
+  operator bidirectional_host_iterator_tag () {return bidirectional_host_iterator_tag();};
 
-  operator bidirectional_device_iterator_tag()
-  {
-    return bidirectional_device_iterator_tag();
-  };
+  operator bidirectional_device_iterator_tag () {return bidirectional_device_iterator_tag();};
 };
+
 
 namespace detail
 {
 
 // create this struct to control conversion precedence in random_access_universal_iterator_tag
-template <typename T>
-struct one_degree_of_separation : T
-{};
-
-} // namespace detail
-
-// deprecated [Since 2.8]
-struct THRUST_DEPRECATED random_access_universal_iterator_tag
+template<typename T>
+struct one_degree_of_separation
+  : T
 {
-  // these conversions are all P0
-  operator random_access_host_iterator_tag()
-  {
-    return random_access_host_iterator_tag();
-  };
-
-  operator random_access_device_iterator_tag()
-  {
-    return random_access_device_iterator_tag();
-  };
-
-  // bidirectional_universal_iterator_tag is P1
-  operator detail::one_degree_of_separation<bidirectional_universal_iterator_tag>()
-  {
-    return detail::one_degree_of_separation<bidirectional_universal_iterator_tag>();
-  }
 };
 
-THRUST_SUPPRESS_DEPRECATED_POP
+} // end detail
+
+
+struct random_access_universal_iterator_tag
+{
+  // these conversions are all P0
+  operator random_access_host_iterator_tag () {return random_access_host_iterator_tag();};
+
+  operator random_access_device_iterator_tag () {return random_access_device_iterator_tag();};
+
+  // bidirectional_universal_iterator_tag is P1
+  operator detail::one_degree_of_separation<bidirectional_universal_iterator_tag> () {return detail::one_degree_of_separation<bidirectional_universal_iterator_tag>();}
+
+};
+
+
 THRUST_NAMESPACE_END
-#endif // THRUST_HOST_COMPILER != THRUST_HOST_COMPILER_NVRTC
+

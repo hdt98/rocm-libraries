@@ -1,6 +1,3 @@
-# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier: MIT
-
 add_custom_target(test_pool)
 
 add_gtest_executable(test_avg_pool3d_bwd test_avg_pool3d_bwd.cpp)

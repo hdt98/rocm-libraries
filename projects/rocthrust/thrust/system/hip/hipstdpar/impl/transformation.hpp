@@ -1,23 +1,3 @@
-// Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 /*
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -40,263 +20,279 @@
 
 #if defined(__HIPSTDPAR__)
 
-#  include <thrust/execution_policy.h>
-#  include <thrust/replace.h>
-#  include <thrust/transform.h>
+#include "hipstd.hpp"
 
-#  include <algorithm>
-#  include <execution>
-#  include <type_traits>
-#  include <utility>
+#include <thrust/execution_policy.h>
+#include <thrust/replace.h>
+#include <thrust/transform.h>
 
-#  include "hipstd.hpp"
+#include <algorithm>
+#include <execution>
+#include <utility>
 
 namespace std
 {
-// BEGIN TRANSFORM
-template <typename I,
-          typename O,
-          typename F,
-          enable_if_t<::hipstd::is_offloadable_iterator<I, O>() && ::hipstd::is_offloadable_callable<F>()>* = nullptr>
-inline O transform(execution::parallel_unsequenced_policy, I fi, I li, O fo, F fn)
-{
-  using fn_t = ::std::decay_t<F>;
-
-  if constexpr (::std::is_trivially_destructible_v<fn_t>)
-  {
-    return ::thrust::transform(::thrust::device, fi, li, fo, ::std::move(fn));
-  }
-  else
-  {
-    ::hipstd::detail::device_callable_guard<fn_t> guard(::std::move(fn));
-    O result;
-    try
+    // BEGIN TRANSFORM
+    template<
+        typename I,
+        typename O,
+        typename F,
+        enable_if_t<
+            ::hipstd::is_offloadable_iterator<I, O>() &&
+            ::hipstd::is_offloadable_callable<F>()>* = nullptr>
+    inline
+    O transform(
+        execution::parallel_unsequenced_policy, I fi, I li, O fo, F fn)
     {
-      result = ::thrust::transform(::thrust::device, fi, li, fo, ::hipstd::detail::callable_proxy<fn_t>{guard.get()});
+        return ::thrust::transform(
+            ::thrust::device, fi, li, fo, ::std::move(fn));
     }
-    catch (...)
+
+    template<
+        typename I,
+        typename O,
+        typename F,
+        enable_if_t<
+            !::hipstd::is_offloadable_iterator<I, O>() ||
+            !::hipstd::is_offloadable_callable<F>()>* = nullptr>
+    inline
+    O transform(
+        execution::parallel_unsequenced_policy, I fi, I li, O fo, F fn)
     {
-      (void) ::hipDeviceSynchronize();
-      throw;
+        if constexpr (!::hipstd::is_offloadable_iterator<I, O>()) {
+            ::hipstd::unsupported_iterator_category<
+                typename iterator_traits<I>::iterator_category,
+                typename iterator_traits<O>::iterator_category>();
+        }
+        if constexpr (!::hipstd::is_offloadable_callable<F>()) {
+            ::hipstd::unsupported_callable_type<F>();
+        }
+
+        return ::std::transform(
+            ::std::execution::par, fi, li, fo, ::std::move(fn));
     }
-    ::thrust::hip_rocprim::throw_on_error(::hipDeviceSynchronize(), "hipstdpar transform: failed to synchronize");
-    guard.destroy_and_free();
-    return result;
-  }
-}
 
-template <typename I,
-          typename O,
-          typename F,
-          enable_if_t<!::hipstd::is_offloadable_iterator<I, O>() || !::hipstd::is_offloadable_callable<F>()>* = nullptr>
-inline O transform(execution::parallel_unsequenced_policy, I fi, I li, O fo, F fn)
-{
-  if constexpr (!::hipstd::is_offloadable_iterator<I, O>())
-  {
-    ::hipstd::unsupported_iterator_category<typename iterator_traits<I>::iterator_category,
-                                            typename iterator_traits<O>::iterator_category>();
-  }
-  if constexpr (!::hipstd::is_offloadable_callable<F>())
-  {
-    ::hipstd::unsupported_callable_type<F>();
-  }
-
-  return ::std::transform(::std::execution::par, fi, li, fo, ::std::move(fn));
-}
-
-template <
-  typename I0,
-  typename I1,
-  typename O,
-  typename F,
-  enable_if_t<::hipstd::is_offloadable_iterator<I0, I1, O>() && ::hipstd::is_offloadable_callable<F>()>* = nullptr>
-inline O transform(execution::parallel_unsequenced_policy, I0 fi0, I0 li0, I1 fi1, O fo, F fn)
-{
-  using fn_t = ::std::decay_t<F>;
-
-  if constexpr (::std::is_trivially_destructible_v<fn_t>)
-  {
-    return ::thrust::transform(::thrust::device, fi0, li0, fi1, fo, ::std::move(fn));
-  }
-  else
-  {
-    ::hipstd::detail::device_callable_guard<fn_t> guard(::std::move(fn));
-    O result;
-    try
+    template<
+        typename I0,
+        typename I1,
+        typename O,
+        typename F,
+        enable_if_t<
+            ::hipstd::is_offloadable_iterator<I0, I1, O>() &&
+            ::hipstd::is_offloadable_callable<F>()>* = nullptr>
+    inline
+    O transform(
+        execution::parallel_unsequenced_policy,
+        I0 fi0,
+        I0 li0,
+        I1 fi1,
+        O fo,
+        F fn)
     {
-      result =
-        ::thrust::transform(::thrust::device, fi0, li0, fi1, fo, ::hipstd::detail::callable_proxy<fn_t>{guard.get()});
+        return ::thrust::transform(
+            ::thrust::device, fi0, li0, fi1, fo, ::std::move(fn));
     }
-    catch (...)
+
+    template<
+        typename I0,
+        typename I1,
+        typename O,
+        typename F,
+        enable_if_t<
+            !::hipstd::is_offloadable_iterator<I0, I1, O>() ||
+            !::hipstd::is_offloadable_callable<F>()>* = nullptr>
+    inline
+    O transform(
+        execution::parallel_unsequenced_policy,
+        I0 fi0,
+        I0 li0,
+        I1 fi1,
+        O fo,
+        F fn)
     {
-      (void) ::hipDeviceSynchronize();
-      throw;
+        if constexpr (!::hipstd::is_offloadable_iterator<I0, I1, O>()) {
+            ::hipstd::unsupported_iterator_category<
+                typename iterator_traits<I0>::iterator_category,
+                typename iterator_traits<I1>::iterator_category,
+                typename iterator_traits<O>::iterator_category>();
+        }
+        if constexpr (!::hipstd::is_offloadable_callable<F>()) {
+            ::hipstd::unsupported_callable_type<F>();
+        }
+
+        return ::std::transform(
+            ::std::execution::par, fi0, li0, fi1, fo, ::std::move(fn));
     }
-    ::thrust::hip_rocprim::throw_on_error(::hipDeviceSynchronize(), "hipstdpar transform: failed to synchronize");
-    guard.destroy_and_free();
-    return result;
-  }
-}
+    // END TRANSFORM
 
-template <
-  typename I0,
-  typename I1,
-  typename O,
-  typename F,
-  enable_if_t<!::hipstd::is_offloadable_iterator<I0, I1, O>() || !::hipstd::is_offloadable_callable<F>()>* = nullptr>
-inline O transform(execution::parallel_unsequenced_policy, I0 fi0, I0 li0, I1 fi1, O fo, F fn)
-{
-  if constexpr (!::hipstd::is_offloadable_iterator<I0, I1, O>())
-  {
-    ::hipstd::unsupported_iterator_category<typename iterator_traits<I0>::iterator_category,
-                                            typename iterator_traits<I1>::iterator_category,
-                                            typename iterator_traits<O>::iterator_category>();
-  }
-  if constexpr (!::hipstd::is_offloadable_callable<F>())
-  {
-    ::hipstd::unsupported_callable_type<F>();
-  }
-
-  return ::std::transform(::std::execution::par, fi0, li0, fi1, fo, ::std::move(fn));
-}
-// END TRANSFORM
-
-// BEGIN REPLACE
-template <typename I, typename T, enable_if_t<::hipstd::is_offloadable_iterator<I>()>* = nullptr>
-inline void replace(execution::parallel_unsequenced_policy, I f, I l, const T& x, const T& y)
-{
-  return ::thrust::replace(::thrust::device, f, l, x, y);
-}
-
-template <typename I, typename T, enable_if_t<!::hipstd::is_offloadable_iterator<I>()>* = nullptr>
-inline void replace(execution::parallel_unsequenced_policy, I f, I l, const T& x, const T& y)
-{
-  ::hipstd::unsupported_iterator_category<typename iterator_traits<I>::iterator_category>();
-
-  return ::std::replace(::std::execution::par, f, l, x, y);
-}
-// END REPLACE
-
-// BEGIN REPLACE_IF
-template <typename I,
-          typename P,
-          typename T,
-          enable_if_t<::hipstd::is_offloadable_iterator<I>() && ::hipstd::is_offloadable_callable<P>()>* = nullptr>
-inline void replace_if(execution::parallel_unsequenced_policy, I f, I l, P p, const T& x)
-{
-  using p_t = ::std::decay_t<P>;
-
-  if constexpr (::std::is_trivially_destructible_v<p_t>)
-  {
-    ::thrust::replace_if(::thrust::device, f, l, ::std::move(p), x);
-  }
-  else
-  {
-    ::hipstd::detail::device_callable_guard<p_t> guard(::std::move(p));
-    try
+    // BEGIN REPLACE
+    template<
+        typename I,
+        typename T,
+        enable_if_t<::hipstd::is_offloadable_iterator<I>()>* = nullptr>
+    inline
+    void replace(
+        execution::parallel_unsequenced_policy,
+        I f,
+        I l,
+        const T& x,
+        const T& y)
     {
-      ::thrust::replace_if(::thrust::device, f, l, ::hipstd::detail::callable_proxy<p_t>{guard.get()}, x);
+        return ::thrust::replace(::thrust::device, f, l, x, y);
     }
-    catch (...)
+
+    template<
+        typename I,
+        typename T,
+        enable_if_t<!::hipstd::is_offloadable_iterator<I>()>* = nullptr>
+    inline
+    void replace(
+        execution::parallel_unsequenced_policy,
+        I f,
+        I l,
+        const T& x,
+        const T& y)
     {
-      (void) ::hipDeviceSynchronize();
-      throw;
+        ::hipstd::unsupported_iterator_category<
+            typename iterator_traits<I>::iterator_category>();
+
+        return ::std::replace(::std::execution::par, f, l, x, y);
     }
-    ::thrust::hip_rocprim::throw_on_error(::hipDeviceSynchronize(), "hipstdpar replace_if: failed to synchronize");
-    guard.destroy_and_free();
-  }
-}
+    // END REPLACE
 
-template <typename I,
-          typename P,
-          typename T,
-          enable_if_t<!::hipstd::is_offloadable_iterator<I>() || !::hipstd::is_offloadable_callable<P>()>* = nullptr>
-inline void replace_if(execution::parallel_unsequenced_policy, I f, I l, P p, const T& x)
-{
-  if constexpr (!::hipstd::is_offloadable_iterator<I>())
-  {
-    ::hipstd::unsupported_iterator_category<typename iterator_traits<I>::iterator_category>();
-  }
-  if constexpr (!::hipstd::is_offloadable_callable<P>())
-  {
-    ::hipstd::unsupported_callable_type<P>();
-  }
-
-  return ::std::replace_if(::std::execution::par, f, l, ::std::move(p), x);
-}
-// END REPLACE_IF
-
-// BEGIN REPLACE_COPY
-template <typename I, typename O, typename T, enable_if_t<::hipstd::is_offloadable_iterator<I, O>()>* = nullptr>
-inline void replace_copy(execution::parallel_unsequenced_policy, I fi, I li, O fo, const T& x, const T& y)
-{
-  return ::thrust::replace_copy(::thrust::device, fi, li, fo, x, y);
-}
-
-template <typename I, typename O, typename T, enable_if_t<!::hipstd::is_offloadable_iterator<I, O>()>* = nullptr>
-inline void replace_copy(execution::parallel_unsequenced_policy, I fi, I li, O fo, const T& x, const T& y)
-{
-  ::hipstd::unsupported_iterator_category<typename iterator_traits<I>::iterator_category,
-                                          typename iterator_traits<O>::iterator_category>();
-
-  return ::std::replace_copy(::std::execution::par, fi, li, fo, x, y);
-}
-// END REPLACE_COPY
-
-// BEGIN REPLACE_COPY_IF
-template <typename I,
-          typename O,
-          typename P,
-          typename T,
-          enable_if_t<::hipstd::is_offloadable_iterator<I, O>() && ::hipstd::is_offloadable_callable<P>()>* = nullptr>
-inline void replace_copy_if(execution::parallel_unsequenced_policy, I fi, I li, O fo, P p, const T& x)
-{
-  using p_t = ::std::decay_t<P>;
-
-  if constexpr (::std::is_trivially_destructible_v<p_t>)
-  {
-    ::thrust::replace_copy_if(::thrust::device, fi, li, fo, ::std::move(p), x);
-  }
-  else
-  {
-    ::hipstd::detail::device_callable_guard<p_t> guard(::std::move(p));
-    try
+    // BEGIN REPLACE_IF
+    template<
+        typename I,
+        typename P,
+        typename T,
+        enable_if_t<
+            ::hipstd::is_offloadable_iterator<I>() &&
+            ::hipstd::is_offloadable_callable<P>()>* = nullptr>
+    inline
+    void replace_if(
+        execution::parallel_unsequenced_policy, I f, I l, P p, const T& x)
     {
-      ::thrust::replace_copy_if(
-        ::thrust::device, fi, li, fo, ::hipstd::detail::callable_proxy<p_t>{guard.get()}, x);
+        return
+            ::thrust::replace_if(::thrust::device, f, l, ::std::move(p), x);
     }
-    catch (...)
+
+    template<
+        typename I,
+        typename P,
+        typename T,
+        enable_if_t<
+            !::hipstd::is_offloadable_iterator<I>() ||
+            !::hipstd::is_offloadable_callable<P>()>* = nullptr>
+    inline
+    void replace_if(
+        execution::parallel_unsequenced_policy, I f, I l, P p, const T& x)
     {
-      (void) ::hipDeviceSynchronize();
-      throw;
+        if constexpr (!::hipstd::is_offloadable_iterator<I>()) {
+            ::hipstd::unsupported_iterator_category<
+                typename iterator_traits<I>::iterator_category>();
+        }
+        if constexpr (!::hipstd::is_offloadable_callable<P>()) {
+            ::hipstd::unsupported_callable_type<P>();
+        }
+
+        return ::std::replace_if(
+            ::std::execution::par, f, l, ::std::move(p), x);
     }
-    ::thrust::hip_rocprim::throw_on_error(
-      ::hipDeviceSynchronize(), "hipstdpar replace_copy_if: failed to synchronize");
-    guard.destroy_and_free();
-  }
-}
+    // END REPLACE_IF
 
-template <typename I,
-          typename O,
-          typename P,
-          typename T,
-          enable_if_t<!::hipstd::is_offloadable_iterator<I, O>() || !::hipstd::is_offloadable_callable<P>()>* = nullptr>
-inline void replace_copy_if(execution::parallel_unsequenced_policy, I fi, I li, O fo, P p, const T& x)
-{
-  if constexpr (!::hipstd::is_offloadable_iterator<I, O>())
-  {
-    ::hipstd::unsupported_iterator_category<typename iterator_traits<I>::iterator_category,
-                                            typename iterator_traits<O>::iterator_category>();
-  }
-  if constexpr (!::hipstd::is_offloadable_callable<P>())
-  {
-    ::hipstd::unsupported_callable_type<P>();
-  }
+    // BEGIN REPLACE_COPY
+    template<
+        typename I,
+        typename O,
+        typename T,
+        enable_if_t<::hipstd::is_offloadable_iterator<I, O>()>* = nullptr>
+    inline
+    void replace_copy(
+        execution::parallel_unsequenced_policy,
+        I fi,
+        I li,
+        O fo,
+        const T& x,
+        const T& y)
+    {
+        return ::thrust::replace_copy(::thrust::device, fi, li, fo, x, y);
+    }
 
-  return ::std::replace_copy_if(::std::execution::par, fi, li, fo, ::std::move(p), x);
+    template<
+        typename I,
+        typename O,
+        typename T,
+        enable_if_t<!::hipstd::is_offloadable_iterator<I, O>()>* = nullptr>
+    inline
+    void replace_copy(
+        execution::parallel_unsequenced_policy,
+        I fi,
+        I li,
+        O fo,
+        const T& x,
+        const T& y)
+    {
+        ::hipstd::unsupported_iterator_category<
+            typename iterator_traits<I>::iterator_category,
+            typename iterator_traits<O>::iterator_category>();
+
+        return ::std::replace_copy(::std::execution::par, fi, li, fo, x, y);
+    }
+    // END REPLACE_COPY
+
+    // BEGIN REPLACE_COPY_IF
+    template<
+        typename I,
+        typename O,
+        typename P,
+        typename T,
+        enable_if_t<
+            ::hipstd::is_offloadable_iterator<I, O>() &&
+            ::hipstd::is_offloadable_callable<P>()>* = nullptr>
+    inline
+    void replace_copy_if(
+        execution::parallel_unsequenced_policy,
+        I fi,
+        I li,
+        O fo,
+        P p,
+        const T& x)
+    {
+        return ::thrust::replace_copy_if(
+            ::thrust::device, fi, li, fo, ::std::move(p), x);
+    }
+
+    template<
+        typename I,
+        typename O,
+        typename P,
+        typename T,
+        enable_if_t<
+            !::hipstd::is_offloadable_iterator<I, O>() ||
+            !::hipstd::is_offloadable_callable<P>()>* = nullptr>
+    inline
+    void replace_copy_if(
+        execution::parallel_unsequenced_policy,
+        I fi,
+        I li,
+        O fo,
+        P p,
+        const T& x)
+    {
+        if constexpr (!::hipstd::is_offloadable_iterator<I, O>()) {
+            ::hipstd::unsupported_iterator_category<
+                typename iterator_traits<I>::iterator_category,
+                typename iterator_traits<O>::iterator_category>();
+        }
+        if constexpr (!::hipstd::is_offloadable_callable<P>()) {
+            ::hipstd::unsupported_callable_type<P>();
+        }
+
+        return ::std::replace_copy_if(
+            ::std::execution::par, fi, li, fo, ::std::move(p), x);
+    }
+    // END REPLACE_COPY_IF
 }
-// END REPLACE_COPY_IF
-} // namespace std
 #else // __HIPSTDPAR__
-#  error "__HIPSTDPAR__ should be defined. Please use the '--hipstdpar' compile option."
+#    error "__HIPSTDPAR__ should be defined. Please use the '--hipstdpar' compile option."
 #endif // __HIPSTDPAR__

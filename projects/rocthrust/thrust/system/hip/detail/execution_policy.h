@@ -25,94 +25,72 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ******************************************************************************/
-
 #pragma once
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
+#include <thrust/version.h>
 
-#include <thrust/system/hip/config.h>
+#include <hip/hip_runtime.h>
 
 #include <thrust/detail/allocator_aware_execution_policy.h>
 #include <thrust/detail/dependencies_aware_execution_policy.h>
 #include <thrust/detail/execution_policy.h>
 #include <thrust/iterator/detail/any_system_tag.h>
-#include <thrust/version.h>
+#include <thrust/system/hip/config.h>
 
 THRUST_NAMESPACE_BEGIN
 
 namespace hip_rocprim
 {
+    struct tag;
 
-struct tag;
+    template <class>
+    struct execution_policy;
 
-template <class>
-struct execution_policy;
+    template <>
+    struct execution_policy<tag> : thrust::execution_policy<tag>
+    {
+        using tag_type = tag;
+    };
 
-template <>
-struct execution_policy<tag> : thrust::execution_policy<tag>
-{
-  using tag_type = tag;
-};
+    struct tag : execution_policy<tag>,
+                 thrust::detail::allocator_aware_execution_policy<hip_rocprim::execution_policy>,
+                 thrust::detail::dependencies_aware_execution_policy<hip_rocprim::execution_policy>
+    {};
 
-THRUST_SUPPRESS_DEPRECATED_PUSH
-struct tag
-    : execution_policy<tag>
-    , thrust::detail::allocator_aware_execution_policy<hip_rocprim::execution_policy>
-    , thrust::detail::dependencies_aware_execution_policy<hip_rocprim::execution_policy>
-{};
-THRUST_SUPPRESS_DEPRECATED_POP
-
-template <class Derived>
-struct execution_policy : thrust::execution_policy<Derived>
-{
-  using tag_type = tag;
-  THRUST_HOST_DEVICE operator tag() const
-  {
-    return tag();
-  }
-};
+    template <class Derived>
+    struct execution_policy : thrust::execution_policy<Derived>
+    {
+       using tag_type = tag;
+       operator tag() const { return tag(); }
+    };
 
 } // namespace hip_rocprim
 
-namespace system
-{
-namespace hip
-{
-namespace detail
+namespace system { namespace hip { namespace detail
 {
 
-using thrust::hip_rocprim::execution_policy;
-using thrust::hip_rocprim::tag;
+  using thrust::hip_rocprim::tag;
+  using thrust::hip_rocprim::execution_policy;
 
-} // namespace detail
-} // namespace hip
-} // namespace system
+}}} // namespace system::hip_rocprim::detail
 
-namespace system
-{
-namespace hip
+namespace system { namespace hip
 {
 
-using thrust::hip_rocprim::execution_policy;
-using thrust::hip_rocprim::tag;
+  using thrust::hip_rocprim::tag;
+  using thrust::hip_rocprim::execution_policy;
 
-} // namespace hip
-} // namespace system
+}} // namespace system::hip
 
 namespace hip
 {
 
-using thrust::hip_rocprim::execution_policy;
-using thrust::hip_rocprim::tag;
+  using thrust::hip_rocprim::tag;
+  using thrust::hip_rocprim::execution_policy;
 
 } // namespace hip
+
 
 THRUST_NAMESPACE_END

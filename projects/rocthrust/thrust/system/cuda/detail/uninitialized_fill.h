@@ -28,78 +28,82 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-
-#if _CCCL_HAS_CUDA_COMPILER
-#  include <thrust/distance.h>
-#  include <thrust/system/cuda/detail/execution_policy.h>
-#  include <thrust/system/cuda/detail/parallel_for.h>
-#  include <thrust/system/cuda/detail/util.h>
-
-#  include <iterator>
+#if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_NVCC
+#include <iterator>
+#include <thrust/distance.h>
+#include <thrust/system/cuda/detail/execution_policy.h>
+#include <thrust/system/cuda/detail/util.h>
+#include <thrust/system/cuda/detail/parallel_for.h>
 
 THRUST_NAMESPACE_BEGIN
 
-namespace cuda_cub
-{
+namespace cuda_cub {
 
-namespace __uninitialized_fill
-{
+namespace __uninitialized_fill {
 
-template <class Iterator, class T>
-struct functor
-{
-  Iterator items;
-  T value;
-
-  using value_type = typename iterator_traits<Iterator>::value_type;
-
-  THRUST_FUNCTION
-  functor(Iterator items_, T const& value_)
-      : items(items_)
-      , value(value_)
-  {}
-
-  template <class Size>
-  void THRUST_DEVICE_FUNCTION operator()(Size idx)
+  template <class Iterator, class T>
+  struct functor
   {
-    value_type& out = raw_reference_cast(items[idx]);
+    Iterator  items;
+    T         value;
 
-#  if _CCCL_CUDA_COMPILER(CLANG)
-    // XXX unsafe. cuda-clang is seemingly unable to call ::new in device code
-    out = value;
-#  else
-    ::new (static_cast<void*>(&out)) value_type(value);
-#  endif
-  }
-}; // struct functor
+    using value_type = typename iterator_traits<Iterator>::value_type;
 
-} // namespace __uninitialized_fill
+    THRUST_FUNCTION
+    functor(Iterator items_, T const& value_)
+        : items(items_), value(value_) {}
 
-template <class Derived, class Iterator, class Size, class T>
+    template<class Size>
+    void THRUST_DEVICE_FUNCTION operator()(Size idx)
+    {
+      value_type& out = raw_reference_cast(items[idx]);
+
+#if defined(__CUDA__) && defined(__clang__)
+      // XXX unsafe. cuda-clang is seemingly unable to call ::new in device code
+      out = value;
+#else
+      ::new (static_cast<void *>(&out)) value_type(value);
+#endif
+    }
+  };    // struct functor
+
+}    // namespace __uninitialized_copy
+
+template <class Derived,
+          class Iterator,
+          class Size,
+          class T>
 Iterator _CCCL_HOST_DEVICE
-uninitialized_fill_n(execution_policy<Derived>& policy, Iterator first, Size count, T const& x)
+uninitialized_fill_n(execution_policy<Derived>& policy,
+                     Iterator                   first,
+                     Size                       count,
+                     T const&                   x)
 {
   using functor_t = __uninitialized_fill::functor<Iterator, T>;
 
-  cuda_cub::parallel_for(policy, functor_t(first, x), count);
+  cuda_cub::parallel_for(policy,
+                         functor_t(first, x),
+                         count);
 
   return first + count;
 }
 
-template <class Derived, class Iterator, class T>
-void _CCCL_HOST_DEVICE uninitialized_fill(execution_policy<Derived>& policy, Iterator first, Iterator last, T const& x)
+template <class Derived,
+          class Iterator,
+          class T>
+void _CCCL_HOST_DEVICE
+uninitialized_fill(execution_policy<Derived>& policy,
+                   Iterator                   first,
+                   Iterator                   last,
+                   T const&                   x)
 {
-  cuda_cub::uninitialized_fill_n(policy, first, thrust::distance(first, last), x);
+  cuda_cub::uninitialized_fill_n(policy,
+                              first,
+                              thrust::distance(first, last),
+                              x);
 }
 
-} // namespace cuda_cub
+}    // namespace cuda_cub
 
 THRUST_NAMESPACE_END
 #endif

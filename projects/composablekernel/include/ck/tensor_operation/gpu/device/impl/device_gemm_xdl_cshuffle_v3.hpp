@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -120,7 +120,6 @@ namespace device {
 ///                             in global memory. Currently not supported!
 /// @tparam PermuteB            Whether the B input tensor has gridwise-gemm friendly data layout
 ///                             in global memory (pre-shuffled).
-/// @tparam UseDataCachePrefetch Whether to use data cache prefetching feature of hardware.
 template <typename ALayout,
           typename BLayout,
           typename CLayout,
@@ -166,9 +165,7 @@ template <typename ALayout,
           typename ComputeTypeA                       = CDataType,
           typename ComputeTypeB                       = ComputeTypeA,
           bool PermuteA                               = false,
-          bool PermuteB                               = false,
-          index_t MinimumOccupancy                    = 0,
-          bool UseDataCachePrefetch                   = false>
+          bool PermuteB                               = false>
 struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
                                                        BLayout,
                                                        CLayout,
@@ -180,28 +177,7 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
                                                        CElementwiseOperation>
 {
     // GridwiseGemm
-    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               true>();
-    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               false>();
-    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
-    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
-    template <typename WarpTileConfig>
-    using GridwiseGemmBase = GridwiseGemm_xdl_cshuffle_v3<
+    using GridwiseGemm = GridwiseGemm_xdl_cshuffle_v3<
         ALayout,
         BLayout,
         CLayout,
@@ -220,10 +196,10 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
         KPerBlock,
         AK1,
         BK1,
-        WarpTileConfig::At(0),
-        WarpTileConfig::At(1),
-        WarpTileConfig::At(2),
-        WarpTileConfig::At(3),
+        MPerXDL,
+        NPerXDL,
+        MXdlPerWave,
+        NXdlPerWave,
         ABlockTransferThreadClusterLengths_AK0_M_AK1,
         ABlockTransferThreadClusterArrangeOrder,
         ABlockTransferSrcAccessOrder,
@@ -240,8 +216,8 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
         BBlockTransferDstScalarPerVector_BK1,
         false,
         BBlockLdsExtraN,
-        WarpTileConfig::At(4),
-        WarpTileConfig::At(5),
+        CShuffleMXdlPerWavePerShuffle,
+        CShuffleNXdlPerWavePerShuffle,
         CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CShuffleBlockTransferScalarPerVector_NPerBlock,
         BlkGemmPipeSched,
@@ -249,14 +225,9 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
         ComputeTypeA,
         ComputeTypeB,
         PermuteA,
-        PermuteB,
-        false,
-        MinimumOccupancy,
-        UseDataCachePrefetch>;
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
+        PermuteB>;
 
-    using Argument = typename GridwiseGemm64::Argument;
+    using Argument = typename GridwiseGemm::Argument;
 
     static constexpr index_t APackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<ADataType>, pk_i4_t>)
@@ -288,9 +259,7 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
         /// @param stream_config The HIP stream configuration helper structure.
         /// @return              The kernel's average execution time (if time measurement is
         ///                      enabled).
-        template <typename GridwiseGemm>
-        float RunImp(const typename GridwiseGemm::Argument& arg,
-                     const StreamConfig& stream_config = StreamConfig{})
+        float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             if(stream_config.log_level_ > 0)
             {
@@ -316,7 +285,7 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             const auto Run = [&](const auto& kernel) {
                 if(stream_config.flush_cache)
                 {
-                    auto arg_ = arg;
+                    Argument arg_ = arg;
 
                     const auto a_grid_desc_ak0_m_ak1 = GridwiseGemm::MakeAGridDescriptor_AK0_M_AK1(
                         arg_.M, arg_.MPadded, arg_.K, arg_.KPadded, arg_.StrideA, arg_.AK0);
@@ -328,7 +297,7 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
                     auto size_b_buffer = b_grid_desc_bk0_n_bk1.GetElementSpaceSize() *
                                          sizeof(BDataType) / BPackedSize;
 
-                    ck::utility::RotatingMemWrapper<typename GridwiseGemm::Argument> rotating_mem(
+                    ck::utility::RotatingMemWrapper<Argument> rotating_mem(
                         arg_, stream_config.rotating_count, size_a_buffer, size_b_buffer);
                     rotating_mem.Print();
 
@@ -368,24 +337,17 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             };
 
             constexpr index_t minimum_occupancy = []() {
-                if constexpr(MinimumOccupancy == 0)
+                if constexpr(BlkGemmPipeSched == BlockGemmPipelineScheduler::Interwave)
                 {
-                    if constexpr(BlkGemmPipeSched == BlockGemmPipelineScheduler::Interwave)
-                    {
-                        return 2;
-                    }
-                    else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
-                    {
-                        return (MPerBlock * NPerBlock / BlockSize <= 128) ? 2 : 1;
-                    }
-                    else
-                    {
-                        return 1;
-                    }
+                    return 2;
+                }
+                else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
+                {
+                    return (MPerBlock * NPerBlock / BlockSize <= 128) ? 2 : 1;
                 }
                 else
                 {
-                    return MinimumOccupancy;
+                    return 1;
                 }
             }();
 
@@ -771,7 +733,6 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             return ave_time;
         }
 
-        INVOKER_RUN3_IMPL
         // polymorphic
         float Run(const BaseArgument* p_arg,
                   const StreamConfig& stream_config = StreamConfig{}) override
@@ -788,40 +749,14 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_xdl_wmma_supported<ComputeTypeA,
-                                      ComputeTypeB,
-                                      MPerXDL,
-                                      NPerXDL,
-                                      WarpTileConfig32.At(0),
-                                      WarpTileConfig32.At(1)>())
+        if(!ck::is_xdl_supported())
         {
             return false;
         }
-        if(arg.KBatch > 1)
+
+        if(!is_bf16_atomic_supported() && std::is_same_v<CDataType, ck::bhalf_t> && arg.KBatch > 1)
         {
-            if(is_gfx11_supported())
-            {
-                return false;
-            }
-
-            if(!is_bf16_atomic_supported() && std::is_same_v<CDataType, ck::bhalf_t>)
-            {
-                return false;
-            }
-
-            if(sizeof(CDataType) == 1)
-            {
-                return false;
-            }
-        }
-
-        if(is_gfx11_supported())
-        {
-            if constexpr(std::is_same_v<ADataType, ck::f8_t> ||
-                         std::is_same_v<ADataType, ck::bf8_t>)
-            {
-                return false;
-            }
+            return false;
         }
 
         if((arg.K % AK1 != 0 || arg.K % BK1 != 0) && !(GemmSpec == GemmSpecialization::MKPadding ||
@@ -832,22 +767,7 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             return false;
         }
 
-        if(get_warp_size() == 64)
-        {
-            if constexpr(NXdlPerWave64 > 0)
-            {
-                return GridwiseGemm64::CheckValidity(arg);
-            }
-        }
-        else
-        {
-            if constexpr(NXdlPerWave32 > 0)
-            {
-                return GridwiseGemm32::CheckValidity(
-                    reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
-            }
-        }
-        return false;
+        return GridwiseGemm::CheckValidity(arg);
     }
 
     // polymorphic
@@ -929,25 +849,6 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             {BlockGemmPipelineVersion::v4, "v4"},
             {BlockGemmPipelineVersion::v5, "v5"}};
 
-        index_t PrefetchStages = 0;
-        index_t AMmaKStride    = 0;
-        if(get_warp_size() == 64)
-        {
-            if constexpr(NXdlPerWave64 > 0)
-            {
-                PrefetchStages = GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages;
-                AMmaKStride    = GridwiseGemm64::BlockwiseGemmPipe::AMmaKStride;
-            }
-        }
-        else
-        {
-            if constexpr(NXdlPerWave32 > 0)
-            {
-                PrefetchStages = GridwiseGemm32::BlockwiseGemmPipe::PrefetchStages;
-                AMmaKStride    = GridwiseGemm32::BlockwiseGemmPipe::AMmaKStride;
-            }
-        }
-
         // clang-format off
         str << "DeviceGemmXdlUniversal"
             << "<"
@@ -971,15 +872,9 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
             << "BlkGemmPipelineVersion: "
             << BlkGemmPipelineVersionToString[BlkGemmPipelineVer] << ", "
             << "BlkGemmPipelinePrefetchStages: "
-            << PrefetchStages << ", "
+            << GridwiseGemm::BlockwiseGemmPipe::PrefetchStages << ", "
             << "Kpack: "
-            << AMmaKStride;
-
-            if constexpr (UseDataCachePrefetch)
-            {
-                str << ", UseDataCachePrefetch";
-            }
-
+            << GridwiseGemm::BlockwiseGemmPipe::AMmaKStride;
         // clang-format on
 
         return str.str();

@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -35,8 +35,7 @@ bool profile_batchnorm_forward_impl(int do_verification,
                                     bool updateMovingAverage,
                                     bool saveMeanAndInvVariance,
                                     double averageFactor,
-                                    double epsilon,
-                                    index_t instance_index = -1)
+                                    double epsilon)
 {
     if(inOutLengths.size() != Rank || reduceDims.size() != NumBatchNormReduceDim)
     {
@@ -261,14 +260,9 @@ bool profile_batchnorm_forward_impl(int do_verification,
 
     int num_kernel = 0;
     bool pass      = true;
-    for(size_t i = 0; i < instance_ptrs.size(); i++)
+
+    for(auto& inst_ptr : instance_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& inst_ptr    = instance_ptrs[i];
         auto argument_ptr = inst_ptr->MakeArgumentPointer(
             arrInOutLengths,
             arrInOutStrides,
@@ -405,11 +399,12 @@ bool profile_batchnorm_forward_impl(int do_verification,
                   << best_instance_name << std::endl;
     }
 
-    if(num_kernel == 0 && instance_index == -1)
+    if(num_kernel == 0)
     {
         std::cout << "Error: No kernel is applicable" << std::endl;
         return false;
     }
+
     return pass;
 }
 

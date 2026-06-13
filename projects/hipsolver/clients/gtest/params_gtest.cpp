@@ -32,7 +32,7 @@ class checkin_misc_PARAMS : public ::testing::Test
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 };
 

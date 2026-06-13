@@ -393,8 +393,7 @@ bool ConvAsmBwdWrW3x3::IsApplicable(const ExecutionContext& ctx,
 {
     if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_ASM_WRW3X3))
         return false;
-    const std::string name = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90")))
+    if(ThisSolverIsDeprecatedStatic::IsDisabled(ctx))
         return false;
     if(!ctx.use_asm_kernels)
         return false;
@@ -412,9 +411,12 @@ bool ConvAsmBwdWrW3x3::IsApplicable(const ExecutionContext& ctx,
         return false;
 
     const auto& target = ctx.GetStream().GetTargetProperties();
-    if(target.isXnackEnabled())
+    if(target.Xnack() && *target.Xnack())
         return false;
 
+    const std::string name = ctx.GetStream().GetDeviceName();
+    if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx9")))
+        return false;
     if(!problem.IsLayoutDefault())
         return false;
     if(problem.IsTensorsCasted())

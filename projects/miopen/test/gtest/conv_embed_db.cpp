@@ -29,8 +29,8 @@
 #include <gtest/gtest.h>
 #include <miopen/miopen.h>
 #include "get_handle.hpp"
+
 #include "../conv2d.hpp"
-#include "gtest_common.hpp"
 
 namespace conv_embed_db {
 
@@ -45,19 +45,15 @@ void GetArgs(const std::string& param, std::vector<std::string>& tokens)
 
 class CPU_ConvEmbedConfig_FP16 : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 class CPU_ConvEmbedConfig_I8 : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 class CPU_ConvEmbedConfig_BFP16 : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 class CPU_ConvEmbedConfig_FP32 : public testing::TestWithParam<std::vector<std::string>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 void Run2dDriver(miopenDataType_t prec)
@@ -70,7 +66,6 @@ void Run2dDriver(miopenDataType_t prec)
     case miopenHalf: params = CPU_ConvEmbedConfig_FP16::GetParam(); break;
     case miopenInt8: params = CPU_ConvEmbedConfig_I8::GetParam(); break;
     case miopenBFloat16: params = CPU_ConvEmbedConfig_BFP16::GetParam(); break;
-
     case miopenInt64:
     case miopenInt32:
     case miopenFloat8_fnuz:
@@ -78,6 +73,8 @@ void Run2dDriver(miopenDataType_t prec)
     case miopenDouble:
         FAIL() << "miopenInt32, miopenFloat8_fnuz, miopenBFloat8_fnuz, miopenDouble data type "
                   "not supported by conv_embed_db test";
+
+    default: params = CPU_ConvEmbedConfig_FP32::GetParam();
     }
 
     for(const auto& test_value : params)
@@ -110,7 +107,7 @@ std::vector<std::string> GetTestCases(const std::string& precision)
 {
     std::string flags = precision + " --disable-validation --verbose ";
 
-    return {
+    const std::vector<std::string> test_cases = {
         // clang-format off
     {flags + "--input 128 128 28 28 --weights 128 128 3 3 --pads_strides_dilations 1 1 1 1 1 1"},
     {flags + "--input 128 256 56 56 --weights 512 256 1 1 --pads_strides_dilations 0 0 2 2 1 1"},
@@ -134,6 +131,8 @@ std::vector<std::string> GetTestCases(const std::string& precision)
     {flags + "--input 128 2048 7 7 --weights 512 2048 1 1 --pads_strides_dilations 0 0 1 1 1 1"}
         // clang-format on
     };
+
+    return test_cases;
 }
 
 } // namespace conv_embed_db

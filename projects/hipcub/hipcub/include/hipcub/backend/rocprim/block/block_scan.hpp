@@ -34,7 +34,7 @@
 
 #include "../thread/thread_operators.hpp"
 
-#include <rocprim/block/block_scan.hpp> // IWYU pragma: export
+#include <rocprim/block/block_scan.hpp>
 
 #include <type_traits>
 

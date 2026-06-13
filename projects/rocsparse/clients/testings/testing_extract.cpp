@@ -218,7 +218,6 @@ static void testing_rocsparse_spmat_extract(rocsparse_handle                    
     }
 
     case rocsparse_format_bell:
-    case rocsparse_format_sell:
     case rocsparse_format_ell:
     case rocsparse_format_bsr:
     case rocsparse_format_coo:
@@ -399,7 +398,6 @@ void testing_extract(const Arguments& arg)
     }
     case rocsparse_format_ell:
     case rocsparse_format_bell:
-    case rocsparse_format_sell:
     case rocsparse_format_bsr:
     case rocsparse_format_coo:
     case rocsparse_format_coo_aos:

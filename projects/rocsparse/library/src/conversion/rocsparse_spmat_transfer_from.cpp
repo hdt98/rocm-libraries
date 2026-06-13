@@ -24,7 +24,7 @@
 #include "rocsparse_spmat_transfer_from.hpp"
 #include "rocsparse_convert_array.hpp"
 
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 rocsparse_status rocsparse::internal_spmat_transfer_from(rocsparse_handle            handle,
                                                          rocsparse_spmat_descr       target,
@@ -85,12 +85,6 @@ rocsparse_status rocsparse::internal_spmat_transfer_from(rocsparse_handle       
     {
         RETURN_ROCSPARSE_ERROR_IF(rocsparse_status_not_implemented,
                                   source->format == rocsparse_format_bell);
-        break;
-    }
-    case rocsparse_format_sell:
-    {
-        RETURN_ROCSPARSE_ERROR_IF(rocsparse_status_not_implemented,
-                                  source->format == rocsparse_format_sell);
         break;
     }
     case rocsparse_format_bsr:

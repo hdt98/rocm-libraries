@@ -215,8 +215,10 @@ rocblas_gbmvn_kernel(bool           host_ptr_mode,
 {
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
 
         const auto alpha = host_ptr_mode ? alpha_device_host.value
                                          : load_scalar(alpha_device_host.ptr, batch, 0);
@@ -225,7 +227,11 @@ rocblas_gbmvn_kernel(bool           host_ptr_mode,
 
         if(!alpha && beta == 1)
         {
-            continue;
+#if DEVICE_GRID_YZ_16BIT
+            continue; //iterate to the next batch in the for loop rather than return.
+#else
+        return;
+#endif
         }
 
         const auto* A = cond_load_ptr_batch(alpha, Aa, batch, shifta, strideA);
@@ -234,7 +240,10 @@ rocblas_gbmvn_kernel(bool           host_ptr_mode,
         auto* y = load_ptr_batch(ya, batch, shifty, stridey);
 
         rocblas_gbmvn_kernel_calc<WARP, DIM_Y>(m, n, kl, ku, alpha, A, lda, x, incx, beta, y, incy);
+
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 template <int DIM_X, int DIM_Y, typename TStruct, typename V, typename W>
@@ -263,8 +272,10 @@ rocblas_gbmvt_kernel(bool              host_ptr_mode,
 {
     uint32_t batch = blockIdx.z;
 
+#if DEVICE_GRID_YZ_16BIT
     for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
     {
+#endif
         const auto alpha = host_ptr_mode ? alpha_device_host.value
                                          : load_scalar(alpha_device_host.ptr, batch, 0);
         const auto beta
@@ -272,7 +283,11 @@ rocblas_gbmvt_kernel(bool              host_ptr_mode,
 
         if(!alpha && beta == 1)
         {
-            continue;
+#if DEVICE_GRID_YZ_16BIT
+            continue; //iterate to the next batch in the for loop rather than return.
+#else
+        return;
+#endif
         }
         const auto* A = cond_load_ptr_batch(alpha, Aa, batch, shifta, strideA);
         const auto* x = cond_load_ptr_batch(alpha, xa, batch, shiftx, stridex);
@@ -281,7 +296,10 @@ rocblas_gbmvt_kernel(bool              host_ptr_mode,
 
         rocblas_gbmvt_kernel_calc<DIM_X, DIM_Y>(
             transA, m, n, kl, ku, alpha, A, lda, x, incx, beta, y, incy);
+
+#if DEVICE_GRID_YZ_16BIT
     }
+#endif
 }
 
 /**

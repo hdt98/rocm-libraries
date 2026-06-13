@@ -1,6 +1,6 @@
 /*
  *  Copyright 2008-2013 NVIDIA Corporation
- *  Modifications Copyright© 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ *  Modifications Copyright© 2019 Advanced Micro Devices, Inc. All rights reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,11 +19,7 @@
 #include <thrust/scan.h>
 #include <thrust/sequence.h>
 
-#include "test_param_fixtures.hpp"
-#include "test_real_assertions.hpp"
-#include "test_utils.hpp"
-
-#include _THRUST_STD_INCLUDE(type_traits)
+#include "test_header.hpp"
 
 TESTS_DEFINE(ReverseIteratorTests, FullTestsParams);
 
@@ -31,137 +27,160 @@ TESTS_DEFINE(PrimitiveReverseIteratorTests, NumericalTestsParams);
 
 TEST(ReverseIteratorTests, UsingHip)
 {
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  ASSERT_EQ(THRUST_DEVICE_SYSTEM, THRUST_DEVICE_SYSTEM_HIP);
+    ASSERT_EQ(THRUST_DEVICE_SYSTEM, THRUST_DEVICE_SYSTEM_HIP);
 }
 
-TEST(ReverseIteratorTests, TestReverseIteratorCopyConstructor)
+TEST(ReverseIteratorTests, ReverseIteratorCopyConstructor)
 {
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  thrust::host_vector<int> h_v(1, 13);
+    thrust::host_vector<int> h_v(1, 13);
 
-  thrust::reverse_iterator<thrust::host_vector<int>::iterator> h_iter0(h_v.end());
-  thrust::reverse_iterator<thrust::host_vector<int>::iterator> h_iter1(h_iter0);
+    thrust::reverse_iterator<thrust::host_vector<int>::iterator> h_iter0(h_v.end());
+    thrust::reverse_iterator<thrust::host_vector<int>::iterator> h_iter1(h_iter0);
 
-  ASSERT_EQ_QUIET(h_iter0, h_iter1);
-  ASSERT_EQ(*h_iter0, *h_iter1);
+    ASSERT_EQ(h_iter0, h_iter1);
+    ASSERT_EQ(*h_iter0, *h_iter1);
 
-  thrust::device_vector<int> d_v(1, 13);
+    thrust::device_vector<int> d_v(1, 13);
 
-  thrust::reverse_iterator<thrust::device_vector<int>::iterator> d_iter2(d_v.end());
-  thrust::reverse_iterator<thrust::device_vector<int>::iterator> d_iter3(d_iter2);
+    thrust::reverse_iterator<thrust::device_vector<int>::iterator> d_iter2(d_v.end());
+    thrust::reverse_iterator<thrust::device_vector<int>::iterator> d_iter3(d_iter2);
 
-  ASSERT_EQ_QUIET(d_iter2, d_iter3);
-  ASSERT_EQ(*d_iter2, *d_iter3);
-}
-static_assert(_THRUST_STD::is_trivially_copy_constructible<thrust::reverse_iterator<int*>>::value, "");
-static_assert(_THRUST_STD::is_trivially_copyable<thrust::reverse_iterator<int*>>::value, "");
-
-TEST(ReverseIteratorTests, TestReverseIteratorIncrement)
-{
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
-
-  thrust::host_vector<int> h_v(4);
-  thrust::sequence(h_v.begin(), h_v.end());
-
-  thrust::reverse_iterator<thrust::host_vector<int>::iterator> h_iter(h_v.end());
-
-  ASSERT_EQ(*h_iter, 3);
-
-  h_iter++;
-  ASSERT_EQ(*h_iter, 2);
-
-  h_iter++;
-  ASSERT_EQ(*h_iter, 1);
-
-  h_iter++;
-  ASSERT_EQ(*h_iter, 0);
-
-  thrust::device_vector<int> d_v(4);
-  thrust::sequence(d_v.begin(), d_v.end());
-
-  thrust::reverse_iterator<thrust::device_vector<int>::iterator> d_iter(d_v.end());
-
-  ASSERT_EQ(*d_iter, 3);
-
-  d_iter++;
-  ASSERT_EQ(*d_iter, 2);
-
-  d_iter++;
-  ASSERT_EQ(*d_iter, 1);
-
-  d_iter++;
-  ASSERT_EQ(*d_iter, 0);
+    ASSERT_EQ(d_iter2, d_iter3);
+    ASSERT_EQ(*d_iter2, *d_iter3);
 }
 
-TYPED_TEST(ReverseIteratorTests, TestReverseIteratorCopy)
+TEST(ReverseIteratorTests, ReverseIteratorIncrement)
 {
-  using Vector = typename TestFixture::input_type;
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    thrust::host_vector<int> h_v(4);
+    thrust::sequence(h_v.begin(), h_v.end());
 
-  Vector source{10, 20, 30, 40};
+    thrust::reverse_iterator<thrust::host_vector<int>::iterator> h_iter(h_v.end());
 
-  Vector destination(8, 0); // arm gcc is complaining here
+    ASSERT_EQ(*h_iter, 3);
 
-  thrust::copy(
-    thrust::make_reverse_iterator(source.end()), thrust::make_reverse_iterator(source.begin()), destination.begin());
+    h_iter++;
+    ASSERT_EQ(*h_iter, 2);
 
-  destination.resize(4);
-  Vector ref{40, 30, 20, 10};
-  ASSERT_EQ(destination, ref);
+    h_iter++;
+    ASSERT_EQ(*h_iter, 1);
+
+    h_iter++;
+    ASSERT_EQ(*h_iter, 0);
+
+    thrust::device_vector<int> d_v(4);
+    thrust::sequence(d_v.begin(), d_v.end());
+
+    thrust::reverse_iterator<thrust::device_vector<int>::iterator> d_iter(d_v.end());
+
+    ASSERT_EQ(*d_iter, 3);
+
+    d_iter++;
+    ASSERT_EQ(*d_iter, 2);
+
+    d_iter++;
+    ASSERT_EQ(*d_iter, 1);
+
+    d_iter++;
+    ASSERT_EQ(*d_iter, 0);
 }
 
-TYPED_TEST(PrimitiveReverseIteratorTests, TestReverseIteratorExclusiveScanSimple)
+TYPED_TEST(ReverseIteratorTests, ReverseIteratorCopy)
 {
-  using T = typename TestFixture::input_type;
+    using Vector = typename TestFixture::input_type;
+    using Policy = typename TestFixture::execution_policy;
+    using T      = typename Vector::value_type;
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  const size_t n = 10;
+    Vector source(4);
+    source[0] = (T)10;
+    source[1] = (T)20;
+    source[2] = (T)30;
+    source[3] = (T)40;
 
-  thrust::host_vector<T> h_data(n);
-  thrust::sequence(h_data.begin(), h_data.end());
+    Vector destination(4, 0);
 
-  thrust::device_vector<T> d_data = h_data;
+    thrust::copy(Policy{},
+                 thrust::make_reverse_iterator(source.end()),
+                 thrust::make_reverse_iterator(source.begin()),
+                 destination.begin());
 
-  thrust::host_vector<T> h_result(h_data.size());
-  thrust::device_vector<T> d_result(d_data.size());
-
-  thrust::exclusive_scan(
-    thrust::make_reverse_iterator(h_data.end()), thrust::make_reverse_iterator(h_data.begin()), h_result.begin());
-
-  thrust::exclusive_scan(
-    thrust::make_reverse_iterator(d_data.end()), thrust::make_reverse_iterator(d_data.begin()), d_result.begin());
-
-  ASSERT_EQ_QUIET(h_result, d_result);
+    ASSERT_EQ(destination[0], (T)40);
+    ASSERT_EQ(destination[1], (T)30);
+    ASSERT_EQ(destination[2], (T)20);
+    ASSERT_EQ(destination[3], (T)10);
 }
 
-TYPED_TEST(PrimitiveReverseIteratorTests, TestReverseIteratorExclusiveScan)
+TYPED_TEST(PrimitiveReverseIteratorTests, ReverseIteratorExclusiveScanSimple)
 {
-  using T = typename TestFixture::input_type;
+    using T = typename TestFixture::input_type;
 
-  SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-  for (auto size : get_sizes())
-  {
-    SCOPED_TRACE(testing::Message() << "with size= " << size);
+    const size_t size = 10;
 
-    thrust::host_vector<T> h_data = random_samples<T>(size);
+    T                      error_margin = (T)0.01 * size;
+    thrust::host_vector<T> h_data(size);
+    thrust::sequence(h_data.begin(), h_data.end());
 
     thrust::device_vector<T> d_data = h_data;
 
-    thrust::host_vector<T> h_result(size);
-    thrust::device_vector<T> d_result(size);
+    thrust::host_vector<T>   h_result(h_data.size());
+    thrust::device_vector<T> d_result(d_data.size());
 
-    thrust::exclusive_scan(
-      thrust::make_reverse_iterator(h_data.end()), thrust::make_reverse_iterator(h_data.begin()), h_result.begin());
+    thrust::exclusive_scan(thrust::make_reverse_iterator(h_data.end()),
+                           thrust::make_reverse_iterator(h_data.begin()),
+                           h_result.begin());
 
-    thrust::exclusive_scan(
-      thrust::make_reverse_iterator(d_data.end()), thrust::make_reverse_iterator(d_data.begin()), d_result.begin());
+    thrust::exclusive_scan(thrust::make_reverse_iterator(d_data.end()),
+                           thrust::make_reverse_iterator(d_data.begin()),
+                           d_result.begin());
 
-    ASSERT_EQ_QUIET(h_result, d_result);
-  }
+    thrust::host_vector<T> h_result_d(d_result);
+    for(size_t i = 0; i < size; i++)
+        ASSERT_NEAR(h_result[i], h_result_d[i], error_margin);
 }
+
+TYPED_TEST(PrimitiveReverseIteratorTests, ReverseIteratorExclusiveScan)
+{
+    using T = typename TestFixture::input_type;
+
+    SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
+
+    for(auto size : get_sizes())
+    {
+        SCOPED_TRACE(testing::Message() << "with size= " << size);
+
+        T error_margin = (T)0.01 * size;
+
+        for(auto seed : get_seeds())
+        {
+            SCOPED_TRACE(testing::Message() << "with seed= " << seed);
+
+            thrust::host_vector<T> h_data = get_random_data<T>(size, 0, 10, seed);
+
+            thrust::device_vector<T> d_data = h_data;
+
+            thrust::host_vector<T>   h_result(size);
+            thrust::device_vector<T> d_result(size);
+
+            thrust::exclusive_scan(thrust::make_reverse_iterator(h_data.end()),
+                                   thrust::make_reverse_iterator(h_data.begin()),
+                                   h_result.begin());
+
+            thrust::exclusive_scan(thrust::make_reverse_iterator(d_data.end()),
+                                   thrust::make_reverse_iterator(d_data.begin()),
+                                   d_result.begin());
+
+            thrust::host_vector<T> h_result_d(d_result);
+            for(size_t i = 0; i < size; i++)
+                ASSERT_NEAR(h_result[i], h_result_d[i], error_margin);
+        }
+    }
+};

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -124,8 +124,8 @@ void testing_getrs_batched_bad_arg(const Arguments& arg)
     int                    info         = 0;
     int                    expectedInfo = 0;
 
-    hipblas_internal_type<T>* const* dAp = dA.ptr_on_device();
-    hipblas_internal_type<T>* const* dBp = dB.ptr_on_device();
+    T* const* dAp = dA.ptr_on_device();
+    T* const* dBp = dB.ptr_on_device();
 
     // Need initialization code because even with bad params we call roc/cu-solver
     // so want to give reasonable data
@@ -262,7 +262,7 @@ void testing_getrs_batched(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dB.memcheck());
     CHECK_DEVICE_ALLOCATION(dIpiv.memcheck());
 
-    double             gpu_time_used{0}, hipblas_error{0};
+    double             gpu_time_used, hipblas_error;
     hipblasLocalHandle handle(arg);
     hipblasOperation_t op = HIPBLAS_OP_N;
 

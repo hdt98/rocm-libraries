@@ -82,7 +82,7 @@ enum class warp_store_method
 /// \tparam T the output/output type.
 /// \tparam ItemsPerThread the number of items to be processed by
 /// each thread.
-/// \tparam VirtualWaveSize the number of threads in a warp. It must be a divisor of the
+/// \tparam WarpSize the number of threads in a warp. It must be a divisor of the
 /// kernel block size.
 /// \tparam Method the method to store data.
 ///
@@ -97,8 +97,6 @@ enum class warp_store_method
 /// \parblock
 /// In the example a store operation is performed on a warp of 8 threads, using type
 /// \p int and 4 items per thread.
-///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/warp/example_warp_store.cpp).
 ///
 /// \code{.cpp}
 /// __global__ void example_kernel(int * output, ...)
@@ -119,25 +117,20 @@ enum class warp_store_method
 /// \endparblock
 template<class T,
          unsigned int      ItemsPerThread,
-         unsigned int      VirtualWaveSize = ::rocprim::arch::wavefront::min_size(),
-         warp_store_method Method          = warp_store_method::warp_store_direct,
-         ::rocprim::arch::wavefront::target TargetWaveSize
-         = ::rocprim::arch::wavefront::get_target(),
-         typename Enabled = void>
+         unsigned int      WarpSize = ::rocprim::arch::wavefront::min_size(),
+         warp_store_method Method   = warp_store_method::warp_store_direct>
 class warp_store
 {
-    static_assert(::rocprim::detail::is_power_of_two(VirtualWaveSize),
+    static_assert(::rocprim::detail::is_power_of_two(WarpSize),
                   "Logical warp size must be a power of two.");
+    ROCPRIM_DETAIL_DEVICE_STATIC_ASSERT(
+        WarpSize <= ::rocprim::arch::wavefront::min_size(),
+        "Logical warp size cannot be larger than physical warp size.");
 
 private:
     using storage_type_ = typename ::rocprim::detail::empty_storage_type;
 
 public:
-    ROCPRIM_INLINE ROCPRIM_HOST_DEVICE warp_store()
-    {
-        detail::check_virtual_wave_size<VirtualWaveSize>();
-    }
-
     /// \brief Struct used to allocate a temporary memory that is required for thread
     /// communication during operations provided by related parallel primitive.
     ///
@@ -178,7 +171,7 @@ public:
         static_assert(std::is_convertible<T, value_type>::value,
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
         block_store_direct_blocked(flat_id, output, items);
     }
 
@@ -211,67 +204,27 @@ public:
         static_assert(std::is_convertible<T, value_type>::value,
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
         block_store_direct_blocked(flat_id, output, items, valid);
     }
 };
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 
-template<typename T,
-         unsigned int      ItemsPerThread,
-         unsigned int      VirtualWaveSize,
-         warp_store_method Method>
-class warp_store<T,
-                 ItemsPerThread,
-                 VirtualWaveSize,
-                 Method,
-                 ::rocprim::arch::wavefront::target::dynamic>
+template<
+    class T,
+    unsigned int ItemsPerThread,
+    unsigned int WarpSize
+>
+class warp_store<T, ItemsPerThread, WarpSize, warp_store_method::warp_store_striped>
 {
-private:
-    using warp_store_wave32 = warp_store<T,
-                                         ItemsPerThread,
-                                         VirtualWaveSize,
-                                         Method,
-                                         ::rocprim::arch::wavefront::target::size32>;
-    using warp_store_wave64 = warp_store<T,
-                                         ItemsPerThread,
-                                         VirtualWaveSize,
-                                         Method,
-                                         ::rocprim::arch::wavefront::target::size64>;
-    using dispatch = ::rocprim::detail::dispatch_wave_size<warp_store_wave32, warp_store_wave64>;
-
-public:
-    using storage_type = typename dispatch::storage_type;
-
-    template<typename... Args>
-    ROCPRIM_DEVICE ROCPRIM_INLINE
-    auto store(Args&&... args)
-    {
-        dispatch{}([](auto impl, auto&&... args) { impl.store(args...); }, args...);
-    }
-};
-
-template<class T,
-         unsigned int                       ItemsPerThread,
-         unsigned int                       VirtualWaveSize,
-         ::rocprim::arch::wavefront::target TargetWaveSize>
-class warp_store<T,
-                 ItemsPerThread,
-                 VirtualWaveSize,
-                 warp_store_method::warp_store_striped,
-                 TargetWaveSize,
-                 ::rocprim::detail::wave_target_guard_t<TargetWaveSize>>
-{
-    static_assert(::rocprim::detail::is_power_of_two(VirtualWaveSize),
+    static_assert(::rocprim::detail::is_power_of_two(WarpSize),
                   "Logical warp size must be a power of two.");
+    ROCPRIM_DETAIL_DEVICE_STATIC_ASSERT(
+        WarpSize <= ::rocprim::arch::wavefront::min_size(),
+        "Logical warp size cannot be larger than physical warp size.");
 
 public:
-    ROCPRIM_INLINE ROCPRIM_HOST_DEVICE warp_store()
-    {
-        detail::check_virtual_wave_size<VirtualWaveSize>();
-    }
-
     using storage_type = typename ::rocprim::detail::empty_storage_type;
 
     template<class OutputIterator>
@@ -284,8 +237,8 @@ public:
         static_assert(std::is_convertible<T, value_type>::value,
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
-        block_store_direct_warp_striped<VirtualWaveSize>(flat_id, output, items);
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
+        block_store_direct_warp_striped<WarpSize>(flat_id, output, items);
     }
 
     template<class OutputIterator>
@@ -299,31 +252,25 @@ public:
         static_assert(std::is_convertible<T, value_type>::value,
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
-        block_store_direct_warp_striped<VirtualWaveSize>(flat_id, output, items, valid);
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
+        block_store_direct_warp_striped<WarpSize>(flat_id, output, items, valid);
     }
 };
 
-template<class T,
-         unsigned int                       ItemsPerThread,
-         unsigned int                       VirtualWaveSize,
-         ::rocprim::arch::wavefront::target TargetWaveSize>
-class warp_store<T,
-                 ItemsPerThread,
-                 VirtualWaveSize,
-                 warp_store_method::warp_store_vectorize,
-                 TargetWaveSize,
-                 ::rocprim::detail::wave_target_guard_t<TargetWaveSize>>
+template<
+    class T,
+    unsigned int ItemsPerThread,
+    unsigned int WarpSize
+>
+class warp_store<T, ItemsPerThread, WarpSize, warp_store_method::warp_store_vectorize>
 {
-    static_assert(::rocprim::detail::is_power_of_two(VirtualWaveSize),
+    static_assert(::rocprim::detail::is_power_of_two(WarpSize),
                   "Logical warp size must be a power of two.");
+    ROCPRIM_DETAIL_DEVICE_STATIC_ASSERT(
+        WarpSize <= ::rocprim::arch::wavefront::min_size(),
+        "Logical warp size cannot be larger than physical warp size.");
 
 public:
-    ROCPRIM_INLINE ROCPRIM_HOST_DEVICE warp_store()
-    {
-        detail::check_virtual_wave_size<VirtualWaveSize>();
-    }
-
     using storage_type = typename ::rocprim::detail::empty_storage_type;
 
     ROCPRIM_DEVICE ROCPRIM_INLINE
@@ -331,7 +278,7 @@ public:
                T (&items)[ItemsPerThread],
                storage_type& /*storage*/)
     {
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
         block_store_direct_blocked_vectorized(flat_id, output, items);
     }
 
@@ -345,7 +292,7 @@ public:
         static_assert(std::is_convertible<T, value_type>::value,
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
         block_store_direct_blocked(flat_id, output, items);
     }
 
@@ -360,34 +307,28 @@ public:
         static_assert(std::is_convertible<T, value_type>::value,
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
         block_store_direct_blocked(flat_id, output, items, valid);
     }
 };
 
-template<class T,
-         unsigned int                       ItemsPerThread,
-         unsigned int                       VirtualWaveSize,
-         ::rocprim::arch::wavefront::target TargetWaveSize>
-class warp_store<T,
-                 ItemsPerThread,
-                 VirtualWaveSize,
-                 warp_store_method::warp_store_transpose,
-                 TargetWaveSize,
-                 ::rocprim::detail::wave_target_guard_t<TargetWaveSize>>
+template<
+    class T,
+    unsigned int ItemsPerThread,
+    unsigned int WarpSize
+>
+class warp_store<T, ItemsPerThread, WarpSize, warp_store_method::warp_store_transpose>
 {
-    static_assert(::rocprim::detail::is_power_of_two(VirtualWaveSize),
+    static_assert(::rocprim::detail::is_power_of_two(WarpSize),
                   "Logical warp size must be a power of two.");
+    ROCPRIM_DETAIL_DEVICE_STATIC_ASSERT(
+        WarpSize <= ::rocprim::arch::wavefront::min_size(),
+        "Logical warp size cannot be larger than physical warp size.");
 
 private:
-    using exchange_type = ::rocprim::warp_exchange<T, ItemsPerThread, VirtualWaveSize>;
+    using exchange_type = ::rocprim::warp_exchange<T, ItemsPerThread, WarpSize>;
 
 public:
-    ROCPRIM_INLINE ROCPRIM_HOST_DEVICE warp_store()
-    {
-        detail::check_virtual_wave_size<VirtualWaveSize>();
-    }
-
     using storage_type = typename exchange_type::storage_type;
 
     template<class OutputIterator>
@@ -401,8 +342,8 @@ public:
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
         exchange_type().blocked_to_striped(items, items, storage);
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
-        block_store_direct_warp_striped<VirtualWaveSize>(flat_id, output, items);
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
+        block_store_direct_warp_striped<WarpSize>(flat_id, output, items);
     }
 
     template<class OutputIterator>
@@ -417,8 +358,8 @@ public:
                       "The type T must be such that an object of type OutputIterator "
                       "can be dereferenced and then implicitly assigned from T.");
         exchange_type().blocked_to_striped(items, items, storage);
-        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<VirtualWaveSize>();
-        block_store_direct_warp_striped<VirtualWaveSize>(flat_id, output, items, valid);
+        const unsigned int flat_id = ::rocprim::detail::logical_lane_id<WarpSize>();
+        block_store_direct_warp_striped<WarpSize>(flat_id, output, items, valid);
     }
 };
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,16 +26,13 @@
     #define ROCRAND_DETAIL_BM_NOT_IN_STATE
 #endif
 
-#if !defined(USE_DEVICE_DISPATCH)
-    #if !defined(_WIN32) && defined(__HIP_PLATFORM_AMD__)
-        #define USE_DEVICE_DISPATCH 1
-    #else
-        #define USE_DEVICE_DISPATCH 0
-    #endif
+#if !defined(USE_DEVICE_DISPATCH) && !defined(_WIN32) && defined(__HIP_PLATFORM_AMD__)
+    #define USE_DEVICE_DISPATCH
 #endif
 
 #include <rocrand/rocrand_common.h>
 
+#include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
 
 #include <cstdio>

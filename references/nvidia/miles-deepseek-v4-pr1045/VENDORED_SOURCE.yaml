@@ -1,0 +1,13 @@
+remote: https://github.com/yueming-yuan/miles.git
+branch: deepseek-v4
+commit: 032721cd61bf7164955f084425eb9f315352fd26
+upstream_pr: https://github.com/radixark/miles/pull/1045
+upstream_base:
+  remote: https://github.com/radixark/miles.git
+  branch: main
+  commit: c8e85df24a0a7dd96e6b13b7724251c034cd4968
+local_state: clean_archive_snapshot_from_remote_commit
+refreshed_at: 2026-05-27
+notes:
+  - NVIDIA-side Day-0 DeepSeek V4 RL reference.
+  - No nested Git metadata is retained in the vendored tree.

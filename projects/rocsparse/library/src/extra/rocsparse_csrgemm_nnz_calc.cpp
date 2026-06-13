@@ -24,12 +24,12 @@
 
 #include "rocsparse_csrgemm_nnz_calc.hpp"
 #include "../conversion/rocsparse_identity.hpp"
+#include "control.h"
 #include "csrgemm_device.h"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csrgemm.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 namespace rocsparse
 {
@@ -620,7 +620,7 @@ rocsparse_status rocsparse::csrgemm_nnz_calc(rocsparse_handle          handle,
         {
             // Allocate additional buffer for C = alpha * A * B
             RETURN_IF_HIP_ERROR(
-                rocsparse_hipMallocAsync(&workspace_B, sizeof(I) * nnz_A, handle->stream));
+                rocsparse_hipMallocAsync((void**)&workspace_B, sizeof(I) * nnz_A, handle->stream));
         }
 
         RETURN_IF_HIPLAUNCHKERNELGGL_ERROR(

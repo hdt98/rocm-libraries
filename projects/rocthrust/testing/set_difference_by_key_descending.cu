@@ -15,35 +15,40 @@
  *  limitations under the License.
  */
 
-#include <thrust/functional.h>
+#include <unittest/unittest.h>
 #include <thrust/set_operations.h>
+#include <thrust/functional.h>
 #include <thrust/sort.h>
 
-#include <unittest/unittest.h>
-
-template <typename Vector>
-void TestSetDifferenceByKeyDescendingSimple()
+template<typename Vector>
+void TestSetDifferenceByKeyDescendingSimple(void)
 {
   using T        = typename Vector::value_type;
   using Iterator = typename Vector::iterator;
 
-  Vector a_key{5, 4, 2, 0}, a_val(4, 0);
-  Vector b_key{6, 4, 3, 3, 0}, b_val(5, 1);
+  Vector a_key(4), a_val(4);
+  Vector b_key(5), b_val(5);
 
-  Vector ref_key{5, 2}, ref_val{0, 0};
+  a_key[0] = 5; a_key[1] = 4; a_key[2] = 2; a_key[3] = 0;
+  a_val[0] = 0; a_val[1] = 0; a_val[2] = 0; a_val[3] = 0;
+
+  b_key[0] = 6; b_key[1] = 4; b_key[2] = 3; b_key[3] = 3; b_key[4] = 0;
+  b_val[0] = 1; b_val[1] = 1; b_val[2] = 1; b_val[3] = 1; b_val[4] = 1;
+
+  Vector ref_key(2), ref_val(2);
+  ref_key[0] = 5; ref_key[1] = 2;
+  ref_val[0] = 0; ref_val[1] = 0;
 
   Vector result_key(2), result_val(2);
 
-  thrust::pair<Iterator, Iterator> end = thrust::set_difference_by_key(
-    a_key.begin(),
-    a_key.end(),
-    b_key.begin(),
-    b_key.end(),
-    a_val.begin(),
-    b_val.begin(),
-    result_key.begin(),
-    result_val.begin(),
-    thrust::greater<T>());
+  thrust::pair<Iterator,Iterator> end =
+    thrust::set_difference_by_key(a_key.begin(), a_key.end(),
+                                  b_key.begin(), b_key.end(),
+                                  a_val.begin(),
+                                  b_val.begin(),
+                                  result_key.begin(),
+                                  result_val.begin(),
+                                  thrust::greater<T>());
 
   ASSERT_EQUAL_QUIET(result_key.end(), end.first);
   ASSERT_EQUAL_QUIET(result_val.end(), end.second);
@@ -52,7 +57,8 @@ void TestSetDifferenceByKeyDescendingSimple()
 }
 DECLARE_VECTOR_UNITTEST(TestSetDifferenceByKeyDescendingSimple);
 
-template <typename T>
+
+template<typename T>
 void TestSetDifferenceByKeyDescending(const size_t n)
 {
   thrust::host_vector<T> temp = unittest::random_integers<T>(2 * n);
@@ -71,40 +77,41 @@ void TestSetDifferenceByKeyDescending(const size_t n)
   thrust::device_vector<T> d_a_val = h_a_val;
   thrust::device_vector<T> d_b_val = h_b_val;
 
-  thrust::host_vector<T> h_result_key(n), h_result_val(n);
+  thrust::host_vector<T>   h_result_key(n), h_result_val(n);
   thrust::device_vector<T> d_result_key(n), d_result_val(n);
 
-  thrust::pair<typename thrust::host_vector<T>::iterator, typename thrust::host_vector<T>::iterator> h_end;
+  thrust::pair<
+    typename thrust::host_vector<T>::iterator,
+    typename thrust::host_vector<T>::iterator
+  > h_end;
 
-  thrust::pair<typename thrust::device_vector<T>::iterator, typename thrust::device_vector<T>::iterator> d_end;
-
-  h_end = thrust::set_difference_by_key(
-    h_a_key.begin(),
-    h_a_key.end(),
-    h_b_key.begin(),
-    h_b_key.end(),
-    h_a_val.begin(),
-    h_b_val.begin(),
-    h_result_key.begin(),
-    h_result_val.begin(),
-    thrust::greater<T>());
-  h_result_key.erase(h_end.first, h_result_key.end());
+  thrust::pair<
+    typename thrust::device_vector<T>::iterator,
+    typename thrust::device_vector<T>::iterator
+  > d_end;
+  
+  h_end = thrust::set_difference_by_key(h_a_key.begin(), h_a_key.end(),
+                                        h_b_key.begin(), h_b_key.end(),
+                                        h_a_val.begin(),
+                                        h_b_val.begin(),
+                                        h_result_key.begin(),
+                                        h_result_val.begin(),
+                                        thrust::greater<T>());
+  h_result_key.erase(h_end.first,  h_result_key.end());
   h_result_val.erase(h_end.second, h_result_val.end());
 
-  d_end = thrust::set_difference_by_key(
-    d_a_key.begin(),
-    d_a_key.end(),
-    d_b_key.begin(),
-    d_b_key.end(),
-    d_a_val.begin(),
-    d_b_val.begin(),
-    d_result_key.begin(),
-    d_result_val.begin(),
-    thrust::greater<T>());
-  d_result_key.erase(d_end.first, d_result_key.end());
+  d_end = thrust::set_difference_by_key(d_a_key.begin(), d_a_key.end(),
+                                        d_b_key.begin(), d_b_key.end(),
+                                        d_a_val.begin(),
+                                        d_b_val.begin(),
+                                        d_result_key.begin(),
+                                        d_result_val.begin(),
+                                        thrust::greater<T>());
+  d_result_key.erase(d_end.first,  d_result_key.end());
   d_result_val.erase(d_end.second, d_result_val.end());
 
   ASSERT_EQUAL(h_result_key, d_result_key);
   ASSERT_EQUAL(h_result_val, d_result_val);
 }
 DECLARE_VARIABLE_UNITTEST(TestSetDifferenceByKeyDescending);
+

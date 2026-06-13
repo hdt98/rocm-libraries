@@ -40,8 +40,8 @@ struct rocsparse_itilu0_alg_t
     static constexpr uint32_t nvalues = 5;
 
     // clang-format off
-    static constexpr value_t  values[nvalues] = {rocsparse_itilu0_alg_default,
-   					                             rocsparse_itilu0_alg_async_inplace,
+  static constexpr value_t  values[nvalues] = {rocsparse_itilu0_alg_default,
+   					         rocsparse_itilu0_alg_async_inplace,
                                                  rocsparse_itilu0_alg_async_split,
                                                  rocsparse_itilu0_alg_sync_split,
                                                  rocsparse_itilu0_alg_sync_split_fusion};
@@ -104,10 +104,10 @@ struct rocsparse_matrix_type_t
     using value_t                     = rocsparse_matrix_type;
     static constexpr uint32_t nvalues = 4;
     // clang-format off
-    static constexpr value_t  values[nvalues] = {rocsparse_matrix_type_general,
-                                                 rocsparse_matrix_type_symmetric,
-                                                 rocsparse_matrix_type_hermitian,
-                                                 rocsparse_matrix_type_triangular};
+  static constexpr value_t  values[nvalues] = {rocsparse_matrix_type_general,
+                                               rocsparse_matrix_type_symmetric,
+                                               rocsparse_matrix_type_hermitian,
+                                               rocsparse_matrix_type_triangular};
     // clang-format on
 };
 
@@ -153,7 +153,7 @@ struct rocsparse_order_t
 struct rocsparse_format_t
 {
     using value_t                     = rocsparse_format;
-    static constexpr uint32_t nvalues = 8;
+    static constexpr uint32_t nvalues = 7;
     // clang-format off
     static constexpr value_t  values[nvalues] = {rocsparse_format_coo,
                                                  rocsparse_format_coo_aos,
@@ -161,8 +161,7 @@ struct rocsparse_format_t
                                                  rocsparse_format_csc,
                                                  rocsparse_format_ell,
                                                  rocsparse_format_bell,
-                                                 rocsparse_format_bsr,
-                                                 rocsparse_format_sell};
+                                                 rocsparse_format_bsr};
     // clang-format on
 
     static constexpr bool is_invalid(rocsparse_int value_)
@@ -181,7 +180,6 @@ struct rocsparse_format_t
         case rocsparse_format_ell:
         case rocsparse_format_bell:
         case rocsparse_format_bsr:
-        case rocsparse_format_sell:
         {
             return false;
         }
@@ -212,11 +210,6 @@ template <>
 inline rocsparse_datatype rocsparse_datatype_t::get<_Float16>()
 {
     return rocsparse_datatype_f16_r;
-}
-template <>
-inline rocsparse_datatype rocsparse_datatype_t::get<rocsparse_bfloat16>()
-{
-    return rocsparse_datatype_bf16_r;
 }
 template <>
 inline rocsparse_datatype rocsparse_datatype_t::get<float>()

@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -109,6 +109,29 @@ constexpr hipsparseOrder_t char_to_hipsparselt_order(char value)
     }
 }
 
+// return precision string for hipsparseLtDatatype_t
+/* @deprecated */
+HIPSPARSELT_EXPORT
+constexpr const char* hipsparselt_datatype_to_string(hipsparseLtDatatype_t type)
+{
+    switch(type)
+    {
+    case HIPSPARSELT_R_32F:
+        return "f32_r";
+    case HIPSPARSELT_R_16F:
+        return "f16_r";
+    case HIPSPARSELT_R_16BF:
+        return "bf16_r";
+    case HIPSPARSELT_R_8I:
+        return "i8_r";
+    case HIPSPARSELT_R_8F:
+        return "f8_r";
+    case HIPSPARSELT_R_8BF:
+        return "bf8_r";
+    }
+    return "invalid";
+}
+
 // return precision string for hipDataType
 HIPSPARSELT_EXPORT
 constexpr const char* hip_datatype_to_string(hipDataType type)
@@ -123,20 +146,10 @@ constexpr const char* hip_datatype_to_string(hipDataType type)
         return "bf16_r";
     case HIP_R_8I:
         return "i8_r";
-    case HIP_R_32I:
-        return "i32_r";        
-#if defined(HIP_FP8_TYPE_OCP) || defined(__HIP_PLATFORM_NVIDIA__)
     case HIP_R_8F_E4M3:
         return "f8_r";
     case HIP_R_8F_E5M2:
         return "bf8_r";
-#endif
-#if defined(HIP_FP8_TYPE_FNUZ)
-    case HIP_R_8F_E4M3_FNUZ:
-        return "f8_fnuz_r";
-    case HIP_R_8F_E5M2_FNUZ:
-        return "bf8_fnuz_r";
-#endif
     default:
         return "invalid";
     }
@@ -154,12 +167,16 @@ constexpr const char* hipsparselt_computetype_to_string(hipsparseLtComputetype_t
         return "i32_r";
     case HIPSPARSELT_COMPUTE_32F:
         return "f32_r";
-    default:
-        return "invalid";
     }
+    return "invalid";
 }
 
 // clang-format off
+
+/* @deprecated */
+HIPSPARSELT_EXPORT
+const hipsparseLtDatatype_t string_to_hipsparselt_datatype(const std::string& value);
+
 HIPSPARSELT_EXPORT
 const hipDataType string_to_hip_datatype(const std::string& value);
 
@@ -209,18 +226,8 @@ __host__ __device__ inline bool hipsparselt_isnan(__nv_bfloat16 arg)
 {
     return __hisnan(arg);
 }
-__host__ __device__ inline bool hipsparselt_isnan(__nv_fp8_e4m3 arg)
-{
-    return (static_cast<unsigned char>(arg) & 0x7f) == 0x7f;
-}
-
-__host__ __device__ inline bool hipsparselt_isnan(__nv_fp8_e5m2 arg)
-{
-    return (static_cast<unsigned char>(arg) & 0x7f) > 0x7c;
-}
 #endif
 
-#ifdef HIP_FP8_TYPE_OCP
 __host__ __device__ inline bool hipsparselt_isnan(__hip_fp8_e4m3 arg)
 {
     return internal::hip_fp8_ocp_is_nan(arg, __HIP_E4M3);
@@ -230,19 +237,6 @@ __host__ __device__ inline bool hipsparselt_isnan(__hip_fp8_e5m2 arg)
 {
     return internal::hip_fp8_ocp_is_nan(arg, __HIP_E5M2);
 }
-#endif
-
-#ifdef HIP_FP8_TYPE_FNUZ
-__host__ __device__ inline bool hipsparselt_isnan(__hip_fp8_e4m3_fnuz arg)
-{
-    return internal::hip_fp8_fnuz_is_nan(arg.__x);
-}
-
-__host__ __device__ inline bool hipsparselt_isnan(__hip_fp8_e5m2_fnuz arg)
-{
-    return internal::hip_fp8_fnuz_is_nan(arg.__x);
-}
-#endif
 /*******************************************************************************
 * \brief  returns true if arg is Infinity
 ********************************************************************************/

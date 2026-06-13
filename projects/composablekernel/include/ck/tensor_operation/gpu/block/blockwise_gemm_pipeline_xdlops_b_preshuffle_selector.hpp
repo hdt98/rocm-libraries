@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -8,7 +8,6 @@
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_dequant_v1.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_gufusion_dequant_v1.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_v2.hpp"
-#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_gufusion_v3.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_v3.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_dequant_v3.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_v4.hpp"
@@ -37,8 +36,7 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool GUFusion   = false,
-          bool TransposeC = false>
+          bool GUFusion = false>
 constexpr auto BlockGemmBPreshufflePipeline_Selector()
 {
     if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
@@ -67,8 +65,7 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
                     NPerXDL,
                     MRepeat,
                     NRepeat,
-                    KPack,
-                    TransposeC>{};
+                    KPack>{};
             }
             else
             {
@@ -91,8 +88,7 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
                                                                    NPerXDL,
                                                                    MRepeat,
                                                                    NRepeat,
-                                                                   KPack,
-                                                                   TransposeC>{};
+                                                                   KPack>{};
             }
         }
         else
@@ -119,8 +115,7 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
                     NPerXDL,
                     MRepeat,
                     NRepeat,
-                    KPack,
-                    TransposeC>{};
+                    KPack>{};
             }
             else
             {
@@ -144,8 +139,7 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
                     NPerXDL,
                     MRepeat,
                     NRepeat,
-                    KPack,
-                    TransposeC>{};
+                    KPack>{};
             }
         }
     }
@@ -170,63 +164,33 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
                                                            NPerXDL,
                                                            MRepeat,
                                                            NRepeat,
-                                                           KPack,
-                                                           TransposeC>{};
+                                                           KPack>{};
     }
     else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
     {
+        static_assert(MRepeat >= 4, "MRepeat should at least be 4 in BlockGemmPipelineVersion::v3");
         if constexpr(std::is_same<ADataType, BDataType>::value)
         {
-            if constexpr(GUFusion)
-            {
-                return BlockwiseGemmXdlops_pipeline_bpreshuffle_gufusion_v3<
-                    BlkGemmPipeSche,
-                    BlockSize,
-                    ADataType,
-                    BDataType,
-                    ComputeDataType,
-                    AccDataType,
-                    ATileDesc,
-                    BTileDesc,
-                    AMmaTileDesc,
-                    BMmaTileDesc,
-                    ABlockTransferSrcScalarPerVector,
-                    BBlockTransferSrcScalarPerVector,
-                    MPerBlock,
-                    NPerBlock,
-                    KPerBlock,
-                    MPerXDL,
-                    NPerXDL,
-                    MRepeat,
-                    NRepeat,
-                    KPack,
-                    TransposeC>{};
-            }
-            else
-            {
-
-                return BlockwiseGemmXdlops_pipeline_bpreshuffle_v3<BlkGemmPipeSche,
-                                                                   BlockSize,
-                                                                   ADataType,
-                                                                   BDataType,
-                                                                   ComputeDataType,
-                                                                   AccDataType,
-                                                                   ATileDesc,
-                                                                   BTileDesc,
-                                                                   AMmaTileDesc,
-                                                                   BMmaTileDesc,
-                                                                   ABlockTransferSrcScalarPerVector,
-                                                                   BBlockTransferSrcScalarPerVector,
-                                                                   MPerBlock,
-                                                                   NPerBlock,
-                                                                   KPerBlock,
-                                                                   MPerXDL,
-                                                                   NPerXDL,
-                                                                   MRepeat,
-                                                                   NRepeat,
-                                                                   KPack,
-                                                                   TransposeC>{};
-            }
+            return BlockwiseGemmXdlops_pipeline_bpreshuffle_v3<BlkGemmPipeSche,
+                                                               BlockSize,
+                                                               ADataType,
+                                                               BDataType,
+                                                               ComputeDataType,
+                                                               AccDataType,
+                                                               ATileDesc,
+                                                               BTileDesc,
+                                                               AMmaTileDesc,
+                                                               BMmaTileDesc,
+                                                               ABlockTransferSrcScalarPerVector,
+                                                               BBlockTransferSrcScalarPerVector,
+                                                               MPerBlock,
+                                                               NPerBlock,
+                                                               KPerBlock,
+                                                               MPerXDL,
+                                                               NPerXDL,
+                                                               MRepeat,
+                                                               NRepeat,
+                                                               KPack>{};
         }
         else
         {
@@ -250,8 +214,7 @@ constexpr auto BlockGemmBPreshufflePipeline_Selector()
                 NPerXDL,
                 MRepeat,
                 NRepeat,
-                KPack,
-                TransposeC>{};
+                KPack>{};
         }
     }
     else

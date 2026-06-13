@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -43,8 +43,7 @@ bool profile_gemm_bilinear_impl(int do_verification,
                                 int StrideD,
                                 int StrideE,
                                 float alpha,
-                                float beta,
-                                int instance_index = -1)
+                                float beta)
 {
     auto f_host_tensor_descriptor =
         [](std::size_t row, std::size_t col, std::size_t stride, auto layout) {
@@ -162,14 +161,8 @@ bool profile_gemm_bilinear_impl(int do_verification,
     bool pass = true;
 
     // profile device operation instances
-    for(size_t i = 0; i < op_ptrs.size(); i++)
+    for(auto& op_ptr : op_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& op_ptr      = op_ptrs[i];
         auto argument_ptr = op_ptr->MakeArgumentPointer(
             a_device_buf.GetDeviceBuffer(),
             b_device_buf.GetDeviceBuffer(),

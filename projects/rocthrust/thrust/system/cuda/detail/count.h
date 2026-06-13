@@ -28,42 +28,48 @@
 
 #include <thrust/detail/config.h>
 
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
+#if THRUST_DEVICE_COMPILER == THRUST_DEVICE_COMPILER_NVCC
+#include <thrust/system/cuda/config.h>
 
-#if _CCCL_HAS_CUDA_COMPILER
-#  include <thrust/system/cuda/config.h>
-
-#  include <thrust/distance.h>
-#  include <thrust/iterator/transform_iterator.h>
-#  include <thrust/system/cuda/detail/reduce.h>
-#  include <thrust/system/cuda/detail/util.h>
+#include <thrust/system/cuda/detail/util.h>
+#include <thrust/system/cuda/detail/reduce.h>
+#include <thrust/distance.h>
 
 THRUST_NAMESPACE_BEGIN
-namespace cuda_cub
-{
+namespace cuda_cub {
 
-template <class Derived, class InputIt, class UnaryPred>
+template <class Derived,
+          class InputIt,
+          class UnaryPred>
 typename iterator_traits<InputIt>::difference_type _CCCL_HOST_DEVICE
-count_if(execution_policy<Derived>& policy, InputIt first, InputIt last, UnaryPred unary_pred)
+count_if(execution_policy<Derived> &policy,
+         InputIt                    first,
+         InputIt                    last,
+         UnaryPred                  unary_pred)
 {
   using size_type       = typename iterator_traits<InputIt>::difference_type;
-  using flag_iterator_t = transform_iterator<UnaryPred, InputIt, size_type, size_type>;
+  using flag_iterator_t = transform_input_iterator_t<size_type, InputIt, UnaryPred>;
 
-  return cuda_cub::reduce_n(
-    policy, flag_iterator_t(first, unary_pred), thrust::distance(first, last), size_type(0), plus<size_type>());
+  return cuda_cub::reduce_n(policy,
+                            flag_iterator_t(first, unary_pred),
+                            thrust::distance(first, last),
+                            size_type(0),
+                            plus<size_type>());
 }
 
-template <class Derived, class InputIt, class Value>
+template <class Derived,
+          class InputIt,
+          class Value>
 typename iterator_traits<InputIt>::difference_type _CCCL_HOST_DEVICE
-count(execution_policy<Derived>& policy, InputIt first, InputIt last, Value const& value)
+count(execution_policy<Derived> &policy,
+      InputIt                    first,
+      InputIt                    last,
+      Value const &              value)
 {
-  return cuda_cub::count_if(policy, first, last, thrust::detail::equal_to_value<Value>(value));
+  return cuda_cub::count_if(policy,
+                            first,
+                            last,
+                            thrust::detail::equal_to_value<Value>(value));
 }
 
 } // namespace cuda_cub

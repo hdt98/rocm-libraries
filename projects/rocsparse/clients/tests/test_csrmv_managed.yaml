@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights Reserved.
+# Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights Reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -50,38 +50,38 @@ Tests:
 - name: csrmv_managed
   category: quick
   function: csrmv_managed
-  precision: *single_double_precisions
-  M: [10, 300]
-  N: [33, 300]
+  precision: *single_double_precisions_complex_real
+  M: [10, 500]
+  N: [33, 842]
   alpha_beta: *alpha_beta_range_quick
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero, rocsparse_index_base_one]
   matrix: [rocsparse_matrix_random]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
 
 - name: csrmv_managed
   category: pre_checkin
   function: csrmv_managed
   precision: *single_double_precisions_complex_real
-  M: [8, 2000]
-  N: [8, 2000]
+  M: [0, 7111]
+  N: [0, 4441]
   alpha_beta: *alpha_beta_range_checkin
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero, rocsparse_index_base_one]
   matrix: [rocsparse_matrix_random]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
 
 - name: csrmv_managed
   category: nightly
   function: csrmv_managed
   precision: *single_double_precisions_complex_real
-  M: [5000]
-  N: [5000]
+  M: [39385, 193482, 639102]
+  N: [29348, 340123, 710341]
   alpha_beta: *alpha_beta_range_nightly
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero, rocsparse_index_base_one]
   matrix: [rocsparse_matrix_random]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
 
 - name: csrmv_managed_file
   category: quick
@@ -93,7 +93,7 @@ Tests:
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero, rocsparse_index_base_one]
   matrix: [rocsparse_matrix_file_rocalution]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   filename: [mac_econ_fwd500,
              nos2,
              nos4,
@@ -110,7 +110,7 @@ Tests:
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero, rocsparse_index_base_one]
   matrix: [rocsparse_matrix_file_rocalution]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   filename: [nos1,
              nos3,
              nos5,
@@ -126,7 +126,7 @@ Tests:
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_one]
   matrix: [rocsparse_matrix_file_rocalution]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   filename: [bibd_22_8,
              bmwcra_1,
              amazon0312,
@@ -137,14 +137,14 @@ Tests:
 - name: csrmv_managed_file
   category: quick
   function: csrmv_managed
-  precision: *single_only_precisions_complex
+  precision: *single_double_precisions_complex
   M: 1
   N: 1
   alpha_beta: *alpha_beta_range_quick
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_file_rocalution]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   filename: [mplate, qc2534]
 
 - name: csrmv_managed_file
@@ -157,7 +157,7 @@ Tests:
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_one]
   matrix: [rocsparse_matrix_file_rocalution]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   filename: [Chevron2]
 
 - name: csrmv_managed_file
@@ -170,7 +170,7 @@ Tests:
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero]
   matrix: [rocsparse_matrix_file_rocalution]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   filename: [Chevron3]
 
 - name: csrmv_managed_graph_test
@@ -183,5 +183,5 @@ Tests:
   transA: [rocsparse_operation_none]
   baseA: [rocsparse_index_base_zero, rocsparse_index_base_one]
   matrix: [rocsparse_matrix_random]
-  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_rowsplit]
+  spmv_alg: [rocsparse_spmv_alg_csr_adaptive, rocsparse_spmv_alg_csr_stream]
   graph_test: true

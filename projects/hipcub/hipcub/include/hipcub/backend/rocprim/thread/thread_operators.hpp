@@ -32,17 +32,12 @@
 
 #include "../../../config.hpp"
 
-#include "../util_macro.hpp"
 #include "../util_type.hpp"
 
-#include <rocprim/type_traits.hpp> // IWYU pragma: export
-#include <rocprim/type_traits_functions.hpp>
-
-#include <hip/hip_bf16.h>
+#include <rocprim/type_traits.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Equality
 {
     template<class T, class U>
@@ -52,7 +47,6 @@ struct Equality
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Inequality
 {
     template<class T, class U>
@@ -62,7 +56,6 @@ struct Inequality
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 template <class EqualityOp>
 struct InequalityWrapper
 {
@@ -78,7 +71,6 @@ struct InequalityWrapper
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Sum
 {
     template<class T, class U>
@@ -88,7 +80,6 @@ struct Sum
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Difference
 {
     template<class T, class U>
@@ -98,7 +89,6 @@ struct Difference
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Division
 {
     template<class T, class U>
@@ -108,27 +98,23 @@ struct Division
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Max
 {
     template<class T, class U>
     HIPCUB_HOST_DEVICE inline constexpr typename std::common_type<T, U>::type
         operator()(T&& t, U&& u) const
     {
-        // TODO: change to use hip::std::max after libhipcxx is ready
-        return (((u) > (t)) ? (u) : (t));
+        return t < u ? u : t;
     }
 };
 
-// TODO: this is deprecated in cub, we should also mark this as deprecated when we have libhipcxx
 struct Min
 {
     template<class T, class U>
     HIPCUB_HOST_DEVICE inline constexpr typename std::common_type<T, U>::type
         operator()(T&& t, U&& u) const
     {
-        // TODO: change to use hip::std::min after libhipcxx is ready
-        return (((u) < (t)) ? (u) : (t));
+        return t < u ? t : u;
     }
 };
 
@@ -280,303 +266,6 @@ BinaryFlip<BinaryOpT> MakeBinaryFlip(BinaryOpT binary_op)
     return BinaryFlip<BinaryOpT>(binary_op);
 }
 
-namespace internal
-{
-
-template<typename T>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Min instead.")]] SimdMin
-{
-    static_assert(false, "Unsupported specialization");
-};
-
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Min instead.")]] SimdMin<int16_t>
-{
-    using simd_type = int32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(int32_t t, int32_t u) const
-    {
-        return HIPCUB_MIN(t, u);
-    }
-};
-
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Min instead.")]] SimdMin<uint16_t>
-{
-    using simd_type = uint32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(uint32_t t, uint32_t u) const
-    {
-        return HIPCUB_MIN(t, u);
-    }
-};
-
-#if !defined(__HIP_NO_HALF_OPERATORS__)
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Min instead.")]] SimdMin<__half>
-{
-    using simd_type = __half2;
-
-    // This function is not constexpr because the operator< of __half does not produce a constant expression
-    HIPCUB_HOST_DEVICE __forceinline__
-    __half2
-        operator()(__half2 t, __half2 u) const
-    {
-        return HIPCUB_MIN(t, u);
-    }
-};
-#endif // !defined(__HIP_NO_HALF_OPERATORS__)
-
-template<>
-struct [[deprecated("SIMD intrinsics are currently not supported on HIP, use Min "
-                    "instead.")]] SimdMin<__hip_bfloat16>
-{
-    using simd_type = __hip_bfloat162;
-
-    // This function is not constexpr because the operator< of __half does not produce a constant expression
-    HIPCUB_HOST_DEVICE __forceinline__
-    __hip_bfloat162
-        operator()(__hip_bfloat162 t, __hip_bfloat162 u) const
-    {
-        return HIPCUB_MIN(t, u);
-    }
-};
-
-template<typename T>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Max instead.")]] SimdMax
-{
-    static_assert(false, "Unsupported specialization");
-};
-
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Max instead.")]] SimdMax<int16_t>
-{
-    using simd_type = int32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(int32_t t, int32_t u) const
-    {
-        return HIPCUB_MAX(t, u);
-    }
-};
-
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Max instead.")]] SimdMax<uint16_t>
-{
-    using simd_type = uint32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(uint32_t t, uint32_t u) const
-    {
-        return HIPCUB_MAX(t, u);
-    }
-};
-
-#if !defined(__HIP_NO_HALF_OPERATORS__)
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Max instead.")]] SimdMax<__half>
-{
-    using simd_type = __half2;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    __half2
-        operator()(__half2 t, __half2 u) const
-    {
-        return HIPCUB_MAX(t, u);
-    }
-};
-#endif // !defined(__HIP_NO_HALF_OPERATORS__)
-
-template<>
-struct [[deprecated("SIMD intrinsics are currently not supported on HIP, use Max "
-                    "instead.")]] SimdMax<__hip_bfloat16>
-{
-    using simd_type = __hip_bfloat162;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    __hip_bfloat162
-        operator()(__hip_bfloat162 t, __hip_bfloat162 u) const
-    {
-        return HIPCUB_MAX(t, u);
-    }
-};
-
-template<typename T>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Sum instead.")]] SimdSum
-{
-    static_assert(false, "Unsupported specialization");
-};
-
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Sum instead.")]] SimdSum<int16_t>
-{
-    using simd_type = int32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(int32_t t, int32_t u) const
-    {
-        return t + u;
-    }
-};
-
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Sum instead.")]] SimdSum<uint16_t>
-{
-    using simd_type = uint32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(uint32_t t, uint32_t u) const
-    {
-        return t + u;
-    }
-};
-#if !defined(__HIP_NO_HALF_OPERATORS__)
-template<>
-struct [[deprecated(
-    "SIMD intrinsics are currently not supported on HIP, use Sum instead.")]] SimdSum<__half>
-{
-    using simd_type = __half2;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    __half2
-        operator()(__half2 t, __half2 u) const
-    {
-        return t + u;
-    }
-};
-#endif // !defined(__HIP_NO_HALF_OPERATORS__)
-
-template<>
-struct [[deprecated("SIMD intrinsics are currently not supported on HIP, use Sum "
-                    "instead.")]] SimdSum<__hip_bfloat16>
-{
-    using simd_type = __hip_bfloat162;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    __hip_bfloat162
-        operator()(__hip_bfloat162 t, __hip_bfloat162 u) const
-    {
-        return t + u;
-    }
-};
-
-// TODO: Mul is not available in hipcub. Use hip::std::multiplies from libhipcxx in the future.
-
-template<typename T>
-struct [[deprecated("Warning: SIMD intrinsics are currently not supported on HIP, so "
-                    "this operator will multiply 2 input values directly")]] SimdMul
-{
-    static_assert(false, "Unsupported specialization");
-};
-
-template<>
-struct [[deprecated("Warning: SIMD intrinsics are currently not supported on HIP, so "
-                    "this operator will multiply 2 input values directly")]] SimdMul<int16_t>
-{
-    using simd_type = int32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(int32_t t, int32_t u) const
-    {
-        return t * u;
-    }
-};
-
-template<>
-struct [[deprecated("Warning: SIMD intrinsics are currently not supported on HIP, so "
-                    "this operator will multiply 2 input values directly")]] SimdMul<uint16_t>
-{
-    using simd_type = uint32_t;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    constexpr uint32_t
-        operator()(uint32_t t, uint32_t u) const
-    {
-        return t * u;
-    }
-};
-
-#if !defined(__HIP_NO_HALF_OPERATORS__)
-template<>
-struct [[deprecated("Warning: SIMD intrinsics are currently not supported on HIP, so "
-                    "this operator will multiply 2 input values directly")]] SimdMul<__half>
-{
-    using simd_type = __half2;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    __half2
-        operator()(__half2 t, __half2 u) const
-    {
-        return t * u;
-    }
-};
-#endif // !defined(__HIP_NO_HALF_OPERATORS__)
-
-template<>
-struct [[deprecated("Warning: SIMD intrinsics are currently not supported on HIP, so "
-                    "this operator will multiply 2 input values directly")]] SimdMul<__hip_bfloat16>
-{
-    using simd_type = __hip_bfloat162;
-
-    HIPCUB_HOST_DEVICE __forceinline__
-    __hip_bfloat162
-        operator()(__hip_bfloat162 t, __hip_bfloat162 u) const
-    {
-        return t * u;
-    }
-};
-
-template<typename ReduceOp, typename T>
-struct HipOperatorToSimdOperator
-{
-    static_assert(false, "Unsupported specialization");
-};
-
-template<typename T>
-struct HipOperatorToSimdOperator<Min, T>
-{
-    using type      = SimdMin<T>;
-    using simd_type = typename type::simd_type;
-};
-
-template<typename T>
-struct HipOperatorToSimdOperator<Max, T>
-{
-    using type      = SimdMax<T>;
-    using simd_type = typename type::simd_type;
-};
-
-template<typename T>
-struct HipOperatorToSimdOperator<Sum, T>
-{
-    using type      = SimdSum<T>;
-    using simd_type = typename type::simd_type;
-};
-
-// TODO: Mul is not available in hipcub. Use hip::std::multiplies from libhipcxx in the future.
-
-} // namespace internal
-
 namespace detail
 {
 
@@ -585,9 +274,13 @@ template<typename IteratorT, typename FallbackT>
 using non_void_value_t =
     typename std::conditional<std::is_same<IteratorT, void>::value, FallbackT, IteratorT>::type;
 
+// Invoke result type.
+template<typename Invokable, typename... Args>
+using invoke_result_t = ::rocprim::invoke_result_t<Invokable, Args...>;
+
 /// Intermediate accumulator type.
-template<typename Invokable, typename InputT, typename InitT = InputT>
-using accumulator_t = ::rocprim::accumulator_t<Invokable, InputT, InitT>;
+template<typename Invokable, typename InitT, typename InputT>
+using accumulator_t = std::decay_t<invoke_result_t<Invokable, InitT, InputT>>;
 
 // CUB uses value_type of OutputIteratorT (if not void) as a type of intermediate results in segmented reduce,
 // for example:
@@ -604,7 +297,9 @@ using accumulator_t = ::rocprim::accumulator_t<Invokable, InputT, InitT>;
 // rocPRIM (as well as Thrust) uses result type of BinaryFunction instead (if not void):
 //
 // using input_type = typename std::iterator_traits<InputIterator>::value_type;
-// using result_type = ::rocprim::accumulator_t<BinaryFunction, input_type>;
+// using result_type = typename ::rocprim::invoke_result_binary_op<
+//     input_type, BinaryFunction
+// >::type;
 //
 // For short -> float using Sum()
 // CUB:     float Sum(float, float)
@@ -646,23 +341,24 @@ convert_result_type(BinaryFunction op)
     return convert_result_type_wrapper<InputIteratorT, OutputIteratorT, BinaryFunction>(op);
 }
 
-// CUB uses the return type of applying BinaryFunction to an Input and an InitialValue (if not void) as the intermediate result type in reduce.
+// CUB now uses as intermediate result type the return type of BinaryFunction in reduce, scan
+// and reduce_by_key.
 //
 // // The accumulator type
-// using AccumT = ::rocprim::accumulator_t<BinaryFunction, InputT, InitT>>;
+// using AccumT = typename std::decay<invoke_result_t<BinaryFunction, InitT, InputT>>::type;
 //
-// rocPRIM uses the return type of applying BinaryFunction to two Inputs (if not void) instead.
-//
-// using AccumT = ::rocprim::accumulator_t<BinaryFunction, InputT, InputT>>;
+// rocPRIM was being passed the value_type of OutputIteratorT (if not void) as intermediate
+// result type, following the previous behaviour of CUB.
 //
 // This wrapper allows to have compatibility with CUB in hipCUB.
 
-template<class BinaryFunction, class InputIteratorT, class InitT>
+template<class InitT, class InputIteratorT, class OutputIteratorT, class BinaryFunction>
 struct convert_binary_result_type_wrapper
 {
     using input_type  = typename std::iterator_traits<InputIteratorT>::value_type;
+    using output_type = typename std::iterator_traits<OutputIteratorT>::value_type;
     using init_type   = InitT;
-    using accum_type  = accumulator_t<BinaryFunction, input_type, init_type>;
+    using accum_type  = accumulator_t<BinaryFunction, init_type, input_type>;
 
     convert_binary_result_type_wrapper(BinaryFunction op) : op(op) {}
 
@@ -675,11 +371,14 @@ struct convert_binary_result_type_wrapper
     BinaryFunction op;
 };
 
-template<class InputIteratorT, class InitT, class BinaryFunction>
-inline convert_binary_result_type_wrapper<BinaryFunction, InputIteratorT, InitT>
+template<class InitT, class InputIteratorT, class OutputIteratorT, class BinaryFunction>
+inline convert_binary_result_type_wrapper<InitT, InputIteratorT, OutputIteratorT, BinaryFunction>
     convert_binary_result_type(BinaryFunction op)
 {
-    return convert_binary_result_type_wrapper<BinaryFunction, InputIteratorT, InitT>(op);
+    return convert_binary_result_type_wrapper<InitT,
+                                              InputIteratorT,
+                                              OutputIteratorT,
+                                              BinaryFunction>(op);
 }
 
 } // end detail namespace

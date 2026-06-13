@@ -367,3 +367,4 @@ def getversion(devicenum, component, cuda):
         return val
     else:
         return "N/A"
+

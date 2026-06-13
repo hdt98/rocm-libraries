@@ -20,3 +20,4 @@
 
 // this system inherits inner_product
 #include <thrust/system/cpp/detail/inner_product.h>
+

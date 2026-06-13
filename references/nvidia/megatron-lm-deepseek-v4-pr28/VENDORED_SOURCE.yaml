@@ -1,0 +1,14 @@
+remote: https://github.com/yueming-yuan/Megatron-LM.git
+branch: deepseek-v4
+commit: 1c6e5b7bcde0097ebe193b6258115ff3558f69d6
+upstream_pr: https://github.com/radixark/Megatron-LM/pull/28
+upstream_base:
+  remote: https://github.com/radixark/Megatron-LM.git
+  branch: miles-main
+  commit: 23924a0b66f35b31050ce9636477d2ee32148767
+merge_ref_commit: d88459d7f80a62f4d4c2ff8ca3f93723d9794695
+local_state: clean_archive_snapshot_from_remote_commit
+refreshed_at: 2026-05-27
+notes:
+  - NVIDIA-side Day-0 DeepSeek V4 Megatron-LM modeling reference.
+  - No nested Git metadata is retained in the vendored tree.

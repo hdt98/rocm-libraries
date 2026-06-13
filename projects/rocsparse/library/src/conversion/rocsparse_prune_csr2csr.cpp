@@ -23,15 +23,14 @@
  * ************************************************************************ */
 
 #include "internal/conversion/rocsparse_prune_csr2csr.h"
-#include "rocsparse_calculate_nnz.hpp"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_nnz_compress.hpp"
 #include "rocsparse_prune_csr2csr.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "csr2csr_compress_device.h"
 #include "rocsparse_common.h"
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 namespace rocsparse
 {

@@ -24,7 +24,7 @@
  *
  * ************************************************************************ */
 #include "handle.h"
-#include "matrix-transform/matrix_transform.h"
+#include "kernels/matrix_transform.h"
 #include "rocblaslt-auxiliary.h"
 #include "rocblaslt-types.h"
 #include "rocblaslt.h"
@@ -32,54 +32,37 @@
 #include <Tensile/hip/HipUtils.hpp>
 #include <functional>
 #include <hipblaslt/hipblaslt-types.h>
-
-#include <filesystem>
+#include <libgen.h>
 #include <map>
 #include <memory>
-#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
 
 namespace
 {
-    std::optional<std::filesystem::path> transformCodeObjectPath()
+    std::string transformCodeObjectPath()
     {
-        int             deviceId{};
-        hipDeviceProp_t props{};
-        if(hipGetDevice(&deviceId) != hipSuccess
-           || hipGetDeviceProperties(&props, deviceId) != hipSuccess)
+        constexpr char DEFAULT_CO_PATH[]
+            = "/opt/rocm/lib/hipblaslt/library/hipblasltTransform.hsaco";
+        auto        soPath = rocblaslt_internal_get_so_path("hipblaslt");
+        std::string libPath(dirname(&soPath[0]));
+
+        if(rocblaslt_internal_test_path(libPath + "/../Tensile/library"))
+            libPath += "/../Tensile/library";
+        else if(rocblaslt_internal_test_path(libPath + "library"))
+            libPath += "/library";
+        else
+            libPath += "/hipblaslt/library";
+
+        libPath += "/hipblasltTransform.hsaco";
+
+        if(rocblaslt_internal_test_path(libPath))
         {
-            rocblaslt_log_error("transformCodeObjectPath",
-                                "hipGetDevice/hipGetDeviceProperties",
-                                "failed to query device for matrix-transform arch lookup");
-            return std::nullopt;
+            return libPath;
         }
 
-        std::string archName = props.gcnArchName;
-        auto        colonPos = archName.find(':');
-        if(colonPos != std::string::npos)
-            archName = archName.substr(0, colonPos);
-
-        auto relpath = std::filesystem::path(archName)
-                       / ("hipblasltTransform_" + archName + ".hsaco");
-        auto perArchPath = rocblaslt_find_library_relative_path(relpath);
-        if(!perArchPath)
-        {
-            rocblaslt_log_error("transformCodeObjectPath",
-                                "rocblaslt_find_library_relative_path",
-                                relpath.string().c_str());
-        }
-        return perArchPath;
-    }
-
-    const std::string& transformCodeObjectFileName()
-    {
-        static const std::string name = [] {
-            auto path = transformCodeObjectPath();
-            return path ? path->filename().string() : std::string{};
-        }();
-        return name;
+        return DEFAULT_CO_PATH;
     }
 
     TensileLite::hip::SolutionAdapter& transformAdapter()
@@ -93,31 +76,24 @@ namespace
             {
                 adapters.emplace_back(new TensileLite::hip::SolutionAdapter);
             }
-            auto coPath = transformCodeObjectPath();
-            if(!coPath)
-            {
-                rocblaslt_log_error("transformAdapter",
-                                    "transformCodeObjectPath",
-                                    "matrix-transform code object not found under per-base layout");
-                return adapters;
-            }
-            const std::string coFolder = coPath->parent_path().string();
+            auto              coPath   = transformCodeObjectPath();
+            const std::string coFolder = dirname(&coPath[0]);
             try
             {
                 for(auto& adp : adapters)
                 {
-                    adp->codeObjectDir(coFolder);
+                    (void)adp->initializeLazyLoading("", coFolder);
                 }
             }
             catch(const std::runtime_error& e)
             {
                 rocblaslt_log_error(
-                    "transformAdapter", "codeObjectDir", coFolder.c_str());
+                    "transformCodeObject", "TransformCodeObjectPath", coFolder.c_str());
             }
             return adapters;
         }();
 
-        int deviceId{};
+        int        deviceId{};
         HIP_CHECK_EXC(hipGetDevice(&deviceId));
         return *adapter.at(deviceId);
     }
@@ -161,10 +137,10 @@ namespace
                                      hipStream_t        stream,
                                      const std::string& kernelName)
     {
-        constexpr auto TileM        = RowMajC ? NumThreadsM : NumThreadsM * VectorWidth;
-        constexpr auto TileN        = RowMajC ? NumThreadsN * VectorWidth : NumThreadsN;
-        const auto     numWg        = (m / TileM + !!(m % TileM)) * (n / TileN + !!(n % TileN));
-        constexpr auto numWorkitems = NumThreadsM * NumThreadsN;
+        constexpr auto           TileM = RowMajC ? NumThreadsM : NumThreadsM * VectorWidth;
+        constexpr auto           TileN = RowMajC ? NumThreadsN * VectorWidth : NumThreadsN;
+        const auto               numWg = (m / TileM + !!(m % TileM)) * (n / TileN + !!(n % TileN));
+        constexpr auto           numWorkitems = NumThreadsM * NumThreadsN;
         TensileLite::KernelArguments kArgs(false);
 
         if(scalarInDevice)
@@ -216,17 +192,16 @@ namespace
             kArgs.appendAligned("transB", transB);
         }
 
-        constexpr auto                NUM_WORKITEMS{NumThreadsM * NumThreadsN};
+        constexpr auto            NUM_WORKITEMS{NumThreadsM * NumThreadsN};
         TensileLite::KernelInvocation invocation{kernelName,
-                                                 transformCodeObjectFileName(),
-                                                 false,
-                                                 {1, 1, 1},
-                                                 {NUM_WORKITEMS, 1, 1},
-                                                 {numWg, 1, batchSize},
-                                                 {numWg * NUM_WORKITEMS, 1, batchSize},
-                                                 0,
-                                                 kArgs};
-        auto&                         adapter = transformAdapter();
+                                             "hipblasltTransform.hsaco",
+                                             false,
+                                             {NUM_WORKITEMS, 1, 1},
+                                             {numWg, 1, batchSize},
+                                             {numWg * NUM_WORKITEMS, 1, batchSize},
+                                             0,
+                                             kArgs};
+        auto&                     adapter = transformAdapter();
         return adapter.launchKernel(invocation, stream, nullptr, nullptr);
     }
 

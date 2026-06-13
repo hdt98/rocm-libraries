@@ -23,11 +23,10 @@
 from copy import deepcopy
 from typing import List
 
-from rocisa import rocIsa
-
-from Tensile.Activation import ActivationInline, ActivationType
+from .TensileInstructions import TensileInstructions
 from Tensile.Common.Architectures import isaToGfx, IsaVersion
-from Tensile.KernelWriterBase import KernelWriterBase
+from .Activation import ActivationInline, ActivationType
+from .KernelWriterBase import KernelWriterBase
 
 class KernelWriterActivationFunction(KernelWriterBase):
 
@@ -36,6 +35,7 @@ class KernelWriterActivationFunction(KernelWriterBase):
     self.cxxCompiler = cxxCompiler
     self.state["ProblemType"] = deepcopy(state["ProblemType"])
     self.state["Kernel"] = state["Kernel"]
+    self._tf = TensileInstructions()
 
     self.actGradientPrefix = ""
     self.actExportType =  ActivationType.Export.NORMAL
@@ -56,18 +56,12 @@ class KernelWriterActivationFunction(KernelWriterBase):
   def keys(self):
     return self.getKernelName()
 
-  @staticmethod
-  def kernelName(solution):
-    state = solution._state if hasattr(solution, "_state") else solution.state
-    actGradientPrefix = "Gradient" if state["ProblemType"]["Gradient"] else ""
-    gaurdStr = "NG" if state["ProblemType"]["ActivationNoGuard"] else ""
-    return "Tensile%sActivation%s_%s_%s"%(actGradientPrefix, \
-                                          gaurdStr, \
-                                          state["ProblemType"]["ActivationComputeDataType"].toChar(), \
-                                          state["ProblemType"]["ActivationType"])
-
   def getKernelName(self):
-    return KernelWriterActivationFunction.kernelName(self)
+    return "Tensile%sActivation%s_%s_%s"%(self.actGradientPrefix, \
+                                          self.gaurdStr, \
+                                          self.state["ProblemType"]["ActivationComputeDataType"].toChar(), \
+                                          self.state["ProblemType"]["ActivationType"])
+
 
   def getSourceFileString(self):
     fileString = "// This is a dummy file."
@@ -92,14 +86,13 @@ class KernelWriterActivationFunction(KernelWriterBase):
     activationStrList = []
 
     isa = tuple(self.state["Kernel"]["ISA"])
-    tf  = rocIsa.getInstance()
-    if not tf.isInit():
-      tf.init(isa, self.cxxCompiler)
-    tf.setKernel(isa, self.state["Kernel"]["WavefrontSize"])
+    if not self._tf.isInit():
+      self._tf.init(isa, self.cxxCompiler)
+    self._tf.setKernelInfo(isa, self.state["Kernel"]["WavefrontSize"])
 
     for arch in self.supportedArchs:
-      tf.init(arch, self.cxxCompiler)
-      tf.setKernel(arch, self.state["Kernel"]["WavefrontSize"])
+      self._tf.init(arch, self.cxxCompiler)
+      self._tf.setKernelInfo(arch, self.state["Kernel"]["WavefrontSize"])
       activationStrList.append(activation.generateInlineAssemblyBody(spaces, activationType))
 
     activationStrSetList = list(set(activationStrList))
@@ -139,13 +132,12 @@ class KernelWriterActivationFunction(KernelWriterBase):
       return fileString
 
     isa = tuple(self.state["Kernel"]["ISA"])
-    tf  = rocIsa.getInstance()
-    tf.init(isa, self.cxxCompiler)
-    tf.setKernel(isa, self.state["Kernel"]["WavefrontSize"])
+    self._tf.init(isa, self.cxxCompiler)
+    self._tf.setKernelInfo(isa, self.state["Kernel"]["WavefrontSize"])
 
     activationCDataType = self.state["ProblemType"]["ActivationComputeDataType"]
     activationType = self.state["ProblemType"]["ActivationType"]
-    tf.setKernel(tuple(self.state["Kernel"]["ISA"]), self.state["Kernel"]["WavefrontSize"])
+    self._tf.setKernelInfo(tuple(self.state["Kernel"]["ISA"]), self.state["Kernel"]["WavefrontSize"])
     activation = ActivationInline(activationCDataType, not self.state["ProblemType"]["ActivationNoGuard"])
 
     fileString = "" # CHeader

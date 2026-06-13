@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -46,8 +46,7 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
                                         int n_warmup = 1,
                                         int n_iter   = 10)
 {
-    bool pass             = true;
-    using ComputeDataType = ADataType;
+    bool pass = true;
 
     auto f_host_tensor_descriptor =
         [](std::size_t row, std::size_t col, std::size_t stride, auto layout) {
@@ -55,11 +54,11 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
 
             if(is_same<decltype(layout), tensor_layout::gemm::RowMajor>::value)
             {
-                return HostTensorDescriptor({row, col}, {stride, 1_uz}, layout);
+                return HostTensorDescriptor({row, col}, {stride, 1_uz});
             }
             else
             {
-                return HostTensorDescriptor({row, col}, {1_uz, stride}, layout);
+                return HostTensorDescriptor({row, col}, {1_uz, stride});
             }
         };
 
@@ -75,8 +74,8 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
     std::vector<Tensor<BDataType>> b_k_n;
     std::vector<Tensor<CDataType>> c_m_n_host_results;
     std::vector<Tensor<CDataType>> c_m_n_device_results;
-    double max_abs_in_val = 0.f;
-    int sum_of_m          = 0;
+    int sum_of_m = 0;
+
     for(std::size_t i = 0; i < group_count; i++)
     {
         sum_of_m += Ms[i];
@@ -96,18 +95,17 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
                       << i << "]:" << b_k_n[i].mDesc << ", c_m_n_device_results[" << i
                       << "]:" << c_m_n_device_results[i].mDesc << std::endl;
         }
+        std::size_t num_thread = 1;
         switch(init_method)
         {
         case 0: break;
         case 1:
-            ck::utils::FillUniformDistributionIntegerValue<ADataType>{-5.f, 5.f}(a_m_k[i]);
-            ck::utils::FillUniformDistributionIntegerValue<BDataType>{-5.f, 5.f}(b_k_n[i]);
-            max_abs_in_val = 5.f;
+            a_m_k[i].GenerateTensorValue(GeneratorTensor_2<ADataType>{-5, 5}, num_thread);
+            b_k_n[i].GenerateTensorValue(GeneratorTensor_2<BDataType>{-5, 5}, num_thread);
             break;
         default:
-            ck::utils::FillUniformDistribution<ADataType>{0.0f, 1.0f}(a_m_k[i]);
-            ck::utils::FillUniformDistribution<BDataType>{-0.5f, 0.5f}(b_k_n[i]);
-            max_abs_in_val = 1.0f;
+            a_m_k[i].GenerateTensorValue(GeneratorTensor_3<ADataType>{0.0, 1.0}, num_thread);
+            b_k_n[i].GenerateTensorValue(GeneratorTensor_3<BDataType>{-0.5, 0.5}, num_thread);
         }
     }
 
@@ -185,8 +183,6 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
 
     const auto op_ptrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
         DeviceOp>::GetInstances();
-
-    std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
 
     if(op_ptrs.size() <= 0)
     {
@@ -286,18 +282,23 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
                     bool instance_pass = true;
                     for(std::size_t i = 0; i < gemm_descs.size(); i++)
                     {
-                        c_device_buf[i]->FromDevice(c_m_n_device_results[i].mData.data());
-                        auto atol = ck::utils::get_absolute_threshold<ComputeDataType, CDataType>(
-                            max_abs_in_val, gemm_descs[i].K_);
-                        auto rtol = ck::utils::get_relative_threshold<ComputeDataType, CDataType>(
-                            gemm_descs[i].K_);
 
-                        instance_pass =
-                            instance_pass && ck::utils::check_err(c_m_n_device_results[i],
-                                                                  c_m_n_host_results[i],
-                                                                  "Error: Incorrect results!",
-                                                                  rtol,
-                                                                  atol);
+                        c_device_buf[i]->FromDevice(c_m_n_device_results[i].mData.data());
+
+                        if(std::is_same_v<CDataType, ck::half_t> && kbatch_curr > 1)
+                        {
+                            instance_pass =
+                                instance_pass && ck::utils::check_err(c_m_n_device_results[i],
+                                                                      c_m_n_host_results[i],
+                                                                      "Error: Incorrect results!",
+                                                                      0.06);
+                        }
+                        else
+                        {
+                            instance_pass =
+                                instance_pass && ck::utils::check_err(c_m_n_device_results[i],
+                                                                      c_m_n_host_results[i]);
+                        }
 
                         if(do_log)
                         {
@@ -314,7 +315,7 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
                         }
                     }
 
-                    std::cout << "Instance: " << gemm_name << "; KBatch: " << kbatch_curr << " "
+                    std::cout << "Instance: " << gemm_name << " verification "
                               << (instance_pass ? "SUCCEED" : "FAILED") << std::endl;
 
                     pass = pass && instance_pass;
@@ -354,8 +355,7 @@ bool profile_grouped_gemm_fixed_nk_impl(int do_verification,
             }
             else
             {
-                std::cout << "Instance: " << gemm_name
-                          << ", does not support this GEMM problem (KBatch: " << kbatch_curr << ")"
+                std::cout << "Instance: " << gemm_name << ", does not support this GEMM problem"
                           << std::endl;
             }
         }

@@ -111,7 +111,7 @@ class ORGBR_UNGBR : public ::TestWithParam<orgbr_tuple>
 protected:
     void TearDown() override
     {
-        ASSERT_EQ(hipGetLastError(), hipSuccess);
+        EXPECT_EQ(hipGetLastError(), hipSuccess);
     }
 
     template <typename T>

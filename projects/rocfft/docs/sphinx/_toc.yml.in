@@ -8,10 +8,8 @@ subtrees:
 
 - caption: Install 
   entries:
-  - file: install/install
-    title: Install rocFFT
   - file: install/building-installing-rocfft
-    title: Build from source
+    title: Installation guide 
 
 - caption: Conceptual 
   entries:
@@ -30,12 +28,10 @@ subtrees:
     title: Use runtime compilation
   - file: how-to/distributed-transforms
     title: Distribute transforms
-  - file: how-to/enabling-logging
-    title: Enable logging
 
 - caption: Samples
   entries:
-  - url: https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocfft/clients/samples
+  - url: https://github.com/ROCm/rocFFT/tree/develop/clients/samples
     title: GitHub client examples 
 
 - caption: API reference

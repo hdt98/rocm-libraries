@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,19 +35,15 @@
 // Parse YAML data
 static std::string hipblas_parse_yaml(const std::string& yaml)
 {
-#ifdef WIN32
-    // Explicitly run via `python.exe`, without relying on the .py file being
-    // treated as an executable that should be run via the python interpreter.
-    std::string python_command_launcher = "python ";
-#else
-    // Rely on the shebang in the file, e.g. `#!/usr/bin/env python3`.
-    std::string python_command_launcher = "";
-#endif
-
     std::string tmp     = hipblas_tempname();
     auto        exepath = hipblas_exepath();
-    auto        cmd = python_command_launcher + exepath + "hipblas_gentest.py --template " + exepath
+#ifdef HIPBLAS_V2
+    auto cmd = exepath + "hipblas_gentest.py --hipblas_v2 --template " + exepath
                + "hipblas_template.yaml -o " + tmp + " " + yaml;
+#else
+    auto cmd = exepath + "hipblas_gentest.py --template " + exepath + "hipblas_template.yaml -o "
+               + tmp + " " + yaml;
+#endif
     std::cerr << cmd << std::endl;
 
 #ifdef WIN32
@@ -55,7 +51,7 @@ static std::string hipblas_parse_yaml(const std::string& yaml)
     if(status == -1)
         exit(EXIT_FAILURE);
 #else
-    int         status                  = system(cmd.c_str());
+    int status = system(cmd.c_str());
     if(status == -1 || !WIFEXITED(status) || WEXITSTATUS(status))
         exit(EXIT_FAILURE);
 #endif

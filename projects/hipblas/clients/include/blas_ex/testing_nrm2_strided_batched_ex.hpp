@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -52,9 +52,9 @@ void testing_nrm2_strided_batched_ex_bad_arg(const Arguments& arg)
 
     hipblasStride stridex = N * incx;
 
-    hipDataType xType         = arg.a_type;
-    hipDataType resultType    = arg.b_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t xType         = arg.a_type;
+    hipblasDatatype_t resultType    = arg.b_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     hipblasLocalHandle handle(arg);
 
@@ -134,9 +134,9 @@ void testing_nrm2_strided_batched_ex(const Arguments& arg)
 
     hipblasStride stridex = N * incx * stride_scale;
 
-    hipDataType xType         = arg.a_type;
-    hipDataType resultType    = arg.b_type;
-    hipDataType executionType = arg.compute_type;
+    hipblasDatatype_t xType         = arg.a_type;
+    hipblasDatatype_t resultType    = arg.b_type;
+    hipblasDatatype_t executionType = arg.compute_type;
 
     hipblasLocalHandle handle(arg);
 
@@ -186,7 +186,7 @@ void testing_nrm2_strided_batched_ex(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dx.memcheck());
     CHECK_DEVICE_ALLOCATION(d_hipblas_result.memcheck());
 
-    double gpu_time_used{0}, hipblas_error_host{0}, hipblas_error_device{0};
+    double gpu_time_used, hipblas_error_host, hipblas_error_device;
 
     // Initial Data on CPU
     hipblas_init_vector(hx, arg, hipblas_client_alpha_sets_nan, true);
@@ -237,8 +237,7 @@ void testing_nrm2_strided_batched_ex(const Arguments& arg)
             ref_nrm2<Tx, Tr>(N, hx[b], incx, &(h_cpu_result[b]));
         }
 
-        double abs_result
-            = (float)h_cpu_result[0] > 0.0f ? (double)h_cpu_result[0] : (double)-h_cpu_result[0];
+        double abs_result = h_cpu_result[0] > 0 ? h_cpu_result[0] : -h_cpu_result[0];
         double abs_error;
 
         abs_error = abs_result > 0 ? hipblas_type_epsilon<Tr> * N * abs_result

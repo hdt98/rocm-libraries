@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,21 +20,16 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from rocisa import rocIsa
-from rocisa.code import Module
-from rocisa.container import vgpr, sgpr,SDWAModifiers, VOP3PModifiers
-from rocisa.enum import DataTypeEnum, SelectBit, UnusedBit, SaturateCastType
-from rocisa.instruction import VAdd3U32, VCvtF32toF16, VLShiftRightB32, \
+from ..TensileInstructions import Module, SDWAModifiers, SelectBit, UnusedBit, \
+                            SaturateCastType, VSaturateCastInt, \
+                            VAdd3U32, VCvtF32toF16, VLShiftRightB32, \
                             VCmpUF32, VCndMaskB32, VCvtPkF32toFP8, VCvtPkF32toBF8, \
-                            VCmpClassF32, VOrB32, VPackF16toB32, \
+                            VOP3PModifiers, VCmpClassF32, VOrB32, VPackF16toB32, \
                             VAndOrB32, VBfeU32, VLShiftLeftB16, SNop, VMed3F32, \
-                            VCvtPkF32toBF16, VCvtPkF32toF16, VAndB32, \
+                            vgpr, sgpr, DataType, TensileInstructions, VCvtPkF32toBF16, VAndB32, \
                             VMovB32, VLShiftLeftB32
-from rocisa.functions import VSaturateCastInt
 
-from ..Common.DataType import DataType
 from ..Component import PackData
-from rocisa.instruction import ECvtF32toF16
 
 def formatting(idx, inputPrefix, prefixOffset):
     if inputPrefix:
@@ -43,44 +38,35 @@ def formatting(idx, inputPrefix, prefixOffset):
         return idx
 
 class PackData_F16(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Half)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.half)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, tmpVgpr=None, inputPrefix="", prefixOffset=0):
         module = Module("PackData F16")
-        ti = rocIsa.getInstance()
         if gwvw == 1:
             formatVgpr = formatting(elementSumIdx, inputPrefix, prefixOffset)
-            module.add(ECvtF32toF16(dst=vgpr(destIdx), src=vgpr(formatVgpr), comment="convert C to fp16"))
+            module.add(VCvtF32toF16(dst=vgpr(destIdx), src=vgpr(formatVgpr), comment="convert C to fp16"))
             return module
 
         assert (gwvw % 2 == 0)
         for vi in range(0, gwvw):
             sumIdxV = elementSumIdx + vi
             formatVgpr = formatting(sumIdxV, inputPrefix, prefixOffset)
-            formatVgpr_1 = formatting(sumIdxV - 1, inputPrefix, prefixOffset)
             if tmpVgpr:
                 tmpDst   = tmpVgpr + vi
                 tmpDst_1 = tmpVgpr + vi - 1
             else:
                 tmpDst   = formatVgpr
                 tmpDst_1 = formatting(sumIdxV-1, inputPrefix, prefixOffset)
-
-            if ti.getAsmCaps()["HasPkF16CVT"]:
-                # VCvtPkF32toF16: convert and pack a pair of elements by one instruction
-                if vi%2 == 1:
-                    d = destIdx + vi//2
-                    module.add(VCvtPkF32toF16(dst=vgpr(d), src0=vgpr(formatVgpr_1), src1=vgpr(formatVgpr), comment="convert C to fp16 and pack with neighbor"))
-            else:
-                module.add(ECvtF32toF16(dst=vgpr(tmpDst), src=vgpr(formatVgpr), comment="convert C to fp16"))
-                if vi%2 == 1:
-                    d = destIdx + vi//2
-                    module.add(VPackF16toB32(dst=vgpr(d), src0=vgpr(tmpDst_1), src1=vgpr(tmpDst), \
-                            comment="Pack with neighbor"))
+            module.add(VCvtF32toF16(dst=vgpr(tmpDst), src=vgpr(formatVgpr), comment="convert C to fp16"))
+            if vi%2 == 1:
+                d = destIdx + vi//2
+                module.add(VPackF16toB32(dst=vgpr(d), src0=vgpr(tmpDst_1), src1=vgpr(tmpDst), \
+                          comment="Pack with neighbor"))
         return module
 
 class PackData_BF16(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.BFloat16)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.bfloat16)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, bf16CVTVgprStruct, tmpS01, laneSGPRC, tmpVgpr=None, inputPrefix="", prefixOffset=0):
-        ti = rocIsa.getInstance()
+        ti = TensileInstructions()
 
         module = Module("PackData BF16")
         if gwvw == 1:
@@ -113,10 +99,13 @@ class PackData_BF16(PackData):
                 tmpDst_1 = formatting(sumIdxV-1, inputPrefix, prefixOffset)
 
             if ti.getAsmCaps()["HasBF16CVT"]:
+#                module.add(VCvtF32toBF16(dst=vgpr(tmpDst), src=vgpr(formatVgpr), comment="convert C to bf16"))
                 if vi%2 == 1:
                     d = destIdx + vi//2
                     module.add(VCvtPkF32toBF16(dst=vgpr(d), src0=vgpr(tmpDst_1), src1=vgpr(tmpDst), \
                                 comment="convert C to bf16 and Pack with neighbor"))
+#                    module.add(VAndOrB32(dst=vgpr(d), src0=vgpr(tmpDst), src1=vgpr(vgprBf16Mask), src2=vgpr(tmpDst_1), comment="pack two bf16 to dword"))
+
             else:
                 vgprBf16Temp = bf16CVTVgprStruct.vgprBf16Temp
                 vgprBf16Inc = bf16CVTVgprStruct.vgprBf16Inc
@@ -136,7 +125,7 @@ class PackData_BF16(PackData):
         return module
 
 class PackData_FLOAT8(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Float8)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.float8)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, tmpS01, laneSGPRC, inputPrefix="", prefixOffset=0):
         vgprFp8NanInf = fp8CVTVgprStruct.vgprFp8NanInf
         vgprFp8Temp   = fp8CVTVgprStruct.vgprFp8Temp
@@ -166,7 +155,7 @@ class PackData_FLOAT8(PackData):
         return module
 
 class PackData_FLOAT8_fnuz(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Float8_fnuz)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.float8_fnuz)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, tmpS01, laneSGPRC, inputPrefix="", prefixOffset=0):
         vgprFp8NanInf = fp8CVTVgprStruct.vgprFp8NanInf
         vgprFp8Temp   = fp8CVTVgprStruct.vgprFp8Temp
@@ -196,7 +185,7 @@ class PackData_FLOAT8_fnuz(PackData):
         return module
 
 class PackData_BF8(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.BFloat8)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.bfloat8)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, bf8CVTVgprStruct, tmpS01, laneSGPRC, inputPrefix="", prefixOffset=0):
         vgprBF8NanInf = bf8CVTVgprStruct.vgprBF8NanInf
         vgprBF8Temp   = bf8CVTVgprStruct.vgprBF8Temp
@@ -227,7 +216,7 @@ class PackData_BF8(PackData):
         return module
 
 class PackData_BF8_fnuz(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.BFloat8_fnuz)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.bfloat8_fnuz)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, bf8CVTVgprStruct, tmpS01, laneSGPRC, inputPrefix="", prefixOffset=0):
         vgprBF8NanInf = bf8CVTVgprStruct.vgprBF8NanInf
         vgprBF8Temp   = bf8CVTVgprStruct.vgprBF8Temp
@@ -258,14 +247,14 @@ class PackData_BF8_fnuz(PackData):
         return module
 
 class PackData_INT8(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Int32), "DestDataType": DataType(DataTypeEnum.Int8)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.int32), "DestDataType": DataType(DataType.int8)}}
     def __call__(self, gwvw, destIdx, elementSumIdx, i8CVTVgprStruct, tmpS01, SaturateTypeInt8 = SaturateCastType.NORMAL, inputPrefix="", prefixOffset=0):
         vgprI8Mask0 = i8CVTVgprStruct.vgprI8Mask0
         vgprI8Mask1 = i8CVTVgprStruct.vgprI8Mask1
         vgprI8Temp0 = i8CVTVgprStruct.vgprI8Temp0
         vgprI8Temp1 = i8CVTVgprStruct.vgprI8Temp1
 
-        ti = rocIsa.getInstance()
+        ti = TensileInstructions()
         module = Module("PackData int8")
         gwvw4 = (gwvw // 4) * 4
         for vi in range(0, gwvw4):
@@ -279,7 +268,7 @@ class PackData_INT8(PackData):
                 module.add(VLShiftLeftB16(dst=vgpr(formatting(sumIdxV-2, inputPrefix, prefixOffset)), shiftHex=8, src=vgpr(formatting(sumIdxV-2, inputPrefix, prefixOffset))))
                 module.add(VLShiftLeftB16(dst=vgpr(formatting(sumIdxV-0, inputPrefix, prefixOffset)), shiftHex=8, src=vgpr(formatting(sumIdxV-0, inputPrefix, prefixOffset))))
                 if ti.getArchCaps()["NoSDWA"]:
-                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFF", comment="bits 7:0")) # src0_sel=SelectBit.BYTE_0
+                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFF", "bits 7:0")) # src0_sel=SelectBit.BYTE_0
                     module.add(VAndB32(dst=vgpr(vgprI8Temp0), src0=vgpr(formatting(sumIdxV-3, inputPrefix, prefixOffset)), \
                                        src1=vgpr(vgprI8Mask0)))
                     module.add(VOrB32(dst=vgpr(formatting(sumIdxV-3, inputPrefix, prefixOffset)), src0=vgpr(vgprI8Temp0), \
@@ -293,7 +282,7 @@ class PackData_INT8(PackData):
                 if ti.getArchCaps()["SDWAWait"]:
                     module.add(SNop(waitState=0, comment="1 wait states"))
                 if ti.getArchCaps()["NoSDWA"]:
-                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFF", comment="bits 7:0")) # src0_sel=SelectBit.BYTE_0
+                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFF", "bits 7:0")) # src0_sel=SelectBit.BYTE_0
                     module.add(VAndB32(dst=vgpr(vgprI8Temp0), src0=vgpr(formatting(sumIdxV-1, inputPrefix, prefixOffset)), \
                                        src1=vgpr(vgprI8Mask0)))
                     module.add(VOrB32(dst=vgpr(formatting(sumIdxV-2, inputPrefix, prefixOffset)), src0=vgpr(vgprI8Temp0), src1=vgpr(formatVgpr), sdwa=None))
@@ -306,7 +295,7 @@ class PackData_INT8(PackData):
                 if ti.getArchCaps()["SDWAWait"]:
                     module.add(SNop(waitState=0, comment="1 wait states"))
                 if ti.getArchCaps()["NoSDWA"]:
-                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFFFF", comment="bits 15:0")) # src0_sel=SelectBit.WORD_0
+                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFFFF", "bits 15:0")) # src0_sel=SelectBit.WORD_0
                     module.add(VAndB32(dst=vgpr(vgprI8Temp0), src0=vgpr(formatting(sumIdxV-3, inputPrefix, prefixOffset)), \
                                        src1=vgpr(vgprI8Mask0)))
                     module.add(VOrB32(dst=vgpr(d), src0=vgpr(vgprI8Temp0), \
@@ -329,7 +318,7 @@ class PackData_INT8(PackData):
                     module.add(VSaturateCastInt(vgpr(formatting(sumIdxV-i, inputPrefix, prefixOffset)), vgprI8Temp0, tmpS01, -128, 127, type=SaturateTypeInt8, initGpr=(i%2 == 1)))
                 module.add(VLShiftLeftB16(dst=vgpr(formatVgpr), shiftHex=8, src=vgpr(formatVgpr)))
                 if ti.getArchCaps()["NoSDWA"]:
-                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFF", comment="bits 7:0")) # src0_sel=SelectBit.BYTE_0
+                    module.add(VMovB32(vgpr(vgprI8Mask0), "0xFF", "bits 7:0")) # src0_sel=SelectBit.BYTE_0
                     module.add(VAndB32(dst=vgpr(vgprI8Temp0), src0=vgpr(formatting(sumIdxV-1, inputPrefix, prefixOffset)), \
                                        src1=vgpr(vgprI8Mask0)))
                     module.add(VOrB32(dst=vgpr(formatting(sumIdxV-1, inputPrefix, prefixOffset)), \
@@ -348,7 +337,7 @@ class PackData_INT8(PackData):
 
 # Cvt is outside of this component, this is just a wrapper for ComputeDataType == float
 class PackData_INT8_F32(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Int8)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataType.single), "DestDataType": DataType(DataType.int8)}}
     packdata = PackData_INT8()
     def __call__(self, gwvw, destIdx, elementSumIdx, i8CVTVgprStruct, tmpS01, SaturateTypeInt8 = SaturateCastType.NORMAL, inputPrefix="", prefixOffset=0):
         return self.packdata(gwvw, destIdx, elementSumIdx, i8CVTVgprStruct, tmpS01, SaturateTypeInt8, inputPrefix, prefixOffset)

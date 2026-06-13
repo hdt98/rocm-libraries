@@ -1,11 +1,10 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #include "ck/ck.hpp"
 
-#include "ck/utility/data_type.hpp"
 #include "ck/library/utility/host_tensor.hpp"
 #include "ck/library/utility/device_memory.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
@@ -74,11 +73,7 @@ struct mfma_scale_type_selector<16, 16>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::mfma_scale_f32_16x16x128f8f6f4>{};
-        op.template run<16, 16, 0, 0>(fragA,
-                                      ck::utils::get_exponent_value(scale_a[Number<0>{}]),
-                                      fragB,
-                                      ck::utils::get_exponent_value(scale_b[Number<0>{}]),
-                                      fragAcc);
+        op.template run<16, 16>(fragA, scale_a[Number<0>{}], fragB, scale_b[Number<0>{}], fragAcc);
     }
 };
 
@@ -97,11 +92,7 @@ struct mfma_scale_type_selector<32, 32>
                                AccumFragT& fragAcc)
     {
         auto op = mfma_type<MfmaInstr::mfma_scale_f32_32x32x64f8f6f4>{};
-        op.template run<32, 32, 0, 0>(fragA,
-                                      ck::utils::get_exponent_value(scale_a[Number<0>{}]),
-                                      fragB,
-                                      ck::utils::get_exponent_value(scale_b[Number<0>{}]),
-                                      fragAcc);
+        op.template run<32, 32>(fragA, scale_a[Number<0>{}], fragB, scale_b[Number<0>{}], fragAcc);
     }
 };
 
@@ -120,7 +111,7 @@ template <typename AType, typename AFragT, int32_t BLOCK_M, int32_t BLOCK_K>
 __device__ AFragT load_A_col_major(AType const* input_ptr)
 {
     // clang-format off
-    // Register Mapping for 16x128 for FP8:                                                ||    Register Mapping for 32x64 for FP8:
+    // Register Mapping for 16x128:                                                        ||    Register Mapping for 32x64:
     // Size              |   BLOCK_M  |   BLOCK_M   |   BLOCK_M  |   BLOCK_M   |           ||    Size              |   BLOCK_M  |   BLOCK_M   |        |
     // M                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    M                 | 0  ...  31 |  0  ...  31 | Vector |
     // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
@@ -159,8 +150,6 @@ __device__ AFragT load_A_col_major(AType const* input_ptr)
     // Reg 7 [24:31]     |     K79    |     K95     |     K111   |     K127    |  v[31]    ||    Reg 7 [24:31]     |     K47    |     K63     |  v[31] |
     // clang-format on
 
-    static_assert(!is_packed_type_v<AType>, "Packed type is not supported");
-
     static constexpr int32_t WAVE_SIZE = 64;
 
     // Here we want to load from rows of A in chunks of 16 elements each.
@@ -188,18 +177,12 @@ __device__ AFragT load_A_col_major(AType const* input_ptr)
     auto kMajorOffset = col_major(majorStepCoord2D, BLOCK_M);
 
     using ARawT        = typename scalar_type<AFragT>::type;
-    using AScalarFragT = typename vector_type<
-        ARawT,
-        BLOCK_M * BLOCK_K / WAVE_SIZE /
-            (ck::is_same_v<ck::remove_cvref_t<AType>, ck::f4x2_pk_t> ? 2 : 1)>::type;
+    using AScalarFragT = vector_type<ARawT, vectorSize(AFragT{})>::type;
 
     AScalarFragT fragA{};
 
-    constexpr index_t num_chunks =
-        (ck::is_same_v<ck::remove_cvref_t<AType>, ck::f4x2_pk_t> ? 1 : 2);
-
 #pragma unroll
-    for(int chunk = 0; chunk < num_chunks; chunk++)
+    for(int chunk = 0; chunk < 2; chunk++)
     {
 #pragma unroll
         for(uint32_t i = 0; i < chunk_size; i++)
@@ -258,50 +241,12 @@ __device__ AFragT load_A_row_major(AType const* input_ptr)
     // Reg 7 [8:15]      |     K77    |     K93     |     K109   |     K125    |  v[29]    ||    Reg 7 [8:15]      |     K45    |     K61     |  v[29] |
     // Reg 7 [16:23]     |     K78    |     K94     |     K110   |     K126    |  v[30]    ||    Reg 7 [16:23]     |     K46    |     K62     |  v[30] |
     // Reg 7 [24:31]     |     K79    |     K95     |     K111   |     K127    |  v[31]    ||    Reg 7 [24:31]     |     K47    |     K63     |  v[31] |
-
-    // Register Mapping for 16x128 for FP4:                                                ||    Register Mapping for 32x64 for FP4:
-    // Size              |   BLOCK_M  |   BLOCK_M   |   BLOCK_M  |   BLOCK_M   |           ||    Size              |   BLOCK_M  |   BLOCK_M   |        |
-    // M                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    M                 | 0  ...  31 |  0  ...  31 | Vector |
-    // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
-    // Register Element  |------------|-------------|------------|-------------|-----------||    Register Element  |------------|-------------|--------|
-    // Reg 0 [0:7]       |     K0K1   |     K32K33  |     K64K65 |    K96K97   |  v[0]     ||    Reg 0 [0:7]       |     K0K1   |     K32K33  |  v[0]  |
-    // Reg 0 [8:15]      |     K2K3   |     K34K35  |     K66K67 |    K98K99   |  v[1]     ||    Reg 0 [8:15]      |     K2K3   |     K34K35  |  v[1]  |
-    // Reg 0 [16:23]     |     K4K5   |     K36K37  |     K68K69 |    K100K101 |  v[2]     ||    Reg 0 [16:23]     |     K4K5   |     K36K37  |  v[2]  |
-    // Reg 0 [24:31]     |     K6K7   |     K38K39  |     K70K71 |    K102K103 |  v[3]     ||    Reg 0 [24:31]     |     K6K7   |     K38K39  |  v[3]  |
-    // Reg 1 [0:7]       |     K8K9   |     K40K41  |     K72K73 |    K104K105 |  v[4]     ||    Reg 1 [0:7]       |     K8K9   |     K40K41  |  v[4]  |
-    // Reg 1 [8:15]      |     K10K11 |     K42K43  |     K74K75 |    K106K107 |  v[5]     ||    Reg 1 [8:15]      |     K10K11 |     K42K43  |  v[5]  |
-    // Reg 1 [16:23]     |     K12K13 |     K44K45  |     K76K77 |    K108K109 |  v[6]     ||    Reg 1 [16:23]     |     K12K13 |     K44K45  |  v[6]  |
-    // Reg 1 [24:31]     |     K14K15 |     K46K47  |     K78K79 |    K110K111 |  v[7]     ||    Reg 1 [24:31]     |     K14K15 |     K46K47  |  v[7]  |
-    // Reg 2 [0:7]       |     K16K17 |     K48K49  |     K80K81 |    K112K113 |  v[8]     ||    Reg 2 [0:7]       |     K16K17 |     K48K49  |  v[8]  |
-    // Reg 2 [8:15]      |     K18K19 |     K50K51  |     K82K83 |    K114K115 |  v[9]     ||    Reg 2 [8:15]      |     K18K19 |     K50K51  |  v[9]  |
-    // Reg 2 [16:23]     |     K20K21 |     K52K53  |     K84K85 |    K116K117 |  v[10]    ||    Reg 2 [16:23]     |     K20K21 |     K52K53  |  v[10] |
-    // Reg 2 [24:31]     |     K22K23 |     K54K55  |     K86K87 |    K118K119 |  v[11]    ||    Reg 2 [24:31]     |     K22K23 |     K54K55  |  v[11] |
-    // Reg 3 [0:7]       |     K24K25 |     K56K57  |     K88K89 |    K120K121 |  v[12]    ||    Reg 3 [0:7]       |     K24K25 |     K56K57  |  v[12] |
-    // Reg 3 [8:15]      |     K26K27 |     K58K59  |     K90K91 |    K122K123 |  v[13]    ||    Reg 3 [8:15]      |     K26K27 |     K58K59  |  v[13] |
-    // Reg 3 [16:23]     |     K28K29 |     K60K61  |     K92K93 |    K124K125 |  v[14]    ||    Reg 3 [16:23]     |     K28K29 |     K60K61  |  v[14] |
-    // Reg 3 [24:31]     |     K30K31 |     K62K63  |     K94K95 |    K126K127 |  v[15]    ||    Reg 3 [24:31]     |     K30K31 |     K62K63  |  v[15] |
-
-
-    // Register Mapping for 16x128 for FP6:                                                ||    Register Mapping for 32x64 for FP6:
-    // Size              |   BLOCK_M  |   BLOCK_M   |   BLOCK_M  |   BLOCK_M   |           ||    Size              |   BLOCK_M  |   BLOCK_M   |        |
-    // M                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    M                 | 0  ...  31 |  0  ...  31 | Vector |
-    // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
-    // Register Element  |------------|-------------|------------|-------------|-----------||    Register Element  |------------|-------------|--------|
-    // Reg 0-2 [0:95]    | K =  0-15  |  K = 32-47  |  K = 64-79 | K = 96-111  |  v[0]     ||    Reg 0-2 [0:95]    | K =  0-15  |  K = 32-47  |  v[0]  |
-    // Reg 3-5 [0:95]    | K = 16-31  |  K = 48-63  |  K = 80-95 | K = 112-127 |  v[0]     ||    Reg 3-5 [0:95]    | K = 16-31  |  K = 48-63  |  v[0]  |
-
     // clang-format on
 
     static constexpr int32_t WAVE_SIZE = 64;
 
-    // FP8 chunk_size = 16, num_chunks = 2, packed_size = 1
-    // FP4 chunk_size = 32, num_chunks = 1, packed_size = 2
-    // FP6 chunk_size = 32, num_chunks = 1, packed_size = 32
-
-    constexpr index_t num_chunks = is_packed_type_v<AType> ? 1 : 2;
-
     // Here we want to load from rows of A in chunks of 16 elements each.
-    constexpr uint32_t chunk_size = is_packed_type_v<AType> ? 32 : 16;
+    static constexpr uint32_t chunk_size = 16;
 
     // each chunk is separated by offset
     static constexpr uint32_t chunk_offset = chunk_size * WAVE_SIZE / BLOCK_M;
@@ -309,38 +254,34 @@ __device__ AFragT load_A_row_major(AType const* input_ptr)
     // To start the loading process, let's visualize in 2D coords.
     // Each thread will load 32 elements.
     // We need to know where they start, and where the next elements are.
-    // FP8/6/4 Row {0-31}  |  {0-15}
-    // FP8     Col {0, 16} |  {0, 16, 32, 48}
-    // FP6/4   Col {0, 32} |  {0, 32, 64, 96}
-    auto startCoord2D = std::make_pair(threadIdx.x % BLOCK_M, (threadIdx.x / BLOCK_M) * chunk_size);
+    auto startCoord2D =
+        std::make_pair(threadIdx.x % BLOCK_M,                 // Row {0-31}  |  {0-15}
+                       (threadIdx.x / BLOCK_M) * chunk_size); // Col {0, 16} |  {0, 16, 32, 48}
 
+    // auto minorStepCoord2D = std::make_pair(0u, 1u);          // read rows
     auto majorStepCoord2D = std::make_pair(0, chunk_offset); // read a chunk from a row
 
     // Flatten to 1D row_major offsets.
     auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
 
-    using ARawT = typename scalar_type<AFragT>::type;
-    using AScalarChunkT =
-        typename vector_type<ARawT, scalar_type<AFragT>::vector_size / num_chunks>::type;
+    // BLOCK_K is a stride in A matrix
+    auto startOffset = row_major(startCoord2D, BLOCK_K);
+    // auto kMinorOffset = row_major(minorStepCoord2D, BLOCK_K);
+    auto kMajorOffset = row_major(majorStepCoord2D, BLOCK_K);
+
+    using ARawT        = typename scalar_type<AFragT>::type;
+    using AScalarFragT = vector_type<ARawT, chunk_size>::type;
 
     union
     {
         AFragT frag;
-        AScalarChunkT chunks[num_chunks];
+        AScalarFragT chunks[2];
     } fragA{};
 
-    const AScalarChunkT* fragPtr;
-
-    // BLOCK_K is a stride in A matrix
-    auto startOffset  = row_major(startCoord2D, BLOCK_K) / packed_size_v<AType>;
-    auto kMajorOffset = row_major(majorStepCoord2D, BLOCK_K) / packed_size_v<AType>;
-
-    for(index_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++)
-    {
-        fragPtr                 = reinterpret_cast<AScalarChunkT const*>(input_ptr + startOffset +
-                                                         chunk_idx * kMajorOffset);
-        fragA.chunks[chunk_idx] = *fragPtr;
-    }
+    auto* fragPtr   = reinterpret_cast<AScalarFragT const*>(input_ptr + startOffset);
+    fragA.chunks[0] = *fragPtr;
+    fragPtr         = reinterpret_cast<AScalarFragT const*>(input_ptr + startOffset + kMajorOffset);
+    fragA.chunks[1] = *fragPtr;
 
     return fragA.frag;
 }
@@ -361,74 +302,52 @@ __device__ AFragT load_mx_A_row_major(AType const* input_ptr,
                                       ScaleFragT& fragX)
 {
     // clang-format off
-    // Register Mapping for 16x128:                                                        ||    Register Mapping for 32x64:
-    // Size              |   BLOCK_M  |   BLOCK_M   |   BLOCK_M  |   BLOCK_M   |           ||    Size              |   BLOCK_M  |   BLOCK_M   |        |
-    // M                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    M                 | 0  ...  31 |  0  ...  31 | Vector |
-    // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
-    // Register           ------------ -------------|------------ -------------|-----------||    Register          |------------|-------------|--------|
-    // Scale Element     |   x(M,0)   |    x(M,1)   |   x(M,2)   |    x(M,3)   |  v[0]     ||    Scale Element     |   x(M,0)   |   x(M,1)    |        |
-    // Register Element   ------------ -------------|------------ -------------|-----------||    Register Element  |------------|-------------|--------|
-    // Reg 0 [0:7]       |     K0     |     K16     |     K32    |     K48     |  v[0]     ||    Reg 0 [0:7]       |     K0     |     K16     |  v[0]  |
-    // Reg 0 [8:15]      |     K1     |     K17     |     K33    |     K49     |  v[1]     ||    Reg 0 [8:15]      |     K1     |     K17     |  v[1]  |
-    // Reg 0 [16:23]     |     K2     |     K18     |     K34    |     K50     |  v[2]     ||    Reg 0 [16:23]     |     K2     |     K18     |  v[2]  |
-    // Reg 0 [24:31]     |     K3     |     K19     |     K35    |     K51     |  v[3]     ||    Reg 0 [24:31]     |     K3     |     K19     |  v[3]  |
-    // Reg 1 [0:7]       |     K4     |     K20     |     K36    |     K52     |  v[4]     ||    Reg 1 [0:7]       |     K4     |     K20     |  v[4]  |
-    // Reg 1 [8:15]      |     K5     |     K21     |     K37    |     K53     |  v[5]     ||    Reg 1 [8:15]      |     K5     |     K21     |  v[5]  |
-    // Reg 1 [16:23]     |     K6     |     K22     |     K38    |     K54     |  v[6]     ||    Reg 1 [16:23]     |     K6     |     K22     |  v[6]  |
-    // Reg 1 [24:31]     |     K7     |     K23     |     K39    |     K55     |  v[7]     ||    Reg 1 [24:31]     |     K7     |     K23     |  v[7]  |
-    // Reg 2 [0:7]       |     K8     |     K24     |     K40    |     K56     |  v[8]     ||    Reg 2 [0:7]       |     K8     |     K24     |  v[8]  |
-    // Reg 2 [8:15]      |     K9     |     K25     |     K41    |     K57     |  v[9]     ||    Reg 2 [8:15]      |     K9     |     K25     |  v[9]  |
-    // Reg 2 [16:23]     |     K10    |     K26     |     K42    |     K58     |  v[10]    ||    Reg 2 [16:23]     |     K10    |     K26     |  v[10] |
-    // Reg 2 [24:31]     |     K11    |     K27     |     K43    |     K59     |  v[11]    ||    Reg 2 [24:31]     |     K11    |     K27     |  v[11] |
-    // Reg 3 [0:7]       |     K12    |     K28     |     K44    |     K60     |  v[12]    ||    Reg 3 [0:7]       |     K12    |     K28     |  v[12] |
-    // Reg 3 [8:15]      |     K13    |     K29     |     K45    |     K61     |  v[13]    ||    Reg 3 [8:15]      |     K13    |     K29     |  v[13] |
-    // Reg 3 [16:23]     |     K14    |     K30     |     K46    |     K62     |  v[14]    ||    Reg 3 [16:23]     |     K14    |     K30     |  v[14] |
-    // Reg 3 [24:31]     |     K15    |     K31     |     K47    |     K63     |  v[15]    ||    Reg 3 [24:31]     |     K15    |     K31     |  v[15] |
-    // Reg 4 [0:7]       |     K64    |     K80     |     K96    |     K112    |  v[16]    ||    Reg 4 [0:7]       |     K32    |     K48     |  v[16] |
-    // Reg 4 [8:15]      |     K65    |     K81     |     K97    |     K113    |  v[17]    ||    Reg 4 [8:15]      |     K33    |     K49     |  v[17] |
-    // Reg 4 [16:23]     |     K66    |     K82     |     K98    |     K114    |  v[18]    ||    Reg 4 [16:23]     |     K34    |     K50     |  v[18] |
-    // Reg 4 [24:31]     |     K67    |     K83     |     K99    |     K115    |  v[19]    ||    Reg 4 [24:31]     |     K35    |     K51     |  v[19] |
-    // Reg 5 [0:7]       |     K68    |     K84     |     K100   |     K116    |  v[20]    ||    Reg 5 [0:7]       |     K36    |     K52     |  v[20] |
-    // Reg 5 [8:15]      |     K69    |     K85     |     K101   |     K117    |  v[21]    ||    Reg 5 [8:15]      |     K37    |     K53     |  v[21] |
-    // Reg 5 [16:23]     |     K70    |     K86     |     K102   |     K118    |  v[22]    ||    Reg 5 [16:23]     |     K38    |     K54     |  v[22] |
-    // Reg 5 [24:31]     |     K71    |     K87     |     K103   |     K119    |  v[23]    ||    Reg 5 [24:31]     |     K39    |     K55     |  v[23] |
-    // Reg 6 [0:7]       |     K72    |     K88     |     K104   |     K120    |  v[24]    ||    Reg 6 [0:7]       |     K40    |     K56     |  v[24] |
-    // Reg 6 [8:15]      |     K73    |     K89     |     K105   |     K121    |  v[25]    ||    Reg 6 [8:15]      |     K41    |     K57     |  v[25] |
-    // Reg 6 [16:23]     |     K74    |     K90     |     K106   |     K122    |  v[26]    ||    Reg 6 [16:23]     |     K42    |     K58     |  v[26] |
-    // Reg 6 [24:31]     |     K75    |     K91     |     K107   |     K123    |  v[27]    ||    Reg 6 [24:31]     |     K43    |     K59     |  v[27] |
-    // Reg 7 [0:7]       |     K76    |     K92     |     K108   |     K124    |  v[28]    ||    Reg 7 [0:7]       |     K44    |     K60     |  v[28] |
-    // Reg 7 [8:15]      |     K77    |     K93     |     K109   |     K125    |  v[29]    ||    Reg 7 [8:15]      |     K45    |     K61     |  v[29] |
-    // Reg 7 [16:23]     |     K78    |     K94     |     K110   |     K126    |  v[30]    ||    Reg 7 [16:23]     |     K46    |     K62     |  v[30] |
-    // Reg 7 [24:31]     |     K79    |     K95     |     K111   |     K127    |  v[31]    ||    Reg 7 [24:31]     |     K47    |     K63     |  v[31] |
-
-    // Register Mapping for 16x128 for FP4:                                                                                            ||    Register Mapping for 32x64 for FP4:
-    // Size              |   BLOCK_M  |          |   BLOCK_M   |          |   BLOCK_M  |          |   BLOCK_M   |          |           ||    Size              |   BLOCK_M  |          |   BLOCK_M   |          |        |
-    // M                 | 0  ...  15 |          |  0  ...  15 |          | 0  ...  15 |          |  0  ...  15 |          | Vector    ||    M                 | 0  ...  31 |          |  0  ...  31 |          | Vector |
-    // Thread Id         | 0  ...  15 |  Scale   | 16  ...  31 |  Scale   | 32  ... 47 |  Scale   | 48  ...  63 |  Scale   | Element   ||    Thread Id         | 0  ...  31 |  Scale   | 32  ...  63 |  Scale   | Element|
-    // Register Element  |------------ ----------|------------- ----------|------------ ----------|------------- ----------|-----------||    Register Element  |------------|----------|-------------|----------|--------|
-    // Reg 0 [0:7]       |     K0K1   |  x(M,0)  |     K32K33  |  x(M,1)  |     K64K65 |  x(M,2)  |    K96K97   |  x(M,3)  |  v[0]     ||    Reg 0 [0:7]       |     K0K1   |  x(M,0)  |     K32K33  |  x(M,1)  |  v[0]  |
-    // Reg 0 [8:15]      |     K2K3   |  x(M,0)  |     K34K35  |  x(M,1)  |     K66K67 |  x(M,2)  |    K98K99   |  x(M,3)  |  v[1]     ||    Reg 0 [8:15]      |     K2K3   |  x(M,0)  |     K34K35  |  x(M,1)  |  v[1]  |
-    // Reg 0 [16:23]     |     K4K5   |  x(M,0)  |     K36K37  |  x(M,1)  |     K68K69 |  x(M,2)  |    K100K101 |  x(M,3)  |  v[2]     ||    Reg 0 [16:23]     |     K4K5   |  x(M,0)  |     K36K37  |  x(M,1)  |  v[2]  |
-    // Reg 0 [24:31]     |     K6K7   |  x(M,0)  |     K38K39  |  x(M,1)  |     K70K71 |  x(M,2)  |    K102K103 |  x(M,3)  |  v[3]     ||    Reg 0 [24:31]     |     K6K7   |  x(M,0)  |     K38K39  |  x(M,1)  |  v[3]  |
-    // Reg 1 [0:7]       |     K8K9   |  x(M,0)  |     K40K41  |  x(M,1)  |     K72K73 |  x(M,2)  |    K104K105 |  x(M,3)  |  v[4]     ||    Reg 1 [0:7]       |     K8K9   |  x(M,0)  |     K40K41  |  x(M,1)  |  v[4]  |
-    // Reg 1 [8:15]      |     K10K11 |  x(M,0)  |     K42K43  |  x(M,1)  |     K74K75 |  x(M,2)  |    K106K107 |  x(M,3)  |  v[5]     ||    Reg 1 [8:15]      |     K10K11 |  x(M,0)  |     K42K43  |  x(M,1)  |  v[5]  |
-    // Reg 1 [16:23]     |     K12K13 |  x(M,0)  |     K44K45  |  x(M,1)  |     K76K77 |  x(M,2)  |    K108K109 |  x(M,3)  |  v[6]     ||    Reg 1 [16:23]     |     K12K13 |  x(M,0)  |     K44K45  |  x(M,1)  |  v[6]  |
-    // Reg 1 [24:31]     |     K14K15 |  x(M,0)  |     K46K47  |  x(M,1)  |     K78K79 |  x(M,2)  |    K110K111 |  x(M,3)  |  v[7]     ||    Reg 1 [24:31]     |     K14K15 |  x(M,0)  |     K46K47  |  x(M,1)  |  v[7]  |
-    // Reg 2 [0:7]       |     K16K17 |  x(M,0)  |     K48K49  |  x(M,1)  |     K80K81 |  x(M,2)  |    K112K113 |  x(M,3)  |  v[8]     ||    Reg 2 [0:7]       |     K16K17 |  x(M,0)  |     K48K49  |  x(M,1)  |  v[8]  |
-    // Reg 2 [8:15]      |     K18K19 |  x(M,0)  |     K50K51  |  x(M,1)  |     K82K83 |  x(M,2)  |    K114K115 |  x(M,3)  |  v[9]     ||    Reg 2 [8:15]      |     K18K19 |  x(M,0)  |     K50K51  |  x(M,1)  |  v[9]  |
-    // Reg 2 [16:23]     |     K20K21 |  x(M,0)  |     K52K53  |  x(M,1)  |     K84K85 |  x(M,2)  |    K116K117 |  x(M,3)  |  v[10]    ||    Reg 2 [16:23]     |     K20K21 |  x(M,0)  |     K52K53  |  x(M,1)  |  v[10] |
-    // Reg 2 [24:31]     |     K22K23 |  x(M,0)  |     K54K55  |  x(M,1)  |     K86K87 |  x(M,2)  |    K118K119 |  x(M,3)  |  v[11]    ||    Reg 2 [24:31]     |     K22K23 |  x(M,0)  |     K54K55  |  x(M,1)  |  v[11] |
-    // Reg 3 [0:7]       |     K24K25 |  x(M,0)  |     K56K57  |  x(M,1)  |     K88K89 |  x(M,2)  |    K120K121 |  x(M,3)  |  v[12]    ||    Reg 3 [0:7]       |     K24K25 |  x(M,0)  |     K56K57  |  x(M,1)  |  v[12] |
-    // Reg 3 [8:15]      |     K26K27 |  x(M,0)  |     K58K59  |  x(M,1)  |     K90K91 |  x(M,2)  |    K122K123 |  x(M,3)  |  v[13]    ||    Reg 3 [8:15]      |     K26K27 |  x(M,0)  |     K58K59  |  x(M,1)  |  v[13] |
-    // Reg 3 [16:23]     |     K28K29 |  x(M,0)  |     K60K61  |  x(M,1)  |     K92K93 |  x(M,2)  |    K124K125 |  x(M,3)  |  v[14]    ||    Reg 3 [16:23]     |     K28K29 |  x(M,0)  |     K60K61  |  x(M,1)  |  v[14] |
-    // Reg 3 [24:31]     |     K30K31 |  x(M,0)  |     K62K63  |  x(M,1)  |     K94K95 |  x(M,2)  |    K126K127 |  x(M,3)  |  v[15]    ||    Reg 3 [24:31]     |     K30K31 |  x(M,0)  |     K62K63  |  x(M,1)  |  v[15] |
+    // Register Mapping for 16x128:                                                                              ||    Register Mapping for 32x64:
+    // Size              |   BLOCK_M  |   BLOCK_M   |          |   BLOCK_M  |   BLOCK_M   |          |           ||    Size              |   BLOCK_M  |   BLOCK_M   |        |          |
+    // M                 | 0  ...  15 |  0  ...  15 |          | 0  ...  15 |  0  ...  15 |          | Vector    ||    M                 | 0  ...  31 |  0  ...  31 | Vector |          |
+    // Thread Id         | 0  ...  15 | 16  ...  31 |  Scale   | 32  ... 47 | 48  ...  63 |  Scale   | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|  Scale   |
+    // Register Element   ------------ ------------- ----------|------------ ------------- ----------|-----------||    Register Element  |------------|-------------|--------|----------|
+    // Reg 0 [0:7]       |     K0     |     K16     |  x(M,0)  |     K32    |     K48     |  x(M,1)  |  v[0]     ||    Reg 0 [0:7]       |     K0     |     K16     |  v[0]  |  x(M,0)  |
+    // Reg 0 [8:15]      |     K1     |     K17     |  x(M,0)  |     K33    |     K49     |  x(M,1)  |  v[1]     ||    Reg 0 [8:15]      |     K1     |     K17     |  v[1]  |  x(M,0)  |
+    // Reg 0 [16:23]     |     K2     |     K18     |  x(M,0)  |     K34    |     K50     |  x(M,1)  |  v[2]     ||    Reg 0 [16:23]     |     K2     |     K18     |  v[2]  |  x(M,0)  |
+    // Reg 0 [24:31]     |     K3     |     K19     |  x(M,0)  |     K35    |     K51     |  x(M,1)  |  v[3]     ||    Reg 0 [24:31]     |     K3     |     K19     |  v[3]  |  x(M,0)  |
+    // Reg 1 [0:7]       |     K4     |     K20     |  x(M,0)  |     K36    |     K52     |  x(M,1)  |  v[4]     ||    Reg 1 [0:7]       |     K4     |     K20     |  v[4]  |  x(M,0)  |
+    // Reg 1 [8:15]      |     K5     |     K21     |  x(M,0)  |     K37    |     K53     |  x(M,1)  |  v[5]     ||    Reg 1 [8:15]      |     K5     |     K21     |  v[5]  |  x(M,0)  |
+    // Reg 1 [16:23]     |     K6     |     K22     |  x(M,0)  |     K38    |     K54     |  x(M,1)  |  v[6]     ||    Reg 1 [16:23]     |     K6     |     K22     |  v[6]  |  x(M,0)  |
+    // Reg 1 [24:31]     |     K7     |     K23     |  x(M,0)  |     K39    |     K55     |  x(M,1)  |  v[7]     ||    Reg 1 [24:31]     |     K7     |     K23     |  v[7]  |  x(M,0)  |
+    // Reg 2 [0:7]       |     K8     |     K24     |  x(M,0)  |     K40    |     K56     |  x(M,1)  |  v[8]     ||    Reg 2 [0:7]       |     K8     |     K24     |  v[8]  |  x(M,0)  |
+    // Reg 2 [8:15]      |     K9     |     K25     |  x(M,0)  |     K41    |     K57     |  x(M,1)  |  v[9]     ||    Reg 2 [8:15]      |     K9     |     K25     |  v[9]  |  x(M,0)  |
+    // Reg 2 [16:23]     |     K10    |     K26     |  x(M,0)  |     K42    |     K58     |  x(M,1)  |  v[10]    ||    Reg 2 [16:23]     |     K10    |     K26     |  v[10] |  x(M,0)  |
+    // Reg 2 [24:31]     |     K11    |     K27     |  x(M,0)  |     K43    |     K59     |  x(M,1)  |  v[11]    ||    Reg 2 [24:31]     |     K11    |     K27     |  v[11] |  x(M,0)  |
+    // Reg 3 [0:7]       |     K12    |     K28     |  x(M,0)  |     K44    |     K60     |  x(M,1)  |  v[12]    ||    Reg 3 [0:7]       |     K12    |     K28     |  v[12] |  x(M,0)  |
+    // Reg 3 [8:15]      |     K13    |     K29     |  x(M,0)  |     K45    |     K61     |  x(M,1)  |  v[13]    ||    Reg 3 [8:15]      |     K13    |     K29     |  v[13] |  x(M,0)  |
+    // Reg 3 [16:23]     |     K14    |     K30     |  x(M,0)  |     K46    |     K62     |  x(M,1)  |  v[14]    ||    Reg 3 [16:23]     |     K14    |     K30     |  v[14] |  x(M,0)  |
+    // Reg 3 [24:31]     |     K15    |     K31     |  x(M,0)  |     K47    |     K63     |  x(M,1)  |  v[15]    ||    Reg 3 [24:31]     |     K15    |     K31     |  v[15] |  x(M,0)  |
+    // Reg 4 [0:7]       |     K64    |     K80     |  x(M,2)  |     K96    |     K112    |  x(M,3)  |  v[16]    ||    Reg 4 [0:7]       |     K32    |     K48     |  v[16] |  x(M,1)  |
+    // Reg 4 [8:15]      |     K65    |     K81     |  x(M,2)  |     K97    |     K113    |  x(M,3)  |  v[17]    ||    Reg 4 [8:15]      |     K33    |     K49     |  v[17] |  x(M,1)  |
+    // Reg 4 [16:23]     |     K66    |     K82     |  x(M,2)  |     K98    |     K114    |  x(M,3)  |  v[18]    ||    Reg 4 [16:23]     |     K34    |     K50     |  v[18] |  x(M,1)  |
+    // Reg 4 [24:31]     |     K67    |     K83     |  x(M,2)  |     K99    |     K115    |  x(M,3)  |  v[19]    ||    Reg 4 [24:31]     |     K35    |     K51     |  v[19] |  x(M,1)  |
+    // Reg 5 [0:7]       |     K68    |     K84     |  x(M,2)  |     K100   |     K116    |  x(M,3)  |  v[20]    ||    Reg 5 [0:7]       |     K36    |     K52     |  v[20] |  x(M,1)  |
+    // Reg 5 [8:15]      |     K69    |     K85     |  x(M,2)  |     K101   |     K117    |  x(M,3)  |  v[21]    ||    Reg 5 [8:15]      |     K37    |     K53     |  v[21] |  x(M,1)  |
+    // Reg 5 [16:23]     |     K70    |     K86     |  x(M,2)  |     K102   |     K118    |  x(M,3)  |  v[22]    ||    Reg 5 [16:23]     |     K38    |     K54     |  v[22] |  x(M,1)  |
+    // Reg 5 [24:31]     |     K71    |     K87     |  x(M,2)  |     K103   |     K119    |  x(M,3)  |  v[23]    ||    Reg 5 [24:31]     |     K39    |     K55     |  v[23] |  x(M,1)  |
+    // Reg 6 [0:7]       |     K72    |     K88     |  x(M,2)  |     K104   |     K120    |  x(M,3)  |  v[24]    ||    Reg 6 [0:7]       |     K40    |     K56     |  v[24] |  x(M,1)  |
+    // Reg 6 [8:15]      |     K73    |     K89     |  x(M,2)  |     K105   |     K121    |  x(M,3)  |  v[25]    ||    Reg 6 [8:15]      |     K41    |     K57     |  v[25] |  x(M,1)  |
+    // Reg 6 [16:23]     |     K74    |     K90     |  x(M,2)  |     K106   |     K122    |  x(M,3)  |  v[26]    ||    Reg 6 [16:23]     |     K42    |     K58     |  v[26] |  x(M,1)  |
+    // Reg 6 [24:31]     |     K75    |     K91     |  x(M,2)  |     K107   |     K123    |  x(M,3)  |  v[27]    ||    Reg 6 [24:31]     |     K43    |     K59     |  v[27] |  x(M,1)  |
+    // Reg 7 [0:7]       |     K76    |     K92     |  x(M,2)  |     K108   |     K124    |  x(M,3)  |  v[28]    ||    Reg 7 [0:7]       |     K44    |     K60     |  v[28] |  x(M,1)  |
+    // Reg 7 [8:15]      |     K77    |     K93     |  x(M,2)  |     K109   |     K125    |  x(M,3)  |  v[29]    ||    Reg 7 [8:15]      |     K45    |     K61     |  v[29] |  x(M,1)  |
+    // Reg 7 [16:23]     |     K78    |     K94     |  x(M,2)  |     K110   |     K126    |  x(M,3)  |  v[30]    ||    Reg 7 [16:23]     |     K46    |     K62     |  v[30] |  x(M,1)  |
+    // Reg 7 [24:31]     |     K79    |     K95     |  x(M,2)  |     K111   |     K127    |  x(M,3)  |  v[31]    ||    Reg 7 [24:31]     |     K47    |     K63     |  v[31] |  x(M,1)  |
     // clang-format on
+    static constexpr uint32_t VW = vectorSize(AFragT{});
+    static_assert(VW == BLOCK_X, "Fragment size must be equal to BLOCK_X");
 
     // To start the loading process, let's visualize in 2D coords.
     // Each thread will load 1 element
     // We need to know where they start
-    auto startCoord2D = std::make_pair(threadIdx.x % BLOCK_M,    // Row
-                                       (threadIdx.x / BLOCK_M)); // Col
+    auto startCoord2D = std::make_pair(threadIdx.x % BLOCK_M,                   // Row
+                                       (threadIdx.x / BLOCK_M) * VW / BLOCK_X); // Col
 
     // Flatten to 1D row_major offsets.
     auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
@@ -450,7 +369,7 @@ template <typename BType, typename BFragT, int32_t BLOCK_K, int32_t BLOCK_N>
 __device__ BFragT load_B_col_major(BType const* input_ptr)
 {
     // clang-format off
-    // Register Mapping for 128x16 for FP8:                                                ||    Register Mapping for 64x32 for FP8:
+    // Register Mapping for 128x16:                                                        ||    Register Mapping for 64x32:
     // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N  |   BLOCK_N   |           ||    Size              |   BLOCK_N  |   BLOCK_N   |        |
     // N                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    N                 | 0  ...  31 |  0  ...  31 | Vector |
     // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
@@ -487,49 +406,12 @@ __device__ BFragT load_B_col_major(BType const* input_ptr)
     // Reg 7 [8:15]      |     K77    |     K93     |     K109   |     K125    |  v[29]    ||    Reg 7 [8:15]      |     K45    |     K61     |  v[29] |
     // Reg 7 [16:23]     |     K78    |     K94     |     K110   |     K126    |  v[30]    ||    Reg 7 [16:23]     |     K46    |     K62     |  v[30] |
     // Reg 7 [24:31]     |     K79    |     K95     |     K111   |     K127    |  v[31]    ||    Reg 7 [24:31]     |     K47    |     K63     |  v[31] |
-
-    // Register Mapping for 128x16 for FP4:                                                ||    Register Mapping for 64x32 for FP4:
-    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N  |   BLOCK_N   |           ||    Size              |   BLOCK_N  |   BLOCK_N   |        |
-    // N                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    N                 | 0  ...  31 |  0  ...  31 | Vector |
-    // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
-    // Register Element  |------------|-------------|------------|-------------|-----------||    Register Element  |------------|-------------|--------|
-    // Reg 0 [0:7]       |     K0K1   |     K32K33  |     K64K65 |    K96K97   |  v[0]     ||    Reg 0 [0:7]       |     K0K1   |     K32K33  |  v[0]  |
-    // Reg 0 [8:15]      |     K2K3   |     K34K35  |     K66K67 |    K98K99   |  v[1]     ||    Reg 0 [8:15]      |     K2K3   |     K34K35  |  v[1]  |
-    // Reg 0 [16:23]     |     K4K5   |     K36K37  |     K68K69 |    K100K101 |  v[2]     ||    Reg 0 [16:23]     |     K4K5   |     K36K37  |  v[2]  |
-    // Reg 0 [24:31]     |     K6K7   |     K38K39  |     K70K71 |    K102K103 |  v[3]     ||    Reg 0 [24:31]     |     K6K7   |     K38K39  |  v[3]  |
-    // Reg 1 [0:7]       |     K8K9   |     K40K41  |     K72K73 |    K104K105 |  v[4]     ||    Reg 1 [0:7]       |     K8K9   |     K40K41  |  v[4]  |
-    // Reg 1 [8:15]      |     K10K11 |     K42K43  |     K74K75 |    K106K107 |  v[5]     ||    Reg 1 [8:15]      |     K10K11 |     K42K43  |  v[5]  |
-    // Reg 1 [16:23]     |     K12K13 |     K44K45  |     K76K77 |    K108K109 |  v[6]     ||    Reg 1 [16:23]     |     K12K13 |     K44K45  |  v[6]  |
-    // Reg 1 [24:31]     |     K14K15 |     K46K47  |     K78K79 |    K110K111 |  v[7]     ||    Reg 1 [24:31]     |     K14K15 |     K46K47  |  v[7]  |
-    // Reg 2 [0:7]       |     K16K17 |     K48K49  |     K80K81 |    K112K113 |  v[8]     ||    Reg 2 [0:7]       |     K16K17 |     K48K49  |  v[8]  |
-    // Reg 2 [8:15]      |     K18K19 |     K50K51  |     K82K83 |    K114K115 |  v[9]     ||    Reg 2 [8:15]      |     K18K19 |     K50K51  |  v[9]  |
-    // Reg 2 [16:23]     |     K20K21 |     K52K53  |     K84K85 |    K116K117 |  v[10]    ||    Reg 2 [16:23]     |     K20K21 |     K52K53  |  v[10] |
-    // Reg 2 [24:31]     |     K22K23 |     K54K55  |     K86K87 |    K118K119 |  v[11]    ||    Reg 2 [24:31]     |     K22K23 |     K54K55  |  v[11] |
-    // Reg 3 [0:7]       |     K24K25 |     K56K57  |     K88K89 |    K120K121 |  v[12]    ||    Reg 3 [0:7]       |     K24K25 |     K56K57  |  v[12] |
-    // Reg 3 [8:15]      |     K26K27 |     K58K59  |     K90K91 |    K122K123 |  v[13]    ||    Reg 3 [8:15]      |     K26K27 |     K58K59  |  v[13] |
-    // Reg 3 [16:23]     |     K28K29 |     K60K61  |     K92K93 |    K124K125 |  v[14]    ||    Reg 3 [16:23]     |     K28K29 |     K60K61  |  v[14] |
-    // Reg 3 [24:31]     |     K30K31 |     K62K63  |     K94K95 |    K126K127 |  v[15]    ||    Reg 3 [24:31]     |     K30K31 |     K62K63  |  v[15] |
-
-    // Register Mapping for 16x128 for FP6:                                                ||    Register Mapping for 32x64 for FP6:
-    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N  |   BLOCK_N   |           ||    Size              |   BLOCK_N  |   BLOCK_N   |        |
-    // N                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    N                 | 0  ...  31 |  0  ...  31 | Vector |
-    // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
-    // Register Element  |------------|-------------|------------|-------------|-----------||    Register Element  |------------|-------------|--------|
-    // Reg 0-2 [0:95]    | K =  0-15  |  K = 32-47  |  K = 64-79 | K = 96-111  |  v[0]     ||    Reg 0-2 [0:95]    | K =  0-15  |  K = 32-47  |  v[0]  |
-    // Reg 3-5 [0:95]    | K = 16-31  |  K = 48-63  |  K = 80-95 | K = 112-127 |  v[0]     ||    Reg 3-5 [0:95]    | K = 16-31  |  K = 48-63  |  v[0]  |
-
     // clang-format on
 
     static constexpr int32_t WAVE_SIZE = 64;
 
-    // FP8 chunk_size = 16, num_chunks = 2, packed_size = 1
-    // FP4 chunk_size = 32, num_chunks = 1, packed_size = 2
-    // FP6 chunk_size = 32, num_chunks = 1, packed_size = 32
-
-    constexpr index_t num_chunks = is_packed_type_v<BType> ? 1 : 2;
-
     // Here we want to load from cols of B in chunks of 16 elements each.
-    constexpr uint32_t chunk_size = is_packed_type_v<BType> ? 32 : 16;
+    static constexpr uint32_t chunk_size = 16;
 
     // each chunk is separated by an offset
     static constexpr uint32_t chunk_offset = chunk_size * WAVE_SIZE / BLOCK_N; // 32 or 64
@@ -537,38 +419,34 @@ __device__ BFragT load_B_col_major(BType const* input_ptr)
     // To start the loading process, let's visualize in 2D coords.
     // Each thread will load 32 elements.
     // We need to know where they start, and where the next elements are.
-    // FP8/6/4 Col {0-31}  |  {0-15}
-    // FP8     Row {0, 16} |  {0, 16, 32, 48}
-    // FP6/4   Row {0, 32} |  {0, 32, 64, 96}
-    auto startCoord2D = std::make_pair((threadIdx.x / BLOCK_N) * chunk_size, threadIdx.x % BLOCK_N);
+    auto startCoord2D =
+        std::make_pair((threadIdx.x / BLOCK_N) * chunk_size, // Row {0, 16} |  {0, 16, 32, 48}
+                       threadIdx.x % BLOCK_N);               // Col {0-31}  |  {0-15}
 
     // Flatten to 1D col_major offsets.
     auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
 
+    // auto minorStepCoord2D = std::make_pair(1u, 0u);       // read cols
     auto majorStepCoord2D = std::make_pair(chunk_offset, 0); // read a chunk from a col
 
-    using BRawT = typename scalar_type<BFragT>::type;
-    using BScalarChunkT =
-        typename vector_type<BRawT, scalar_type<BFragT>::vector_size / num_chunks>::type;
+    // BLOCK_K is a stride in B matrix
+    auto startOffset = col_major(startCoord2D, BLOCK_K);
+    // auto kMinorOffset = col_major(minorStepCoord2D, BLOCK_K);
+    auto kMajorOffset = col_major(majorStepCoord2D, BLOCK_K);
+
+    using BRawT        = typename scalar_type<BFragT>::type;
+    using BScalarFragT = vector_type<BRawT, chunk_size>::type;
 
     union
     {
         BFragT frag;
-        BScalarChunkT chunks[num_chunks];
+        BScalarFragT chunks[2];
     } fragB{};
 
-    const BScalarChunkT* fragPtr;
-
-    // BLOCK_K is a stride in B matrix
-    auto startOffset  = col_major(startCoord2D, BLOCK_K) / packed_size_v<BType>;
-    auto kMajorOffset = col_major(majorStepCoord2D, BLOCK_K) / packed_size_v<BType>;
-
-    for(index_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++)
-    {
-        fragPtr                 = reinterpret_cast<BScalarChunkT const*>(input_ptr + startOffset +
-                                                         chunk_idx * kMajorOffset);
-        fragB.chunks[chunk_idx] = *fragPtr;
-    }
+    auto* fragPtr   = reinterpret_cast<BScalarFragT const*>(input_ptr + startOffset);
+    fragB.chunks[0] = *fragPtr;
+    fragPtr         = reinterpret_cast<BScalarFragT const*>(input_ptr + startOffset + kMajorOffset);
+    fragB.chunks[1] = *fragPtr;
 
     return fragB.frag;
 }
@@ -628,56 +506,15 @@ __device__ BFragT load_mx_B_col_major(BType const* input_ptr,
     // Reg 7 [16:23]     |     K78    |     K94     |  x(2,N)  |     K110   |     K126    |  x(3,N)  |  v[30]    ||    Reg 7 [16:23]     |     K46    |     K62     |  v[30] |  x(1,N)  |
     // Reg 7 [24:31]     |     K79    |     K95     |  x(2,N)  |     K111   |     K127    |  x(3,N)  |  v[31]    ||    Reg 7 [24:31]     |     K47    |     K63     |  v[31] |  x(1,N)  |
 
-    // Register Mapping for 128x16 for FP4:                                                ||    Register Mapping for 64x32 for FP4:
-    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N  |   BLOCK_N   |           ||    Size              |   BLOCK_N  |   BLOCK_N   |        |
-    // N                 | 0  ...  15 |  0  ...  15 | 0  ...  15 |  0  ...  15 | Vector    ||    N                 | 0  ...  31 |  0  ...  31 | Vector |
-    // Thread Id         | 0  ...  15 | 16  ...  31 | 32  ... 47 | 48  ...  63 | Element   ||    Thread Id         | 0  ...  31 | 32  ...  63 | Element|
-    // Register Element  |------------|-------------|------------|-------------|-----------||    Register Element  |------------|-------------|--------|
-    // Reg 0 [0:7]       |     K0K1   |     K32K33  |     K64K65 |    K96K97   |  v[0]     ||    Reg 0 [0:7]       |     K0K1   |     K32K33  |  v[0]  |
-    // Reg 0 [8:15]      |     K2K3   |     K34K35  |     K66K67 |    K98K99   |  v[1]     ||    Reg 0 [8:15]      |     K2K3   |     K34K35  |  v[1]  |
-    // Reg 0 [16:23]     |     K4K5   |     K36K37  |     K68K69 |    K100K101 |  v[2]     ||    Reg 0 [16:23]     |     K4K5   |     K36K37  |  v[2]  |
-    // Reg 0 [24:31]     |     K6K7   |     K38K39  |     K70K71 |    K102K103 |  v[3]     ||    Reg 0 [24:31]     |     K6K7   |     K38K39  |  v[3]  |
-    // Reg 1 [0:7]       |     K8K9   |     K40K41  |     K72K73 |    K104K105 |  v[4]     ||    Reg 1 [0:7]       |     K8K9   |     K40K41  |  v[4]  |
-    // Reg 1 [8:15]      |     K10K11 |     K42K43  |     K74K75 |    K106K107 |  v[5]     ||    Reg 1 [8:15]      |     K10K11 |     K42K43  |  v[5]  |
-    // Reg 1 [16:23]     |     K12K13 |     K44K45  |     K76K77 |    K108K109 |  v[6]     ||    Reg 1 [16:23]     |     K12K13 |     K44K45  |  v[6]  |
-    // Reg 1 [24:31]     |     K14K15 |     K46K47  |     K78K79 |    K110K111 |  v[7]     ||    Reg 1 [24:31]     |     K14K15 |     K46K47  |  v[7]  |
-    // Reg 2 [0:7]       |     K16K17 |     K48K49  |     K80K81 |    K112K113 |  v[8]     ||    Reg 2 [0:7]       |     K16K17 |     K48K49  |  v[8]  |
-    // Reg 2 [8:15]      |     K18K19 |     K50K51  |     K82K83 |    K114K115 |  v[9]     ||    Reg 2 [8:15]      |     K18K19 |     K50K51  |  v[9]  |
-    // Reg 2 [16:23]     |     K20K21 |     K52K53  |     K84K85 |    K116K117 |  v[10]    ||    Reg 2 [16:23]     |     K20K21 |     K52K53  |  v[10] |
-    // Reg 2 [24:31]     |     K22K23 |     K54K55  |     K86K87 |    K118K119 |  v[11]    ||    Reg 2 [24:31]     |     K22K23 |     K54K55  |  v[11] |
-    // Reg 3 [0:7]       |     K24K25 |     K56K57  |     K88K89 |    K120K121 |  v[12]    ||    Reg 3 [0:7]       |     K24K25 |     K56K57  |  v[12] |
-    // Reg 3 [8:15]      |     K26K27 |     K58K59  |     K90K91 |    K122K123 |  v[13]    ||    Reg 3 [8:15]      |     K26K27 |     K58K59  |  v[13] |
-    // Reg 3 [16:23]     |     K28K29 |     K60K61  |     K92K93 |    K124K125 |  v[14]    ||    Reg 3 [16:23]     |     K28K29 |     K60K61  |  v[14] |
-    // Reg 3 [24:31]     |     K30K31 |     K62K63  |     K94K95 |    K126K127 |  v[15]    ||    Reg 3 [24:31]     |     K30K31 |     K62K63  |  v[15] |
-
-    // Register Mapping for 128x16 for FP4:                                                                                            ||    Register Mapping for 64x32 for FP4:
-    // Size              |   BLOCK_N  |          |   BLOCK_N   |          |   BLOCK_N  |          |   BLOCK_N   |          |           ||    Size              |   BLOCK_N  |          |   BLOCK_N   |          |        |
-    // N                 | 0  ...  15 |          |  0  ...  15 |          | 0  ...  15 |          |  0  ...  15 |          | Vector    ||    N                 | 0  ...  31 |          |  0  ...  31 |          | Vector |
-    // Thread Id         | 0  ...  15 |  Scale   | 16  ...  31 |  Scale   | 32  ... 47 |  Scale   | 48  ...  63 |  Scale   | Element   ||    Thread Id         | 0  ...  31 |  Scale   | 32  ...  63 |  Scale   | Element|
-    // Register Element  |------------ ----------|------------- ----------|------------ ----------|------------- ----------|-----------||    Register Element  |------------|----------|-------------|----------|--------|
-    // Reg 0 [0:7]       |     K0K1   |  x(0,N)  |     K32K33  |  x(M,1)  |     K64K65 |  x(M,2)  |    K96K97   |  x(M,3)  |  v[0]     ||    Reg 0 [0:7]       |     K0K1   |  x(M,0)  |     K32K33  |  x(M,1)  |  v[0]  |
-    // Reg 0 [8:15]      |     K2K3   |  x(0,N)  |     K34K35  |  x(M,1)  |     K66K67 |  x(M,2)  |    K98K99   |  x(M,3)  |  v[1]     ||    Reg 0 [8:15]      |     K2K3   |  x(M,0)  |     K34K35  |  x(M,1)  |  v[1]  |
-    // Reg 0 [16:23]     |     K4K5   |  x(0,N)  |     K36K37  |  x(M,1)  |     K68K69 |  x(M,2)  |    K100K101 |  x(M,3)  |  v[2]     ||    Reg 0 [16:23]     |     K4K5   |  x(M,0)  |     K36K37  |  x(M,1)  |  v[2]  |
-    // Reg 0 [24:31]     |     K6K7   |  x(0,N)  |     K38K39  |  x(M,1)  |     K70K71 |  x(M,2)  |    K102K103 |  x(M,3)  |  v[3]     ||    Reg 0 [24:31]     |     K6K7   |  x(M,0)  |     K38K39  |  x(M,1)  |  v[3]  |
-    // Reg 1 [0:7]       |     K8K9   |  x(0,N)  |     K40K41  |  x(M,1)  |     K72K73 |  x(M,2)  |    K104K105 |  x(M,3)  |  v[4]     ||    Reg 1 [0:7]       |     K8K9   |  x(M,0)  |     K40K41  |  x(M,1)  |  v[4]  |
-    // Reg 1 [8:15]      |     K10K11 |  x(0,N)  |     K42K43  |  x(M,1)  |     K74K75 |  x(M,2)  |    K106K107 |  x(M,3)  |  v[5]     ||    Reg 1 [8:15]      |     K10K11 |  x(M,0)  |     K42K43  |  x(M,1)  |  v[5]  |
-    // Reg 1 [16:23]     |     K12K13 |  x(0,N)  |     K44K45  |  x(M,1)  |     K76K77 |  x(M,2)  |    K108K109 |  x(M,3)  |  v[6]     ||    Reg 1 [16:23]     |     K12K13 |  x(M,0)  |     K44K45  |  x(M,1)  |  v[6]  |
-    // Reg 1 [24:31]     |     K14K15 |  x(0,N)  |     K46K47  |  x(M,1)  |     K78K79 |  x(M,2)  |    K110K111 |  x(M,3)  |  v[7]     ||    Reg 1 [24:31]     |     K14K15 |  x(M,0)  |     K46K47  |  x(M,1)  |  v[7]  |
-    // Reg 2 [0:7]       |     K16K17 |  x(0,N)  |     K48K49  |  x(M,1)  |     K80K81 |  x(M,2)  |    K112K113 |  x(M,3)  |  v[8]     ||    Reg 2 [0:7]       |     K16K17 |  x(M,0)  |     K48K49  |  x(M,1)  |  v[8]  |
-    // Reg 2 [8:15]      |     K18K19 |  x(0,N)  |     K50K51  |  x(M,1)  |     K82K83 |  x(M,2)  |    K114K115 |  x(M,3)  |  v[9]     ||    Reg 2 [8:15]      |     K18K19 |  x(M,0)  |     K50K51  |  x(M,1)  |  v[9]  |
-    // Reg 2 [16:23]     |     K20K21 |  x(0,N)  |     K52K53  |  x(M,1)  |     K84K85 |  x(M,2)  |    K116K117 |  x(M,3)  |  v[10]    ||    Reg 2 [16:23]     |     K20K21 |  x(M,0)  |     K52K53  |  x(M,1)  |  v[10] |
-    // Reg 2 [24:31]     |     K22K23 |  x(0,N)  |     K54K55  |  x(M,1)  |     K86K87 |  x(M,2)  |    K118K119 |  x(M,3)  |  v[11]    ||    Reg 2 [24:31]     |     K22K23 |  x(M,0)  |     K54K55  |  x(M,1)  |  v[11] |
-    // Reg 3 [0:7]       |     K24K25 |  x(0,N)  |     K56K57  |  x(M,1)  |     K88K89 |  x(M,2)  |    K120K121 |  x(M,3)  |  v[12]    ||    Reg 3 [0:7]       |     K24K25 |  x(M,0)  |     K56K57  |  x(M,1)  |  v[12] |
-    // Reg 3 [8:15]      |     K26K27 |  x(0,N)  |     K58K59  |  x(M,1)  |     K90K91 |  x(M,2)  |    K122K123 |  x(M,3)  |  v[13]    ||    Reg 3 [8:15]      |     K26K27 |  x(M,0)  |     K58K59  |  x(M,1)  |  v[13] |
-    // Reg 3 [16:23]     |     K28K29 |  x(0,N)  |     K60K61  |  x(M,1)  |     K92K93 |  x(M,2)  |    K124K125 |  x(M,3)  |  v[14]    ||    Reg 3 [16:23]     |     K28K29 |  x(M,0)  |     K60K61  |  x(M,1)  |  v[14] |
-    // Reg 3 [24:31]     |     K30K31 |  x(0,N)  |     K62K63  |  x(M,1)  |     K94K95 |  x(M,2)  |    K126K127 |  x(M,3)  |  v[15]    ||    Reg 3 [24:31]     |     K30K31 |  x(M,0)  |     K62K63  |  x(M,1)  |  v[15] |
     // clang-format on
+    static constexpr uint32_t VW = vectorSize(BFragT{});
+    static_assert(VW == BLOCK_X, "Fragment size must be equal to BLOCK_X");
 
     // To start the loading process, let's visualize in 2D coords.
     // Each thread will load 1 element
     // We need to know where to start
-    auto startCoord2D = std::make_pair((threadIdx.x / BLOCK_N), // Row
-                                       threadIdx.x % BLOCK_N);  // Col
+    auto startCoord2D = std::make_pair((threadIdx.x / BLOCK_N) * VW / BLOCK_X, // Row
+                                       threadIdx.x % BLOCK_N);                 // Col
 
     // Flatten to 1D col_major offsets.
     auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
@@ -784,19 +621,19 @@ struct store_C_col_major<CType, CFragT, 32, 32>
 
         // we can vector store 4 contiguous elements at a time.
         using CRawT        = typename scalar_type<CFragT>::type;
-        using CScalarFragT = typename vector_type<CRawT, VW>::type;
+        using CScalarFragT = vector_type<CRawT, VW>::type;
         union
         {
             CFragT frag;
             CScalarFragT chunks[vectorSize(CFragT{}) / VW];
         } fragC{cFrag}; // Initialize with input fragment
 
-        CScalarFragT* fragPtr;
-        for(uint32_t idx = 0; idx < vectorSize(CFragT{}) / VW; ++idx)
-        {
-            fragPtr  = reinterpret_cast<CScalarFragT*>(output + startOffset + idx * kMajorOffset);
-            *fragPtr = fragC.chunks[idx];
-        }
+        *(reinterpret_cast<CScalarFragT*>(output + startOffset))                = fragC.chunks[0];
+        *(reinterpret_cast<CScalarFragT*>(output + startOffset + kMajorOffset)) = fragC.chunks[1];
+        *(reinterpret_cast<CScalarFragT*>(output + startOffset + 2 * kMajorOffset)) =
+            fragC.chunks[2];
+        *(reinterpret_cast<CScalarFragT*>(output + startOffset + 3 * kMajorOffset)) =
+            fragC.chunks[3];
     }
 };
 
@@ -929,29 +766,18 @@ template <typename AType,
           typename AccType,
           int32_t BLOCK_M,
           int32_t BLOCK_N,
-          int32_t BLOCK_K,
-          typename ALayout,
-          typename BLayout,
-          typename CLayout>
-__global__ void matmul(const packed_type_t<AType>* a, const packed_type_t<BType>* b, CType* c)
+          int32_t BLOCK_K>
+__global__ void matmul(const AType* a, const BType* b, CType* c)
 {
-    using PackedAType            = packed_type_t<AType>;
-    constexpr auto packed_size_a = packed_size_v<PackedAType>;
-    using PackedBType            = packed_type_t<BType>;
-    constexpr auto packed_size_b = packed_size_v<PackedBType>;
-
     constexpr int WAVE_SIZE = 64;
     assert(threadIdx.x < WAVE_SIZE);
     assert(blockDim.x == 1 && blockDim.y == 1 && blockDim.z == 1);
 
-    using AFragT =
-        typename vector_type<PackedAType, BLOCK_M * BLOCK_K / WAVE_SIZE / packed_size_a>::type;
-    using BFragT =
-        typename vector_type<PackedBType, BLOCK_K * BLOCK_N / WAVE_SIZE / packed_size_b>::type;
-
-    using CFragT        = typename vector_type<CType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
+    using AFragT        = vector_type<AType, BLOCK_M * BLOCK_K / WAVE_SIZE>::type;
+    using BFragT        = vector_type<BType, BLOCK_K * BLOCK_N / WAVE_SIZE>::type;
+    using CFragT        = vector_type<CType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
     using AccumFragT    = vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>;
-    using RawAccumFragT = typename vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
+    using RawAccumFragT = vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
 
     // Create frags
     auto fragA   = AFragT{};
@@ -960,23 +786,10 @@ __global__ void matmul(const packed_type_t<AType>* a, const packed_type_t<BType>
     auto fragAcc = AccumFragT{0};
 
     // Load the inputs.
-    if constexpr(is_same_v<ALayout, tensor_layout::gemm::RowMajor>)
-    {
-        fragA = load_A_row_major<PackedAType, AFragT, BLOCK_M, BLOCK_K>(a);
-    }
-    else
-    {
-        fragA = load_A_col_major<PackedAType, AFragT, BLOCK_M, BLOCK_K>(a);
-    }
-
-    if constexpr(is_same_v<BLayout, tensor_layout::gemm::RowMajor>)
-    {
-        printf("This layout is not implemented\n");
-    }
-    else
-    {
-        fragB = load_B_col_major<PackedBType, BFragT, BLOCK_K, BLOCK_N>(b);
-    }
+    // A = col major, BLOCK_M x BLOCK_K
+    fragA = load_A_col_major<AType, AFragT, BLOCK_M, BLOCK_K>(a);
+    // B = col major, BLOCK_K x BLOCK_N
+    fragB = load_B_col_major<BType, BFragT, BLOCK_K, BLOCK_N>(b);
 
     // Matrix multiply-accumulate using MFMA units
     // Accumulation intermediate = BLOCK_M x BLOCK_N
@@ -988,14 +801,8 @@ __global__ void matmul(const packed_type_t<AType>* a, const packed_type_t<BType>
         fragC[i] = type_convert<CType>(fragAcc.template AsType<RawAccumFragT>()[Number<0>{}][i]);
     }
 
-    if constexpr(is_same_v<CLayout, tensor_layout::gemm::RowMajor>)
-    {
-        store_C_row_major<CType, CFragT, BLOCK_M, BLOCK_N>{}(c, fragC);
-    }
-    else
-    {
-        store_C_col_major<CType, CFragT, BLOCK_M, BLOCK_N>{}(c, fragC);
-    }
+    auto storeC = store_C_col_major<CType, CFragT, BLOCK_M, BLOCK_N>{};
+    storeC(c, fragC);
 }
 
 template <typename AType,
@@ -1006,35 +813,21 @@ template <typename AType,
           int32_t BLOCK_M,
           int32_t BLOCK_N,
           int32_t BLOCK_K,
-          int32_t BLOCK_X,
-          typename ALayout,
-          typename BLayout,
-          typename CLayout>
-__global__ void matmul(const packed_type_t<AType>* a,
-                       const ScaleType* xa,
-                       const packed_type_t<BType>* b,
-                       const ScaleType* xb,
-                       CType* c)
+          int32_t BLOCK_X>
+__global__ void
+matmul(const AType* a, const ScaleType* xa, const BType* b, const ScaleType* xb, CType* c)
 {
-    using PackedAType            = packed_type_t<AType>;
-    constexpr auto packed_size_a = packed_size_v<PackedAType>;
-    using PackedBType            = packed_type_t<BType>;
-    constexpr auto packed_size_b = packed_size_v<PackedBType>;
-
     constexpr int WAVE_SIZE = 64;
     assert(threadIdx.x < WAVE_SIZE);
     assert(blockDim.x == 1 && blockDim.y == 1 && blockDim.z == 1);
 
-    using AFragT =
-        typename vector_type<PackedAType, BLOCK_M * BLOCK_K / WAVE_SIZE / packed_size_a>::type;
-    using BFragT =
-        typename vector_type<PackedBType, BLOCK_K * BLOCK_N / WAVE_SIZE / packed_size_b>::type;
-
-    using CFragT        = typename vector_type<CType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
+    using AFragT        = vector_type<AType, BLOCK_M * BLOCK_K / WAVE_SIZE>::type;
+    using BFragT        = vector_type<BType, BLOCK_K * BLOCK_N / WAVE_SIZE>::type;
+    using CFragT        = vector_type<CType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
     using AccumFragT    = vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>;
-    using RawAccumFragT = typename vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
-    using AScaleFragT   = typename vector_type<ScaleType, 1>::type;
-    using BScaleFragT   = typename vector_type<ScaleType, 1>::type;
+    using RawAccumFragT = vector_type<AccType, BLOCK_M * BLOCK_N / WAVE_SIZE>::type;
+    using AScaleFragT   = vector_type<ScaleType, 1>::type;
+    using BScaleFragT   = vector_type<ScaleType, 1>::type;
 
     // Create frags
     auto fragA   = AFragT{};
@@ -1045,35 +838,13 @@ __global__ void matmul(const packed_type_t<AType>* a,
     auto fragXb  = BScaleFragT{};
 
     // Load the inputs.
-    if constexpr(is_same_v<ALayout, tensor_layout::gemm::RowMajor>)
-    {
-        fragA = load_mx_A_row_major<PackedAType,
-                                    AFragT,
-                                    ScaleType,
-                                    AScaleFragT,
-                                    BLOCK_M,
-                                    BLOCK_K,
-                                    BLOCK_X>(a, xa, fragXa);
-    }
-    else
-    {
-        printf("This layout is not implemented\n");
-    }
+    // A = col major, BLOCK_M x BLOCK_K
+    fragA = load_mx_A_row_major<AType, AFragT, ScaleType, AScaleFragT, BLOCK_M, BLOCK_K, BLOCK_X>(
+        a, xa, fragXa);
 
-    if constexpr(is_same_v<BLayout, tensor_layout::gemm::RowMajor>)
-    {
-        printf("This layout is not implemented\n");
-    }
-    else
-    {
-        fragB = load_mx_B_col_major<PackedBType,
-                                    BFragT,
-                                    ScaleType,
-                                    BScaleFragT,
-                                    BLOCK_K,
-                                    BLOCK_N,
-                                    BLOCK_X>(b, xb, fragXb);
-    }
+    // B = col major, BLOCK_K x BLOCK_N
+    fragB = load_mx_B_col_major<BType, BFragT, ScaleType, BScaleFragT, BLOCK_K, BLOCK_N, BLOCK_X>(
+        b, xb, fragXb);
 
     // Scaled Matrix multiply-accumulate using MFMA units
     // Accumulation intermediate = BLOCK_M x BLOCK_N
@@ -1089,14 +860,8 @@ __global__ void matmul(const packed_type_t<AType>* a,
         fragC[i] = type_convert<CType>(fragAcc.template AsType<RawAccumFragT>()[Number<0>{}][i]);
     }
 
-    if constexpr(is_same_v<CLayout, tensor_layout::gemm::RowMajor>)
-    {
-        store_C_row_major<CType, CFragT, BLOCK_M, BLOCK_N>{}(c, fragC);
-    }
-    else
-    {
-        store_C_col_major<CType, CFragT, BLOCK_M, BLOCK_N>{}(c, fragC);
-    }
+    auto storeC = store_C_row_major<CType, CFragT, BLOCK_M, BLOCK_N>{};
+    storeC(c, fragC);
 }
 
 /**
@@ -1195,11 +960,6 @@ template <typename DeviceMFMA,
           index_t BLOCK_X>
 struct TestMXMFMA
 {
-    using PackedAType                   = packed_type_t<ADataType>;
-    static constexpr auto packed_size_a = packed_size_v<PackedAType>;
-    using PackedBType                   = packed_type_t<BDataType>;
-    static constexpr auto packed_size_b = packed_size_v<PackedBType>;
-
     auto PrepareGemmTensors(const GemmParams& params, index_t init)
     {
         auto f_host_tensor_descriptor =
@@ -1216,11 +976,11 @@ struct TestMXMFMA
                 }
             };
 
-        Tensor<PackedAType> a_m_k(
+        Tensor<ADataType> a_m_k(
             f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
         Tensor<ScaleType> a_scales(
             f_host_tensor_descriptor(params.M, params.K / BLOCK_X, params.K / BLOCK_X, ALayout{}));
-        Tensor<PackedBType> b_n_k(
+        Tensor<BDataType> b_n_k(
             f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
         Tensor<ScaleType> b_scales(
             f_host_tensor_descriptor(params.K / BLOCK_X, params.N, params.K / BLOCK_X, BLayout{}));
@@ -1232,40 +992,49 @@ struct TestMXMFMA
         switch(init)
         {
         case 0:
-            a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{0.5f});
+            a_m_k.GenerateTensorValue(GeneratorTensor_1<ADataType>{1.0f});
+            a_scales.GenerateTensorValue(
+                GeneratorTensor_1<ScaleType>{ScaleType{0.015625f}}); // 1/64
             // NOTE: not all numbers are representable in FP8, BF8, etc.
             // 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 16 18 20 20 20 22 24 24 24 26 28 28 28 30 32
-            b_n_k.GenerateTensorValue(GeneratorTensor_Sequential<PackedBType, 1>{});
-            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{1.0f});
+            b_n_k.GenerateTensorValue(GeneratorTensor_Sequential<BDataType, 1>{});
+            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{ScaleType{1.0f}});
             break;
         case 1:
             // results in C = {K}
-            a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{512.0f});
-            b_n_k.GenerateTensorValue(GeneratorTensor_1<PackedBType>{1.0f});
-            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{1.0f / 512});
+            a_m_k.GenerateTensorValue(GeneratorTensor_1<ADataType>{1.0f});
+            a_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{ScaleType{512.0f}});
+            b_n_k.GenerateTensorValue(GeneratorTensor_1<BDataType>{1.0f});
+            b_scales.GenerateTensorValue(GeneratorTensor_1<ScaleType>{ScaleType{1.0f / 512}});
             break;
         case 2:
             // expect small round off errors
-            a_m_k.GenerateTensorValue(GeneratorTensor_3<PackedAType>{-2.0, 2.0});
-            a_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{0, 4});
-            b_n_k.GenerateTensorValue(GeneratorTensor_3<PackedBType>{-2.0, 2.0});
-            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{0, 4});
+            a_m_k.GenerateTensorValue(GeneratorTensor_3<ADataType>{-2.0, 2.0});
+            a_scales.GenerateTensorValue(
+                GeneratorTensor_2<ScaleType>{126, 129}); // scales: {0.5, 1, 2}
+
+            b_n_k.GenerateTensorValue(GeneratorTensor_3<ADataType>{-2.0, 2.0});
+            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{126, 129});
             break;
+
         case 3:
             // expect small round off errors
-            a_m_k.GenerateTensorValue(GeneratorTensor_4<PackedAType>(0, 1, time(nullptr)));
-            a_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{0, 4});
-            b_n_k.GenerateTensorValue(GeneratorTensor_4<PackedBType>(0, 1, time(nullptr) / 2));
-            b_scales.GenerateTensorValue(GeneratorTensor_2<ScaleType>{0, 4});
+            a_m_k.GenerateTensorValue(GeneratorTensor_4<ADataType>(0, 1));
+            a_scales.GenerateTensorValue(
+                GeneratorTensor_2<ScaleType>{126, 129}); // scales: {0.5, 1, 2}
+            b_n_k.GenerateTensorValue(GeneratorTensor_4<BDataType>(0, 1));
+            b_scales.GenerateTensorValue(
+                GeneratorTensor_2<ScaleType>{126, 129}); //  scales: {0.5, 1, 2}
             break;
         default:
             // all initial values are representable in FP8, BF8
-            a_m_k.GenerateTensorValue(GeneratorTensor_2<PackedAType>{-6, 7}); // Z[-6,6]
-            a_scales.GenerateTensorValue(GeneratorTensor_3<ScaleType>{0.0625f, 8.0f});
-            b_n_k.GenerateTensorValue(GeneratorTensor_2<PackedBType>{-6, 7}); // Z[-6,6]
-            b_scales.GenerateTensorValue(GeneratorTensor_3<ScaleType>{0.0625f, 8.0f});
+            a_m_k.GenerateTensorValue(GeneratorTensor_2<ADataType>{-5, 6}); // Z[-5,5]
+            a_scales.GenerateTensorValue(
+                GeneratorTensor_2<ScaleType>{122, 129});                    // scales: [1/32,..., 2]
+            b_n_k.GenerateTensorValue(GeneratorTensor_2<BDataType>{-5, 6}); // Z[-5,5]
+            b_scales.GenerateTensorValue(
+                GeneratorTensor_2<ScaleType>{122, 129}); //  scales: [1/32,..., 2]
+
             break;
         }
 
@@ -1307,9 +1076,9 @@ struct TestMXMFMA
 
         auto host_tensors = PrepareGemmTensors(params, init);
 
-        const Tensor<PackedAType>& a      = std::get<0>(host_tensors);
+        const Tensor<ADataType>& a        = std::get<0>(host_tensors);
         const Tensor<ScaleType>& a_scales = std::get<1>(host_tensors);
-        const Tensor<PackedBType>& b      = std::get<2>(host_tensors);
+        const Tensor<BDataType>& b        = std::get<2>(host_tensors);
         const Tensor<ScaleType>& b_scales = std::get<3>(host_tensors);
         Tensor<CDataType>& c_host         = std::get<4>(host_tensors);
         Tensor<CDataType>& c_device       = std::get<5>(host_tensors);
@@ -1391,11 +1160,6 @@ template <typename DeviceMFMA,
           index_t BLOCK_K>
 struct TestMFMA
 {
-    using PackedAType                   = packed_type_t<ADataType>;
-    static constexpr auto packed_size_a = packed_size_v<PackedAType>;
-    using PackedBType                   = packed_type_t<BDataType>;
-    static constexpr auto packed_size_b = packed_size_v<PackedBType>;
-
     auto PrepareGemmTensors(const GemmParams& params, index_t init)
     {
         auto f_host_tensor_descriptor =
@@ -1412,9 +1176,9 @@ struct TestMFMA
                 }
             };
 
-        Tensor<PackedAType> a_m_k(
+        Tensor<ADataType> a_m_k(
             f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
-        Tensor<PackedBType> b_n_k(
+        Tensor<BDataType> b_n_k(
             f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
         Tensor<CDataType> c_m_n_host_result(
             f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
@@ -1424,30 +1188,29 @@ struct TestMFMA
         switch(init)
         {
         case 0:
-            a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{0.625f});
+            a_m_k.GenerateTensorValue(GeneratorTensor_1<ADataType>{0.015625f});
             // NOTE: not all numbers are representable in FP8, BF8, etc.
-            b_n_k.GenerateTensorValue(GeneratorTensor_Sequential<PackedBType, 1>{});
+            b_n_k.GenerateTensorValue(GeneratorTensor_Sequential<BDataType, 1>{});
             break;
         case 1:
             // results in C = {K}
-            a_m_k.GenerateTensorValue(GeneratorTensor_1<PackedAType>{1.0f});
-            b_n_k.GenerateTensorValue(GeneratorTensor_1<PackedBType>{1.0f});
+            a_m_k.GenerateTensorValue(GeneratorTensor_1<ADataType>{1.0f});
+            b_n_k.GenerateTensorValue(GeneratorTensor_1<BDataType>{1.0f});
             break;
         case 2:
-            // expect small round off errors that lead to FP8MFMA32x32x64 failures
-            a_m_k.GenerateTensorValue(GeneratorTensor_3<PackedAType>{-5, 5});
-            b_n_k.GenerateTensorValue(GeneratorTensor_3<PackedBType>{-5, 5});
+            // expect small round off errors
+            a_m_k.GenerateTensorValue(GeneratorTensor_3<ADataType>{-5, 5});
+            b_n_k.GenerateTensorValue(GeneratorTensor_3<BDataType>{-5, 5});
             break;
         case 3:
-            // expect small round off errors that lead to FP8MFMA32x32x64 failures
-            a_m_k.GenerateTensorValue(GeneratorTensor_4<PackedAType>(-1, 3));
-            b_n_k.GenerateTensorValue(GeneratorTensor_4<PackedBType>(1, 3));
+            // expect small round off errors
+            a_m_k.GenerateTensorValue(GeneratorTensor_4<ADataType>(-1, 3));
+            b_n_k.GenerateTensorValue(GeneratorTensor_4<BDataType>(1, 3));
             break;
-
         default:
-            // all initial values are representable in FP8/6, BF8/6 FP4 is missing 5
-            a_m_k.GenerateTensorValue(GeneratorTensor_2<PackedAType>{-6, 7}); // Z[-6,6]
-            b_n_k.GenerateTensorValue(GeneratorTensor_2<PackedBType>{-6, 7});
+            // all initial values are representable in FP8, BF8
+            a_m_k.GenerateTensorValue(GeneratorTensor_2<ADataType>{-5, 6});
+            b_n_k.GenerateTensorValue(GeneratorTensor_2<BDataType>{-5, 6});
 
             break;
         }
@@ -1489,10 +1252,10 @@ struct TestMFMA
 
         auto host_tensors = PrepareGemmTensors(params, init);
 
-        const Tensor<PackedAType>& a = std::get<0>(host_tensors);
-        const Tensor<PackedBType>& b = std::get<1>(host_tensors);
-        Tensor<CDataType>& c_host    = std::get<2>(host_tensors);
-        Tensor<CDataType>& c_device  = std::get<3>(host_tensors);
+        const Tensor<ADataType>& a  = std::get<0>(host_tensors);
+        const Tensor<BDataType>& b  = std::get<1>(host_tensors);
+        Tensor<CDataType>& c_host   = std::get<2>(host_tensors);
+        Tensor<CDataType>& c_device = std::get<3>(host_tensors);
 
         using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
@@ -1500,8 +1263,8 @@ struct TestMFMA
         auto b_element_op = PassThrough{};
         auto c_element_op = PassThrough{};
 
-        using ReferenceGemmInstance = ck::tensor_operation::host::ReferenceGemm<PackedAType,
-                                                                                PackedBType,
+        using ReferenceGemmInstance = ck::tensor_operation::host::ReferenceGemm<ADataType,
+                                                                                BDataType,
                                                                                 CDataType,
                                                                                 CPUAccDataType,
                                                                                 PassThrough,

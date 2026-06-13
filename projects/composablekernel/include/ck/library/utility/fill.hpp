@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -85,20 +85,6 @@ struct FillUniformDistributionIntegerValue
     }
 };
 
-/**
- * @brief A functor for filling a container with a monotonically increasing or decreasing sequence.
- *
- * FillMonotonicSeq generates a sequence of values starting from an initial value
- * and incrementing by a fixed step for each subsequent element.
- *
- * @tparam T The numeric type of the sequence elements.
- *
- * Example usage:
- * ```
- * std::vector<int> v(5);
- * FillMonotonicSeq<int>{10, 2}(v); // Fills v with {10, 12, 14, 16, 18}
- * ```
- */
 template <typename T>
 struct FillMonotonicSeq
 {
@@ -138,10 +124,9 @@ struct FillConstant
     }
 
     template <typename ForwardRange>
-    auto operator()(ForwardRange&& range) const
-        -> std::void_t<decltype(std::declval<const FillConstant&>()(
-            std::begin(std::forward<ForwardRange>(range)),
-            std::end(std::forward<ForwardRange>(range))))>
+    auto operator()(ForwardRange&& range) const -> std::void_t<
+        decltype(std::declval<const FillConstant&>()(std::begin(std::forward<ForwardRange>(range)),
+                                                     std::end(std::forward<ForwardRange>(range))))>
     {
         (*this)(std::begin(std::forward<ForwardRange>(range)),
                 std::end(std::forward<ForwardRange>(range)));

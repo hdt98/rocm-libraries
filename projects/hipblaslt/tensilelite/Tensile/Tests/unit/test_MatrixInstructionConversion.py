@@ -22,6 +22,7 @@
 #
 # SPDX-License-Identifier: MIT
 ################################################################################
+import pytest
 import yaml
 from pprint import pformat
 
@@ -98,6 +99,7 @@ WorkGroup: [16, 16, 1]
     assert outputConf["MIInputPerThreadB"] == 5
     assert outputConf["MIInputPerThreadMetadata"] == 5
     assert outputConf["ThreadTile"] == [1, 1]
+    assert outputConf["Sparse"] == 0
     assert outputConf["WorkGroup"] == [128, 3, 1]
     assert outputConf["WavefrontSize"] == 48
     assert outputConf["ISA"] == isa
@@ -200,6 +202,7 @@ custom.config:
     assert outputConf["MIInputPerThreadB"] == 5
     assert outputConf["MIInputPerThreadMetadata"] == 5
     assert outputConf["ThreadTile"] == [1, 1]
+    assert outputConf["Sparse"] == 0
     assert outputConf["WorkGroup"] == [1280, 2, 6]  # Why do we change the workgroup here?
     assert outputConf["WavefrontSize"] == 48
     assert outputConf["ISA"] == isa

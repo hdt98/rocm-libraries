@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2023 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -39,46 +39,67 @@ namespace detail
 {
 
 template<class Value, class Output>
-struct binary_search_config_selector
-{
-    using targets    = binary_search_targets;
-    using param_type = transform_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr binary_search_config_selector(Target)
-        : params(binary_search_config_picker<Target, Value, Output>())
-    {}
-};
+struct default_config_for_binary_search
+{};
 
 template<class Value, class Output>
-struct lower_bound_config_selector
-{
-    using targets    = lower_bound_targets;
-    using param_type = transform_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr lower_bound_config_selector(Target)
-        : params(lower_bound_config_picker<Target, Value, Output>())
-    {}
-};
+struct default_config_for_upper_bound
+{};
 
 template<class Value, class Output>
-struct upper_bound_config_selector
+struct default_config_for_lower_bound
+{};
+
+template<class Unused, class Value, class Output>
+struct wrapped_transform_config<default_config_for_binary_search<Value, Output>, Unused>
 {
-    using targets    = upper_bound_targets;
-    using param_type = transform_config_params;
-
-    param_type params;
-
-    template<class Target>
-    constexpr upper_bound_config_selector(Target)
-        : params(upper_bound_config_picker<Target, Value, Output>())
-    {}
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr transform_config_params params
+            = default_binary_search_config<static_cast<unsigned int>(Arch), Value, Output>{};
+    };
 };
+
+template<class Unused, class Value, class Output>
+struct wrapped_transform_config<default_config_for_upper_bound<Value, Output>, Unused>
+{
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr transform_config_params params
+            = default_upper_bound_config<static_cast<unsigned int>(Arch), Value, Output>{};
+    };
+};
+
+template<class Unused, class Value, class Output>
+struct wrapped_transform_config<default_config_for_lower_bound<Value, Output>, Unused>
+{
+    template<target_arch Arch>
+    struct architecture_config
+    {
+        static constexpr transform_config_params params
+            = default_lower_bound_config<static_cast<unsigned int>(Arch), Value, Output>{};
+    };
+};
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+template<class Unused, class Value, class Output>
+template<target_arch Arch>
+constexpr transform_config_params
+    wrapped_transform_config<default_config_for_binary_search<Value, Output>,
+                             Unused>::architecture_config<Arch>::params;
+template<class Unused, class Value, class Output>
+template<target_arch Arch>
+constexpr transform_config_params
+    wrapped_transform_config<default_config_for_upper_bound<Value, Output>,
+                             Unused>::architecture_config<Arch>::params;
+template<class Unused, class Value, class Output>
+template<target_arch Arch>
+constexpr transform_config_params
+    wrapped_transform_config<default_config_for_lower_bound<Value, Output>,
+                             Unused>::architecture_config<Arch>::params;
+#endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } // end namespace detail
 

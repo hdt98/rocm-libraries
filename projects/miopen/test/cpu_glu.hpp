@@ -26,9 +26,8 @@
 
 #pragma once
 
+#include "ford.hpp"
 #include "tensor_holder.hpp"
-
-#include <miopen/ford.hpp>
 
 template <typename T>
 T sigmoid(T x)
@@ -42,7 +41,7 @@ void cpu_glu_contiguous_dim0_forward(const tensor<T>& input, tensor<T>& ref_outp
     auto output_dims  = ref_output.desc.GetLengths();
     auto output_numel = ref_output.desc.GetElementSize();
 
-    miopen::par_ford(output_numel)([&](size_t o) {
+    par_ford(output_numel)([&](size_t o) {
         T valA        = input[o];
         T valB        = input[o + output_numel];
         T val         = valA * sigmoid(valB);
@@ -58,7 +57,7 @@ void cpu_glu_contiguous_dim0_backward(const tensor<T>& input,
     auto outputGrad_dims  = grad_output.desc.GetLengths();
     auto outputGrad_numel = grad_output.desc.GetElementSize();
 
-    miopen::par_ford(outputGrad_numel)([&](size_t o) {
+    par_ford(outputGrad_numel)([&](size_t o) {
         T inputFirstHalf_v               = input[o];
         T sigmoid_v                      = sigmoid(input[o + outputGrad_numel]);
         T grad_v                         = grad_output[o];

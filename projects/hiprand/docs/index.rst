@@ -12,29 +12,25 @@ The hipRAND library is a wrapper library that lets you easily port NVIDIA CUDA a
 to the HIP layer. It sits between your application and the backend RAND library,
 where it marshals inputs to the backend and results to the application. hipRAND exports an interface that doesn't
 require the client to change, regardless of the chosen backend.
-It uses rocRAND in a ROCm environment and provides C, C++, and Python API wrappers.
+It uses rocRAND in a ROCm environment and cuRAND in a CUDA environment and provides C, C++, and Python API wrappers.
 
-The hipRAND public repository is located at `<https://github.com/ROCm/rocm-libraries/tree/develop/projects/hiprand>`_.
+The hipRAND public repository is located at `<https://github.com/ROCm/hipRAND>`_.
 
-.. note::
-
-   The hipRAND repository for ROCm 6.4 and earlier is located at `<https://github.com/ROCm/hipRAND>`_.
 
 .. grid:: 2
   :gutter: 3
 
   .. grid-item-card:: Install
 
-    * :doc:`Install hipRAND <./install/installation>`
-    * :doc:`Build from source <./install/build>`
+    * :doc:`Installation guide <./install/installation>`    
 
   .. grid-item-card:: How to
 
-    * :doc:`Use hipRAND interfaces <./how-to/use-hiprand-interfaces>`
+    * :doc:`Use hipRAND interfaces <./how-to/use-hiprand-interfaces>`    
 
   .. grid-item-card:: Examples
 
-    * `Examples <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hiprand/python/hiprand/examples>`_
+    * `Examples <https://github.com/ROCm/hipRAND/tree/develop/python/hiprand/examples>`_
 
   .. grid-item-card:: API reference
 

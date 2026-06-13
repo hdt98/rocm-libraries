@@ -19,3 +19,4 @@
 #include <thrust/detail/config.h>
 
 #include <thrust/mr/device_memory_resource.h>
+

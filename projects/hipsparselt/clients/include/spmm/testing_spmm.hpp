@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -45,18 +45,18 @@
 template <typename T, typename Tb = T, typename To = T, hipsparseOrder_t order>
 void bias(int64_t m, int64_t n, int64_t ld, T* src, To* dest, Tb* bias)
 {
-    using TAccum = float;
-
-    auto saturate_i8 = [](TAccum val) {
+    auto saturate_i8 = [](Tb val) {
         auto _val = std::nearbyint(static_cast<double>(val));
         _val      = _val > 127.f ? 127.f : _val < -128.f ? -128.f : _val;
         return static_cast<To>(_val);
     };
 
-    auto saturate_o = [](TAccum val) { return static_cast<To>(val); };
+    auto saturate_o = [](Tb val) { return static_cast<To>(val); };
 
-    To (*saturate)(TAccum val);
+    To (*saturate)(Tb val);
     saturate = std::is_same<int8_t, To>() ? saturate_i8 : saturate_o;
+
+    using TAccum = std::conditional_t<std::is_same<__half, Tb>::value, float, Tb>;
 
     for(int64_t i = 0; i < m; i++)
     {
@@ -114,7 +114,7 @@ auto _clippedrelu = [](auto in, auto arg1, auto arg2) -> decltype(in) {
     if(in > arg1)
         return static_cast<decltype(in)>(std::min(in, arg2));
     else
-        return static_cast<decltype(in)>(std::min(static_cast<decltype(in)>(0.0), arg2));
+        return static_cast<decltype(in)>(0);
 };
 
 auto _gelu = [](auto in, auto arg1, auto /*arg2*/) -> decltype(in) {
@@ -182,9 +182,6 @@ void testing_spmm_bad_arg(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dC.memcheck());
     CHECK_DEVICE_ALLOCATION(dD.memcheck());
 
-    hipsparseLtHandle_t      handle_;
-    hipsparseLtMatmulPlan_t plan_;
-
     hipsparselt_local_handle    handle{arg};
     hipsparselt_local_mat_descr matA(
         hipsparselt_matrix_type_structured, handle, M, K, lda, arg.a_type, HIPSPARSE_ORDER_COL);
@@ -210,15 +207,7 @@ void testing_spmm_bad_arg(const Arguments& arg)
         HIPSPARSE_STATUS_INVALID_VALUE);
 
     EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmul(&handle_, plan, &alpha, dA, dB, &beta, dC, dD, workspace, &stream, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    EXPECT_HIPSPARSE_STATUS(
         hipsparseLtMatmul(handle, nullptr, &alpha, dA, dB, &beta, dC, dD, workspace, &stream, 1),
-        HIPSPARSE_STATUS_INVALID_VALUE);
-
-    EXPECT_HIPSPARSE_STATUS(
-        hipsparseLtMatmul(handle, &plan_, &alpha, dA, dB, &beta, dC, dD, workspace, &stream, 1),
         HIPSPARSE_STATUS_INVALID_VALUE);
 
     EXPECT_HIPSPARSE_STATUS(
@@ -581,14 +570,14 @@ void testing_spmm(const Arguments& arg)
     hipsparselt_local_matmul_alg_selection alg_sel(handle, matmul, HIPSPARSELT_MATMUL_ALG_DEFAULT);
 
     size_t workspace_size = 0, compressed_size = 0, compress_buffer_size = 0;
-    int config_max_id = 0;
-    hipsparseLtMatmulAlgGetAttribute(
-        handle, alg_sel, HIPSPARSELT_MATMUL_ALG_CONFIG_MAX_ID, &config_max_id, sizeof(int));
+
     {
 
         if(arg.search)
         {
-
+            int config_max_id = 0;
+            hipsparseLtMatmulAlgGetAttribute(
+                handle, alg_sel, HIPSPARSELT_MATMUL_ALG_CONFIG_MAX_ID, &config_max_id, sizeof(int));
             for(int i = 0; i < config_max_id; i++)
             {
                 hipsparseLtMatmulAlgSetAttribute(
@@ -612,20 +601,6 @@ void testing_spmm(const Arguments& arg)
                 hipsparseLtMatmulGetWorkspace(handle, plan_tmp, &workspace_size),
                 HIPSPARSE_STATUS_SUCCESS);
         }
-    }
-
-    int selected_config_id = 0;
-    if(!arg.search and arg.solution_index > 0)
-    {
-        if(arg.solution_index >= config_max_id)
-        {
-            hipsparselt_cerr << "The given solution_index(" << arg.solution_index << ") is out of the rang [0, " << config_max_id - 1 << "]" << std::endl;
-            return;
-        }
-        hipsparseLtMatmulAlgSetAttribute(
-            handle, alg_sel, HIPSPARSELT_MATMUL_ALG_CONFIG_ID, &arg.solution_index, sizeof(int));
-        hipsparseLtMatmulAlgGetAttribute(
-            handle, alg_sel, HIPSPARSELT_MATMUL_ALG_CONFIG_ID, &selected_config_id, sizeof(int));
     }
 
     hipsparselt_local_matmul_plan plan(handle, matmul, alg_sel);
@@ -777,7 +752,6 @@ void testing_spmm(const Arguments& arg)
         HIPSPARSE_STATUS_SUCCESS);
 
     if(arg.search)
-    {
         EXPECT_HIPSPARSE_STATUS(
             hipsparseLtMatmulSearch(handle,
                                     plan,
@@ -791,10 +765,6 @@ void testing_spmm(const Arguments& arg)
                                     &stream,
                                     1),
             HIPSPARSE_STATUS_SUCCESS);
-
-        hipsparseLtMatmulAlgGetAttribute(
-            handle, alg_sel, HIPSPARSELT_MATMUL_ALG_CONFIG_ID, &selected_config_id, sizeof(int));
-    }
     if(arg.unit_check || arg.norm_check)
     {
         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
@@ -974,11 +944,6 @@ void testing_spmm(const Arguments& arg)
         {
             hipsparselt_error = std::abs(
                 norm_check_general<To>('F', tM, tN, ldd, stride_d, hD_gold, hD_1, num_batches));
-
-            if(arg.norm_check_assert)
-            {
-                CHECK_SUCCESS(norm_check<To>(hipsparselt_error));
-            }
         }
 
         // Debug
@@ -1063,8 +1028,8 @@ void testing_spmm(const Arguments& arg)
         default:
             break;
         }
-#define argument_param_nb                                                                                 \
-    e_sparse_b, e_transA, e_transB, e_M, e_N, e_K, e_alpha, e_lda, e_stride_a, e_beta, e_ldb, e_stride_b, \
+#define argument_param_nb                                                                     \
+    e_transA, e_transB, e_M, e_N, e_K, e_alpha, e_lda, e_stride_a, e_beta, e_ldb, e_stride_b, \
         e_ldc, e_stride_c, e_ldd, e_stride_d
 #define argument_param argument_param_nb, e_batch_count
 
@@ -1075,11 +1040,7 @@ void testing_spmm(const Arguments& arg)
                                                             flops,
                                                             ArgumentLogging::NA_value,
                                                             cpu_time_used,
-                                                            hipsparselt_error,
-                                                            ArgumentLogging::NA_value,
-                                                            ArgumentLogging::NA_value,
-                                                            ArgumentLogging::NA_value,
-                                                            selected_config_id);
+                                                            hipsparselt_error);
         else
             ArgumentModel<argument_param_nb>{}.log_args<float>(hipsparselt_cout,
                                                                arg,
@@ -1087,11 +1048,7 @@ void testing_spmm(const Arguments& arg)
                                                                flops,
                                                                ArgumentLogging::NA_value,
                                                                cpu_time_used,
-                                                               hipsparselt_error,
-                                                               ArgumentLogging::NA_value,
-                                                               ArgumentLogging::NA_value,
-                                                               ArgumentLogging::NA_value,
-                                                               selected_config_id);
+                                                               hipsparselt_error);
     }
     CHECK_HIP_ERROR(hipStreamDestroy(stream));
 }
@@ -1533,14 +1490,4 @@ void testing_aux_plan_assign(const Arguments& arg)
     }
 
     CHECK_HIP_ERROR(hipStreamDestroy(stream));
-}
-
-template <typename Ti,
-          typename To,
-          typename Tc,
-          typename TBias>
-void testing_spmm_logging(const Arguments& arg)
-{
-    Logger logger(arg.logging);
-    testing_spmm<Ti, To, Tc, TBias>(arg);
 }

@@ -82,20 +82,18 @@ public:
     {
         if(chunk_id > 0)
         {
-            (void)msController.SetWaitEvent(layerChunkEndEvent[layer_id][chunk_id - 1].get(),
-                                            stream_id);
+            msController.SetWaitEvent(layerChunkEndEvent[layer_id][chunk_id - 1].get(), stream_id);
         }
         if(layer_id > 0)
         {
-            (void)msController.SetWaitEvent(layerChunkEndEvent[layer_id - 1][chunk_id].get(),
-                                            stream_id);
+            msController.SetWaitEvent(layerChunkEndEvent[layer_id - 1][chunk_id].get(), stream_id);
         }
     }
 
     inline void PostDispatchUpdate(size_t layer_id, size_t chunk_id, int stream_id)
     {
         layerNewTimeState[layer_id] += timeChunkSz;
-        (void)msController.RecordEvent(layerChunkEndEvent[layer_id][chunk_id].get(), stream_id);
+        msController.RecordEvent(layerChunkEndEvent[layer_id][chunk_id].get(), stream_id);
     }
 
     inline bool IsDispatchable(size_t layer_id, size_t dispatch_chunk_time) const

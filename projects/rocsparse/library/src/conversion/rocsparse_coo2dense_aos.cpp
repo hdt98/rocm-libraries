@@ -23,10 +23,10 @@
  * ************************************************************************ */
 
 #include "rocsparse_coo2dense_aos.hpp"
+#include "common.h"
+#include "control.h"
 #include "rocsparse_common.h"
-#include "rocsparse_common.hpp"
-#include "rocsparse_control.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "coo2dense_device.h"
 
@@ -146,14 +146,10 @@ rocsparse_status rocsparse::coo2dense_aos_template(rocsparse_handle          han
         int64_t                   lda,                                         \
         rocsparse_order           order)
 
-INSTANTIATE(int32_t, _Float16);
-INSTANTIATE(int32_t, rocsparse_bfloat16);
 INSTANTIATE(int32_t, float);
 INSTANTIATE(int32_t, double);
 INSTANTIATE(int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, rocsparse_double_complex);
-INSTANTIATE(int64_t, _Float16);
-INSTANTIATE(int64_t, rocsparse_bfloat16);
 INSTANTIATE(int64_t, float);
 INSTANTIATE(int64_t, double);
 INSTANTIATE(int64_t, rocsparse_float_complex);

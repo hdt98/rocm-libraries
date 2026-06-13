@@ -1,28 +1,7 @@
-// Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 #include <thrust/detail/raw_reference_cast.h>
 #include <thrust/device_vector.h>
-#include <thrust/fill.h>
 #include <thrust/sequence.h>
-
+#include <thrust/fill.h>
 #include <iostream>
 
 #include "include/host_device.h"
@@ -32,7 +11,7 @@
 //
 // Using iterators in the manner described here is generally discouraged.
 // Users should only resort to this technique if there is no viable
-// implementation of a given operation in terms of Thrust algorithms.
+// implemention of a given operation in terms of Thrust algorithms.
 // For example this particular example is better solved with thrust::copy,
 // which is safer and potentially faster.  Only use this approach after all
 // safer alternatives have been exhausted.
@@ -50,35 +29,39 @@
 // meta-data so it should only be used when the code is guaranteed to be
 // executed within an appropriate context.
 
-__host__ __device__ void assign_reference_to_reference(int& x, int& y)
+
+__host__ __device__
+void assign_reference_to_reference(int& x, int& y)
 {
   y = x;
 }
 
-__host__ __device__ void assign_value_to_reference(int x, int& y)
+__host__ __device__
+void assign_value_to_reference(int x, int& y)
 {
   y = x;
 }
 
-template <typename InputIterator, typename OutputIterator>
+template <typename InputIterator,
+          typename OutputIterator>
 struct copy_iterators
 {
-  InputIterator input;
+  InputIterator  input;
   OutputIterator output;
 
   copy_iterators(InputIterator input, OutputIterator output)
-      : input(input)
-      , output(output)
+    : input(input), output(output)
   {}
 
-  __host__ __device__ void operator()(int i)
+  __host__ __device__
+  void operator()(int i)
   {
-    InputIterator in   = input + i;
+    InputIterator  in  = input  + i;
     OutputIterator out = output + i;
 
     // invalid - reference<int> is not convertible to int&
     // assign_reference_to_reference(*in, *out);
-
+   
     // valid - reference<int> explicitly converted to int&
     assign_reference_to_reference(thrust::raw_reference_cast(*in), thrust::raw_reference_cast(*out));
 
@@ -93,11 +76,11 @@ void print(const std::string& name, const Vector& v)
   using T = typename Vector::value_type;
 
   std::cout << name << ": ";
-  thrust::copy(v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "));
+  thrust::copy(v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "));  
   std::cout << "\n";
 }
 
-int main()
+int main(void)
 {
   using Vector   = thrust::device_vector<int>;
   using Iterator = Vector::iterator;
@@ -116,13 +99,14 @@ int main()
   print("B", B);
 
   // note: we must specify the System to ensure correct execution
-  thrust::for_each(thrust::counting_iterator<int, System>(0),
-                   thrust::counting_iterator<int, System>(5),
-                   copy_iterators<Iterator, Iterator>(A.begin(), B.begin()));
-
+  thrust::for_each(thrust::counting_iterator<int,System>(0),
+                   thrust::counting_iterator<int,System>(5),
+                   copy_iterators<Iterator,Iterator>(A.begin(), B.begin()));
+  
   std::cout << "After A->B Copy" << std::endl;
   print("A", A);
   print("B", B);
-
+ 
   return 0;
 }
+

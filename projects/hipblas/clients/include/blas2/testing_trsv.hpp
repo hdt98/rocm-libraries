@@ -151,7 +151,7 @@ void testing_trsv(const Arguments& arg)
     CHECK_DEVICE_ALLOCATION(dA.memcheck());
     CHECK_DEVICE_ALLOCATION(dx_or_b.memcheck());
 
-    double hipblas_error{0};
+    double hipblas_error;
 
     // Initial Data on CPU
     hipblas_init_matrix(hA,
@@ -201,7 +201,7 @@ void testing_trsv(const Arguments& arg)
 
     if(arg.timing)
     {
-        double      gpu_time_used{0};
+        double      gpu_time_used;
         hipStream_t stream;
         CHECK_HIPBLAS_ERROR(hipblasGetStream(handle, &stream));
         CHECK_HIPBLAS_ERROR(hipblasSetPointerMode(handle, HIPBLAS_POINTER_MODE_HOST));

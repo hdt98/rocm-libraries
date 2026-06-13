@@ -40,6 +40,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+hipsparseLtComputetype_t RocSparseLtComputetypeToHIPComputetype(rocsparselt_compute_type_ type);
 hipsparseOperation_t     HCCOperationToHIPOperation(rocsparselt_operation_ op);
 #ifdef __cplusplus
 }
@@ -50,6 +51,18 @@ inline bool isAligned(const void* pointer, size_t byte_count)
     return reinterpret_cast<uintptr_t>(pointer) % byte_count == 0;
 }
 
+// return precision string for hipDataType
+constexpr const char* hipDataType_string(hipDataType type)
+{
+    return hip_datatype_to_string(type);
+}
+
+// return precision string for rocsparselt_compute_type
+constexpr const char* rocsparselt_compute_type_string(rocsparselt_compute_type type)
+{
+    return hipsparselt_computetype_to_string(RocSparseLtComputetypeToHIPComputetype(type));
+}
+
 constexpr const char* rocsparselt_transpose_letter(rocsparselt_operation op)
 {
     return hipsparselt_operation_to_string(HCCOperationToHIPOperation(op));
@@ -58,35 +71,29 @@ constexpr const char* rocsparselt_transpose_letter(rocsparselt_operation op)
 template <typename>
 static constexpr char rocsparselt_precision_string[] = "invalid";
 template <>
-inline constexpr char rocsparselt_precision_string<hip_bfloat16>[] = "bf16_r";
+static constexpr char rocsparselt_precision_string<hip_bfloat16>[] = "bf16_r";
 template <>
-inline constexpr char rocsparselt_precision_string<__half>[] = "f16_r";
+static constexpr char rocsparselt_precision_string<__half>[] = "f16_r";
 template <>
-inline constexpr char rocsparselt_precision_string<float>[] = "f32_r";
+static constexpr char rocsparselt_precision_string<float>[] = "f32_r";
 template <>
-inline constexpr char rocsparselt_precision_string<double>[] = "f64_r";
+static constexpr char rocsparselt_precision_string<double>[] = "f64_r";
 template <>
-inline constexpr char rocsparselt_precision_string<int8_t>[] = "i8_r";
+static constexpr char rocsparselt_precision_string<int8_t>[] = "i8_r";
 template <>
-inline constexpr char rocsparselt_precision_string<uint8_t>[] = "u8_r";
+static constexpr char rocsparselt_precision_string<uint8_t>[] = "u8_r";
 template <>
-inline constexpr char rocsparselt_precision_string<int32_t>[] = "i32_r";
+static constexpr char rocsparselt_precision_string<int32_t>[] = "i32_r";
 template <>
-inline constexpr char rocsparselt_precision_string<uint32_t>[] = "u32_r";
-#if HIP_FP8_TYPE_OCP
+static constexpr char rocsparselt_precision_string<uint32_t>[] = "u32_r";
 template <>
-inline constexpr char rocsparselt_precision_string<__hip_fp8_e4m3>[] = "f8_r";
+static constexpr char rocsparselt_precision_string<__hip_fp8_e4m3>[] = "f8_r";
 template <>
-inline constexpr char rocsparselt_precision_string<__hip_fp8_e5m2>[] = "bf8_r";
-#endif
-#if HIP_FP8_TYPE_FNUZ
-template <>
-inline constexpr char rocsparselt_precision_string<__hip_fp8_e4m3_fnuz>[] = "f8_fnuz_r";
-template <>
-inline constexpr char rocsparselt_precision_string<__hip_fp8_e5m2_fnuz>[] = "bf8_fnuz_r";
-#endif
+static constexpr char rocsparselt_precision_string<__hip_fp8_e5m2>[] = "bf8_r";
 
 std::string prefix(const char* layer, const char* caller);
+
+const char* hipDataType_to_string(hipDataType type);
 
 const char* rocsparselt_compute_type_to_string(rocsparselt_compute_type type);
 

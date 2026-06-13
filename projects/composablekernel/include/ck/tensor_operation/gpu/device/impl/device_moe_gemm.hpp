@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -87,29 +87,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                                                                    BElementwiseOperation,
                                                                    CElementwiseOperation>
 {
-    static constexpr auto WarpTileConfig64 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               true>();
-    static constexpr auto WarpTileConfig32 = GetWarpTileConfig<BlockSize,
-                                                               MPerBlock,
-                                                               NPerBlock,
-                                                               MPerXDL,
-                                                               NPerXDL,
-                                                               MXdlPerWave,
-                                                               CShuffleMXdlPerWavePerShuffle,
-                                                               CShuffleNXdlPerWavePerShuffle,
-                                                               false>();
-    static constexpr auto NXdlPerWave64    = WarpTileConfig64.At(3);
-    static constexpr auto NXdlPerWave32    = WarpTileConfig32.At(3);
-    static constexpr index_t NumDTensor    = DsDataType::Size();
-    template <typename WarpTileConfig>
-    using GridwiseGemmBase =
+    static constexpr index_t NumDTensor = DsDataType::Size();
+    using GridwiseGemm =
         GridwiseMoeGemm<ALayout,
                         BLayout,
                         DsLayout,
@@ -130,10 +109,10 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         KPerBlock,
                         AK1,
                         BK1,
-                        WarpTileConfig::At(0),
-                        WarpTileConfig::At(1),
-                        WarpTileConfig::At(2),
-                        WarpTileConfig::At(3),
+                        MPerXDL,
+                        NPerXDL,
+                        MXdlPerWave,
+                        NXdlPerWave,
                         ABlockTransferThreadClusterLengths_AK0_M_AK1,
                         ABlockTransferThreadClusterArrangeOrder,
                         ABlockTransferSrcAccessOrder,
@@ -150,8 +129,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         BBlockTransferDstScalarPerVector_BK1,
                         false,
                         BBlockLdsExtraN,
-                        WarpTileConfig::At(4),
-                        WarpTileConfig::At(5),
+                        CShuffleMXdlPerWavePerShuffle,
+                        CShuffleNXdlPerWavePerShuffle,
                         CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
                         CDEShuffleBlockTransferScalarPerVectors,
                         BlkGemmPipeSched,
@@ -166,10 +145,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         ComputeTypeB,
                         LDSTypeA,
                         LDSTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
-    using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
 
-    using Argument = typename GridwiseGemm64::Argument;
+    using Argument = typename GridwiseGemm::Argument;
 
     static constexpr index_t APackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<ADataType>, pk_i4_t>)
@@ -185,17 +162,12 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
             return 1;
     }();
 
-    int GetPreShuffleParameters() override
-    {
-        return get_warp_size() == 64 ? WarpTileConfig64.At(1) : WarpTileConfig32.At(1);
-    }
+    int GetPreShuffleParameters() override { return NPerXDL; }
 
     // Invoker
     struct Invoker : public BaseInvoker
     {
-        template <typename GridwiseGemm>
-        float RunImp(const typename GridwiseGemm::Argument& arg,
-                     const StreamConfig& stream_config = StreamConfig{})
+        float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             if(stream_config.log_level_ > 0)
             {
@@ -223,7 +195,7 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
 
                     std::array<std::size_t, NumDTensor> DsSize;
 
-                    auto arg_ = arg;
+                    Argument arg_ = arg;
 
                     const auto a_grid_desc_ak0_m_ak1 = GridwiseGemm::MakeAGridDescriptor_AK0_M_AK1(
                         arg_.M, arg_.MPadded, arg_.K, arg_.KPadded, arg_.StrideA, arg_.AK0);
@@ -242,13 +214,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
                         DsSize[i] = ds_grid_desc_m_n[i].GetElementSpaceSize() * sizeof(DDataType);
                     });
-                    ck::utility::RotatingMemWrapperMultiD<typename GridwiseGemm::Argument,
-                                                          DsDataType>
-                        rotating_mem(arg_,
-                                     stream_config.rotating_count,
-                                     size_a_buffer,
-                                     size_b_buffer,
-                                     DsSize);
+                    ck::utility::RotatingMemWrapperMultiD<Argument, DsDataType> rotating_mem(
+                        arg_, stream_config.rotating_count, size_a_buffer, size_b_buffer, DsSize);
                     rotating_mem.Print();
 
                     auto run_flush_cache = [&]() {
@@ -358,58 +325,18 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                 // Tail number always 1
                 if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
                 {
-                    if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
-                    {
-                        const auto kernel = kernel_moe_gemm<GridwiseGemm,
-                                                            false,
-                                                            MemoryDataOp,
-                                                            minimum_occupancy,
-                                                            TailNumber::Odd>;
-                        RunKernel(kernel);
-                    }
-                    else
-                    {
-                        const auto kernel = kernel_moe_gemm<GridwiseGemm,
-                                                            false,
-                                                            MemoryDataOp,
-                                                            minimum_occupancy,
-                                                            TailNumber::Even>;
-                        RunKernel(kernel);
-                    }
-                }
-                else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v2 ||
-                                  BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
-                {
-                    if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
-                    {
-                        const auto kernel = kernel_moe_gemm_2lds<GridwiseGemm,
-                                                                 false,
-                                                                 MemoryDataOp,
-                                                                 minimum_occupancy,
-                                                                 TailNumber::Odd>;
-                        RunKernel(kernel);
-                    }
-                    else
-                    {
-                        const auto kernel = kernel_moe_gemm_2lds<GridwiseGemm,
-                                                                 false,
-                                                                 MemoryDataOp,
-                                                                 minimum_occupancy,
-                                                                 TailNumber::Even>;
-                        RunKernel(kernel);
-                    }
-                }
-                else
-                {
-                    throw std::runtime_error("todo: only v1 & v2 support now");
+                    const auto kernel = kernel_moe_gemm<GridwiseGemm,
+                                                        true,
+                                                        InMemoryDataOperationEnum::Set,
+                                                        minimum_occupancy,
+                                                        TailNumber::Odd>;
+                    RunKernel(kernel);
                 }
             }
 #endif
 
             return ave_time;
         }
-
-        INVOKER_RUN3_IMPL
 
         // polymorphic
         float Run(const BaseArgument* p_arg,
@@ -432,15 +359,11 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
         {
             return false;
         }
-        if(!ck::is_xdl_wmma_supported<ComputeTypeA,
-                                      ComputeTypeB,
-                                      MPerXDL,
-                                      NPerXDL,
-                                      WarpTileConfig32.At(0),
-                                      WarpTileConfig32.At(1)>())
+        if(!ck::is_xdl_supported())
         {
             return false;
         }
+
         if(!is_bf16_atomic_supported() && std::is_same_v<CDataType, ck::bhalf_t> && arg.KBatch > 1)
         {
             return false;
@@ -457,22 +380,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
         {
             return false;
         }
-        if(get_warp_size() == 64)
-        {
-            if constexpr(NXdlPerWave64 > 0)
-            {
-                return GridwiseGemm64::CheckValidity(arg);
-            }
-        }
-        else
-        {
-            if constexpr(NXdlPerWave32 > 0)
-            {
-                return GridwiseGemm32::CheckValidity(
-                    reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
-            }
-        }
-        return false;
+
+        return GridwiseGemm::CheckValidity(arg);
     }
 
     // polymorphic
@@ -606,7 +515,7 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
             << "BlkGemmPipelineVersion: "
             << BlkGemmPipelineVersionToString[BlkGemmPipelineVer] << ", "
             << "BlkGemmPipelinePrefetchStages: "
-            << GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages;
+            << GridwiseGemm::BlockwiseGemmPipe::PrefetchStages;
         // clang-format on
 
         return str.str();

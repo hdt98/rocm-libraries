@@ -17,7 +17,6 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/system/detail/generic/tag.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -28,17 +27,32 @@ namespace detail
 namespace generic
 {
 
-template <typename DerivedPolicy, typename InputIterator, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator
-copy(thrust::execution_policy<DerivedPolicy>& exec, InputIterator first, InputIterator last, OutputIterator result);
 
-template <typename DerivedPolicy, typename InputIterator, typename Size, typename OutputIterator>
-THRUST_HOST_DEVICE OutputIterator
-copy_n(thrust::execution_policy<DerivedPolicy>& exec, InputIterator first, Size n, OutputIterator result);
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator copy(thrust::execution_policy<DerivedPolicy> &exec,
+                      InputIterator  first,
+                      InputIterator  last,
+                      OutputIterator result);
 
-} // namespace generic
-} // namespace detail
-} // namespace system
+
+template<typename DerivedPolicy,
+         typename InputIterator,
+         typename Size,
+         typename OutputIterator>
+THRUST_HOST_DEVICE
+  OutputIterator copy_n(thrust::execution_policy<DerivedPolicy> &exec,
+                        InputIterator  first,
+                        Size           n,
+                        OutputIterator result);
+
+
+} // end generic
+} // end detail
+} // end system
 THRUST_NAMESPACE_END
 
 #include <thrust/system/detail/generic/copy.inl>
+

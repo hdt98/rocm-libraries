@@ -5,7 +5,5 @@ myst:
         "keywords": "rocFFT, FFT, ROCm, API, documentation, license"
 ---
 
-# License
-
 ```{include} ../LICENSE.md
 ```

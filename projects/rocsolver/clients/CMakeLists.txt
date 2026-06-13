@@ -1,5 +1,5 @@
 # ##########################################################################
-# Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,12 +25,13 @@
 # SUCH DAMAGE.
 # ##########################################################################
 
+project(rocsolver-clients LANGUAGES C CXX)
 if(UNIX)
   enable_language(Fortran)
 endif()
 
 # Specify where to put the client binaries
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/staging")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging")
 
 # The rocsolver target will exist if the library is being built along with the clients,
 # but if this is a clients-only build, we'll have to search for it.
@@ -57,12 +58,11 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   add_library(clients-common INTERFACE)
   target_include_directories(clients-common INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../library/src/include>
   )
   target_link_libraries(clients-common INTERFACE
     ${LAPACK_LIBRARIES}
     $<$<PLATFORM_ID:Linux>:stdc++fs>
-    fmt::fmt-header-only
+    fmt::fmt
   )
   target_link_options(clients-common INTERFACE
     ${LAPACK_LINKER_FLAGS}
@@ -72,14 +72,11 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/auxiliary/testing_lacgv.cpp
     common/auxiliary/testing_laswp.cpp
     common/auxiliary/testing_larfg.cpp
-    common/auxiliary/testing_lange.cpp
-    common/auxiliary/testing_gecon.cpp
     common/auxiliary/testing_larf.cpp
     common/auxiliary/testing_larft.cpp
     common/auxiliary/testing_larfb.cpp
     common/auxiliary/testing_lasr.cpp
     common/auxiliary/testing_latrd.cpp
-    common/auxiliary/testing_latrd_forsytrd.cpp
     common/auxiliary/testing_labrd.cpp
     common/auxiliary/testing_lauum.cpp
     common/auxiliary/testing_bdsqr.cpp
@@ -116,7 +113,6 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_geql2_geqlf.cpp
     common/lapack/testing_gelq2_gelqf.cpp
     common/lapack/testing_getrs.cpp
-    common/lapack/testing_getrs_npvt.cpp
     common/lapack/testing_gesv.cpp
     common/lapack/testing_gesvd.cpp
     common/lapack/testing_gesdd.cpp
@@ -130,8 +126,6 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_gels.cpp
     common/lapack/testing_gebd2_gebrd.cpp
     common/lapack/testing_sytf2_sytrf.cpp
-    common/lapack/testing_sytrs.cpp
-    common/lapack/testing_sytrs2.cpp
     common/lapack/testing_sytxx_hetxx.cpp
     common/lapack/testing_sygsx_hegsx.cpp
     common/lapack/testing_syev_heev.cpp
@@ -161,10 +155,6 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/refact/testing_csrrf_solve.cpp
   )
 
-  set(rocunit_inst_files
-    common/unit/testing_gemm.cpp
-  )
-
   set(common_source_files
     common/misc/lapack_host_reference.cpp
     common/misc/rocsolver_test.cpp
@@ -175,15 +165,15 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     ${rocauxiliary_inst_files}
     ${roclapack_inst_files}
     ${rocrefact_inst_files}
-    ${rocunit_inst_files}
   )
 
   prepend_path("${CMAKE_CURRENT_SOURCE_DIR}/" common_source_files common_source_paths)
+  target_sources(clients-common INTERFACE ${common_source_paths})
 
   # Copy and point to sparse test data
   file(COPY
     ${CMAKE_CURRENT_SOURCE_DIR}/sparsedata/
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/staging/sparsedata/
+    DESTINATION ${PROJECT_BINARY_DIR}/staging/sparsedata/
   )
   install(DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/sparsedata/

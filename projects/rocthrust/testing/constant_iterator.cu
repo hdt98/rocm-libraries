@@ -15,16 +15,13 @@
  *  limitations under the License.
  */
 
-#include <thrust/copy.h>
-#include <thrust/iterator/constant_iterator.h>
-#include <thrust/reduce.h>
-#include <thrust/transform.h>
-
 #include <unittest/unittest.h>
+#include <thrust/iterator/constant_iterator.h>
+#include <thrust/copy.h>
+#include <thrust/transform.h>
+#include <thrust/reduce.h>
 
-#include _THRUST_STD_INCLUDE(type_traits)
-
-void TestConstantIteratorConstructFromConvertibleSystem()
+void TestConstantIteratorConstructFromConvertibleSystem(void)
 {
   using namespace thrust;
 
@@ -38,94 +35,96 @@ void TestConstantIteratorConstructFromConvertibleSystem()
 }
 DECLARE_UNITTEST(TestConstantIteratorConstructFromConvertibleSystem);
 
-void TestConstantIteratorIncrement()
+void TestConstantIteratorIncrement(void)
 {
-  using namespace thrust;
+    using namespace thrust;
 
-  constant_iterator<int> lhs(0, 0);
-  constant_iterator<int> rhs(0, 0);
+    constant_iterator<int> lhs(0,0);
+    constant_iterator<int> rhs(0,0);
 
-  ASSERT_EQUAL(0, lhs - rhs);
+    ASSERT_EQUAL(0, lhs - rhs);
 
-  lhs++;
+    lhs++;
 
-  ASSERT_EQUAL(1, lhs - rhs);
+    ASSERT_EQUAL(1, lhs - rhs);
 
-  lhs++;
-  lhs++;
+    lhs++;
+    lhs++;
 
-  ASSERT_EQUAL(3, lhs - rhs);
+    ASSERT_EQUAL(3, lhs - rhs);
 
-  lhs += 5;
+    lhs += 5;
 
-  ASSERT_EQUAL(8, lhs - rhs);
+    ASSERT_EQUAL(8, lhs - rhs);
 
-  lhs -= 10;
+    lhs -= 10;
 
-  ASSERT_EQUAL(-2, lhs - rhs);
+    ASSERT_EQUAL(-2, lhs - rhs);
 }
 DECLARE_UNITTEST(TestConstantIteratorIncrement);
-static_assert(_THRUST_STD::is_trivially_copy_constructible<thrust::constant_iterator<int>>::value, "");
-static_assert(_THRUST_STD::is_trivially_copyable<thrust::constant_iterator<int>>::value, "");
+static_assert(std::is_trivially_copy_constructible<thrust::constant_iterator<int>>::value, "");
+static_assert(std::is_trivially_copyable<thrust::constant_iterator<int>>::value, "");
 
-void TestConstantIteratorIncrementBig()
+void TestConstantIteratorIncrementBig(void)
 {
-  long long int n = 10000000000ULL;
+    long long int n = 10000000000ULL;
 
-  thrust::constant_iterator<long long int> begin(1);
-  thrust::constant_iterator<long long int> end = begin + n;
+    thrust::constant_iterator<long long int> begin(1);
+    thrust::constant_iterator<long long int> end = begin + n;
 
-  ASSERT_EQUAL(thrust::distance(begin, end), n);
+    ASSERT_EQUAL(thrust::distance(begin, end), n);
 }
 DECLARE_UNITTEST(TestConstantIteratorIncrementBig);
 
-void TestConstantIteratorComparison()
+void TestConstantIteratorComparison(void)
 {
-  using namespace thrust;
+    using namespace thrust;
 
-  constant_iterator<int> iter1(0);
-  constant_iterator<int> iter2(0);
+    constant_iterator<int> iter1(0);
+    constant_iterator<int> iter2(0);
 
-  ASSERT_EQUAL(0, iter1 - iter2);
-  ASSERT_EQUAL(true, iter1 == iter2);
+    ASSERT_EQUAL(0, iter1 - iter2);
+    ASSERT_EQUAL(true, iter1 == iter2);
 
-  iter1++;
+    iter1++;
 
-  ASSERT_EQUAL(1, iter1 - iter2);
-  ASSERT_EQUAL(false, iter1 == iter2);
+    ASSERT_EQUAL(1, iter1 - iter2);
+    ASSERT_EQUAL(false, iter1 == iter2);
 
-  iter2++;
+    iter2++;
 
-  ASSERT_EQUAL(0, iter1 - iter2);
-  ASSERT_EQUAL(true, iter1 == iter2);
+    ASSERT_EQUAL(0, iter1 - iter2);
+    ASSERT_EQUAL(true, iter1 == iter2);
 
-  iter1 += 100;
-  iter2 += 100;
+    iter1 += 100;
+    iter2 += 100;
 
-  ASSERT_EQUAL(0, iter1 - iter2);
-  ASSERT_EQUAL(true, iter1 == iter2);
+    ASSERT_EQUAL(0, iter1 - iter2);
+    ASSERT_EQUAL(true, iter1 == iter2);
 }
 DECLARE_UNITTEST(TestConstantIteratorComparison);
 
-void TestMakeConstantIterator()
+
+void TestMakeConstantIterator(void)
 {
-  using namespace thrust;
+    using namespace thrust;
 
-  // test one argument version
-  constant_iterator<int> iter0 = make_constant_iterator<int>(13);
+    // test one argument version
+    constant_iterator<int> iter0 = make_constant_iterator<int>(13);
 
-  ASSERT_EQUAL(13, *iter0);
+    ASSERT_EQUAL(13, *iter0);
 
-  // test two argument version
-  constant_iterator<int, thrust::detail::intmax_t> iter1 = make_constant_iterator<int, thrust::detail::intmax_t>(13, 7);
+    // test two argument version
+    constant_iterator<int,thrust::detail::intmax_t> iter1 = make_constant_iterator<int,thrust::detail::intmax_t>(13, 7);
 
-  ASSERT_EQUAL(13, *iter1);
-  ASSERT_EQUAL(7, iter1 - iter0);
+    ASSERT_EQUAL(13, *iter1);
+    ASSERT_EQUAL(7, iter1 - iter0);
 }
 DECLARE_UNITTEST(TestMakeConstantIterator);
 
-template <typename Vector>
-void TestConstantIteratorCopy()
+
+template<typename Vector>
+void TestConstantIteratorCopy(void)
 {
   using namespace thrust;
 
@@ -138,13 +137,16 @@ void TestConstantIteratorCopy()
   ConstIter last  = first + result.size();
   thrust::copy(first, last, result.begin());
 
-  Vector ref(4, 7);
-  ASSERT_EQUAL(ref, result);
+  ASSERT_EQUAL(7, result[0]);
+  ASSERT_EQUAL(7, result[1]);
+  ASSERT_EQUAL(7, result[2]);
+  ASSERT_EQUAL(7, result[3]);
 };
 DECLARE_VECTOR_UNITTEST(TestConstantIteratorCopy);
 
-template <typename Vector>
-void TestConstantIteratorTransform()
+
+template<typename Vector>
+void TestConstantIteratorTransform(void)
 {
   using namespace thrust;
 
@@ -159,17 +161,22 @@ void TestConstantIteratorTransform()
 
   thrust::transform(first1, last1, result.begin(), thrust::negate<T>());
 
-  Vector ref(4, -7);
-  ASSERT_EQUAL(ref, result);
+  ASSERT_EQUAL(-7, result[0]);
+  ASSERT_EQUAL(-7, result[1]);
+  ASSERT_EQUAL(-7, result[2]);
+  ASSERT_EQUAL(-7, result[3]);
 
   thrust::transform(first1, last1, first2, result.begin(), thrust::plus<T>());
 
-  ref = Vector(4, 10);
-  ASSERT_EQUAL(ref, result);
+  ASSERT_EQUAL(10, result[0]);
+  ASSERT_EQUAL(10, result[1]);
+  ASSERT_EQUAL(10, result[2]);
+  ASSERT_EQUAL(10, result[3]);
 };
 DECLARE_VECTOR_UNITTEST(TestConstantIteratorTransform);
 
-void TestConstantIteratorReduce()
+
+void TestConstantIteratorReduce(void)
 {
   using namespace thrust;
 
@@ -184,3 +191,4 @@ void TestConstantIteratorReduce()
   ASSERT_EQUAL(sum, 4 * 7);
 };
 DECLARE_UNITTEST(TestConstantIteratorReduce);
+

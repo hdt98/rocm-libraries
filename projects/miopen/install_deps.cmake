@@ -16,7 +16,7 @@ endforeach()
 include(CMakeParseArguments)
 
 set(options help --minimum)
-set(oneValueArgs --prefix --generator)
+set(oneValueArgs --prefix)
 set(multiValueArgs)
 
 cmake_parse_arguments(PARSE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGS})
@@ -25,11 +25,10 @@ if(PARSE_help)
 message("Usage: install_deps.cmake [options] [cmake-args]")
 message("")
 message("Options:")
-message("  --prefix                   Set the prefix to install the dependencies.")
-message("  --generator <generator>    Specify the CMake generator (e.g., Ninja, Unix Makefiles).")
+message("  --prefix               Set the prefix to install the dependencies.")
 message("")
 message("Commands:")
-message("  help                       Show this message and exit.")
+message("  help                   Show this message and exit.")
 message("")
 message("  --minimum                  Install minimum dependencies.")
 message("")
@@ -42,17 +41,6 @@ if(PARSE_--prefix)
 endif()
 
 get_filename_component(PREFIX ${_PREFIX} ABSOLUTE)
-
-# Optionally map --generator to CGET_EXTRA_OPTIONS
-if(DEFINED PARSE_--generator)
-    set(VALID_GENERATORS "Ninja" "Unix Makefiles")
-    list(FIND VALID_GENERATORS "${PARSE_--generator}" _GENERATOR_INDEX)
-    if(_GENERATOR_INDEX EQUAL -1)
-        message(WARNING "Invalid generator '${PARSE_--generator}'. Valid options are: ${VALID_GENERATORS}. Ignoring this generator.")
-    else()
-        list(APPEND CGET_EXTRA_OPTIONS -G "${PARSE_--generator}")
-    endif()
-endif()
 
 find_program(VIRTUALENV_PYTHON_EXE python3)
 if(NOT VIRTUALENV_PYTHON_EXE)
@@ -92,7 +80,8 @@ if(NOT DEFINED ENV{CXX} AND NOT DEFINED CMAKE_CXX_COMPILER AND NOT DEFINED CMAKE
     endif()
 endif()
 
-if(NOT DEFINED ENV{CC} AND NOT DEFINED CMAKE_C_COMPILER AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+
+if(NOT DEFINED ENV{CC} AND NOT DEFINED CMAKE_C_COMPILER AND NOT DEFINED CMAKE_TOOLCHAIN_FILE) 
     find_program(CLANGC clang
         PATHS
             /opt/rocm/llvm
@@ -124,5 +113,5 @@ cget(init ${TOOLCHAIN_FLAG} -DCMAKE_INSTALL_RPATH=${PREFIX}/lib ${PARSE_UNPARSED
 cget(ignore pcre)
 
 # Install dependencies
-cget(install ${CGET_EXTRA_OPTIONS} -U ROCm/rocm-recipes@d7827046100ac0ed8167e16c53999baa126e760d)
-cget(install ${CGET_EXTRA_OPTIONS} -U -f requirements.txt)
+cget(install -U ROCm/rocm-recipes@92c6695449c85887962f45509b376f2eb0d284f7)
+cget(install -U -f requirements.txt)

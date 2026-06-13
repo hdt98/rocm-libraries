@@ -54,7 +54,8 @@ void init_kernel(EngineState*             states,
 }
 
 template<typename EngineState, typename T, typename Generator>
-__global__ __launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
+__global__
+__launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
 void generate_kernel(EngineState* states, T* data, const size_t size, Generator generator)
 {
     const unsigned int state_id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -108,15 +109,15 @@ struct runner
 };
 
 template<typename T, typename Generator>
-__global__ __launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
+__global__
+__launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
 void generate_kernel(rocrand_state_mtgp32* states, T* data, const size_t size, Generator generator)
 {
-    const unsigned int   state_id = blockIdx.x;
-    unsigned int         index    = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int         stride   = gridDim.x * blockDim.x;
+    const unsigned int state_id = blockIdx.x;
+    unsigned int       index    = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int stride         = gridDim.x * blockDim.x;
 
-    __shared__
-    rocrand_state_mtgp32 state;
+    __shared__ rocrand_state_mtgp32 state;
     rocrand_mtgp32_block_copy(&states[state_id], &state);
 
     const size_t r                 = size % blockDim.x;
@@ -240,7 +241,8 @@ struct runner<rocrand_state_lfsr113>
 };
 
 template<typename EngineState, typename SobolType>
-__global__ __launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
+__global__
+__launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
 void init_sobol_kernel(EngineState* states, SobolType* directions, SobolType offset)
 {
     const unsigned int dimension = blockIdx.y;
@@ -251,7 +253,8 @@ void init_sobol_kernel(EngineState* states, SobolType* directions, SobolType off
 }
 
 template<typename EngineState, typename SobolType>
-__global__ __launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
+__global__
+__launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
 void init_scrambled_sobol_kernel(EngineState* states,
                                  SobolType*   directions,
                                  SobolType*   scramble_constants,
@@ -269,7 +272,8 @@ void init_scrambled_sobol_kernel(EngineState* states,
 
 // generate_kernel for the normal and scrambled sobol generators
 template<typename EngineState, typename T, typename Generator>
-__global__ __launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
+__global__
+__launch_bounds__(ROCRAND_DEFAULT_MAX_BLOCK_SIZE)
 void generate_sobol_kernel(EngineState* states, T* data, const size_t size, Generator generator)
 {
     const unsigned int dimension = blockIdx.y;
@@ -572,7 +576,8 @@ struct generator_uint : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand(state);
     }
@@ -589,7 +594,8 @@ struct generator_ullong : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand(state);
     }
@@ -606,7 +612,8 @@ struct generator_uniform : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand_uniform(state);
     }
@@ -623,7 +630,8 @@ struct generator_uniform_double : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand_uniform_double(state);
     }
@@ -640,7 +648,8 @@ struct generator_normal : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand_normal(state);
     }
@@ -657,7 +666,8 @@ struct generator_normal_double : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand_normal_double(state);
     }
@@ -674,7 +684,8 @@ struct generator_log_normal : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand_log_normal(state, 0.f, 1.f);
     }
@@ -691,7 +702,8 @@ struct generator_log_normal_double : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state) const
+    data_type
+        operator()(Engine* state) const
     {
         return rocrand_log_normal_double(state, 0., 1.);
     }
@@ -710,7 +722,8 @@ struct generator_poisson : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state)
+    data_type
+        operator()(Engine* state)
     {
         return rocrand_poisson(state, lambda);
     }
@@ -741,7 +754,8 @@ struct generator_discrete_poisson : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state)
+    data_type
+        operator()(Engine* state)
     {
         return rocrand_discrete(state, discrete_distribution);
     }
@@ -782,7 +796,8 @@ struct generator_discrete_custom : public generator_type
     }
 
     __device__
-    data_type operator()(Engine* state)
+    data_type
+        operator()(Engine* state)
     {
         return rocrand_discrete(state, discrete_distribution);
     }

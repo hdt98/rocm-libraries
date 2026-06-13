@@ -39,14 +39,14 @@ extern "C" {
 *  temporary storage buffer has to be allocated by the user.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine supports execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
 *  m               number of rows of the sparse COO matrix.
 *  @param[in]
@@ -65,8 +65,8 @@ extern "C" {
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, or \p nnz is invalid.
-*  \retval     rocsparse_status_invalid_pointer \p coo_row_ind, \p coo_col_ind, or
+*  \retval     rocsparse_status_invalid_size \p m, \p n or \p nnz is invalid.
+*  \retval     rocsparse_status_invalid_pointer \p coo_row_ind, \p coo_col_ind or
 *              \p buffer_size pointer is invalid.
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 */
@@ -80,15 +80,15 @@ rocsparse_status rocsparse_coosort_buffer_size(rocsparse_handle     handle,
                                                size_t*              buffer_size);
 
 /*! \ingroup conv_module
-*  \brief Sort a sparse COO matrix by row.
+*  \brief Sort a sparse COO matrix by row
 *
 *  \details
 *  \p rocsparse_coosort_by_row sorts a matrix in COO format by row. The sorted
-*  permutation vector \p perm can be used to obtain the sorted \p coo_val array. In this
-*  case, \p perm must be initialized as the identity permutation. See
+*  permutation vector \p perm can be used to obtain sorted \p coo_val array. In this
+*  case, \p perm must be initialized as the identity permutation, see
 *  \ref rocsparse_create_identity_permutation().
 *
-*  \p rocsparse_coosort_by_row requires an extra temporary storage buffer that has to be
+*  \p rocsparse_coosort_by_row requires extra temporary storage buffer that has to be
 *  allocated by the user. Storage buffer size can be determined by
 *  \ref rocsparse_coosort_buffer_size().
 *
@@ -96,14 +96,14 @@ rocsparse_status rocsparse_coosort_buffer_size(rocsparse_handle     handle,
 *  \p perm can be \p NULL if a sorted permutation vector is not required.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
 *  m               number of rows of the sparse COO matrix.
 *  @param[in]
@@ -117,22 +117,70 @@ rocsparse_status rocsparse_coosort_buffer_size(rocsparse_handle     handle,
 *  coo_col_ind     array of \p nnz elements containing the column indices of the sparse
 *                  COO matrix.
 *  @param[inout]
-*  perm            array of \p nnz integers containing the unsorted map indices, which can be
+*  perm            array of \p nnz integers containing the unsorted map indices, can be
 *                  \p NULL.
 *  @param[in]
-*  temp_buffer     temporary storage buffer allocated by the user. The size is returned by
+*  temp_buffer     temporary storage buffer allocated by the user, size is returned by
 *                  \ref rocsparse_coosort_buffer_size().
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, or \p nnz is invalid.
-*  \retval     rocsparse_status_invalid_pointer \p coo_row_ind, \p coo_col_ind, or
+*  \retval     rocsparse_status_invalid_size \p m, \p n or \p nnz is invalid.
+*  \retval     rocsparse_status_invalid_pointer \p coo_row_ind, \p coo_col_ind or
 *              \p temp_buffer pointer is invalid.
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
 *  The following example sorts a \f$3 \times 3\f$ COO matrix by row indices.
-*  \snippet example_rocsparse_coosort_by_row.cpp doc example
+*  \code{.c}
+*      //     1 2 3
+*      // A = 4 5 6
+*      //     7 8 9
+*      rocsparse_int m   = 3;
+*      rocsparse_int n   = 3;
+*      rocsparse_int nnz = 9;
+*
+*      coo_row_ind[nnz] = {0, 1, 2, 0, 1, 2, 0, 1, 2}; // device memory
+*      coo_col_ind[nnz] = {0, 0, 0, 1, 1, 1, 2, 2, 2}; // device memory
+*      coo_val[nnz]     = {1, 4, 7, 2, 5, 8, 3, 6, 9}; // device memory
+*
+*      // Create permutation vector perm as the identity map
+*      rocsparse_int* perm;
+*      hipMalloc((void**)&perm, sizeof(rocsparse_int) * nnz);
+*      rocsparse_create_identity_permutation(handle, nnz, perm);
+*
+*      // Allocate temporary buffer
+*      size_t buffer_size;
+*      void* temp_buffer;
+*      rocsparse_coosort_buffer_size(handle,
+*                                    m,
+*                                    n,
+*                                    nnz,
+*                                    coo_row_ind,
+*                                    coo_col_ind,
+*                                    &buffer_size);
+*      hipMalloc(&temp_buffer, buffer_size);
+*
+*      // Sort the COO matrix
+*      rocsparse_coosort_by_row(handle,
+*                               m,
+*                               n,
+*                               nnz,
+*                               coo_row_ind,
+*                               coo_col_ind,
+*                               perm,
+*                               temp_buffer);
+*
+*      // Gather sorted coo_val array
+*      float* coo_val_sorted;
+*      hipMalloc((void**)&coo_val_sorted, sizeof(float) * nnz);
+*      rocsparse_sgthr(handle, nnz, coo_val, coo_val_sorted, perm, rocsparse_index_base_zero);
+*
+*      // Clean up
+*      hipFree(temp_buffer);
+*      hipFree(perm);
+*      hipFree(coo_val);
+*  \endcode
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_coosort_by_row(rocsparse_handle handle,
@@ -145,15 +193,15 @@ rocsparse_status rocsparse_coosort_by_row(rocsparse_handle handle,
                                           void*            temp_buffer);
 
 /*! \ingroup conv_module
-*  \brief Sort a sparse COO matrix by column.
+*  \brief Sort a sparse COO matrix by column
 *
 *  \details
 *  \p rocsparse_coosort_by_column sorts a matrix in COO format by column. The sorted
-*  permutation vector \p perm can be used to obtain the sorted \p coo_val array. In this
-*  case, \p perm must be initialized as the identity permutation. See
+*  permutation vector \p perm can be used to obtain sorted \p coo_val array. In this
+*  case, \p perm must be initialized as the identity permutation, see
 *  \ref rocsparse_create_identity_permutation().
 *
-*  \p rocsparse_coosort_by_column requires an extra temporary storage buffer that has to be
+*  \p rocsparse_coosort_by_column requires extra temporary storage buffer that has to be
 *  allocated by the user. Storage buffer size can be determined by
 *  \ref rocsparse_coosort_buffer_size().
 *
@@ -161,14 +209,14 @@ rocsparse_status rocsparse_coosort_by_row(rocsparse_handle handle,
 *  \p perm can be \p NULL if a sorted permutation vector is not required.
 *
 *  \note
-*  This function is non-blocking and executed asynchronously with respect to the host.
-*  It can return before the actual computation has finished.
+*  This function is non blocking and executed asynchronously with respect to the host.
+*  It may return before the actual computation has finished.
 *
 *  \note
 *  This routine does not support execution in a hipGraph context.
 *
 *  @param[in]
-*  handle          handle to the rocSPARSE library context queue.
+*  handle          handle to the rocsparse library context queue.
 *  @param[in]
 *  m               number of rows of the sparse COO matrix.
 *  @param[in]
@@ -182,22 +230,70 @@ rocsparse_status rocsparse_coosort_by_row(rocsparse_handle handle,
 *  coo_col_ind     array of \p nnz elements containing the column indices of the sparse
 *                  COO matrix.
 *  @param[inout]
-*  perm            array of \p nnz integers containing the unsorted map indices, which can be
+*  perm            array of \p nnz integers containing the unsorted map indices, can be
 *                  \p NULL.
 *  @param[in]
-*  temp_buffer     temporary storage buffer allocated by the user. The size is returned by
+*  temp_buffer     temporary storage buffer allocated by the user, size is returned by
 *                  \ref rocsparse_coosort_buffer_size().
 *
 *  \retval     rocsparse_status_success the operation completed successfully.
 *  \retval     rocsparse_status_invalid_handle the library context was not initialized.
-*  \retval     rocsparse_status_invalid_size \p m, \p n, or \p nnz is invalid.
-*  \retval     rocsparse_status_invalid_pointer \p coo_row_ind, \p coo_col_ind, or
+*  \retval     rocsparse_status_invalid_size \p m, \p n or \p nnz is invalid.
+*  \retval     rocsparse_status_invalid_pointer \p coo_row_ind, \p coo_col_ind or
 *              \p temp_buffer pointer is invalid.
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
 *  The following example sorts a \f$3 \times 3\f$ COO matrix by column indices.
-*  \snippet example_rocsparse_coosort_by_col.cpp doc example
+*  \code{.c}
+*      //     1 2 3
+*      // A = 4 5 6
+*      //     7 8 9
+*      rocsparse_int m   = 3;
+*      rocsparse_int n   = 3;
+*      rocsparse_int nnz = 9;
+*
+*      coo_row_ind[nnz] = {0, 0, 0, 1, 1, 1, 2, 2, 2}; // device memory
+*      coo_col_ind[nnz] = {0, 1, 2, 0, 1, 2, 0, 1, 2}; // device memory
+*      coo_val[nnz]     = {1, 2, 3, 4, 5, 6, 7, 8, 9}; // device memory
+*
+*      // Create permutation vector perm as the identity map
+*      rocsparse_int* perm;
+*      hipMalloc((void**)&perm, sizeof(rocsparse_int) * nnz);
+*      rocsparse_create_identity_permutation(handle, nnz, perm);
+*
+*      // Allocate temporary buffer
+*      size_t buffer_size;
+*      void* temp_buffer;
+*      rocsparse_coosort_buffer_size(handle,
+*                                    m,
+*                                    n,
+*                                    nnz,
+*                                    coo_row_ind,
+*                                    coo_col_ind,
+*                                    &buffer_size);
+*      hipMalloc(&temp_buffer, buffer_size);
+*
+*      // Sort the COO matrix
+*      rocsparse_coosort_by_column(handle,
+*                                  m,
+*                                  n,
+*                                  nnz,
+*                                  coo_row_ind,
+*                                  coo_col_ind,
+*                                  perm,
+*                                  temp_buffer);
+*
+*      // Gather sorted coo_val array
+*      float* coo_val_sorted;
+*      hipMalloc((void**)&coo_val_sorted, sizeof(float) * nnz);
+*      rocsparse_sgthr(handle, nnz, coo_val, coo_val_sorted, perm, rocsparse_index_base_zero);
+*
+*      // Clean up
+*      hipFree(temp_buffer);
+*      hipFree(perm);
+*      hipFree(coo_val);
+*  \endcode
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_coosort_by_column(rocsparse_handle handle,

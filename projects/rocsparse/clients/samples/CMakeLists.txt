@@ -31,9 +31,6 @@ function(add_rocsparse_example EXAMPLE_SOURCE)
 
   # Include common client headers
   target_include_directories(${EXAMPLE_TARGET} PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-  if (BUILD_CLIENTS_ONLY)
-    target_include_directories(${EXAMPLE_TARGET} PRIVATE ${rocsparse_INCLUDE_DIRS}/rocsparse)
-  endif()
 
   # Linker dependencies
   target_link_libraries(${EXAMPLE_TARGET} PRIVATE roc::rocsparse hip::host hip::device)
@@ -44,10 +41,8 @@ endfunction()
 # Examples
 
 # Empty C program for checking rocsparse headers are C compatible.
-# weird compiler flags on Windows.
-if(NOT WIN32)
-  add_rocsparse_example(example_c_headers.c)
-endif()
+# Post-poned, weird compiler flags on Windows.
+# add_rocsparse_example(example_c_headers.c)
 
 # Auxiliary
 add_rocsparse_example(example_handle.cpp)
@@ -75,26 +70,6 @@ add_rocsparse_example(example_spmv_csr.cpp)
 add_rocsparse_example(example_spmv_ell.cpp)
 add_rocsparse_example(example_gebsrmv.cpp)
 add_rocsparse_example(example_gemvi.cpp)
-add_rocsparse_example(example_v2_spmv_csr.cpp)
-add_rocsparse_example(example_sptrsv.cpp)
-
-set_source_files_properties(
-  example_spmv_coo.cpp
-  PROPERTIES
-  COMPILE_FLAGS "-Wno-deprecated-declarations"
-)
-
-set_source_files_properties(
-  example_spmv_csr.cpp
-  PROPERTIES
-  COMPILE_FLAGS "-Wno-deprecated-declarations"
-)
-
-set_source_files_properties(
-  example_spmv_ell.cpp
-  PROPERTIES
-  COMPILE_FLAGS "-Wno-deprecated-declarations"
-)
 
 # Level 3
 add_rocsparse_example(example_bsrmm.cpp)
@@ -140,9 +115,6 @@ if(TARGET rocsparse)
 
       # Include common client headers
       target_include_directories(${EXAMPLE_TARGET} PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-      if (BUILD_CLIENTS_ONLY)
-        target_include_directories(${EXAMPLE_TARGET} PRIVATE ${rocsparse_INCLUDE_DIRS}/rocsparse)
-      endif()
 
       # Linker dependencies
       target_link_libraries(${EXAMPLE_TARGET} PRIVATE roc::rocsparse hip::host)
@@ -172,10 +144,3 @@ if(TARGET rocsparse)
     add_rocsparse_fortran_example(example_fortran_roti.f90)
   endif()
 endif()
-
-# Build documentation examples
-FILE(GLOB_RECURSE DOCUMENTATION_EXAMPLES documentation_examples/*.cpp)
-
-foreach(file ${DOCUMENTATION_EXAMPLES})
-    add_rocsparse_example(${file})
-endforeach()

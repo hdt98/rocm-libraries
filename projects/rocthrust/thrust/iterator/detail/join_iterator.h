@@ -17,37 +17,35 @@
 #pragma once
 
 #include <thrust/detail/config.h>
-
-#if defined(_CCCL_IMPLICIT_SYSTEM_HEADER_GCC)
-#  pragma GCC system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_CLANG)
-#  pragma clang system_header
-#elif defined(_CCCL_IMPLICIT_SYSTEM_HEADER_MSVC)
-#  pragma system_header
-#endif // no system header
-#include <thrust/detail/type_traits.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/detail/minimum_system.h>
 #include <thrust/iterator/iterator_facade.h>
+#include <thrust/iterator/detail/minimum_system.h>
+#include <thrust/iterator/counting_iterator.h>
+#include <thrust/detail/type_traits.h>
 
-#if !_THRUST_HAS_DEVICE_SYSTEM_STD
-#  include <type_traits>
-#endif
 
 THRUST_NAMESPACE_BEGIN
 namespace detail
 {
 
-template <typename RandomAccessIterator1, typename RandomAccessIterator2, typename Difference, typename Reference>
+
+template<typename RandomAccessIterator1,
+         typename RandomAccessIterator2,
+         typename Difference,
+         typename Reference>
 class join_iterator;
+
 
 namespace join_iterator_detail
 {
 
-template <typename RandomAccessIterator1, typename RandomAccessIterator2, typename Difference, typename Reference>
+
+template<typename RandomAccessIterator1,
+         typename RandomAccessIterator2,
+         typename Difference,
+         typename Reference>
 struct join_iterator_base
 {
-  using value_type = _THRUST_STD::remove_reference_t<Reference>;
+  using value_type = ::cuda::std::__libcpp_remove_reference_t<Reference>;
 
   using system1 = typename thrust::iterator_system<RandomAccessIterator1>::type;
   using system2 = typename thrust::iterator_system<RandomAccessIterator2>::type;
@@ -63,64 +61,72 @@ struct join_iterator_base
                              Difference>;
 }; // end join_iterator_base
 
-} // namespace join_iterator_detail
 
-template <typename RandomAccessIterator1,
-          typename RandomAccessIterator2,
-          typename Difference = typename thrust::iterator_difference<RandomAccessIterator1>::type,
-          typename Reference  = typename thrust::iterator_value<RandomAccessIterator1>::type>
+} // end join_iterator_detail
+
+
+template<typename RandomAccessIterator1,
+         typename RandomAccessIterator2,
+         typename Difference = typename thrust::iterator_difference<RandomAccessIterator1>::type,
+         typename Reference  = typename thrust::iterator_value<RandomAccessIterator1>::type>
 class join_iterator
-    : public join_iterator_detail::
-        join_iterator_base<RandomAccessIterator1, RandomAccessIterator2, Difference, Reference>::type
+  : public join_iterator_detail::join_iterator_base<RandomAccessIterator1, RandomAccessIterator2, Difference, Reference>::type
 {
-private:
-  using super_t = typename join_iterator_detail::
-    join_iterator_base<RandomAccessIterator1, RandomAccessIterator2, Difference, Reference>::type;
-  using size_type = typename super_t::difference_type;
+  private:
+    using super_t = typename join_iterator_detail::join_iterator_base<RandomAccessIterator1, RandomAccessIterator2, Difference, Reference>::type;
+    using size_type = typename super_t::difference_type;
 
-public:
-  inline THRUST_HOST_DEVICE join_iterator(RandomAccessIterator1 first1, size_type n, RandomAccessIterator2 first2)
-      : super_t(thrust::counting_iterator<size_type>(0))
-      , m_n1(n)
-      , m_iter1(first1)
-      , m_iter2(first2 - m_n1)
-  {}
+  public:
+    inline THRUST_HOST_DEVICE
+    join_iterator(RandomAccessIterator1 first1, size_type n, RandomAccessIterator2 first2)
+      : super_t(thrust::counting_iterator<size_type>(0)),
+        m_n1(n),
+        m_iter1(first1),
+        m_iter2(first2 - m_n1)
+    {}
 
-  inline THRUST_HOST_DEVICE join_iterator(const join_iterator& other)
-      : super_t(other)
-      , m_n1(other.m_n1)
-      , m_iter1(other.m_iter1)
-      , m_iter2(other.m_iter2)
-  {}
 
-private:
-  friend class thrust::iterator_core_access;
+    inline THRUST_HOST_DEVICE
+    join_iterator(const join_iterator &other)
+      : super_t(other),
+        m_n1(other.m_n1),
+        m_iter1(other.m_iter1),
+        m_iter2(other.m_iter2)
+    {}
 
-  // MSVC 2013 and 2015 incorrectly warning about returning a reference to
-  // a local/temporary here.
-  // See goo.gl/LELTNp
-  THRUST_DIAG_PUSH
-  THRUST_DIAG_SUPPRESS_MSVC(4172)
 
-  THRUST_HOST_DEVICE typename super_t::reference dereference() const
-  {
-    size_type i = *super_t::base();
-    return (i < m_n1) ? m_iter1[i] : static_cast<typename super_t::reference>(m_iter2[i]);
-  } // end dereference()
+  private:
+    friend class thrust::iterator_core_access;
 
-  THRUST_DIAG_POP
+    // MSVC 2013 and 2015 incorrectly warning about returning a reference to
+    // a local/temporary here.
+    // See goo.gl/LELTNp
+    THRUST_DISABLE_MSVC_WARNING_BEGIN(4172)
 
-  size_type m_n1;
-  RandomAccessIterator1 m_iter1;
-  RandomAccessIterator2 m_iter2;
+    THRUST_HOST_DEVICE
+    typename super_t::reference dereference() const
+    {
+      size_type i = *super_t::base();
+      return (i < m_n1) ? m_iter1[i] : static_cast<typename super_t::reference>(m_iter2[i]);
+    } // end dereference()
+
+    THRUST_DISABLE_MSVC_WARNING_END(4172)
+
+
+    size_type m_n1;
+    RandomAccessIterator1 m_iter1;
+    RandomAccessIterator2 m_iter2;
 }; // end join_iterator
 
-template <typename RandomAccessIterator1, typename Size, typename RandomAccessIterator2>
-THRUST_HOST_DEVICE join_iterator<RandomAccessIterator1, RandomAccessIterator2, Size>
-make_join_iterator(RandomAccessIterator1 first1, Size n1, RandomAccessIterator2 first2)
+
+template<typename RandomAccessIterator1, typename Size, typename RandomAccessIterator2>
+THRUST_HOST_DEVICE
+join_iterator<RandomAccessIterator1,RandomAccessIterator2,Size> make_join_iterator(RandomAccessIterator1 first1, Size n1, RandomAccessIterator2 first2)
 {
-  return join_iterator<RandomAccessIterator1, RandomAccessIterator2, Size>(first1, n1, first2);
+  return join_iterator<RandomAccessIterator1,RandomAccessIterator2,Size>(first1, n1, first2);
 } // end make_join_iterator()
 
-} // namespace detail
+
+} // end detail
 THRUST_NAMESPACE_END
+

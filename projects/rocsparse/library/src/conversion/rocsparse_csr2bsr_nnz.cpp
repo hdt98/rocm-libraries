@@ -22,15 +22,15 @@
  *
  * ************************************************************************ */
 
+#include "control.h"
 #include "internal/conversion/rocsparse_csr2bsr.h"
 #include "rocsparse_common.h"
-#include "rocsparse_control.hpp"
 #include "rocsparse_csr2bsr.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "csr2bsr_nnz_device.h"
 
-#include "rocsparse_primitives.hpp"
+#include "rocsparse_primitives.h"
 
 /*
  * ===========================================================================

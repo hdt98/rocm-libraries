@@ -31,7 +31,6 @@
 #include <miopen/env.hpp>
 #include "../conv2d.hpp"
 #include "get_handle.hpp"
-#include "gtest_common.hpp"
 
 using TestCase = std::tuple<std::vector<std::string>, std::string>;
 
@@ -67,12 +66,10 @@ void GetArgs(const TestCase& param, std::vector<std::string>& tokens)
 
 class GPU_ConvImplicitGemm_FP16 : public testing::TestWithParam<std::vector<TestCase>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 class GPU_ConvImplicitGemm_BFP16 : public testing::TestWithParam<std::vector<TestCase>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 void Run2dDriver(miopenDataType_t prec)
@@ -83,7 +80,6 @@ void Run2dDriver(miopenDataType_t prec)
     {
     case miopenHalf: params = GPU_ConvImplicitGemm_FP16::GetParam(); break;
     case miopenBFloat16: params = GPU_ConvImplicitGemm_BFP16::GetParam(); break;
-
     case miopenFloat:
     case miopenInt8:
     case miopenInt32:
@@ -91,6 +87,7 @@ void Run2dDriver(miopenDataType_t prec)
     case miopenDouble:
     case miopenFloat8_fnuz:
     case miopenBFloat8_fnuz:
+    default:
         FAIL() << "miopenFloat, miopenInt8, miopenInt32, miopenDouble, miopenFloat8_fnuz, "
                   "miopenBFloat8_fnuz "
                   "data type not supported by test_conv_for_implicit_gemm test";
@@ -119,7 +116,7 @@ bool IsTestSupportedForDevice(const miopen::Handle& handle)
     std::string devName = handle.GetDeviceName();
     if(devName == "gfx900" || devName == "gfx906" || devName == "gfx908" || devName == "gfx90a" ||
        devName == "gfx942" || miopen::StartsWith(devName, "gfx103") ||
-       miopen::StartsWith(devName, "gfx110") || miopen::StartsWith(devName, "gfx115"))
+       miopen::StartsWith(devName, "gfx110"))
     {
         return true;
     }

@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,15 +20,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "benchmark_device_transform.hpp"
-#include "primbench.hpp"
+#include "benchmark_device_transform.parallel.hpp"
+#include "benchmark_utils.hpp"
+
+// CmdParser
+#include "cmdparser.hpp"
 
 #ifndef BENCHMARK_CONFIG_TUNING
     #include "../common/utils_custom_type.hpp"
 #endif
 
+// Google Benchmark
+#include <benchmark/benchmark.h>
+
+// HIP API
 #include <hip/hip_runtime.h>
 
+// rocPRIM
 #ifndef BENCHMARK_CONFIG_TUNING
     #include <rocprim/types.hpp>
 #endif
@@ -40,43 +48,104 @@
     #include <stdint.h>
 #endif
 
-#define CREATE_BENCHMARK(T) executor.queue<device_transform_benchmark<T, false>>();
+#ifndef DEFAULT_BYTES
+const size_t DEFAULT_BYTES = 1024 * 1024 * 128 * 4;
+#endif
 
-#define CREATE_BENCHMARK_BINARY(T) executor.queue<device_transform_benchmark<T, false, true>>();
+#define CREATE_BENCHMARK(T)                                            \
+    {                                                                  \
+        const device_transform_benchmark<T> instance{};                \
+        REGISTER_BENCHMARK(benchmarks, bytes, seed, stream, instance); \
+    }
 
 int main(int argc, char* argv[])
 {
-    primbench::settings settings;
-    settings.size = 512 * primbench::MiB;
-    primbench::executor executor(argc, argv, settings);
+    cli::Parser parser(argc, argv);
+    parser.set_optional<size_t>("size", "size", DEFAULT_BYTES, "number of bytes");
+    parser.set_optional<int>("trials", "trials", -1, "number of iterations");
+    parser.set_optional<std::string>("name_format",
+                                     "name_format",
+                                     "human",
+                                     "either: json,human,txt");
+    parser.set_optional<std::string>("seed", "seed", "random", get_seed_message());
+#ifdef BENCHMARK_CONFIG_TUNING
+    // optionally run an evenly split subset of benchmarks, when making multiple program invocations
+    parser.set_optional<int>("parallel_instance",
+                             "parallel_instance",
+                             0,
+                             "parallel instance index");
+    parser.set_optional<int>("parallel_instances",
+                             "parallel_instances",
+                             1,
+                             "total parallel instances");
+#endif // BENCHMARK_CONFIG_TUNING
+    parser.run_and_exit_if_error();
 
-#ifndef BENCHMARK_CONFIG_TUNING
-    // Tuned types
-    CREATE_BENCHMARK(rocprim::int128_t)
-    CREATE_BENCHMARK(int64_t)
-    CREATE_BENCHMARK(int32_t)
-    CREATE_BENCHMARK(int16_t)
+    // Parse argv
+    benchmark::Initialize(&argc, argv);
+    const size_t bytes  = parser.get<size_t>("size");
+    const int    trials = parser.get<int>("trials");
+    bench_naming::set_format(parser.get<std::string>("name_format"));
+    const std::string  seed_type = parser.get<std::string>("seed");
+    const managed_seed seed(seed_type);
+
+    // HIP
+    hipStream_t stream = 0; // default
+
+    // Benchmark info
+    add_common_benchmark_info();
+    benchmark::AddCustomContext("bytes", std::to_string(bytes));
+    benchmark::AddCustomContext("seed", seed_type);
+
+    // Add benchmarks
+    std::vector<benchmark::internal::Benchmark*> benchmarks = {};
+#ifdef BENCHMARK_CONFIG_TUNING
+    const int parallel_instance  = parser.get<int>("parallel_instance");
+    const int parallel_instances = parser.get<int>("parallel_instances");
+    config_autotune_register::register_benchmark_subset(benchmarks,
+                                                        parallel_instance,
+                                                        parallel_instances,
+                                                        bytes,
+                                                        seed,
+                                                        stream);
+#else // BENCHMARK_CONFIG_TUNING
+    using custom_float2  = common::custom_type<float, float>;
+    using custom_double2 = common::custom_type<double, double>;
+    CREATE_BENCHMARK(int)
+    CREATE_BENCHMARK(long long)
+
     CREATE_BENCHMARK(int8_t)
-    CREATE_BENCHMARK(double)
-    CREATE_BENCHMARK(float)
+    CREATE_BENCHMARK(uint8_t)
     CREATE_BENCHMARK(rocprim::half)
 
-    #ifndef BENCHMARK_AUTOTUNED_TYPES_ONLY
-    // Not tuned types
-    CREATE_BENCHMARK(uint8_t)
+    CREATE_BENCHMARK(float)
+    CREATE_BENCHMARK(double)
+
+    CREATE_BENCHMARK(custom_float2)
+    CREATE_BENCHMARK(custom_double2)
+
+    CREATE_BENCHMARK(rocprim::int128_t)
     CREATE_BENCHMARK(rocprim::uint128_t)
+#endif // BENCHMARK_CONFIG_TUNING
 
-    CREATE_BENCHMARK_BINARY(int32_t)
-    CREATE_BENCHMARK_BINARY(float)
-    CREATE_BENCHMARK_BINARY(int8_t)
-    CREATE_BENCHMARK_BINARY(rocprim::int128_t)
+    // Use manual timing
+    for(auto& b : benchmarks)
+    {
+        b->UseManualTime();
+        b->Unit(benchmark::kMillisecond);
+    }
 
-    // Not tuned custom types
-    CREATE_BENCHMARK(custom_f32_f32)
-    CREATE_BENCHMARK(custom_f64_f64)
-    CREATE_BENCHMARK_BINARY(custom_f64_f64)
-    #endif
-#endif
+    // Force number of iterations
+    if(trials > 0)
+    {
+        for(auto& b : benchmarks)
+        {
+            b->Iterations(trials);
+        }
+    }
 
-    executor.run();
+    // Run benchmarks
+    benchmark::RunSpecifiedBenchmarks();
+
+    return 0;
 }

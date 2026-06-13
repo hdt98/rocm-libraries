@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@
  *
  * ************************************************************************ */
 
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "rocsparse_gcoo2coo_aos.hpp"
 #include "rocsparse_gcoo_aos2coo.hpp"
@@ -47,6 +47,7 @@
 #include "rocsparse_dense2csx_impl.hpp"
 #include "rocsparse_identity.hpp"
 #include "rocsparse_nnz_impl.hpp"
+#include "rocsparse_sparse_to_coo_to_sparse.hpp"
 #include "rocsparse_sparse_to_csr_to_sparse.hpp"
 #include "rocsparse_sparse_to_sparse.hpp"
 #include "rocsparse_spmat_transfer_from.hpp"

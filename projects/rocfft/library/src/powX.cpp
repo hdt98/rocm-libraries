@@ -1,4 +1,4 @@
-// Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2016 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -335,19 +335,19 @@ void DebugPrintBuffer(rocfft_ostream&             stream,
         case rocfft_precision_half:
         {
             buffer_printer<rocfft_fp16> s;
-            s.print_buffer_half(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+            s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
             break;
         }
         case rocfft_precision_single:
         {
             buffer_printer<float> s;
-            s.print_buffer_single(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+            s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
             break;
         }
         case rocfft_precision_double:
         {
             buffer_printer<double> s;
-            s.print_buffer_double(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+            s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
             break;
         }
         }
@@ -364,15 +364,13 @@ void DebugPrintBuffer(rocfft_ostream&             stream,
             case rocfft_array_type_hermitian_interleaved:
             {
                 buffer_printer<rocfft_complex<rocfft_fp16>> s;
-                s.print_buffer_half(
-                    bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+                s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
                 break;
             }
             case rocfft_array_type_real:
             {
                 buffer_printer<rocfft_fp16> s;
-                s.print_buffer_half(
-                    bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+                s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
                 break;
             }
             default:
@@ -388,15 +386,13 @@ void DebugPrintBuffer(rocfft_ostream&             stream,
             case rocfft_array_type_hermitian_interleaved:
             {
                 buffer_printer<rocfft_complex<float>> s;
-                s.print_buffer_single(
-                    bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+                s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
                 break;
             }
             case rocfft_array_type_real:
             {
                 buffer_printer<float> s;
-                s.print_buffer_single(
-                    bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+                s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
                 break;
             }
             default:
@@ -412,15 +408,13 @@ void DebugPrintBuffer(rocfft_ostream&             stream,
             case rocfft_array_type_hermitian_interleaved:
             {
                 buffer_printer<rocfft_complex<double>> s;
-                s.print_buffer_double(
-                    bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+                s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
                 break;
             }
             case rocfft_array_type_real:
             {
                 buffer_printer<double> s;
-                s.print_buffer_double(
-                    bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
+                s.print_buffer(bufvec, length_rm, stride_rm, batch, dist, print_offset, stream);
                 break;
             }
             default:
@@ -525,25 +519,19 @@ void SetDefaultCallback(const TreeNode* node, const SetCallbackType& type, void*
 
 // Internal plan executor.
 // For in-place transforms, in_buffer == out_buffer.
-void TransformPowX(const ExecPlan&                         execPlan,
-                   void*                                   in_buffer[],
-                   void*                                   out_buffer[],
-                   const rocfft_execution_info_internal&   info,
-                   size_t                                  multiPlanIdx,
-                   const std::map<int, device_callback_t>& callbacks)
+void TransformPowX(const ExecPlan&       execPlan,
+                   void*                 in_buffer[],
+                   void*                 out_buffer[],
+                   rocfft_execution_info info,
+                   size_t                multiPlanIdx)
 {
     assert(execPlan.execSeq.size() == execPlan.gridParam.size());
-
-    // use user-specified stream if present, and plan's stream otherwise
-    hipStream_t execStream = info.get_user_stream(execPlan.location.device);
-    if(!execStream)
-        execStream = execPlan.get_local_stream();
 
     bool processing_tuning = TuningBenchmarker::GetSingleton().IsProcessingTuning();
     auto tuningPacket      = TuningBenchmarker::GetSingleton().GetPacket();
     // we can log profile information if we're on the null stream,
     // since we will be able to wait for the transform to finish
-    bool emit_profile_log  = (processing_tuning || LOG_PROFILE_ENABLED()) && !execStream;
+    bool emit_profile_log  = (processing_tuning || LOG_PROFILE_ENABLED()) && !info->rocfft_stream;
     bool emit_kernelio_log = LOG_KERNELIO_ENABLED();
 
     rocfft_ostream*    kernelio_stream = nullptr;
@@ -562,33 +550,20 @@ void TransformPowX(const ExecPlan&                         execPlan,
     TreeNode* store_node            = nullptr;
     std::tie(load_node, store_node) = execPlan.get_load_store_nodes();
 
-    auto it = callbacks.find(execPlan.location.device);
-    if(it != callbacks.end())
-    {
-        if(execPlan.rootPlan->loadOps)
-        {
-            load_node->callbacks.load_cb_fn        = it->second.load_fn;
-            load_node->callbacks.load_cb_data      = it->second.load_data;
-            load_node->callbacks.load_cb_lds_bytes = info.get_load_cb_lds_bytes();
-        }
+    load_node->callbacks.load_cb_fn        = info->callbacks.load_cb_fn;
+    load_node->callbacks.load_cb_data      = info->callbacks.load_cb_data;
+    load_node->callbacks.load_cb_lds_bytes = info->callbacks.load_cb_lds_bytes;
 
-        if(execPlan.rootPlan->storeOps)
-        {
-            store_node->callbacks.store_cb_fn        = it->second.store_fn;
-            store_node->callbacks.store_cb_data      = it->second.store_data;
-            store_node->callbacks.store_cb_lds_bytes = info.get_store_cb_lds_bytes();
-        }
-    }
+    store_node->callbacks.store_cb_fn        = info->callbacks.store_cb_fn;
+    store_node->callbacks.store_cb_data      = info->callbacks.store_cb_data;
+    store_node->callbacks.store_cb_lds_bytes = info->callbacks.store_cb_lds_bytes;
 
     for(size_t i = 0; i < execPlan.execSeq.size(); i++)
     {
         DeviceCallIn data;
         data.node          = execPlan.execSeq[i];
-        data.rocfft_stream = execStream;
-        //
-        data.deviceProp = execPlan.deviceProp;
-
-        auto& local_work_buffer = info.get_work_buffer(execPlan.location.device);
+        data.rocfft_stream = (info == nullptr) ? 0 : info->rocfft_stream;
+        data.deviceProp    = execPlan.deviceProp;
 
         // Size of complex type
         const size_t complexTSize = complex_type_size(data.node->precision);
@@ -612,7 +587,7 @@ void TransformPowX(const ExecPlan&                         execPlan,
             }
             break;
         case OB_TEMP:
-            data.bufIn[0] = local_work_buffer.data();
+            data.bufIn[0] = info->workBuffer;
             if(data.node->inArrayType == rocfft_array_type_complex_planar
                || data.node->inArrayType == rocfft_array_type_hermitian_planar)
             {
@@ -620,11 +595,12 @@ void TransformPowX(const ExecPlan&                         execPlan,
                 // interleaved format, and we just need to split it for
                 // planar.
                 data.bufIn[1]
-                    = local_work_buffer.data_offset(execPlan.tmpWorkBufSize * complexTSize / 2);
+                    = (void*)((char*)info->workBuffer + execPlan.tmpWorkBufSize * complexTSize / 2);
             }
             break;
         case OB_TEMP_CMPLX_FOR_REAL:
-            data.bufIn[0] = local_work_buffer.data_offset(execPlan.tmpWorkBufSize * complexTSize);
+            data.bufIn[0]
+                = (void*)((char*)info->workBuffer + execPlan.tmpWorkBufSize * complexTSize);
             // TODO: Can we use this in planar as well ??
             // if(data.node->inArrayType == rocfft_array_type_complex_planar
             //    || data.node->inArrayType == rocfft_array_type_hermitian_planar)
@@ -635,8 +611,9 @@ void TransformPowX(const ExecPlan&                         execPlan,
             // }
             break;
         case OB_TEMP_BLUESTEIN:
-            data.bufIn[0] = local_work_buffer.data_offset(
-                (execPlan.tmpWorkBufSize + execPlan.copyWorkBufSize) * complexTSize);
+            data.bufIn[0]
+                = (void*)((char*)info->workBuffer
+                          + (execPlan.tmpWorkBufSize + execPlan.copyWorkBufSize) * complexTSize);
             // Bluestein mul-kernels (3 types) work well for CI->CI
             // so we only consider CI->CI now
             break;
@@ -668,7 +645,7 @@ void TransformPowX(const ExecPlan&                         execPlan,
             }
             break;
         case OB_TEMP:
-            data.bufOut[0] = local_work_buffer.data();
+            data.bufOut[0] = info->workBuffer;
             if(data.node->outArrayType == rocfft_array_type_complex_planar
                || data.node->outArrayType == rocfft_array_type_hermitian_planar)
             {
@@ -676,11 +653,12 @@ void TransformPowX(const ExecPlan&                         execPlan,
                 // interleaved format, and we just need to split it for
                 // planar.
                 data.bufOut[1]
-                    = local_work_buffer.data_offset(execPlan.tmpWorkBufSize * complexTSize / 2);
+                    = (void*)((char*)info->workBuffer + execPlan.tmpWorkBufSize * complexTSize / 2);
             }
             break;
         case OB_TEMP_CMPLX_FOR_REAL:
-            data.bufOut[0] = local_work_buffer.data_offset(execPlan.tmpWorkBufSize * complexTSize);
+            data.bufOut[0]
+                = (void*)((char*)info->workBuffer + execPlan.tmpWorkBufSize * complexTSize);
             // TODO: Can we use this in planar as well ??
             // if(data.node->outArrayType == rocfft_array_type_complex_planar
             //    || data.node->outArrayType == rocfft_array_type_hermitian_planar)
@@ -691,8 +669,9 @@ void TransformPowX(const ExecPlan&                         execPlan,
             // }
             break;
         case OB_TEMP_BLUESTEIN:
-            data.bufOut[0] = local_work_buffer.data_offset(
-                (execPlan.tmpWorkBufSize + execPlan.copyWorkBufSize) * complexTSize);
+            data.bufOut[0]
+                = (void*)((char*)info->workBuffer
+                          + (execPlan.tmpWorkBufSize + execPlan.copyWorkBufSize) * complexTSize);
             // Bluestein mul-kernels (3 types) work well for CI->CI
             // so we only consider CI->CI now
             break;
@@ -731,8 +710,8 @@ void TransformPowX(const ExecPlan&                         execPlan,
         // single-kernel bluestein requires a bluestein temp buffer separate from input and output
         if(data.node->scheme == CS_KERNEL_BLUESTEIN_SINGLE)
         {
-            data.bufTemp = local_work_buffer.data_offset(
-                (execPlan.tmpWorkBufSize + execPlan.copyWorkBufSize) * complexTSize);
+            data.bufTemp = ((char*)info->workBuffer
+                            + (execPlan.tmpWorkBufSize + execPlan.copyWorkBufSize) * complexTSize);
         }
 
         // if callbacks are enabled, make sure load_cb_fn and store_cb_fn are not nullptrs

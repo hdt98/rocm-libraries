@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -237,11 +237,14 @@ public:
 
     //!
     //! @brief Check if memory exists.
-    //! @return The status of memory allocation and initialization.
+    //! @return hipSuccess if memory exists, hipErrorOutOfMemory otherwise.
     //!
     hipError_t memcheck() const
     {
-        return this->mem_status;
+        if(*this)
+            return hipSuccess;
+        else
+            return hipErrorOutOfMemory;
     }
 
 private:
@@ -258,9 +261,8 @@ private:
     bool try_initialize_memory()
     {
         bool success = false;
-        this->mem_status = (hipMalloc)(&this->m_device_data, this->m_batch_count * sizeof(T*));
 
-        success = (hipSuccess == this->mem_status);
+        success = (hipSuccess == (hipMalloc)(&this->m_device_data, this->m_batch_count * sizeof(T*)));
         if(success)
         {
             success = (nullptr != (this->m_data = (T**)calloc(this->m_batch_count, sizeof(T*))));
@@ -268,7 +270,6 @@ private:
             {
                 for(int64_t batch_index = 0; batch_index < this->m_batch_count; ++batch_index)
                 {
-                    // device_vector_setup() sets mem_status
                     success = (nullptr != (this->m_data[batch_index] = this->device_vector_setup()));
                     if(!success)
                     {
@@ -278,15 +279,10 @@ private:
 
                 if(success)
                 {
-                    this->mem_status
-                        = hipMemcpy(this->m_device_data, this->m_data,
-                                    sizeof(T*) * this->m_batch_count, hipMemcpyHostToDevice);
-                    success = (hipSuccess == this->mem_status);
+                    success = (hipSuccess
+                               == hipMemcpy(this->m_device_data, this->m_data,
+                                            sizeof(T*) * this->m_batch_count, hipMemcpyHostToDevice));
                 }
-            }
-            else
-            {
-                this->mem_status = hipErrorMemoryAllocation;
             }
         }
         return success;

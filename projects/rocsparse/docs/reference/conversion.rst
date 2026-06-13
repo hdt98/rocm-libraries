@@ -1,6 +1,6 @@
 .. meta::
-  :description: rocSPARSE conversion functions API documentation
-  :keywords: rocSPARSE, ROCm, API, documentation, conversion functions
+  :description: rocSPARSE documentation and API reference library
+  :keywords: rocSPARSE, ROCm, API, documentation
 
 .. _rocsparse_conversion_functions_:
 
@@ -8,7 +8,7 @@
 Sparse conversion functions
 ********************************************************************
 
-This module contains all sparse conversion routines.
+This module holds all sparse conversion routines.
 
 The sparse conversion routines describe operations on a matrix in sparse format to obtain a matrix in a different sparse format.
 

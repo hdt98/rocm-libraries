@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,19 +27,11 @@
 
 #pragma once
 
-#include <cassert>
-
 #include <hip/hip_runtime.h>
 
 #include "ideal_sizes.hpp"
 #include "lib_macros.hpp"
 #include "libcommon.hpp"
-
-#if defined(__GFX9__)
-__device__ static constexpr int WarpSize = 64;
-#else
-__device__ static constexpr int WarpSize = 32;
-#endif
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -54,75 +46,6 @@ ROCSOLVER_BEGIN_NAMESPACE
 // **********************************************************
 // device functions that are used by many kernels
 // **********************************************************
-
-// NaN helpers
-template <typename T, std::enable_if_t<std::is_integral<T>{}, int> = 0>
-__device__ __host__ inline bool rocblas_isnan(T)
-{
-    return false;
-}
-
-template <typename T,
-          std::enable_if_t<
-              !std::is_integral<T>{}
-                  && !rocblas_is_complex<T> && !std::is_same_v<T, rocblas_half> && !std::is_same_v<T, rocblas_bfloat16>,
-              int> = 0>
-__device__ __host__ inline bool rocblas_isnan(T arg)
-{
-    return std::isnan(arg);
-}
-
-template <typename T, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
-__device__ __host__ inline bool rocblas_isnan(const T& arg)
-{
-    return rocblas_isnan(std::real(arg)) || rocblas_isnan(std::imag(arg));
-}
-
-__device__ __host__ inline bool rocblas_isnan(rocblas_half arg)
-{
-    union
-    {
-        rocblas_half fp;
-        uint16_t data;
-    } x = {arg};
-    // NaN if exponent is all 1s and mantissa is non-zero (IEEE 754 half)
-    return (~x.data & 0x7c00) == 0 && (x.data & 0x03ff) != 0;
-}
-
-__device__ __host__ inline bool rocblas_isnan(rocblas_bfloat16 arg)
-{
-    // NaN if exponent is all 1s and mantissa is non-zero
-    return (~arg.data & 0x7f80) == 0 && (arg.data & 0x007f) != 0;
-}
-
-// max that propagates NaNs consistently:
-//   rocblas_max_nan( 1,   NaN ) = NaN
-//   rocblas_max_nan( NaN, 1   ) = NaN
-template <typename T, std::enable_if_t<std::is_integral<T>{}, int> = 0>
-__device__ __host__ inline T rocblas_max_nan(T x, T y)
-{
-    return y >= x ? y : x;
-}
-
-template <typename T,
-          std::enable_if_t<
-              !std::is_integral<T>{}
-                  && !rocblas_is_complex<T> && !std::is_same_v<T, rocblas_half> && !std::is_same_v<T, rocblas_bfloat16>,
-              int> = 0>
-__device__ __host__ inline T rocblas_max_nan(T x, T y)
-{
-    return (rocblas_isnan(y) || y >= x) ? y : x;
-}
-
-__device__ __host__ inline rocblas_half rocblas_max_nan(rocblas_half x, rocblas_half y)
-{
-    return (rocblas_isnan(y) || float(y) >= float(x)) ? y : x;
-}
-
-__device__ __host__ inline rocblas_bfloat16 rocblas_max_nan(rocblas_bfloat16 x, rocblas_bfloat16 y)
-{
-    return (rocblas_isnan(y) || float(y) >= float(x)) ? y : x;
-}
 
 template <typename S, typename T, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
 __device__ S aabs(T val)
@@ -145,31 +68,11 @@ __device__ __forceinline__ void swap(T& a, T& b)
 }
 
 template <typename T>
-__device__ __host__ void
-    swap(const rocblas_int n, T* a, const rocblas_int inca, T* b, const rocblas_int incb)
+__device__ void swap(const rocblas_int n, T* a, const rocblas_int inca, T* b, const rocblas_int incb)
 {
     int tid = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
     if(tid < n)
         swap(a[inca * tid], b[incb * tid]);
-}
-
-template <typename T, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
-__device__ __inline__ T shift_left(T& value, int lane_delta)
-{
-    T r = value;
-    r = __shfl_down(r, lane_delta);
-    return r;
-}
-
-template <typename T, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
-__device__ __inline__ T shift_left(T& value, int lane_delta)
-{
-    using S = decltype(std::real(T{}));
-    S r = value.real();
-    S i = value.imag();
-    r = __shfl_down(r, lane_delta);
-    i = __shfl_down(i, lane_delta);
-    return rocblas_complex_num<S>(r, i);
 }
 
 /** SWAPVECT device function swap vectors a and b of dimension n **/
@@ -300,7 +203,7 @@ __device__ static void shell_sort_ascending(const I n, S* a, I* map = nullptr)
     {
         for(auto k = k_start; k < (n - 1); k += k_inc)
         {
-            assert(std::isnan(a[k]) || std::isnan(a[k + 1]) || a[k] <= a[k + 1]);
+            assert(a[k] <= a[k + 1]);
         };
     };
     __syncthreads();
@@ -384,7 +287,7 @@ __device__ static void shell_sort_descending(const I n, S* a, I* map = nullptr)
     {
         for(auto k = k_start; k < (n - 1); k += k_inc)
         {
-            assert(std::isnan(a[k]) || std::isnan(a[k + 1]) || a[k] >= a[k + 1]);
+            assert(a[k] >= a[k + 1]);
         };
     };
     __syncthreads();
@@ -486,7 +389,7 @@ __device__ static void selection_sort_ascending(const I n, S* D, I* map = nullpt
     {
         for(auto k = k_start; k < (n - 1); k += k_inc)
         {
-            assert(std::isnan(D[k]) || std::isnan(D[k + 1]) || D[k] <= D[k + 1]);
+            assert(D[k] <= D[k + 1]);
         };
     };
     __syncthreads();
@@ -570,7 +473,7 @@ __device__ static void selection_sort_descending(const I n, S* D, I* map = nullp
     {
         for(auto k = k_start; k < (n - 1); k += k_inc)
         {
-            assert(std::isnan(D[k]) || std::isnan(D[k + 1]) || D[k] >= D[k + 1]);
+            assert(D[k] >= D[k + 1]);
         };
     };
     __syncthreads();
@@ -669,7 +572,7 @@ __device__ static void permute_swap(const I n, T* C, I ldc, I* map, const I nev 
     __syncthreads();
     for(auto k = k_start; k < nn; k += k_inc)
     {
-        assert(std::isnan(map[k]) || map[k] == k);
+        assert(map[k] == k);
     }
     __syncthreads();
 #endif
@@ -930,10 +833,9 @@ template <typename T, typename I, typename U>
 ROCSOLVER_KERNEL void reset_info(T* info, const I n, U val, I incr = 0)
 {
     I idx = hipBlockIdx_x * static_cast<I>(hipBlockDim_x) + hipThreadIdx_x;
-    I stride = hipGridDim_x * static_cast<I>(hipBlockDim_x);
 
-    for(I i = idx; i < n; i += stride)
-        info[i] = T(val) + incr * i;
+    if(idx < n)
+        info[idx] = T(val) + incr * idx;
 }
 
 template <typename T, typename I, typename S, typename U>
@@ -1101,64 +1003,6 @@ ROCSOLVER_KERNEL void set_zero(const rocblas_int m,
             T* Ap = load_ptr_batch<T>(A, b, shiftA, strideA);
             Ap[i + j * lda] = 0.0;
         }
-    }
-}
-
-/** Eigensolver scalar case (n=1) **/
-template <typename T, typename U, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
-ROCSOLVER_KERNEL void syev_scalar_case(const rocblas_evect evect,
-                                       U AA,
-                                       const rocblas_stride strideA,
-                                       T* DD,
-                                       const rocblas_stride strideD,
-                                       rocblas_int bc)
-{
-    int b = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
-
-    if(b < bc)
-    {
-        T* A = load_ptr_batch<T>(AA, b, 0, strideA);
-        T* D = DD + b * strideD;
-        D[0] = std::real(A[0]);
-
-        if(evect == rocblas_evect_original)
-            A[0] = T(1);
-    }
-}
-
-/** Eigensolver scalar case (n=1) **/
-template <typename T, typename S, typename U, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
-ROCSOLVER_KERNEL void syev_scalar_case(const rocblas_evect evect,
-                                       U AA,
-                                       const rocblas_stride strideA,
-                                       S* DD,
-                                       const rocblas_stride strideD,
-                                       rocblas_int bc)
-{
-    int b = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
-
-    if(b < bc)
-    {
-        T* A = load_ptr_batch<T>(AA, b, 0, strideA);
-        S* D = DD + b * strideD;
-        D[0] = A[0].real();
-
-        if(evect == rocblas_evect_original)
-            A[0] = T(1);
-    }
-}
-
-template <typename T>
-ROCSOLVER_KERNEL void sygv_update_info(T* info, T* iinfo, const rocblas_int n, const rocblas_int bc)
-{
-    int b = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
-
-    if(b < bc)
-    {
-        if(info[b] != 0)
-            info[b] += n;
-        else
-            info[b] = iinfo[b];
     }
 }
 
@@ -1406,7 +1250,7 @@ ROCSOLVER_KERNEL void check_singularity(const rocblas_int n,
 /** SWAP swaps the values of vectors x and y of dimension n.
     Launch this kernel with a desired number of threads organized in
     NG groups in the x direction with NT threads in the x direction. **/
-template <typename T, typename I>
+template <typename S, typename T, typename I>
 ROCSOLVER_KERNEL void swap_kernel(I const n, T* const x, I const incx, T* const y, I const incy)
 {
     if(n <= 0)

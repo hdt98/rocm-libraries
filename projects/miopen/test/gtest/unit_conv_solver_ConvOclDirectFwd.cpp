@@ -26,6 +26,9 @@
 
 #include "unit_conv_solver.hpp"
 
+// LWPMIOPEN-1392: Disabling failing deprecated Ocl solvers for Gfx11 and Gfx12
+#define WORKAROUND_LWPMIOPEN_1392 (HIP_PACKAGE_VERSION_FLAT >= 6004000000)
+
 namespace {
 
 auto GetConvTestCases(miopenDataType_t datatype)
@@ -42,8 +45,13 @@ auto GetConvTestCases(miopenDataType_t datatype)
 const auto& GetTestParams()
 {
     static const auto params = [] {
-        Gpu supported_gpus = Gpu::gfx900 | Gpu::gfx906 | Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx103X;
-        auto p             = miopen::unit_tests::UnitTestConvSolverParams(supported_gpus);
+#if WORKAROUND_LWPMIOPEN_1392
+        Gpu supported_gpus = Gpu::All & ~(Gpu::gfx110X | Gpu::gfx120X);
+#else
+        Gpu supported_gpus = Gpu::All;
+#endif
+        auto p = miopen::unit_tests::UnitTestConvSolverParams(supported_gpus);
+        p.EnableDeprecatedSolvers();
         p.Tunable(5);
         return p;
     }();

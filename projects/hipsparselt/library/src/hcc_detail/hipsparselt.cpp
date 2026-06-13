@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2022-2026 Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,6 @@
  *
  *******************************************************************************/
 
-#include "Debug.hpp"
 #include "exceptions.hpp"
 #include "hipsparselt_ostream.hpp"
 #include "utility.hpp"
@@ -33,6 +32,7 @@
 #include <rocsparselt.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "Debug.hpp"
 
 #define TO_STR2(x) #x
 #define TO_STR(x) TO_STR2(x)
@@ -58,6 +58,31 @@ extern "C" {
             return RocSparseLtStatusToHIPStatus(TMP_STATUS_FOR_CHECK);    \
         }                                                                 \
     }
+
+hipsparseStatus_t hipErrorToHIPSPARSEStatus(hipError_t status)
+{
+    switch(status)
+    {
+    case hipSuccess:
+        return HIPSPARSE_STATUS_SUCCESS;
+    case hipErrorMemoryAllocation:
+        return HIPSPARSE_STATUS_ALLOC_FAILED;
+    case hipErrorLaunchOutOfResources:
+        return HIPSPARSE_STATUS_INSUFFICIENT_RESOURCES;
+    case hipErrorInvalidDevicePointer:
+        return HIPSPARSE_STATUS_INVALID_VALUE;
+    case hipErrorInvalidDevice:
+    case hipErrorInvalidResourceHandle:
+        return HIPSPARSE_STATUS_NOT_INITIALIZED;
+    case hipErrorInvalidValue:
+        return HIPSPARSE_STATUS_INVALID_VALUE;
+    case hipErrorNoDevice:
+    case hipErrorUnknown:
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    default:
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
+}
 
 hipsparseStatus_t RocSparseLtStatusToHIPStatus(rocsparselt_status_ status)
 {
@@ -97,6 +122,19 @@ rocsparselt_compute_type_ HIPComputetypeToRocSparseLtComputetype(hipsparseLtComp
     default:
         throw HIPSPARSE_STATUS_NOT_SUPPORTED;
     }
+}
+
+hipsparseLtComputetype_t RocSparseLtComputetypeToHIPComputetype(rocsparselt_compute_type_ type)
+{
+    switch(type)
+    {
+    case rocsparselt_compute_f32:
+        return HIPSPARSELT_COMPUTE_32F;
+
+    case rocsparselt_compute_i32:
+        return HIPSPARSELT_COMPUTE_32I;
+    }
+    throw HIPSPARSE_STATUS_NOT_SUPPORTED;
 }
 
 rocsparselt_operation_ HIPOperationToHCCOperation(hipsparseOperation_t op)
@@ -142,12 +180,36 @@ rocsparselt_order_ HIPOrderToHCCOrder(hipsparseOrder_t op)
     }
 }
 
+hipsparseOrder_t HCCOrderToHIPOrder(rocsparselt_order_ op)
+{
+    switch(op)
+    {
+    case rocsparselt_order_row:
+        return HIPSPARSE_ORDER_ROW;
+    case rocsparselt_order_column:
+        return HIPSPARSE_ORDER_COL;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
 rocsparselt_sparsity_ HIPSparsityToRocSparseLtSparsity(hipsparseLtSparsity_t sparsity)
 {
     switch(sparsity)
     {
     case HIPSPARSELT_SPARSITY_50_PERCENT:
         return rocsparselt_sparsity_50_percent;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
+hipsparseLtSparsity_t RocSparseLtSparsityToHIPSparsity(rocsparselt_sparsity_ sparsity)
+{
+    switch(sparsity)
+    {
+    case rocsparselt_sparsity_50_percent:
+        return HIPSPARSELT_SPARSITY_50_PERCENT;
     default:
         throw HIPSPARSE_STATUS_NOT_SUPPORTED;
     }
@@ -197,6 +259,64 @@ rocsparselt_matmul_descr_attribute_
     }
 }
 
+hipsparseLtMatmulDescAttribute_t
+    RocSparseLtMatmulDescAttributeToHIPMatmulDescAttribute(rocsparselt_matmul_descr_attribute_ attr)
+{
+    switch(attr)
+    {
+    case rocsparselt_matmul_activation_relu:
+        return HIPSPARSELT_MATMUL_ACTIVATION_RELU;
+    case rocsparselt_matmul_activation_relu_upperbound:
+        return HIPSPARSELT_MATMUL_ACTIVATION_RELU_UPPERBOUND;
+    case rocsparselt_matmul_activation_relu_threshold:
+        return HIPSPARSELT_MATMUL_ACTIVATION_RELU_THRESHOLD;
+    case rocsparselt_matmul_activation_gelu:
+        return HIPSPARSELT_MATMUL_ACTIVATION_GELU;
+    case rocsparselt_matmul_activation_gelu_scaling:
+        return HIPSPARSELT_MATMUL_ACTIVATION_GELU_SCALING;
+    case rocsparselt_matmul_alpha_vector_scaling:
+        return HIPSPARSELT_MATMUL_ALPHA_VECTOR_SCALING;
+    case rocsparselt_matmul_beta_vector_scaling:
+        return HIPSPARSELT_MATMUL_BETA_VECTOR_SCALING;
+    case rocsparselt_matmul_bias_stride:
+        return HIPSPARSELT_MATMUL_BIAS_STRIDE;
+    case rocsparselt_matmul_bias_pointer:
+        return HIPSPARSELT_MATMUL_BIAS_POINTER;
+    case rocsparselt_matmul_activation_abs:
+        return HIPSPARSELT_MATMUL_ACTIVATION_ABS;
+    case rocsparselt_matmul_activation_leakyrelu:
+        return HIPSPARSELT_MATMUL_ACTIVATION_LEAKYRELU;
+    case rocsparselt_matmul_activation_leakyrelu_alpha:
+        return HIPSPARSELT_MATMUL_ACTIVATION_LEAKYRELU_ALPHA;
+    case rocsparselt_matmul_activation_sigmoid:
+        return HIPSPARSELT_MATMUL_ACTIVATION_SIGMOID;
+    case rocsparselt_matmul_activation_tanh:
+        return HIPSPARSELT_MATMUL_ACTIVATION_TANH;
+    case rocsparselt_matmul_activation_tanh_alpha:
+        return HIPSPARSELT_MATMUL_ACTIVATION_TANH_ALPHA;
+    case rocsparselt_matmul_activation_tanh_beta:
+        return HIPSPARSELT_MATMUL_ACTIVATION_TANH_BETA;
+    case rocsparselt_matmul_bias_type:
+        return HIPSPARSELT_MATMUL_BIAS_TYPE;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
+hipsparseLtMatDescAttribute_t
+    RocSparseLtMatDescAttributeToHIPMatDescAttribute(rocsparselt_mat_descr_attribute_ attr)
+{
+    switch(attr)
+    {
+    case rocsparselt_mat_num_batches:
+        return HIPSPARSELT_MAT_NUM_BATCHES;
+    case rocsparselt_mat_batch_stride:
+        return HIPSPARSELT_MAT_BATCH_STRIDE;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
 rocsparselt_mat_descr_attribute_
     HIPMatDescAttributeToRocSparseLtMatDescAttribute(hipsparseLtMatDescAttribute_t attr)
 {
@@ -217,6 +337,17 @@ rocsparselt_matmul_alg_ HIPMatmulAlgToRocSparseLtMatmulAlg(hipsparseLtMatmulAlg_
     {
     case HIPSPARSELT_MATMUL_ALG_DEFAULT:
         return rocsparselt_matmul_alg_default;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
+hipsparseLtMatmulAlg_t RocSparseLtMatmulAlgToHIPMatmulAlg(rocsparselt_matmul_alg_ alg)
+{
+    switch(alg)
+    {
+    case rocsparselt_matmul_alg_default:
+        return HIPSPARSELT_MATMUL_ALG_DEFAULT;
     default:
         throw HIPSPARSE_STATUS_NOT_SUPPORTED;
     }
@@ -244,6 +375,28 @@ rocsparselt_matmul_alg_attribute_
     }
 }
 
+hipsparseLtMatmulAlgAttribute_t
+    RocSparseLtAlgAttributeToHIPMatmulAlgAttribute(rocsparselt_matmul_alg_attribute_ alg)
+{
+    switch(alg)
+    {
+    case rocsparselt_matmul_alg_config_id:
+        return HIPSPARSELT_MATMUL_ALG_CONFIG_ID;
+    case rocsparselt_matmul_alg_config_max_id:
+        return HIPSPARSELT_MATMUL_ALG_CONFIG_MAX_ID;
+    case rocsparselt_matmul_search_iterations:
+        return HIPSPARSELT_MATMUL_SEARCH_ITERATIONS;
+    case rocsparselt_matmul_split_k:
+        return HIPSPARSELT_MATMUL_SPLIT_K;
+    case rocsparselt_matmul_split_k_mode:
+        return HIPSPARSELT_MATMUL_SPLIT_K_MODE;
+    case rocsparselt_matmul_split_k_buffers:
+        return HIPSPARSELT_MATMUL_SPLIT_K_BUFFERS;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
 rocsparselt_prune_alg_ HIPPruneAlgToRocSparseLtPruneAlg(hipsparseLtPruneAlg_t alg)
 {
     switch(alg)
@@ -252,6 +405,19 @@ rocsparselt_prune_alg_ HIPPruneAlgToRocSparseLtPruneAlg(hipsparseLtPruneAlg_t al
         return rocsparselt_prune_smfmac_tile;
     case HIPSPARSELT_PRUNE_SPMMA_STRIP:
         return rocsparselt_prune_smfmac_strip;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
+hipsparseLtPruneAlg_t RocSparseLtPruneAlgToHIPPruneAlg(rocsparselt_prune_alg_ alg)
+{
+    switch(alg)
+    {
+    case rocsparselt_prune_smfmac_tile:
+        return HIPSPARSELT_PRUNE_SPMMA_TILE;
+    case rocsparselt_prune_smfmac_strip:
+        return HIPSPARSELT_PRUNE_SPMMA_STRIP;
     default:
         throw HIPSPARSE_STATUS_NOT_SUPPORTED;
     }
@@ -270,11 +436,30 @@ rocsparselt_split_k_mode HIPSplitKModeToRocSparseLtSplitKMode(hipsparseLtSplitKM
     }
 }
 
+hipsparseLtSplitKMode_t RocSparseLtSplitKModeToHIPSplitKMode(rocsparselt_split_k_mode mode)
+{
+    switch(mode)
+    {
+    case rocsparselt_splik_k_mode_one_kernel:
+        return HIPSPARSELT_SPLIT_K_MODE_ONE_KERNEL;
+    case rocsparselt_split_k_mode_two_kernels:
+        return HIPSPARSELT_SPLIT_K_MODE_TWO_KERNELS;
+    default:
+        throw HIPSPARSE_STATUS_NOT_SUPPORTED;
+    }
+}
+
 hipsparseStatus_t hipsparseLtInit(hipsparseLtHandle_t* handle)
 try
 {
     // Check if handle is valid
     rocsparselt::Debug::Instance().markerStart("hipsparseLtInit");
+    if(handle == nullptr)
+    {
+        rocsparselt::Debug::Instance().markerStop();
+        return HIPSPARSE_STATUS_INVALID_VALUE;
+    }
+
     int               deviceId;
     hipError_t        err;
     hipsparseStatus_t retval = HIPSPARSE_STATUS_SUCCESS;
@@ -520,20 +705,6 @@ catch(...)
     return exception_to_hipsparselt_status();
 }
 
-hipsparseStatus_t hipsparseLtMatmulAlgSelectionDestroy(const hipsparseLtMatmulAlgSelection_t* algSelection)
-try
-{
-    rocsparselt::Debug::Instance().markerStart("hipsparseLtMatmulAlgSelectionDestroy");
-    auto status = RocSparseLtStatusToHIPStatus(
-        rocsparselt_matmul_alg_selection_destroy((const rocsparselt_matmul_alg_selection*)algSelection));
-    rocsparselt::Debug::Instance().markerStop();
-    return status;
-}
-catch(...)
-{
-    return exception_to_hipsparselt_status();
-}
-
 hipsparseStatus_t hipsparseLtMatmulAlgSetAttribute(const hipsparseLtHandle_t*       handle,
                                                    hipsparseLtMatmulAlgSelection_t* algSelection,
                                                    hipsparseLtMatmulAlgAttribute_t  attribute,
@@ -645,18 +816,17 @@ hipsparseStatus_t hipsparseLtMatmul(const hipsparseLtHandle_t*     handle,
 try
 {
     rocsparselt::Debug::Instance().markerStart("hipsparseLtMatmul");
-    auto status
-        = RocSparseLtStatusToHIPStatus(rocsparselt_matmul((const rocsparselt_handle*)handle,
-                                                          (const rocsparselt_matmul_plan*)plan,
-                                                          alpha,
-                                                          d_A,
-                                                          d_B,
-                                                          beta,
-                                                          d_C,
-                                                          d_D,
-                                                          workspace,
-                                                          streams,
-                                                          numStreams));
+    auto status = RocSparseLtStatusToHIPStatus(rocsparselt_matmul((const rocsparselt_handle*)handle,
+                                                           (const rocsparselt_matmul_plan*)plan,
+                                                           alpha,
+                                                           d_A,
+                                                           d_B,
+                                                           beta,
+                                                           d_C,
+                                                           d_D,
+                                                           workspace,
+                                                           streams,
+                                                           numStreams));
     rocsparselt::Debug::Instance().markerStop();
     return status;
 }
@@ -679,18 +849,17 @@ hipsparseStatus_t hipsparseLtMatmulSearch(const hipsparseLtHandle_t* handle,
 try
 {
     rocsparselt::Debug::Instance().markerStart("hipsparseLtMatmulSearch");
-    auto status
-        = RocSparseLtStatusToHIPStatus(rocsparselt_matmul_search((const rocsparselt_handle*)handle,
-                                                                 (rocsparselt_matmul_plan*)plan,
-                                                                 alpha,
-                                                                 d_A,
-                                                                 d_B,
-                                                                 beta,
-                                                                 d_C,
-                                                                 d_D,
-                                                                 workspace,
-                                                                 streams,
-                                                                 numStreams));
+    auto status = RocSparseLtStatusToHIPStatus(rocsparselt_matmul_search((const rocsparselt_handle*)handle,
+                                                                  (rocsparselt_matmul_plan*)plan,
+                                                                  alpha,
+                                                                  d_A,
+                                                                  d_B,
+                                                                  beta,
+                                                                  d_C,
+                                                                  d_D,
+                                                                  workspace,
+                                                                  streams,
+                                                                  numStreams));
     rocsparselt::Debug::Instance().markerStop();
     return status;
 }
@@ -902,8 +1071,6 @@ void hipsparseLtInitialize()
 hipsparseStatus_t hipsparseLtGetVersion(const hipsparseLtHandle_t* handle, int* version)
 try
 {
-    if(version == nullptr)
-        return HIPSPARSE_STATUS_INVALID_VALUE;
     *version = hipsparseltVersionMajor * 100000 + hipsparseltVersionMinor * 100
                + hipsparseltVersionPatch;
 
@@ -917,9 +1084,6 @@ catch(...)
 hipsparseStatus_t hipsparseLtGetProperty(hipLibraryPropertyType propertyType, int* value)
 try
 {
-    if(value == nullptr)
-        return HIPSPARSE_STATUS_INVALID_VALUE;
-
     switch(propertyType)
     {
     case HIP_LIBRARY_MAJOR_VERSION:
@@ -942,7 +1106,7 @@ catch(...)
 hipsparseStatus_t hipsparseLtGetGitRevision(hipsparseLtHandle_t handle, char* rev)
 try
 {
-    // Get hipSPARSELt revision
+    // Get hipSPARSE revision
     if(rev == nullptr)
     {
         return HIPSPARSE_STATUS_INVALID_VALUE;
@@ -962,13 +1126,10 @@ catch(...)
 hipsparseStatus_t hipsparseLtGetArchName(char** archName)
 try
 {
-    if(archName == nullptr)
-        return HIPSPARSE_STATUS_INVALID_VALUE;
-
-    *archName = nullptr;
-    auto arch = rocsparselt_internal_get_arch_name();
-    *archName = (char*)malloc((arch.size() + 1) * sizeof(char));
-    strcpy(*archName, arch.c_str());
+    *archName        = nullptr;
+    std::string arch = "cuda";
+    *archName        = (char*)malloc(arch.size() * sizeof(char));
+    strncpy(*archName, arch.c_str(), arch.size());
     return HIPSPARSE_STATUS_SUCCESS;
 }
 catch(...)

@@ -101,3 +101,4 @@ bool operator!=(const tagged_allocator<T1,Pointer1,Tag> &, const tagged_allocato
 
 } // end detail
 THRUST_NAMESPACE_END
+

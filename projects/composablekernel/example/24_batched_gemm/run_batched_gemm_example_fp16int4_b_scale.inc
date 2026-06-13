@@ -1,6 +1,7 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 #include <random>
+
 #pragma once
 struct ProblemSize final
 {
@@ -27,7 +28,7 @@ struct ExecutionConfig final
 {
     bool do_verification = true;
     int init_method      = 1;
-    bool time_kernel     = false;
+    bool time_kernel     = true;
 };
 
 template <typename DataType>
@@ -115,7 +116,6 @@ inline __host__ __device__ constexpr double get_atol()
 bool run_batched_gemm(const ProblemSize& problem_size, const ExecutionConfig& config)
 {
     using namespace ck::literals;
-    using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
     auto& [M,
            N,
@@ -137,13 +137,11 @@ bool run_batched_gemm(const ProblemSize& problem_size, const ExecutionConfig& co
                                        auto layout) {
         if constexpr(std::is_same_v<decltype(layout), ck::tensor_layout::gemm::RowMajor>)
         {
-            return HostTensorDescriptor(
-                {batch_count_, row, col}, {batch_stride, stride, 1_uz}, Bypass{});
+            return HostTensorDescriptor({batch_count_, row, col}, {batch_stride, stride, 1_uz});
         }
         else
         {
-            return HostTensorDescriptor(
-                {batch_count_, row, col}, {batch_stride, 1_uz, stride}, Bypass{});
+            return HostTensorDescriptor({batch_count_, row, col}, {batch_stride, 1_uz, stride});
         }
     };
 
@@ -346,7 +344,7 @@ bool run_batched_gemm(const ProblemSize& problem_size, const ExecutionConfig& co
     {
         std::cerr << gemm.GetTypeString() << " does not support this problem" << std::endl;
 
-        return false;
+        return true;
     }
 
     bool pass = true;
@@ -523,11 +521,6 @@ bool run_batched_gemm(const ProblemSize& problem_size, const ExecutionConfig& co
 
 bool run_batched_gemm_fp16_int4_b_scale_example(int argc, char* argv[])
 {
-    if(ck::is_gfx11_supported() || ck::is_gfx120_supported())
-    {
-        return 1;
-    }
-
     ProblemSize problem_size;
     ExecutionConfig config;
 
@@ -536,34 +529,34 @@ bool run_batched_gemm_fp16_int4_b_scale_example(int argc, char* argv[])
 
     problem_size.M = 128 * (dis(gen) + 1);
     problem_size.N = 128 * (dis(gen) + 1);
-    problem_size.K = 256 * (dis(gen) + 4);
+    problem_size.K = 256 * (dis(gen) + 2);
 
     problem_size.batch_count = 2;
 
-    if(argc == 1)
-    {
-        // use default case
-    }
-    else if(argc == 4 || argc >= 7)
+    if(argc == 4)
     {
         config.do_verification = std::stoi(argv[1]);
         config.init_method     = std::stoi(argv[2]);
         config.time_kernel     = std::stoi(argv[3]);
-        if(argc >= 7)
+    }
+    else if(argc >= 7)
+    {
+        config.do_verification = std::stoi(argv[1]);
+        config.init_method     = std::stoi(argv[2]);
+        config.time_kernel     = std::stoi(argv[3]);
+
+        problem_size.M = std::stoi(argv[4]);
+        problem_size.N = std::stoi(argv[5]);
+        problem_size.K = std::stoi(argv[6]);
+
+        if(argc >= 8)
         {
-            problem_size.M = std::stoi(argv[4]);
-            problem_size.N = std::stoi(argv[5]);
-            problem_size.K = std::stoi(argv[6]);
+            problem_size.batch_count = std::stoi(argv[7]);
+        }
 
-            if(argc >= 8)
-            {
-                problem_size.batch_count = std::stoi(argv[7]);
-            }
-
-            if(argc >= 9)
-            {
-                problem_size.KBatch = std::stoi(argv[8]);
-            }
+        if(argc >= 9)
+        {
+            problem_size.KBatch = std::stoi(argv[8]);
         }
     }
     else
@@ -571,10 +564,7 @@ bool run_batched_gemm_fp16_int4_b_scale_example(int argc, char* argv[])
         printf("arg1: verification (0=no, 1=yes)\n");
         printf("arg2: initialization (0=no init, 1=integer value, 2=decimal value)\n");
         printf("arg3: time kernel (0=n0, 1=yes)\n");
-        printf("arg4-6: problem size (M, N, K)\n");
-        printf("arg7: batch count\n");
-        printf("arg8: KBatch\n");
-        exit(1);
+        exit(0);
     }
 
     problem_size.stride_A = problem_size.K;

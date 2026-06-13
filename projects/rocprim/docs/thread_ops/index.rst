@@ -5,14 +5,13 @@
 .. _thread-index:
 
 ********************************************************************
-rocPRIM thread-level operations
+ Thread-Level Operations
 ********************************************************************
 
-API reference for rocPRIM thread-level operations.
-
-* :ref:`thread_operators`
-* :ref:`thread_load`
-* :ref:`thread_reduce`
-* :ref:`thread_scan`
-* :ref:`thread_search`
-* :ref:`thread_store`
+   * :ref:`radix-key-codec`
+   * :ref:`thread_operators`
+   * :ref:`thread_load`
+   * :ref:`thread_reduce`
+   * :ref:`thread_scan`
+   * :ref:`thread_search`
+   * :ref:`thread_store`

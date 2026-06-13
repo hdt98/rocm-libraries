@@ -1,5 +1,5 @@
 .. meta::
-  :description: hipSOLVER sparse matrix helper functions API documentation
+  :description: hipSOLVER documentation and API reference library
   :keywords: hipSOLVER, rocSOLVER, ROCm, API, documentation
 
 .. _sparse_helpers:
@@ -8,16 +8,16 @@
 Sparse matrix helper functions
 *******************************
 
-These helper functions control aspects of the hipSOLVER library. They are divided
+These are helper functions that control aspects of the hipSOLVER library. They are divided
 into the following categories:
 
-* :ref:`sparse_initialize`: Functions to initialize and cleanup the library handle.
-* :ref:`sparse_stream`: Functions to manipulate streams.
+* :ref:`sparse_initialize` functions. Used to initialize and cleanup the library handle.
+* :ref:`sparse_stream` functions. Provide functionality to manipulate streams.
 
 
 .. _sparse_initialize:
 
-Handle setup and teardown
+Handle set-up and tear-down
 ===============================
 
 .. contents:: List of handle initialization functions

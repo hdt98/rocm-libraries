@@ -1,6 +1,3 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #include "ck_tile/host.hpp"
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
@@ -97,11 +94,12 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     constexpr bool kTwoPass = true;
 
-    using BlockTile      = ck_tile::sequence<2, 128>;
-    using Vector         = ck_tile::sequence<1, 1>;
-    using ThreadPerBlock = ck_tile::sequence<2, 128>;
+    using BlockWarps = ck_tile::sequence<2, 2>;
+    using BlockTile  = ck_tile::sequence<2, 128>;
+    using WarpTile   = ck_tile::sequence<1, 64>;
+    using Vector     = ck_tile::sequence<1, 1>;
 
-    using Shape   = ck_tile::Generic2dBlockShape<BlockTile, ThreadPerBlock, Vector>;
+    using Shape   = ck_tile::Generic2dBlockShape<BlockTile, BlockWarps, WarpTile, Vector>;
     using Problem = ck_tile::SmoothquantPipelineProblem<XDataType,
                                                         SmoothScaleDataType,
                                                         ComputeDataType,
@@ -128,11 +126,12 @@ bool run(const ck_tile::ArgParser& arg_parser)
     auto kargs = Kernel::MakeKargs(args);
 
     const dim3 grids                       = Kernel::GridSize(args);
-    const dim3 blocks                      = Kernel::BlockSize();
+    constexpr dim3 blocks                  = Kernel::BlockSize();
     constexpr ck_tile::index_t kBlockPerCu = 1;
     auto s = ck_tile::stream_config{nullptr, true, 1, warmup, repeat};
 
-    ck_tile::launch_kernel(s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+    ck_tile::launch_kernel(
+        s, ck_tile::make_kernel<blocks.x, kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
 
     bool pass = true;
 
@@ -217,9 +216,10 @@ bool run(const ck_tile::ArgParser& arg_parser)
             }
         }
 
-        std::cout << "[" << data_type << "]" << " m:" << m << ", n:" << n
-                  << ", x_stride:" << x_stride << ", y_stride:" << y_stride
-                  << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
+        std::cout << "[" << data_type << "]"
+                  << " m:" << m << ", n:" << n << ", x_stride:" << x_stride
+                  << ", y_stride:" << y_stride << ", valid:" << (pass ? "y" : "n") << std::flush
+                  << std::endl;
     }
 
     return pass;

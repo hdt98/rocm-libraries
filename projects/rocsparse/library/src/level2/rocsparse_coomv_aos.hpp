@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 namespace rocsparse
 {
@@ -39,37 +39,14 @@ namespace rocsparse
     rocsparse_status coomv_aos_template(rocsparse_handle          handle,
                                         rocsparse_operation       trans,
                                         rocsparse_coomv_aos_alg   alg,
-                                        int64_t                   m,
-                                        int64_t                   n,
+                                        I                         m,
+                                        I                         n,
                                         int64_t                   nnz,
-                                        const void*               alpha_device_host,
+                                        const T*                  alpha_device_host,
                                         const rocsparse_mat_descr descr,
-                                        const void*               coo_val,
-                                        const void*               coo_ind,
-                                        const void*               x,
-                                        const void*               beta_device_host,
-                                        void*                     y,
-                                        bool                      fallback_algorithm);
-
-    rocsparse_status coomv_aos(rocsparse_handle          handle,
-                               rocsparse_operation       trans,
-                               rocsparse_coomv_aos_alg   alg,
-                               int64_t                   m,
-                               int64_t                   n,
-                               int64_t                   nnz,
-                               rocsparse_datatype        alpha_device_host_datatype,
-                               const void*               alpha_device_host,
-                               const rocsparse_mat_descr descr,
-                               rocsparse_datatype        coo_val_datatype,
-                               const void*               coo_val,
-                               rocsparse_indextype       coo_ind_indextype,
-                               const void*               coo_ind,
-                               rocsparse_datatype        x_datatype,
-                               const void*               x,
-                               rocsparse_datatype        beta_device_host_datatype,
-                               const void*               beta_device_host,
-                               rocsparse_datatype        y_datatype,
-                               void*                     y,
-                               bool                      fallback_algorithm);
-
+                                        const A*                  coo_val,
+                                        const I*                  coo_ind,
+                                        const X*                  x,
+                                        const T*                  beta_device_host,
+                                        Y*                        y);
 }

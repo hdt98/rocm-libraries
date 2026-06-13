@@ -10,19 +10,6 @@ rocBLAS deprecations by version
 
 The following sections list the features deprecation by release version.
 
-Removed in rocBLAS 5.0
-=========================
-
-rocblas_gemm_ex3, gemm_batched_ex3 and gemm_strided_batched_ex3 removed
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
-``rocblas_gemm_ex3``, ``gemm_batched_ex3``, and ``gemm_strided_batched_ex3`` API functions were removed in 5.0.
-
-rocblas_Xgemm_kernel_name removed
-'''''''''''''''''''''''''''''''''
-
-``rocblas_Xgemm_kernel_name`` API functions were removed in 5.0.
-
 Announced in rocBLAS 4.3
 ==========================
 
@@ -38,7 +25,7 @@ gemm_ex3 deprecation for all 8 bit float API
 ''''''''''''''''''''''''''''''''''''''''''''
 
 ``rocblas_gemm_ex3``, ``gemm_batched_ex3``, and ``gemm_strided_batched_ex3`` are deprecated and will be removed in the next
-major release of rocBLAS. See `hipBLASLt <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblaslt>`_ for future 8-bit float usage.
+major release of rocBLAS. See `hipBLASLt <https://github.com/ROCm/hipBLASLt>`_ for future 8-bit float usage.
 
 Announced in rocBLAS 4.0
 =========================
@@ -182,16 +169,6 @@ Due to this the following APIs would be affected:
 * ``rocblas_is_user_managing_device_memory()`` will be removed.
 * ``rocblas_set_device_memory_size()`` will be replaced by a future function ``rocblas_increase_device_memory_size()``, this new API would allow users to increase the device memory pool size at runtime.
 
-Announced in rocBLAS 2.46
-=========================
-
-Remove ability for hipBLAS to set rocblas_int8_type_for_hipblas
-'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
-From rocBLAS 3.0, remove ``enum rocblas_int8_type_for_hipblas`` and the functions ``rocblas_get_int8_type_for_hipblas`` and
-``rocblas_set_int8_type_for_hipblas``. These are used by hipBLAS to select either ``int8_t`` or ``packed_int8x4`` datatype.
-In hipBLAS the option to use ``packed_int8x4`` will be removed, only ``int8_t`` will be available.
-
 Announced in rocBLAS 2.45
 ==========================
 
@@ -205,3 +182,15 @@ Replace truncate with rocblas_truncate
 
 From rocBLAS 3.0 enum ``truncate_t`` and the value truncate has been removed and replaced by ``rocblas_truncate_t``
 and ``rocblas_truncate``, respectively.
+
+Announced in rocBLAS 2.46
+=========================
+
+Remove ability for hipBLAS to set rocblas_int8_type_for_hipblas
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+From rocBLAS 3.0, remove ``enum rocblas_int8_type_for_hipblas`` and the functions ``rocblas_get_int8_type_for_hipblas`` and
+``rocblas_set_int8_type_for_hipblas``. These are used by hipBLAS to select either ``int8_t`` or ``packed_int8x4`` datatype.
+In hipBLAS the option to use ``packed_int8x4`` will be removed, only ``int8_t`` will be available.
+
+

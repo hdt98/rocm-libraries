@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,8 +28,8 @@
 #include "config_types.hpp"
 #include "device_transform.hpp"
 
-#include "../common.hpp"
 #include "../config.hpp"
+#include "../common.hpp"
 #include "../functional.hpp"
 
 #include "../detail/temp_storage.hpp"
@@ -56,13 +56,37 @@ BEGIN_ROCPRIM_NAMESPACE
 
 namespace detail
 {
-
 template<typename Config,
          bool InPlace,
          bool Right,
          typename InputIt,
          typename OutputIt,
          typename BinaryFunction>
+void ROCPRIM_KERNEL ROCPRIM_LAUNCH_BOUNDS(
+    device_params<Config>()
+        .adjacent_difference_kernel_config
+        .block_size) adjacent_difference_kernel(const InputIt        input,
+                                          const OutputIt       output,
+                                          const std::size_t    size,
+                                          const BinaryFunction op,
+                                          const typename std::iterator_traits<InputIt>::value_type*
+                                                            previous_values,
+                                          const std::size_t starting_block)
+{
+    adjacent_difference_kernel_impl<Config, InPlace, Right>(input,
+                                                            output,
+                                                            size,
+                                                            op,
+                                                            previous_values,
+                                                            starting_block);
+}
+
+template <typename Config,
+          bool InPlace,
+          bool Right,
+          typename InputIt,
+          typename OutputIt,
+          typename BinaryFunction>
 hipError_t adjacent_difference_impl(void* const          temporary_storage,
                                     std::size_t&         storage_size,
                                     const InputIt        input,
@@ -73,20 +97,26 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
                                     const bool           debug_synchronous)
 {
     using value_type  = typename std::iterator_traits<InputIt>::value_type;
-    using output_type = ::rocprim::accumulator_t<BinaryFunction, value_type>;
+    using output_type = rocprim::invoke_result_binary_op_t<value_type, BinaryFunction>;
     using larger_type
         = std::conditional_t<(sizeof(value_type) >= sizeof(output_type)), value_type, output_type>;
 
-    using Selector = adjacent_difference_config_selector<InPlace, larger_type>;
+    using config = wrapped_adjacent_difference_config<Config, InPlace, larger_type>;
 
-    const target current_target(stream);
+    detail::target_arch target_arch;
+    hipError_t          result = detail::host_target_arch(stream, target_arch);
+    if(result != hipSuccess)
+    {
+        return result;
+    }
 
-    const auto params = get_config<Selector>(Config{}, current_target);
+    const detail::adjacent_difference_config_params params
+        = detail::dispatch_target_arch<config>(target_arch);
 
-    const unsigned int block_size          = params.kernel_config.block_size;
-    const unsigned int items_per_thread    = params.kernel_config.items_per_thread;
-    const unsigned int items_per_block     = block_size * items_per_thread;
-    const std::size_t  num_blocks          = ceiling_div(size, items_per_block);
+    const unsigned int block_size       = params.adjacent_difference_kernel_config.block_size;
+    const unsigned int items_per_thread = params.adjacent_difference_kernel_config.items_per_thread;
+    const unsigned int items_per_block  = block_size * items_per_thread;
+    const std::size_t  num_blocks       = ceiling_div(size, items_per_block);
     const std::size_t  num_previous_values = InPlace && num_blocks >= 2 ? num_blocks - 1 : 0;
 
     value_type* previous_values;
@@ -107,7 +137,7 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
 
     // Copy values before they are overwritten to use as tile predecessors/successors
     // previous_values is not dereferenced when the operation is not in place
-    if constexpr(InPlace)
+    if ROCPRIM_IF_CONSTEXPR(InPlace)
     {
         // If doing left adjacent diff then the last item of each block is needed for the
         // next block, otherwise the first item is needed for the previous block
@@ -121,7 +151,7 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
         const hipError_t error = ::rocprim::transform(block_starts_iter,
                                                       previous_values,
                                                       num_blocks - 1,
-                                                      rocprim::identity<>{},
+                                                      rocprim::identity<> {},
                                                       stream,
                                                       debug_synchronous);
         if(error != hipSuccess)
@@ -130,7 +160,7 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
         }
     }
 
-    const unsigned int size_limit             = params.kernel_config.size_limit;
+    const unsigned int size_limit             = params.adjacent_difference_kernel_config.size_limit;
     const auto         number_of_blocks_limit = std::max(size_limit / items_per_block, 1u);
     const auto         aligned_size_limit     = number_of_blocks_limit * items_per_block;
 
@@ -165,32 +195,25 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
 
             start = std::chrono::steady_clock::now();
         }
-
-        auto adjacent_difference_kernel = [=](auto target_config)
-        {
-            adjacent_difference_kernel_impl<decltype(target_config), InPlace, Right>(
-                input + offset,
-                output + offset,
-                size,
-                op,
-                previous_values + starting_block,
-                starting_block);
-        };
-
-        ROCPRIM_RETURN_ON_ERROR(execute_launch_plan<Config, Selector>(current_target,
-                                                                      adjacent_difference_kernel,
-                                                                      current_blocks,
-                                                                      block_size,
-                                                                      0,
-                                                                      stream));
-
-        ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR("adjacent_difference_kernel",
-                                                    current_size,
-                                                    start);
+        hipLaunchKernelGGL(HIP_KERNEL_NAME(adjacent_difference_kernel<config, InPlace, Right>),
+                           dim3(current_blocks),
+                           dim3(block_size),
+                           0,
+                           stream,
+                           input + offset,
+                           output + offset,
+                           size,
+                           op,
+                           previous_values + starting_block,
+                           starting_block);
+        ROCPRIM_DETAIL_HIP_SYNC_AND_RETURN_ON_ERROR(
+            "adjacent_difference_kernel", current_size, start);
     }
     return hipSuccess;
 }
 } // namespace detail
+
+
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
@@ -240,21 +263,19 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
 /// \parblock
 /// In this example a device-level adjacent_difference operation is performed on integer values.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/device/example_device_adjacent_difference.cpp).
-///
 /// \code{.cpp}
 /// #include <rocprim/rocprim.hpp> //or <rocprim/device/device_adjacent_difference.hpp>
 ///
 /// // custom binary function
 /// auto binary_op =
-///     [] (int a, int b) -> int
+///     [] __device__ (int a, int b) -> int
 ///     {
 ///         return a - b;
 ///     };
 ///
 /// // Prepare input and output (declare pointers, allocate device memory etc.)
 /// std::size_t size; // e.g., 8
-/// int* input1; // e.g., [1, 2, 3, 4, 5, 6, 7, 8]
+/// int* input1; // e.g., [8, 7, 6, 5, 4, 3, 2, 1]
 /// int* output; // empty array of 8 elements
 ///
 /// std::size_t temporary_storage_size_bytes;
@@ -273,32 +294,26 @@ hipError_t adjacent_difference_impl(void* const          temporary_storage,
 ///     temporary_storage_ptr, temporary_storage_size_bytes,
 ///     input, output, size, binary_op
 /// );
-/// // output: [1, 1, 1, 1, 1, 1, 1, 1]
+/// // output: [8, 1, 1, 1, 1, 1, 1, 1]
 /// \endcode
 /// \endparblock
-template<typename Config = default_config,
-         typename InputIt,
-         typename OutputIt,
-         typename BinaryFunction = ::rocprim::minus<>>
+template <typename Config = default_config,
+          typename InputIt,
+          typename OutputIt,
+          typename BinaryFunction = ::rocprim::minus<>>
 hipError_t adjacent_difference(void* const          temporary_storage,
                                std::size_t&         storage_size,
                                const InputIt        input,
                                const OutputIt       output,
                                const std::size_t    size,
-                               const BinaryFunction op                = BinaryFunction{},
+                               const BinaryFunction op                = BinaryFunction {},
                                const hipStream_t    stream            = 0,
                                const bool           debug_synchronous = false)
 {
     static constexpr bool in_place = false;
     static constexpr bool right    = false;
-    return detail::adjacent_difference_impl<Config, in_place, right>(temporary_storage,
-                                                                     storage_size,
-                                                                     input,
-                                                                     output,
-                                                                     size,
-                                                                     op,
-                                                                     stream,
-                                                                     debug_synchronous);
+    return detail::adjacent_difference_impl<Config, in_place, right>(
+        temporary_storage, storage_size, input, output, size, op, stream, debug_synchronous);
 }
 
 /// \brief Parallel primitive for applying a binary operation across pairs of consecutive elements
@@ -335,27 +350,21 @@ hipError_t adjacent_difference(void* const          temporary_storage,
 ///
 /// \return `hipSuccess` (0) after successful scan, otherwise the HIP runtime error of
 /// type `hipError_t`
-template<typename Config = default_config,
-         typename InputIt,
-         typename BinaryFunction = ::rocprim::minus<>>
+template <typename Config = default_config,
+          typename InputIt,
+          typename BinaryFunction = ::rocprim::minus<>>
 hipError_t adjacent_difference_inplace(void* const          temporary_storage,
                                        std::size_t&         storage_size,
                                        const InputIt        values,
                                        const std::size_t    size,
-                                       const BinaryFunction op                = BinaryFunction{},
+                                       const BinaryFunction op                = BinaryFunction {},
                                        const hipStream_t    stream            = 0,
                                        const bool           debug_synchronous = false)
 {
     static constexpr bool in_place = true;
     static constexpr bool right    = false;
-    return detail::adjacent_difference_impl<Config, in_place, right>(temporary_storage,
-                                                                     storage_size,
-                                                                     values,
-                                                                     values,
-                                                                     size,
-                                                                     op,
-                                                                     stream,
-                                                                     debug_synchronous);
+    return detail::adjacent_difference_impl<Config, in_place, right>(
+        temporary_storage, storage_size, values, values, size, op, stream, debug_synchronous);
 }
 
 /// \brief Parallel primitive for applying a binary operation across pairs of consecutive elements
@@ -464,7 +473,7 @@ hipError_t adjacent_difference_inplace(void* const          temporary_storage,
 ///
 /// // custom binary function
 /// auto binary_op =
-///     [] (int a, int b) -> int
+///     [] __device__ (int a, int b) -> int
 ///     {
 ///         return a - b;
 ///     };
@@ -493,29 +502,23 @@ hipError_t adjacent_difference_inplace(void* const          temporary_storage,
 /// // output: [1, 1, 1, 1, 1, 1, 1, 8]
 /// \endcode
 /// \endparblock
-template<typename Config = default_config,
-         typename InputIt,
-         typename OutputIt,
-         typename BinaryFunction = ::rocprim::minus<>>
+template <typename Config = default_config,
+          typename InputIt,
+          typename OutputIt,
+          typename BinaryFunction = ::rocprim::minus<>>
 hipError_t adjacent_difference_right(void* const          temporary_storage,
                                      std::size_t&         storage_size,
                                      const InputIt        input,
                                      const OutputIt       output,
                                      const std::size_t    size,
-                                     const BinaryFunction op                = BinaryFunction{},
+                                     const BinaryFunction op                = BinaryFunction {},
                                      const hipStream_t    stream            = 0,
                                      const bool           debug_synchronous = false)
 {
     static constexpr bool in_place = false;
     static constexpr bool right    = true;
-    return detail::adjacent_difference_impl<Config, in_place, right>(temporary_storage,
-                                                                     storage_size,
-                                                                     input,
-                                                                     output,
-                                                                     size,
-                                                                     op,
-                                                                     stream,
-                                                                     debug_synchronous);
+    return detail::adjacent_difference_impl<Config, in_place, right>(
+        temporary_storage, storage_size, input, output, size, op, stream, debug_synchronous);
 }
 
 /// \brief Parallel primitive for applying a binary operation across pairs of consecutive elements
@@ -552,27 +555,21 @@ hipError_t adjacent_difference_right(void* const          temporary_storage,
 ///
 /// \return `hipSuccess` (0) after successful scan, otherwise the HIP runtime error of
 /// type `hipError_t`
-template<typename Config = default_config,
-         typename InputIt,
-         typename BinaryFunction = ::rocprim::minus<>>
+template <typename Config = default_config,
+          typename InputIt,
+          typename BinaryFunction = ::rocprim::minus<>>
 hipError_t adjacent_difference_right_inplace(void* const          temporary_storage,
                                              std::size_t&         storage_size,
                                              const InputIt        values,
                                              const std::size_t    size,
-                                             const BinaryFunction op     = BinaryFunction{},
+                                             const BinaryFunction op     = BinaryFunction {},
                                              const hipStream_t    stream = 0,
                                              const bool           debug_synchronous = false)
 {
     static constexpr bool in_place = true;
     static constexpr bool right    = true;
-    return detail::adjacent_difference_impl<Config, in_place, right>(temporary_storage,
-                                                                     storage_size,
-                                                                     values,
-                                                                     values,
-                                                                     size,
-                                                                     op,
-                                                                     stream,
-                                                                     debug_synchronous);
+    return detail::adjacent_difference_impl<Config, in_place, right>(
+        temporary_storage, storage_size, values, values, size, op, stream, debug_synchronous);
 }
 
 /// \brief Parallel primitive for applying a binary operation across pairs of consecutive elements

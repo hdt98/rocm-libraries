@@ -9,10 +9,8 @@ subtrees:
 
 - caption: Install
   entries:
-  - file: install/install
-    title: Install hipBLASLt
   - file: install/building-installing-hipblaslt
-    title: Build from source
+    title: Installation guide
 
 - caption: Conceptual
   entries:
@@ -20,8 +18,6 @@ subtrees:
     title: hipBLASLt library organization
   - file: conceptual/hipblaslt-clients
     title: hipBLASLt clients
-  - file: conceptual/pci-chip-id-predicates-walkthrough
-    title: hipBLASLt PCI chip ID predicates
 
 - caption: How to
   entries:
@@ -33,8 +29,6 @@ subtrees:
     title: Use logging and heuristics
   - file: how-to/how-to-use-streamk
     title: Use Stream-K with hipBLASLt
-  - file: how-to/how-to-detect-nan
-    title: Detect NaN in GEMM output
 
 - caption: Examples
   entries:
@@ -45,16 +39,14 @@ subtrees:
       - file: samples/client_extop_softmax
       - file: samples/sample_hipblaslt_ext_op_layernorm
       - file: samples/sample_hipblaslt_ext_op_amax
-  - url: https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipblaslt/clients/samples
+      - file: samples/sample_hipblaslt_ext_op_amax_with_scale
+  - url: https://github.com/ROCm/hipBLASLt/tree/develop/clients/samples
     title: hipBLASLt client examples
 
 - caption: API reference
   entries:
-  - file: reference/data-type-support
   - file: reference/datatypes
     title: hipBLASLt datatypes
-  - file: reference/env-variables
-    title: hipBLASLt environment variables
   - file: reference/api-reference
     title: hipBLASLt API
   - file: reference/ext-reference

@@ -41,7 +41,7 @@ int main()
     float* hz = (float*)calloc(N, sizeof(*hz));
     float* dx;
 
-    double gpu_time_used = 0.0;
+    double gpu_time_used;
 
     hipblasHandle_t handle;
     hipblasCreate(&handle);

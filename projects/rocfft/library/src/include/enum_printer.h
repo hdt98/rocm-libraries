@@ -24,7 +24,7 @@
 #include <string>
 
 #include "../../../shared/rocfft_complex.h"
-#include "../device/kernels/device_enum.h"
+#include "../device/kernels/common.h"
 #include "rocfft/rocfft.h"
 
 enum OperatingBuffer
@@ -44,7 +44,7 @@ enum PlacementCode
     PC_UNSET,
 };
 
-// the decision strategy for buffer assignment
+// the decision strategy for buffer assigment
 enum rocfft_optimize_strategy
 {
     rocfft_optimize_min_buffer, // minimize number of buffers, possibly fewer fusions

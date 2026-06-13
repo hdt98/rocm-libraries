@@ -31,13 +31,6 @@ endfunction()
 function(add_hipcub_test TEST_NAME TEST_SOURCES)
   get_hipcub_test_target(${TEST_SOURCES} TEST_TARGET)
   add_hipcub_test_internal(${TEST_NAME} "${TEST_SOURCES}" ${TEST_TARGET})
-  # Re-propagate DLLS_COPIED from add_hipcub_test_internal's scope to our
-  # caller (file scope). PARENT_SCOPE only propagates one level, so without
-  # this relay the guard resets on every call and each test target gets
-  # duplicate POST_BUILD copy commands that race on parallel builds.
-  if(DEFINED DLLS_COPIED)
-    set(DLLS_COPIED "${DLLS_COPIED}" PARENT_SCOPE)
-  endif()
 endfunction()
 
 function(add_hipcub_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
@@ -50,17 +43,11 @@ function(add_hipcub_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
     PRIVATE
       GTest::gtest
       GTest::gtest_main
+      hipcub
   )
 
-  if(USE_SYSTEM_LIB)
-    target_link_libraries(${TEST_TARGET} PRIVATE hip::hipcub)
-  else()
-    target_link_libraries(${TEST_TARGET} PRIVATE hipcub)
-  endif()
-
   if(HIP_COMPILER STREQUAL "nvcc")
-    # For test/hipcub, std::exclusive_scan is used, which is a c++ 17 feature
-    target_compile_features(${TEST_TARGET} PUBLIC cuda_std_17)
+    set_property(TARGET ${TEST_TARGET} PROPERTY CUDA_STANDARD 14)
     set_source_files_properties(${TEST_SOURCES} PROPERTIES LANGUAGE CUDA)
     target_link_libraries(${TEST_TARGET}
       PRIVATE
@@ -81,21 +68,14 @@ function(add_hipcub_test_internal TEST_NAME TEST_SOURCES TEST_TARGET)
   )
   if(GPU_TEST_TARGETS)
     foreach(GPU_TARGET IN LISTS GPU_TEST_TARGETS)
-      add_relative_test("${GPU_TARGET}-${TEST_NAME}" ${TEST_TARGET} ${GPU_TARGET})
-      # note: the set_tests_properties call below will set the test properties in the build directory.
-      # They also need to be set in the install directory. This is done in the call to add_relative_test (above),
-      # by writing to the install_CTestTestfile.cmake file used in the install).
+      add_relative_test("${GPU_TARGET}-${TEST_NAME}" ${TEST_TARGET})
       set_tests_properties("${GPU_TARGET}-${TEST_NAME}"
           PROPERTIES
               RESOURCE_GROUPS "1,${GPU_TARGET}:1"
       )
     endforeach()
   else()
-      add_relative_test(${TEST_NAME} ${TEST_TARGET} ${DEFAULT_GPU_RESOURCE})
-      set_tests_properties(${TEST_NAME}
-          PROPERTIES
-              RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
-      )
+      add_relative_test(${TEST_NAME} ${TEST_TARGET})
   endif()
 
   if (WIN32 AND NOT DEFINED DLLS_COPIED)
@@ -212,10 +192,6 @@ ${TEST_TYPE_SLICE_COUNT} test type slice(s) for test target ${TEST_TARGET}")
 
   add_hipcub_test_internal(${TEST_NAME} "${SOURCES}" ${TEST_TARGET})
   target_include_directories("${TEST_TARGET}" PRIVATE "../../test/hipcub")
-  # Re-propagate DLLS_COPIED (see comment in add_hipcub_test).
-  if(DEFINED DLLS_COPIED)
-    set(DLLS_COPIED "${DLLS_COPIED}" PARENT_SCOPE)
-  endif()
 endfunction()
 
 # ****************************************************************************
@@ -224,9 +200,6 @@ endfunction()
 
 # HIP basic test, which also checks if there are no linkage problems when there are multiple sources
 add_hipcub_test("hipcub.BasicTest" "test_hipcub_basic.cpp;detail/get_hipcub_version.cpp")
-
-# This test checks if hipCUB can compile with the __HIP_NO_HALF_CONVERSIONS__ and __HIP_NO_HALF_OPERATORS__ flags.
-add_hipcub_test("hipcub.NoHalfOperators" test_hipcub_no_half_operators.cpp)
 
 add_hipcub_test("hipcub.CachingDeviceAllocator" test_hipcub_caching_device_allocator.cpp)
 add_hipcub_test("hipcub.BlockAdjacentDifference" test_hipcub_block_adjacent_difference.cpp)
@@ -246,7 +219,6 @@ add_hipcub_test("hipcub.DeviceCopy" test_hipcub_device_copy.cpp)
 add_hipcub_test("hipcub.DeviceFor" test_hipcub_device_for.cpp)
 add_hipcub_test("hipcub.DeviceHistogram" test_hipcub_device_histogram.cpp)
 add_hipcub_test("hipcub.DeviceMemcpy" test_hipcub_device_memcpy.cpp)
-add_hipcub_test("hipcub.DeviceMerge" test_hipcub_device_merge.cpp)
 add_hipcub_test("hipcub.DeviceMergeSort" test_hipcub_device_merge_sort.cpp)
 add_hipcub_test_parallel("hipcub.DeviceRadixSort" test_hipcub_device_radix_sort.cpp.in)
 add_hipcub_test("hipcub.DeviceReduce" test_hipcub_device_reduce.cpp)
@@ -258,7 +230,6 @@ add_hipcub_test("hipcub.DeviceSegmentedReduce" test_hipcub_device_segmented_redu
 add_hipcub_test_parallel("hipcub.DeviceSegmentedSort" test_hipcub_device_segmented_sort.cpp.in)
 add_hipcub_test("hipcub.DeviceSelect" test_hipcub_device_select.cpp)
 add_hipcub_test("hipcub.DeviceSpmv" test_hipcub_device_spmv.cpp)
-add_hipcub_test("hipcub.DeviceTransform" test_hipcub_device_transform.cpp)
 add_hipcub_test("hipcub.DevicePartition" test_hipcub_device_partition.cpp)
 add_hipcub_test("hipcub.Grid" test_hipcub_grid.cpp)
 add_hipcub_test("hipcub.UtilPtx" test_hipcub_util_ptx.cpp)

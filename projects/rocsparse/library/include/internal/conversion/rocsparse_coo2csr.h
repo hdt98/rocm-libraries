@@ -33,26 +33,26 @@ extern "C" {
 #endif
 
 /*! \ingroup conv_module
- *  \brief Convert a sparse COO matrix into a sparse CSR matrix.
+ *  \brief Convert a sparse COO matrix into a sparse CSR matrix
  *
  *  \details
  *  \p rocsparse_coo2csr converts the COO array containing the row indices into a
  *  CSR array of row offsets that point to the start of every row.
  *  It is assumed that the COO row index array is sorted.
  *
- *  \p rocsparse_coo2csr can also be used to convert a COO array containing the column
- *  indices into a CSC array of column offsets that point to the start of every column.
+ *  \p rocsparse_coo2csr can also be used, to convert a COO array containing the column 
+ *  indices into a CSC array of column offsets that point to the start of every column. 
  *  In this case it is assumed that the COO column index array is sorted instead.
  *
  *  \note
- *  This function is non-blocking and executed asynchronously with respect to the host.
- *  It can return before the actual computation has finished.
+ *  This function is non blocking and executed asynchronously with respect to the host.
+ *  It may return before the actual computation has finished.
  *
  *  \note
  *  This routine supports execution in a hipGraph context.
  *
  *  @param[in]
- *  handle      handle to the rocSPARSE library context queue.
+ *  handle      handle to the rocsparse library context queue.
  *  @param[in]
  *  coo_row_ind array of \p nnz elements containing the row indices of the sparse COO
  *              matrix.
@@ -74,7 +74,47 @@ extern "C" {
  *
  *  \par Example
  *  This example converts a COO matrix into a CSR matrix.
- *  \snippet example_rocsparse_coo2csr.cpp doc example
+ *  \code{.c}
+ *      //     1 2 0 3 0
+ *      // A = 0 4 5 0 0
+ *      //     6 0 0 7 8
+ *
+ *      rocsparse_int m   = 3;
+ *      rocsparse_int n   = 5;
+ *      rocsparse_int nnz = 8;
+ *
+ *      coo_row_ind[nnz] = {0, 0, 0, 1, 1, 2, 2, 2}; // device memory
+ *      coo_col_ind[nnz] = {0, 1, 3, 1, 2, 0, 3, 4}; // device memory
+ *      coo_val[nnz]     = {1, 2, 3, 4, 5, 6, 7, 8}; // device memory
+ *
+ *      // Allocate CSR matrix arrays
+ *      rocsparse_int* csr_row_ptr;
+ *      rocsparse_int* csr_col_ind;
+ *      float* csr_val;
+ *
+ *      hipMalloc((void**)&csr_row_ptr, sizeof(rocsparse_int) * (m + 1));
+ *      hipMalloc((void**)&csr_col_ind, sizeof(rocsparse_int) * nnz);
+ *      hipMalloc((void**)&csr_val, sizeof(float) * nnz);
+ *
+ *      // Convert the coo row indices into csr row offsets
+ *      rocsparse_coo2csr(handle,
+ *                        coo_row_ind,
+ *                        nnz,
+ *                        m,
+ *                        csr_row_ptr,
+ *                        rocsparse_index_base_zero);
+ *
+ *      // Copy the column and value arrays
+ *      hipMemcpy(csr_col_ind,
+ *                coo_col_ind,
+ *                sizeof(rocsparse_int) * nnz,
+ *                hipMemcpyDeviceToDevice);
+ *
+ *      hipMemcpy(csr_val,
+ *                coo_val,
+ *                sizeof(float) * nnz,
+ *                hipMemcpyDeviceToDevice);
+ *  \endcode
  */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_coo2csr(rocsparse_handle     handle,

@@ -60,23 +60,20 @@ template<unsigned int ItemsPerThread,
          class KeyType>
 __device__
 auto test_hip_warp_sort_impl(KeyType* device_key_output)
-    -> std::enable_if_t<(LogicalWarpSize <= ::rocprim::arch::wavefront::max_size())>
+    -> std::enable_if_t<(LogicalWarpSize <= ::rocprim::arch::wavefront::min_size())>
 {
-    if(LogicalWarpSize <= ::rocprim::arch::wavefront::size())
-    {
-        const unsigned int lid          = threadIdx.x;
-        const unsigned int block_offset = blockIdx.x * ItemsPerThread * BlockSize;
+    const unsigned int lid          = threadIdx.x;
+    const unsigned int block_offset = blockIdx.x * ItemsPerThread * BlockSize;
 
-        KeyType keys[ItemsPerThread];
-        ::rocprim::block_load_direct_warp_striped<LogicalWarpSize>(lid,
-                                                                   device_key_output + block_offset,
-                                                                   keys);
+    KeyType keys[ItemsPerThread];
+    ::rocprim::block_load_direct_warp_striped<LogicalWarpSize>(lid,
+                                                               device_key_output + block_offset,
+                                                               keys);
 
-        rocprim::warp_sort<KeyType, LogicalWarpSize> wsort;
-        wsort.sort(keys);
+    rocprim::warp_sort<KeyType, LogicalWarpSize> wsort;
+    wsort.sort(keys);
 
-        ::rocprim::block_store_direct_blocked(lid, device_key_output + block_offset, keys);
-    }
+    ::rocprim::block_store_direct_blocked(lid, device_key_output + block_offset, keys);
 }
 
 template<unsigned int ItemsPerThread,
@@ -85,7 +82,7 @@ template<unsigned int ItemsPerThread,
          class KeyType>
 __device__
 auto test_hip_warp_sort_impl(KeyType*)
-    -> std::enable_if_t<(LogicalWarpSize > ::rocprim::arch::wavefront::max_size())>
+    -> std::enable_if_t<(LogicalWarpSize > ::rocprim::arch::wavefront::min_size())>
 {}
 
 template<unsigned int ItemsPerThread,
@@ -106,29 +103,25 @@ template<unsigned int ItemsPerThread,
          class ValueType>
 __device__
 auto test_hip_sort_key_value_impl(KeyType* device_key_output, ValueType* device_value_output)
-    -> std::enable_if_t<(LogicalWarpSize <= ::rocprim::arch::wavefront::max_size())>
+    -> std::enable_if_t<(LogicalWarpSize <= ::rocprim::arch::wavefront::min_size())>
 {
-    if(LogicalWarpSize <= ::rocprim::arch::wavefront::size())
-    {
-        const unsigned int lid          = threadIdx.x;
-        const unsigned int block_offset = blockIdx.x * ItemsPerThread * BlockSize;
+    const unsigned int lid          = threadIdx.x;
+    const unsigned int block_offset = blockIdx.x * ItemsPerThread * BlockSize;
 
-        KeyType   keys[ItemsPerThread];
-        ValueType values[ItemsPerThread];
-        ::rocprim::block_load_direct_warp_striped<LogicalWarpSize>(lid,
-                                                                   device_key_output + block_offset,
-                                                                   keys);
-        ::rocprim::block_load_direct_warp_striped<LogicalWarpSize>(lid,
-                                                                   device_value_output
-                                                                       + block_offset,
-                                                                   values);
+    KeyType   keys[ItemsPerThread];
+    ValueType values[ItemsPerThread];
+    ::rocprim::block_load_direct_warp_striped<LogicalWarpSize>(lid,
+                                                               device_key_output + block_offset,
+                                                               keys);
+    ::rocprim::block_load_direct_warp_striped<LogicalWarpSize>(lid,
+                                                               device_value_output + block_offset,
+                                                               values);
 
-        rocprim::warp_sort<KeyType, LogicalWarpSize, ValueType> wsort;
-        wsort.sort(keys, values);
+    rocprim::warp_sort<KeyType, LogicalWarpSize, ValueType> wsort;
+    wsort.sort(keys, values);
 
-        ::rocprim::block_store_direct_blocked(lid, device_key_output + block_offset, keys);
-        ::rocprim::block_store_direct_blocked(lid, device_value_output + block_offset, values);
-    }
+    ::rocprim::block_store_direct_blocked(lid, device_key_output + block_offset, keys);
+    ::rocprim::block_store_direct_blocked(lid, device_value_output + block_offset, values);
 }
 
 template<unsigned int ItemsPerThread,
@@ -138,7 +131,7 @@ template<unsigned int ItemsPerThread,
          class ValueType>
 __device__
 auto test_hip_sort_key_value_impl(KeyType*, ValueType*)
-    -> std::enable_if_t<(LogicalWarpSize > ::rocprim::arch::wavefront::max_size())>
+    -> std::enable_if_t<(LogicalWarpSize > ::rocprim::arch::wavefront::min_size())>
 {}
 
 template<unsigned int ItemsPerThread,

@@ -23,9 +23,9 @@
  * ************************************************************************ */
 
 #include "internal/conversion/rocsparse_csr2ell.h"
-#include "rocsparse_control.hpp"
+#include "control.h"
 #include "rocsparse_csr2ell.hpp"
-#include "rocsparse_utility.hpp"
+#include "utility.h"
 
 #include "csr2ell_device.h"
 

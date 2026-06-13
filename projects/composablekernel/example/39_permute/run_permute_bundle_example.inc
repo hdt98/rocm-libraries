@@ -1,9 +1,9 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
-bool run_permute_bundle(const Problem& problem, bool time_kernel)
+bool run_permute_bundle(const Problem& problem)
 {
     const auto& input_bundle_shape = problem.shape;
     const auto& input_bundle_axes  = problem.axes;
@@ -41,7 +41,7 @@ bool run_permute_bundle(const Problem& problem, bool time_kernel)
     };
 
     auto invoker   = permute.MakeInvoker();
-    float ave_time = invoker.Run(argument, StreamConfig{nullptr, time_kernel});
+    float ave_time = invoker.Run(argument, StreamConfig{nullptr, true});
 
     std::cout << "Perf: " << ave_time << " ms" << std::endl;
 
@@ -72,9 +72,7 @@ bool run_permute_bundle(const Problem& problem, bool time_kernel)
                                 1e-6);
 }
 
-bool run_permute_bundle_example(const Problem::Shape& shape,
-                                const Problem::Axes& axes,
-                                bool time_kernel)
+bool run_permute_bundle_example(const Problem::Shape& shape, const Problem::Axes& axes)
 {
-    return run_permute_bundle(Problem{shape, axes}, time_kernel);
+    return run_permute_bundle(Problem{shape, axes});
 }

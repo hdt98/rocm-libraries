@@ -106,13 +106,12 @@ using TestCase = decltype(GetTestCases(std::string{}))::value_type;
 
 class GPU_ConvGroup_FP32 : public testing::TestWithParam<std::vector<TestCase>>
 {
-    MIOPEN_DECLARE_GTEST_USES_TEST_DRIVE();
 };
 
 bool IsTestSupportedForDevice()
 {
     using namespace miopen::debug;
-    using e_mask = enabled<Gpu::gfx94X, Gpu::gfx103X, Gpu::gfx110X, Gpu::gfx115X>;
+    using e_mask = enabled<Gpu::gfx94X, Gpu::gfx103X, Gpu::gfx110X>;
     using d_mask = disabled<Gpu::Default>;
     return ::IsTestSupportedForDevMask<d_mask, e_mask>();
 }

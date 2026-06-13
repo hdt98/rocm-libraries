@@ -14,14 +14,13 @@
  *  limitations under the License.
  */
 
-/*! \file
+/*! \file 
  *  \brief Deallocates storage allocated by \p device_malloc.
  */
 
 #pragma once
 
 #include <thrust/detail/config.h>
-
 #include <thrust/device_ptr.h>
 
 THRUST_NAMESPACE_BEGIN
@@ -63,3 +62,4 @@ inline void device_free(thrust::device_ptr<void> ptr);
 THRUST_NAMESPACE_END
 
 #include <thrust/detail/device_free.inl>
+

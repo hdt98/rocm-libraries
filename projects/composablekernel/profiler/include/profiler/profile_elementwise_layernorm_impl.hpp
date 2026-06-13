@@ -1,5 +1,5 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -49,8 +49,7 @@ bool profile_elementwise_layernorm_impl(int do_verification,
                                         int init_method,
                                         bool do_log,
                                         bool time_kernel,
-                                        std::vector<index_t> length,
-                                        index_t instance_index = -1)
+                                        std::vector<index_t> length)
 {
     using Add         = ck::tensor_operation::element_wise::Add;
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
@@ -177,14 +176,8 @@ bool profile_elementwise_layernorm_impl(int do_verification,
 
     int num_kernel = 0;
 
-    for(size_t i = 0; i < instance_ptrs.size(); i++)
+    for(auto& inst_ptr : instance_ptrs)
     {
-        if((instance_index != -1) && (instance_index != static_cast<int>(i)))
-        {
-            // skip test if instance_index is specified
-            continue;
-        }
-        auto& inst_ptr    = instance_ptrs[i];
         auto argument_ptr = inst_ptr->MakeArgumentPointer(
             length,
             {
@@ -206,11 +199,6 @@ bool profile_elementwise_layernorm_impl(int do_verification,
         if(inst_ptr->IsSupportedArgument(argument_ptr.get()))
         {
             ++num_kernel;
-            if((instance_index != -1) && (instance_index + 1 != num_kernel))
-            {
-                // skip test if instance_index is specified
-                continue;
-            }
         }
         else
         {
@@ -276,7 +264,7 @@ bool profile_elementwise_layernorm_impl(int do_verification,
                   << best_gb_per_sec << " GB/s, " << best_instance_name << std::endl;
     }
 
-    if(num_kernel == 0 && instance_index == -1)
+    if(num_kernel == 0)
     {
         std::cout << "Error: No kernel is tested" << std::endl;
         return false;

@@ -84,7 +84,6 @@ public:
     Tref GetTolerance();
     int VerifyBackward() override;
     int VerifyForward() override;
-
     ~TransformersAdamWDriver() override
     {
         miopenDestroyTensorDescriptor(paramDesc);
@@ -141,12 +140,11 @@ private:
     float beta2;
     float weight_decay;
     float eps;
-    bool correct_bias    = true;
-    bool found_inf       = false;
-    bool is_amp          = false;
-    int grad_scale       = 1;
-    int iter             = 0;
-    bool use_multithread = false;
+    bool correct_bias = true;
+    bool found_inf    = false;
+    bool is_amp       = false;
+    int grad_scale    = 1;
+    int iter          = 0;
 
     miopenDataType_t grad_type;
 };
@@ -166,15 +164,14 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::ParseCmdLineArgs(int argc, char*
 template <typename Tgpu, typename Tref, typename Tgrad>
 int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::GetandSetData()
 {
-    auto param_len  = GetInputTensorLengthsFromCmdLine();
-    lr              = inflags.GetValueDouble("lr");
-    beta1           = inflags.GetValueDouble("beta1");
-    beta2           = inflags.GetValueDouble("beta2");
-    eps             = inflags.GetValueDouble("eps");
-    weight_decay    = inflags.GetValueDouble("weight_decay");
-    correct_bias    = inflags.GetValueInt("correct_bias");
-    iter            = inflags.GetValueInt("iter");
-    use_multithread = (inflags.GetValueInt("mt") != 0);
+    auto param_len = GetInputTensorLengthsFromCmdLine();
+    lr             = inflags.GetValueDouble("lr");
+    beta1          = inflags.GetValueDouble("beta1");
+    beta2          = inflags.GetValueDouble("beta2");
+    eps            = inflags.GetValueDouble("eps");
+    weight_decay   = inflags.GetValueDouble("weight_decay");
+    correct_bias   = inflags.GetValueInt("correct_bias");
+    iter           = inflags.GetValueInt("iter");
 
     if(is_amp)
     {
@@ -224,7 +221,6 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::AddCmdLineArgs()
     inflags.AddInputFlag("time", 't', "0", "Time Each Layer (Default=0)", "int");
     inflags.AddInputFlag(
         "wall", 'w', "0", "Wall-clock Time Each Layer, Requires time == 1 (Default=0)", "int");
-    inflags.AddInputFlag("mt", 'M', "0", "Use multithreaded version (Default=0)", "int");
 
     return miopenStatusSuccess;
 }
@@ -232,16 +228,19 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::AddCmdLineArgs()
 template <typename Tgpu, typename Tref, typename Tgrad>
 std::vector<int> TransformersAdamWDriver<Tgpu, Tref, Tgrad>::GetInputTensorLengthsFromCmdLine()
 {
+    std::vector<int> ret;
     auto tensor = inflags.GetValueTensor("dims");
-    return tensor.lengths;
+    if(!tensor.lengths.empty())
+        return tensor.lengths;
+    return ret;
 }
 
 template <typename Tgpu, typename Tref, typename Tgrad>
 int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::AllocateBuffersAndCopy()
 {
-    const size_t param_sz = GetTensorSize(paramDesc);
-    const uint32_t ctx    = 0;
+    size_t param_sz = GetTensorSize(paramDesc);
 
+    uint32_t ctx   = 0;
     param_dev      = std::unique_ptr<GPUMem>(new GPUMem(ctx, param_sz, sizeof(Tgpu)));
     grad_dev       = std::unique_ptr<GPUMem>(new GPUMem(ctx, param_sz, sizeof(Tgrad)));
     exp_avg_dev    = std::unique_ptr<GPUMem>(new GPUMem(ctx, param_sz, sizeof(Tgpu)));
@@ -266,7 +265,7 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::AllocateBuffersAndCopy()
     exp_avg_host    = std::vector<Tref>(param_sz, static_cast<Tref>(0));
     exp_avg_sq_host = std::vector<Tref>(param_sz, static_cast<Tref>(0));
 
-    for(size_t i = 0; i < param_sz; ++i)
+    for(int i = 0; i < param_sz; i++)
     {
         param[i]        = prng::gen_A_to_B<Tgpu>(static_cast<Tgpu>(0.0), static_cast<Tgpu>(1.0));
         grad[i]         = prng::gen_A_to_B<Tgrad>(static_cast<Tgrad>(0.0), static_cast<Tgrad>(0.1));
@@ -399,48 +398,45 @@ int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::RunForwardCPU()
     if(is_amp && found_inf)
         return miopenStatusSuccess;
 
-    const auto params      = param_host.data();
-    const auto grads       = grad_host.data();
-    const auto exp_avgs    = exp_avg_host.data();
-    const auto exp_avg_sqs = exp_avg_sq_host.data();
-    const auto step        = iter;
+    auto params      = param_host.data();
+    auto grads       = grad_host.data();
+    auto exp_avgs    = exp_avg_host.data();
+    auto exp_avg_sqs = exp_avg_sq_host.data();
+    auto step        = iter;
 
-    const size_t numel = miopen::deref(paramDesc).GetElementSize();
-
-    const float bias_correction1 = 1.0 - pow(beta1, step);
-    const float bias_correction2 = 1.0 - pow(beta2, step);
-    const float corrected_step_size =
-        correct_bias ? (lr * sqrt(bias_correction2) / bias_correction1) : 0.0;
-    const float step_size       = correct_bias ? corrected_step_size : lr;
-    const float k               = 1.0 - (lr * weight_decay);
-    const float inv_grad_scale  = 1.0 / static_cast<float>(grad_scale);
-    const float one_minus_beta1 = 1.0 - beta1;
-    const float one_minus_beta2 = 1.0 - beta2;
-    const size_t min_grain      = use_multithread ? 8 : numel;
-
-    miopen::par_for(numel, min_grain, [&](int i) {
+    size_t numel = miopen::deref(paramDesc).GetElementSize();
+    for(int i = 0; i < numel; i++)
+    {
         Tref exp_avg_val    = exp_avgs[i];
         Tref exp_avg_sq_val = exp_avg_sqs[i];
 
         Tref param_val = params[i];
         Tref grad_val  = grads[i];
         if(is_amp)
-            grad_val *= inv_grad_scale;
+            grad_val /= grad_scale;
 
-        exp_avg_val    = exp_avg_val * beta1 + grad_val * one_minus_beta1;
-        exp_avg_sq_val = exp_avg_sq_val * beta2 + grad_val * grad_val * one_minus_beta2;
+        exp_avg_val    = exp_avg_val * beta1 + grad_val * (1 - beta1);
+        exp_avg_sq_val = exp_avg_sq_val * beta2 + grad_val * grad_val * (1 - beta2);
 
-        const float denorm = sqrt(exp_avg_sq_val) + eps;
+        float denorm    = sqrt(exp_avg_sq_val) + eps;
+        float step_size = lr;
 
-        param_val -= exp_avg_val / denorm * step_size;
+        if(correct_bias)
+        {
+            float bias_correction1 = 1 - pow(beta1, step);
+            float bias_correction2 = 1 - pow(beta2, step);
+            step_size              = step_size * sqrt(bias_correction2) / bias_correction1;
+        }
+
+        param_val = param_val + exp_avg_val / denorm * -step_size;
 
         if(weight_decay > 0.0)
         {
-            param_val *= k;
+            param_val = param_val - param_val * (lr * weight_decay);
         }
 
         params[i] = param_val;
-    });
+    }
 
     return miopenStatusSuccess;
 }
@@ -476,22 +472,17 @@ Tref TransformersAdamWDriver<Tgpu, Tref, Tgrad>::GetTolerance()
 template <typename Tgpu, typename Tref, typename Tgrad>
 int TransformersAdamWDriver<Tgpu, Tref, Tgrad>::VerifyForward()
 {
-    const Tref tolerance = GetTolerance();
-    const char* ref_type = use_multithread ? "multi-threaded" : "single-threaded";
-
     RunForwardCPU();
-
-    const auto error = miopen::rms_range(param_host, param);
+    const Tref tolerance = GetTolerance();
+    auto error           = miopen::rms_range(param_host, param);
 
     if(!std::isfinite(error) || error > tolerance)
     {
-        std::cout << "Forward Transformers Adam FAILED on " << ref_type
-                  << " CPU reference: " << error << std::endl;
+        std::cout << "Forward Adam FAILED: " << error << std::endl;
         return EC_VerifyFwd;
     }
 
-    std::cout << "Forward Transformers Adam Verifies OK on " << ref_type << " CPU reference"
-              << std::endl;
+    std::cout << "Forward Adam Verifies OK on CPU reference" << std::endl;
 
     return miopenStatusSuccess;
 }

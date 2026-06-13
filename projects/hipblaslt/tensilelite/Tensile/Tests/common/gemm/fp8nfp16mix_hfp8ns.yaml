@@ -1,11 +1,9 @@
 TestParameters:
-  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201, skip-gfx1250] # not supported by arch
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201] # not supported by arch
 
 GlobalParameters:
-  # SyncsPerBenchmark is not set to 0: this test uses LibraryLogic which
-  # requires benchmark data to build the library table.
   NumElementsToValidate: -1
-  MinimumRequiredVersion: 5.0.0
+  MinimumRequiredVersion: 4.14.0
   PrintLevel: 1
   PrintSolutionRejectionReason: True
   Device: 0
@@ -20,6 +18,7 @@ GlobalParameters:
   DataInitTypeBeta: 1
   DataInitTypeBias: 21
   DataInitTypeScaleAlphaVec: 21
+  NumElementsToValidate: -1
   BoundsCheck: 2
 
 BenchmarkProblems:
@@ -34,8 +33,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -96,8 +95,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -158,8 +157,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -223,8 +222,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: False
+      TransposeA: 0
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -284,8 +283,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: True
+      TransposeA: 0
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -345,8 +344,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -407,8 +406,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: True
+      TransposeA: 1
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -472,8 +471,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: False
+      TransposeA: 0
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -533,8 +532,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: False
-      TransposeB: True
+      TransposeA: 0
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True
@@ -594,8 +593,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: False
+      TransposeA: 1
+      TransposeB: 0
       UseBeta: True
       Batched: True
       Activation:    True
@@ -656,8 +655,8 @@ BenchmarkProblems:
       DestDataType: F8N
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: True
-      TransposeB: True
+      TransposeA: 1
+      TransposeB: 1
       UseBeta: True
       Batched: True
       Activation:    True

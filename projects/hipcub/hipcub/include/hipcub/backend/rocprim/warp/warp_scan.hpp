@@ -35,7 +35,7 @@
 #include "../util_ptx.hpp"
 #include "../thread/thread_operators.hpp"
 
-#include <rocprim/warp/warp_scan.hpp> // IWYU pragma: export
+#include <rocprim/warp/warp_scan.hpp>
 
 BEGIN_HIPCUB_NAMESPACE
 

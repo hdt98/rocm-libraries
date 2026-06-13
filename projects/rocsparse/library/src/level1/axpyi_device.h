@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,14 +24,14 @@
 
 #pragma once
 
-#include "rocsparse_common.hpp"
+#include "common.h"
 
 namespace rocsparse
 {
     // y = a * x + y kernel for sparse x and dense y
-    template <uint32_t BLOCKSIZE, typename T, typename I, typename X, typename Y>
+    template <uint32_t BLOCKSIZE, typename I, typename T>
     ROCSPARSE_DEVICE_ILF void axpyi_device(
-        I nnz, T alpha, const X* x_val, const I* x_ind, Y* y, rocsparse_index_base idx_base)
+        I nnz, T alpha, const T* x_val, const I* x_ind, T* y, rocsparse_index_base idx_base)
     {
         I idx = hipBlockIdx_x * BLOCKSIZE + hipThreadIdx_x;
 
@@ -41,6 +41,6 @@ namespace rocsparse
         }
 
         I i  = x_ind[idx] - idx_base;
-        y[i] = rocsparse::fma<T>(alpha, x_val[idx], y[i]);
+        y[i] = rocsparse::fma(alpha, x_val[idx], y[i]);
     }
 }

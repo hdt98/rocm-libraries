@@ -26,7 +26,6 @@
 #ifndef GUARD_MIOPEN_HIPOC_PROGRAM_HPP
 #define GUARD_MIOPEN_HIPOC_PROGRAM_HPP
 
-#include <miopen/config.hpp>
 #include <miopen/target_properties.hpp>
 #include <miopen/manage_ptr.hpp>
 #include <miopen/hipoc_program_impl.hpp>
@@ -51,19 +50,18 @@ struct HIPOCProgram
                  const TargetProperties& target,
                  const std::string& kernel_src);
     HIPOCProgram(const fs::path& program_name, const fs::path& hsaco);
-    MIOPEN_INTERNALS_EXPORT HIPOCProgram(const fs::path& program_name,
-                                         const std::vector<char>& hsaco);
+    HIPOCProgram(const fs::path& program_name, const std::vector<char>& hsaco);
     HIPOCProgram(const fs::path& program_name, const std::vector<uint8_t>& hsaco);
     std::shared_ptr<HIPOCProgramImpl> impl;
     hipModule_t GetModule() const;
     /// \return Pathname of CO file, if it resides on the filesystem.
     /// This function should not be called after FreeCodeObjectFileStorage().
-    MIOPEN_INTERNALS_EXPORT fs::path GetCodeObjectPathname() const;
+    fs::path GetCodeObjectPathname() const;
     /// \return In-memory CO blob.
-    MIOPEN_INTERNALS_EXPORT const std::vector<char>& GetCodeObjectBlob() const;
+    const std::vector<char>& GetCodeObjectBlob() const;
     /// \return True if CO blob resides in-memory.
     /// False if CO resides on filesystem.
-    MIOPEN_INTERNALS_EXPORT bool IsCodeObjectInMemory() const;
+    bool IsCodeObjectInMemory() const;
     bool IsCodeObjectInFile() const;
     bool IsCodeObjectInTempFile() const;
     void FreeCodeObjectFileStorage();

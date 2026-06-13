@@ -1,10 +1,6 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
-
 #include "ck_tile/host.hpp"
 #include "add_rmsnorm2d_rdquant_fwd.hpp"
 #include <cstring>
-#include "ck_tile/utility/json_dump.hpp"
 
 // different threshold for different dtype
 template <typename InputDataType>
@@ -45,9 +41,7 @@ auto create_args(int argc, char* argv[])
         .insert("prec", "fp16", "precision")
         .insert("quant", "int8", "precision")
         .insert("warmup", "5", "cold iter")
-        .insert("repeat", "20", "hot iter")
-        .insert("json", "0", "0: No Json, 1: Dump Results in Json format")
-        .insert("jsonfile", "add_rmsnorm2d_rdquant_fwd.json", "json file name to dump results");
+        .insert("repeat", "20", "hot iter");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -77,10 +71,10 @@ bool run(const ck_tile::ArgParser& arg_parser)
     using BDataType        = typename TypeConfig::BDataType;
     using GammaDataType    = typename TypeConfig::GammaDataType;
     using XDataType        = typename TypeConfig::XDataType;
+    using UnquantYDataType = ck_tile::null_type;
     using YScaleDataType   = typename TypeConfig::YScaleDataType;
     using QYDataType       = typename TypeConfig::QYDataType;
     using ComputeDataType  = float;
-    using UnquantYDataType = ck_tile::null_type;
 
     // host verify
     ck_tile::HostTensor<ADataType> a_host({m, n}, {stride, 1});
@@ -95,6 +89,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     ck_tile::HostTensor<QYDataType> qy_host_ref({m, n}, {stride, 1});
     ck_tile::HostTensor<QYDataType> qy_host_dev({m, n}, {stride, 1});
+    ck_tile::HostTensor<UnquantYDataType> unquant_y_host_ref({m, n}, {stride, 1});
 
     ck_tile::FillUniformDistribution<ADataType>{-.5f, .5f}(a_host);
     ck_tile::FillUniformDistribution<BDataType>{-.5f, .5f}(b_host);
@@ -111,8 +106,8 @@ bool run(const ck_tile::ArgParser& arg_parser)
     b_buf.ToDevice(b_host.data());
     gamma_buf.ToDevice(gamma_host.data());
 
-    std::cout << "[" << input_data_type << ", " << quantized_data_type << "]" << " m:" << m
-              << ", n:" << n << ", stride:" << stride << std::flush;
+    std::cout << "[" << input_data_type << ", " << quantized_data_type << "]"
+              << " m:" << m << ", n:" << n << ", stride:" << stride << std::flush;
 
     add_rmsnorm2d_rdquant_fwd_traits traits{input_data_type, quantized_data_type, SaveX};
 
@@ -191,7 +186,6 @@ bool run(const ck_tile::ArgParser& arg_parser)
         // Rmsnorm2d
         {
             ck_tile::HostTensor<InvRmsDataType> invRms_host_ref({m});
-            ck_tile::HostTensor<UnquantYDataType> unquant_y_host_ref({m, n});
 
             // CAUSION: kernel use ComputeDataType version of x, but we use XDataType here for
             // simplicity
@@ -264,21 +258,6 @@ bool run(const ck_tile::ArgParser& arg_parser)
         }
 
         std::cout << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
-    }
-
-    if(arg_parser.get_int("json") == 1)
-    {
-        dump_add_rmsnorm2d_rdquant_fwd_json(arg_parser.get_str("jsonfile"),
-                                            input_data_type,
-                                            quantized_data_type,
-                                            m,
-                                            n,
-                                            stride,
-                                            epsilon,
-                                            ave_time,
-                                            0,
-                                            gb_per_sec,
-                                            pass);
     }
 
     return pass;

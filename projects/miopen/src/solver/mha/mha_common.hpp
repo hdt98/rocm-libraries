@@ -40,14 +40,11 @@
 #include <half/half.hpp>
 #if MIOPEN_ROCBLAS_VERSION_FLAT < 2045000
 #include <rocblas.h>
-#define USE_ROCBLAS_EX3 0
 #else
 #include <rocblas/rocblas.h>
 /// rocblas_gemm_ex3 supports F8 datatypes.
 /// strided_batched_ex3 introduced in rocblas 4.0
-#define USE_ROCBLAS_EX3                                                                   \
-    ((MIOPEN_ROCBLAS_VERSION_FLAT >= 4000000 && MIOPEN_ROCBLAS_VERSION_FLAT < 5000000) && \
-     ROCBLAS_BETA_FEATURES_API)
+#define USE_ROCBLAS_EX3 ((MIOPEN_ROCBLAS_VERSION_FLAT >= 4000000) && ROCBLAS_BETA_FEATURES_API)
 #endif
 #endif
 
@@ -94,26 +91,26 @@ constexpr T nextPow2(T v)
 //// implies CType is always miopenFloat
 //// beta is always 0.0f
 //// input matricies are always row-major
-inline void gemm([[maybe_unused]] const Handle& handle,
-                 [[maybe_unused]] bool transA,
-                 [[maybe_unused]] bool transB,
-                 [[maybe_unused]] int m,
-                 [[maybe_unused]] int n,
-                 [[maybe_unused]] int k,
-                 [[maybe_unused]] int lda,
-                 [[maybe_unused]] int ldb,
-                 [[maybe_unused]] int ldc,
-                 [[maybe_unused]] int batch_count,
-                 [[maybe_unused]] long long int strideA,
-                 [[maybe_unused]] long long int strideB,
-                 [[maybe_unused]] long long int strideC,
-                 [[maybe_unused]] float alpha,
-                 [[maybe_unused]] miopenDataType_t AType,
-                 [[maybe_unused]] ConstData_t A,
-                 [[maybe_unused]] miopenDataType_t BType,
-                 [[maybe_unused]] ConstData_t B,
-                 [[maybe_unused]] Data_t C,
-                 [[maybe_unused]] bool deterministic)
+inline void gemm(const Handle& handle,
+                 bool transA,
+                 bool transB,
+                 int m,
+                 int n,
+                 int k,
+                 int lda,
+                 int ldb,
+                 int ldc,
+                 int batch_count,
+                 long long int strideA,
+                 long long int strideB,
+                 long long int strideC,
+                 float alpha,
+                 miopenDataType_t AType,
+                 ConstData_t A,
+                 miopenDataType_t BType,
+                 ConstData_t B,
+                 Data_t C,
+                 bool deterministic)
 {
 #if MIOPEN_USE_ROCBLAS
     rocblas_atomics_mode cur_mode =
@@ -133,22 +130,10 @@ inline void gemm([[maybe_unused]] const Handle& handle,
         switch(miopen)
         {
         case miopenFloat: return rocblas_datatype::rocblas_datatype_f32_r;
-#if USE_ROCBLAS_EX3
         case miopenFloat8_fnuz: return rocblas_datatype::rocblas_datatype_f8_r;
         case miopenBFloat8_fnuz: return rocblas_datatype::rocblas_datatype_bf8_r;
-#else
-        case miopenFloat8_fnuz:
-        case miopenBFloat8_fnuz:
-#endif
-        case miopenBFloat16:
-        case miopenHalf:
-        case miopenInt32:
-        case miopenInt8:
-        case miopenDouble:
-        case miopenInt64: break;
+        default: return rocblas_datatype::rocblas_datatype_invalid;
         }
-
-        return rocblas_datatype::rocblas_datatype_invalid;
     };
 
     // fp32 x fp32 case
@@ -225,8 +210,6 @@ inline void gemm([[maybe_unused]] const Handle& handle,
             rocblas_gemm_algo::rocblas_gemm_algo_standard,
             0,
             0);
-#else
-        MIOPEN_THROW("rocblas GEMM operations is not supported!");
 #endif
     }
     else

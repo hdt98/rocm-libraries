@@ -147,7 +147,7 @@ auto MakeStrideArray(V vec)
     {
         ret[i] = static_cast<StrideIndexType>(vec[i]);
     }
-    return std::move(ret);
+    return ret;
 }
 
 ::miopen::solver::ConvSolution

@@ -175,7 +175,7 @@ void testing_tpmv_batched(const Arguments& arg)
         return;
     }
 
-    double hipblas_error{0};
+    double hipblas_error;
 
     // Naming: `h` is in CPU (host) memory(eg hAp), `d` is in GPU (device) memory (eg dAp).
     // Allocate host memory
@@ -250,7 +250,7 @@ void testing_tpmv_batched(const Arguments& arg)
 
     if(arg.timing)
     {
-        double      gpu_time_used{0};
+        double      gpu_time_used;
         hipStream_t stream;
         CHECK_HIPBLAS_ERROR(hipblasGetStream(handle, &stream));
 

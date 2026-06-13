@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,34 +20,28 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from rocisa.code import Label, Module
-from rocisa.container import vgpr, sgpr, accvgpr, Holder, MemTokenData
-from rocisa.instruction import SBarrier, SBranch, SMovB32, SMovB64, SWaitCnt, SWaitTensorcnt,\
-  VAccvgprReadB32, VAccvgprWriteB32, VFmaF32, VFmaF64, VLShiftLeftB64, VMovB32, \
-  VMulF32, VMulF64, VMulLOU32, VMulPKF16
-from rocisa.functions import BranchIfNotZero
+from .TensileInstructions import DataType, Label, Module, vgpr, sgpr, accvgpr, \
+                                 Holder, SBranchIfNotZero
+from .TensileInstructions.Instructions import *
 
-from Tensile.Common.DataType import DataType
+def allocPostLoopSrdSuppressRaw(ch: str, chAddress: str, labelStr: str, sgprLength) -> Module:
+    module = Module("allocPostLoopSrdSuppress")
+    label  = Label("%sAddrValid"%labelStr, "")
+    label2 = Label("%sAddrValid_End"%labelStr, "")
+    # Buffer-load uses one base read pointer stored in the SRD - set it here:
+    module.add(SMovB64(dst=sgpr("Srd%s+0"%ch, 2), src=sgpr("Address%s+0"%chAddress, 2), comment="init SRD base address" ))
+    module.add(SMovB32(dst=sgpr("Srd%s+3"%ch), src="Srd127_96", comment="Set bits 127_96 in post-loop SRD"))
+    module.add(SBranchIfNotZero("Address%s"%chAddress, DataType('int64'), label))
+    module.add(SMovB32(dst=sgpr("Srd%s+2"%ch), src=0))
+    module.add(SBranch(label2.getLabelName()))
+    module.add(label)
+    module.add(SMovB32(dst=sgpr("Srd%s+2"%ch), src=sgprLength))
+    module.add(label2)
+    module.addSpaceLine()
+    return module
 
-def tdmWait(states, kernel, tPA, tPB, tensorcnt: int, comment: str) -> Module:
-  #TODO: refactor this
-  skipGR = tensorcnt > -1
-  vmcnt = 0 if skipGR else -1
-  mod = Module()
-  if skipGR:
-    #TODO: remove
-    # numMXSA = kernel["NumLoadsPerpendicularMXSA"] * kernel["NumLoadsCoalescedMXSA"] if kernel["ProblemType"]["MXBlockA"] else 0
-    # numMXSB = kernel["NumLoadsPerpendicularMXSB"] * kernel["NumLoadsCoalescedMXSB"] if kernel["ProblemType"]["MXBlockB"] else 0
-    # numM = 0
-    # if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-    #   numM = kernel["NumLoadsPerpendicularMetadata"] * kernel["NumLoadsCoalescedMetadata"]
-    # numGR = 0
-    # if tensorcnt > -1:
-    #   numGR += tensorcnt * (numMXSA + numMXSB + numM)
-    # vmcnt += numGR
-    mod.add(SWaitCnt(vlcnt=vmcnt))
-  mod.add(SWaitTensorcnt(tensorcnt=tensorcnt, comment=comment))
-  return mod
+def allocPostLoopSrdSuppress(ch: str, labelStr: str, sgprLength) -> Module:
+    return allocPostLoopSrdSuppressRaw(ch, ch, labelStr, sgprLength)
 
 ##############################################################################
 # WaitCnt
@@ -58,14 +52,14 @@ def tdmWait(states, kernel, tPA, tPB, tensorcnt: int, comment: str) -> Module:
 # specify global read in inst unit (for DirectToVgpr. Optional):
 #   - Pending global reads in inst unit.
 # If a skip* arg is -1, the associated component does not contribute to
-# the expected dscnt or vlcnt
+# the expected lgkmcnt or vmcnt
 ##############################################################################
 def wait(states, kernel, tPA, tPB, skipGlobalRead, skipLocalWrite, \
     skipLocalRead, conservativeWaitCnt: int, comment, skipGlobalReadInst=-1):
     # skip = -1 -> ignore
     # skip =  n -> waitcnt(n*num)
 
-    dscnt = 0 if skipLocalWrite > -1 or skipLocalRead > -1 else -1
+    lgkmcnt = 0 if skipLocalWrite > -1 or skipLocalRead > -1 else -1
 
     if skipLocalWrite > -1 or skipLocalRead > -1:
         if skipLocalWrite > -1:
@@ -73,84 +67,75 @@ def wait(states, kernel, tPA, tPB, skipGlobalRead, skipLocalWrite, \
                    else tPA["nrp"]*tPA["nrc"]*max(tPA["nwcv"],tPA["nwpv"])//tPA["nwcvpi"]
             numB = 0 if (kernel["DirectToLdsB"] or  kernel["DirectToVgprB"]) \
                    else tPB["nrp"]*tPB["nrc"]*max(tPB["nwcv"],tPB["nwpv"])//tPB["nwcvpi"]
-            numMXSA = 0
-            numMXSB = 0
-            if kernel["ProblemType"]["MXBlockA"]:
-                numMXSA = 0 if (kernel["DirectToLdsA"] or kernel["DirectToVgprA"]) \
-                       else tPA["MX"]["nrp"]*tPA["MX"]["nrc"]*max(tPA["MX"]["nwcv"],tPA["MX"]["nwpv"])//tPA["MX"]["nwcvpi"]
-            if kernel["ProblemType"]["MXBlockB"]:
-                numMXSB = 0 if (kernel["DirectToLdsB"] or kernel["DirectToVgprB"]) \
-                       else tPB["MX"]["nrp"]*tPB["MX"]["nrc"]*max(tPB["MX"]["nwcv"],tPB["MX"]["nwpv"])//tPB["MX"]["nwcvpi"]
+
             numM = 0
             if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
               tPM = tPA["tpsMetadata"] if tPA["is_sparse"] else tPB["tpsMetadata"]
               numM = tPM["nrp"]*tPM["nrc"]*max(tPM["nwcv"],tPM["nwpv"])//tPM["nwcvpi"]
-            dscnt += skipLocalWrite * (numA + numB + numM + numMXSA + numMXSB)
+            lgkmcnt += skipLocalWrite * (numA + numB + numM)
         if skipLocalRead > -1:
-            numInstPerReadA  = 2 if (tPA["localReadInstruction"].blockWidth == 6) else 1
-            numInstPerReadB  = 2 if (tPB["localReadInstruction"].blockWidth == 6) else 1
-            numReadsPerIterA = 0 if kernel["DirectToVgprA"] else states.numReadsPerIterA * numInstPerReadA
-            numReadsPerIterB = 0 if kernel["DirectToVgprB"] else states.numReadsPerIterB * numInstPerReadB
-            numReadsPerIterMXSA = states.numReadsPerIterMXSA if (kernel["ProblemType"]["MXBlockA"] and (not kernel["DirectToVgprMXSA"])) else 0
-            numReadsPerIterMXSB = states.numReadsPerIterMXSB if (kernel["ProblemType"]["MXBlockB"] and (not kernel["DirectToVgprMXSB"])) else 0
-            readsPerIter = numReadsPerIterA + numReadsPerIterMXSA + numReadsPerIterB + numReadsPerIterMXSB + states.numReadsPerIterMetadata
-            dscnt += skipLocalRead * readsPerIter
+            numReadsPerIterA = 0 if kernel["DirectToVgprA"] else states.numReadsPerIterA
+            numReadsPerIterB = 0 if kernel["DirectToVgprB"] else states.numReadsPerIterB
+            readsPerIter = numReadsPerIterA + numReadsPerIterB + states.numReadsPerIterMetadata
+            lgkmcnt += skipLocalRead * readsPerIter
 
     skipGR = skipGlobalRead > -1 or skipGlobalReadInst > -1
-    vlcnt = 0 if skipGR else -1
+    vmcnt = 0 if skipGR else -1
     if skipGR:
         numA = kernel["NumLoadsPerpendicularA"] * kernel["NumLoadsCoalescedA"]
         numB = kernel["NumLoadsPerpendicularB"] * kernel["NumLoadsCoalescedB"]
-        numMXSA = kernel["NumLoadsPerpendicularMXSA"] * kernel["NumLoadsCoalescedMXSA"] if kernel["ProblemType"]["MXBlockA"] else 0
-        numMXSB = kernel["NumLoadsPerpendicularMXSB"] * kernel["NumLoadsCoalescedMXSB"] if kernel["ProblemType"]["MXBlockB"] else 0
         numM = 0
         if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
           numM = kernel["NumLoadsPerpendicularMetadata"] * kernel["NumLoadsCoalescedMetadata"]
         numGR = 0
         if skipGlobalRead > -1:
-          numGR += skipGlobalRead * (numA + numB + numMXSA + numMXSB + numM)
+          numGR += skipGlobalRead * (numA + numB + numM)
         if skipGlobalReadInst > -1:
           numGR += skipGlobalReadInst
-        vlcnt += numGR
+        vmcnt += numGR
 
         # Unlike flat loads, BufferLoad do not increment the outstanding
-        # dscnt
-        if dscnt > -1 and not kernel["BufferLoad"]:
-            dscnt += numGR
+        # lgkmcnt
+        if lgkmcnt > -1 and not kernel["BufferLoad"]:
+            lgkmcnt += numGR
 
     if (conservativeWaitCnt & 0x2) and skipGR or \
        (conservativeWaitCnt & 0x4) and skipLocalWrite != -1 or \
        (conservativeWaitCnt & 0x8) and skipLocalRead  != -1:
         imod = Module("ConservativeWaitCnt")
-        imod.add(SWaitCnt(dscnt=0, vlcnt=0, vscnt=0, comment="debug %s"%comment))
+        imod.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=0, comment="debug %s"%comment))
         imod.add(SBarrier(comment="debug"))
         return imod
 
-    if dscnt >= 0 and vlcnt >= 0:
-        vlcnt = -1 # preserve prior behavior of removing vlcnt here?
+    maxLgkmcnt = states.asmCaps["MaxLgkmcnt"]
+    lgkmcnt = min(lgkmcnt, maxLgkmcnt)
+    if lgkmcnt >= 0 and vmcnt >= 0:
+        vmcnt = -1 # preserve prior behavior of removing vmcnt here?
+    maxVmcnt = states.asmCaps["MaxVmcnt"]
+    vmcnt = min(vmcnt, maxVmcnt)
+    # This line is added for backward compatibility
+    vscnt = vmcnt if lgkmcnt != -1 and vmcnt != -1 and states.archCaps["SeparateVscnt"] else -1
 
-    waitcnt = SWaitCnt(dscnt=dscnt, vlcnt=vlcnt, comment=comment)
+    waitcnt = SWaitCnt(lgkmcnt,vmcnt, vscnt, comment)
     return waitcnt
 
 ##############################################################################
 # SyncThreads
 ##############################################################################
-def syncThreads(kernel, archCaps, asmCaps, comment="", skipForceWaitcnt0=False, memoryToken=None):
+def syncThreads(kernel, archCaps, comment="", skipForceWaitcnt0=False):
     imod = Module("syncThreads")
     if kernel["NumThreads"] > kernel["WavefrontSize"]:
-        if asmCaps["SeparateVscnt"]:
-            imod.add(SWaitCnt(dscnt=0, comment="extra navi wait"))
-        elif kernel["_ScheduleIterAlg"] == 2 \
-          or kernel["PrefetchGlobalRead"] >= 2 \
+        if archCaps["SeparateVscnt"]:
+            imod.add(SWaitCnt(lgkmcnt="null", comment="extra navi wait"))
+        elif kernel["ScheduleIterAlg"] == 2 \
+          or kernel["PrefetchGlobalRead"] == 2 \
           or skipForceWaitcnt0:
             imod.addComment("Skip force waitcnt0")
         elif archCaps["Waitcnt0Disabled"]:
-            imod.add(SWaitCnt(dscnt=0, vlcnt=0, vscnt=0, comment="force waitcnt0"))
+            # FIXME: should we add s_waitcnt_vscnt?
+            imod.add(SWaitCnt(lgkmcnt=0, vmcnt=0, vscnt=-1, comment="force waitcnt0"))
 
-        _barrier = SBarrier(comment=comment)
-        if memoryToken is not None:
-            _barrier.setMemToken(MemTokenData(memoryToken))
-        imod.add(_barrier)
+        imod.add(SBarrier(comment=comment))
     else:
         imod.addComment("Skip barrier: NumThreads=%s"%(kernel["NumThreads"]) + \
                 comment)
@@ -212,11 +197,12 @@ def accVgprImagNumOffset(kernel):
 # MapAcctoArch
 # function to map MFMA Acc  Registers to Arch VGPR register
 ##############################################################################
-def mapAcctoArchRegs(kernel, maxAgpr=256, write=False, spilledVgprBase=None):
+def mapAcctoArchRegs(kernel, maxAgpr=256, write=False):
   acc2arch, _ = accToArchMapper(kernel)
 
   complexMultiplier = 2 if kernel["ProblemType"]["DataType"].isComplex() else 1
-  itemList = [None] * kernel["MIRegPerOut"] * complexMultiplier * len(acc2arch)
+  imod = Module("AccVgpr{}".format("Write" if write else "Read"))
+  imod.itemList = [None] * kernel["MIRegPerOut"] * complexMultiplier * len(acc2arch)
   accImOffset = accVgprImagNumOffset(kernel)
   for i in range(len(acc2arch)):
     for cm in range(complexMultiplier):
@@ -231,44 +217,32 @@ def mapAcctoArchRegs(kernel, maxAgpr=256, write=False, spilledVgprBase=None):
               return accvgpr(idx)
           accStr = gprfunc(srcIdx)
           if srcIdx >= maxAgpr:
-            # Spilled accumulator: lives in an arch vgpr, not an accvgpr.
-            # For subtile kernels the spilled D-tile vgprs are allocated from
-            # the pool at spilledVgprBase (not at ValuC+N), so reference them
-            # directly.  For non-subtile kernels spilledVgprBase is None and
-            # the legacy "ValuC+N" addressing is used (vgprValuC == 0 there).
-            spill_offset = srcIdx - maxAgpr
-            if spilledVgprBase is not None:
-              spilledVgpr = vgpr(spilledVgprBase + spill_offset)
-            else:
-              spilledVgpr = vgpr("ValuC+%u" % spill_offset)
             if write:
-              itemList[destIdx] = VMovB32(dst=spilledVgpr,
+              imod.itemList[destIdx] = VMovB32(dst=vgpr("ValuC+%u"%(srcIdx-maxAgpr)),
                                              src=vgpr(Holder(name="ValuC")),
                                              comment="copy vreg[%u] to MI out reg" % destIdx)
             else:
-              itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
-                                              src=spilledVgpr,
+              imod.itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
+                                              src=vgpr("ValuC+%u"%(srcIdx-maxAgpr)),
                                               comment="copy MI out reg to vreg[%u]" % destIdx)
           else:
             if write:
-              itemList[destIdx] = VAccvgprWriteB32(dst=accStr,
+              imod.itemList[destIdx] = VAccvgprWriteB32(dst=accStr,
                                                         src=vgpr(Holder(name="ValuC")),
                                                         comment="copy vreg[%u] to acc" % destIdx)
             else:
-              itemList[destIdx] = VAccvgprReadB32(dst=vgpr(Holder(name="ValuC")),
+              imod.itemList[destIdx] = VAccvgprReadB32(dst=vgpr(Holder(name="ValuC")),
                                                       src=accStr,
                                                       comment="copy acc to vreg[%u]" % destIdx)
         else:
           if write:
-            itemList[destIdx] = VMovB32(dst=vgpr("ValuC+%u"%srcIdx),
+            imod.itemList[destIdx] = VMovB32(dst=vgpr("ValuC+%u"%srcIdx),
                                              src=vgpr(Holder(name="ValuC")),
                                              comment="copy vreg[%u] to MI out reg" % destIdx)
           else:
-            itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
+            imod.itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
                                              src=vgpr("ValuC+%u"%srcIdx),
                                              comment="copy MI out reg to vreg[%u]" % destIdx)
-  imod = Module("AccVgpr{}".format("Write" if write else "Read"))
-  imod.setItems(itemList)
   return imod
 
 ##############################################################################
@@ -277,43 +251,44 @@ def mapAcctoArchRegs(kernel, maxAgpr=256, write=False, spilledVgprBase=None):
 ##############################################################################
 def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
   acc2arch, _ = accToArchMapper(kernel)
-  itemList = [None] * len(acc2arch)
+
+  imod = Module("MulAlpha")
+  imod.itemList = [None] * len(acc2arch)
   for i in range(len(acc2arch)):
     destIdx = acc2arch[i]
     srcIdx  = i * kernel["MIRegPerOut"]
-    # TODO: Add conversion support for different compute data types
     if kernel["ProblemType"]["ComputeDataType"].isDouble():
-      itemList[destIdx] = VMulF64(dst=vgpr(Holder(name="ValuC"),2),
+      imod.itemList[destIdx] = VMulF64(dst=vgpr(Holder(name="ValuC"),2),
                                                     src0=sgpr("Alpha",2), src1=vgpr("ValuC+%u"%srcIdx,2),
                                                     comment="Multiply MI out reg with alpha")
     elif kernel["ProblemType"]["ComputeDataType"].isSingle() or \
         (kernel["ProblemType"]["ComputeDataType"].isHalf() and kernel["ProblemType"]["HighPrecisionAccumulate"]):
-      itemList[destIdx] = VMulF32(dst=vgpr(Holder(name="ValuC")),
+      imod.itemList[destIdx] = VMulF32(dst=vgpr(Holder(name="ValuC")),
                                                     src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%srcIdx),
                                                     comment="Multiply MI out reg with alpha")
     elif (kernel["ProblemType"]["ComputeDataType"].isHalf() and not kernel["ProblemType"]["HighPrecisionAccumulate"]):
-      itemList[destIdx] = VMulPKF16(dst=vgpr(Holder(name="ValuC")),
+        imod.itemList[destIdx] = VMulPKF16(dst=vgpr(Holder(name="ValuC")),
                                                        src0=sgpr("Alpha"),
                                                        src1=vgpr("ValuC+%u"%srcIdx), comment="Multiply MI out reg with alpha")
     elif kernel["ProblemType"]["ComputeDataType"].isInt32():
-      itemList[destIdx] = VMulLOU32(dst=vgpr(Holder(name="ValuC")),
+      imod.itemList[destIdx] = VMulLOU32(dst=vgpr(Holder(name="ValuC")),
                                                       src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%srcIdx),
                                                        comment="Multiply MI out reg with alpha")
     elif kernel["ProblemType"]["ComputeDataType"].isSingleComplex():
-        accImOffset = accVgprImagNumOffset(kernel)
+        accImOffset = accVgprImagNumOffset(kernel, lrvwB)
         cimod = Module()
         # cannot use tmp vgpr for write batch, use allocated vgpr instead
         vtmp1 = startVgprAlphaTmp
         vtmp2 = vtmp1 + 1
         # tmp1 = a.real * b.real
-        cimod.add(VMulF32(dst=vgpr(vtmp1), src0=sgpr("Alpha+0"), src1=vgpr("ValuC+%u"%srcIdx), comment="tmp1 = a.real * b.real"))
+        cimod.add(VMulF32(dst=vgpr(vtmp1), src0=sgpr("Alpha+0"), src1=vgpr("ValuC+%u"%srcIdx), comment=""))
         # tmp2 = a.imag * b.real
-        cimod.add(VMulF32(dst=vgpr(vtmp2), src0=sgpr("Alpha+1"), src1=vgpr("ValuC+%u"%srcIdx), comment="tmp2 = a.imag * b.real"))
+        cimod.add(VMulF32(dst=vgpr(vtmp2), src0=sgpr("Alpha+1"), src1=vgpr("ValuC+%u"%srcIdx), comment=""))
         # c.real = a.real * b.real - a.imag * b.imag = tmp1 - a.imag * b.imag
-        cimod.add(VFmaF32(dst=vgpr(Holder(name="ValuC")), src0=sgpr("Alpha+1"), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset)).getMinus(), src2=vgpr(vtmp1), comment="c.real = a.real * b.real - a.imag * b.imag = tmp1 - a.imag * b.imag"))
+        cimod.add(VFmaF32(dst=vgpr(Holder(name="ValuC")), src0=sgpr("Alpha+1"), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset)), src2=vgpr(vtmp1)))
         # c.imag = a.real * b.imag + a.imag * b.real = a.real * b.imag + tmp2
-        cimod.add(VFmaF32(dst=vgpr(Holder(name="ValuC+1")), src0=sgpr("Alpha+0"), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset)), src2=vgpr(vtmp2), comment="c.imag = a.real * b.imag + a.imag * b.real = a.real * b.imag + tmp2"))
-        itemList[destIdx] = cimod
+        cimod.add(VFmaF32(dst=vgpr(Holder(name="ValuC+1")), src0=sgpr("Alpha+0"), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset)), src2=vgpr(vtmp2)))
+        imod.itemList[destIdx] = cimod
     elif kernel["ProblemType"]["ComputeDataType"].isDoubleComplex():
       accImOffset = accVgprImagNumOffset(kernel)
       cimod = Module()
@@ -325,13 +300,10 @@ def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
       # tmp2 = a.imag * b.real
       cimod.add(VMulF64(dst=vgpr(vtmp2,2), src0=sgpr("Alpha+2",2), src1=vgpr("ValuC+%u"%srcIdx,2)))
       # c.real = a.real * b.real - a.imag * b.imag = tmp1 - a.imag * b.imag
-      cimod.add(VFmaF64(dst=vgpr(Holder(name="ValuC"),2), src0=sgpr("Alpha+2",2), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset),2).getMinus(), src2=vgpr(vtmp1,2)))
+      cimod.add(VFmaF64(dst=vgpr(Holder(name="ValuC"),2), src0=sgpr("Alpha+2",2), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset),2), src2=vgpr(vtmp1,2)))
       # c.imag = a.real * b.imag + a.imag * b.real = a.real * b.imag + tmp2
       cimod.add(VFmaF64(dst=vgpr(Holder(name="ValuC+2"),2), src0=sgpr("Alpha+0",2), src1=vgpr("ValuC+%u"%(srcIdx+accImOffset),2), src2=vgpr(vtmp2,2)))
-      itemList[destIdx] = cimod
-
-  imod = Module("MulAlpha")
-  imod.setItems(itemList)
+      imod.itemList[destIdx] = cimod
   return imod
 
   ##############################################################################
@@ -340,39 +312,40 @@ def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
   ##############################################################################
 def moveMIoutToArch(kernel, startVgprAlphaTmp):
   acc2arch, _ = accToArchMapper(kernel)
-  itemList = [None] * len(acc2arch)
+
+  imod = Module("MulAlpha")
+  imod.itemList = [None] * len(acc2arch)
   for i in range(len(acc2arch)):
     destIdx = acc2arch[i]
     srcIdx  = i * kernel["MIRegPerOut"]
     if kernel["ProblemType"]["ComputeDataType"].isDouble():
-      itemList[destIdx] = VLShiftLeftB64(dst=vgpr(Holder(name="ValuC"), 2),
+      imod.itemList[destIdx] = VLShiftLeftB64(dst=vgpr(Holder(name="ValuC"), 2),
                                                      shiftHex=0,
                                                      src=vgpr("ValuC+%u"%srcIdx,2), comment="Rearrange MI out reg")
     elif kernel["ProblemType"]["ComputeDataType"].isSingle() or \
         (kernel["ProblemType"]["ComputeDataType"].isHalf() and kernel["ProblemType"]["HighPrecisionAccumulate"]):
-      itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
+      imod.itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
                                                      src=vgpr("ValuC+%u"%srcIdx), comment="Rearrange MI out reg")
     elif (kernel["ProblemType"]["ComputeDataType"].isHalf() and not kernel["ProblemType"]["HighPrecisionAccumulate"]):
-      itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
+      imod.itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
                                                      src=vgpr("ValuC+%u"%srcIdx), comment="Rearrange MI out reg")
     elif kernel["ProblemType"]["ComputeDataType"].isInt32():
-      itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
+      imod.itemList[destIdx] = VMovB32(dst=vgpr(Holder(name="ValuC")),
                                                      src=vgpr("ValuC+%u"%srcIdx), comment="Rearrange MI out reg")
     elif kernel["ProblemType"]["ComputeDataType"].isSingleComplex():
-        accImOffset = accVgprImagNumOffset(kernel)
+        accImOffset = accVgprImagNumOffset(kernel, lrvwB)
         cimod = Module()
         cimod.add(VMovB32(dst=vgpr(Holder(name="ValuC")), src=vgpr("ValuC+%u"%srcIdx), comment="Rearrange MI out reg"))
-        cimod.add(VMovB32(dst=vgpr(Holder(name="ValuC+1")), src=vgpr("ValuC+%u"%(srcIdx+accImOffset)), comment="Rearrange MI out reg"))
-        itemList[destIdx] = cimod
+        cimod.addInst(VMovB32(dst=vgpr(Holder(name="ValuC+1")), src=vgpr("ValuC+%u"%(srcIdx+accImOffset)), comment="Rearrange MI out reg"))
+        imod.itemList[destIdx] = cimod
     elif kernel["ProblemType"]["ComputeDataType"].isDoubleComplex():
-      accImOffset = accVgprImagNumOffset(kernel)
+      accImOffset = accVgprImagNumOffset(kernel, lrvwB)
       cimod = Module()
       # tmp1 = a.real * b.real
       cimod.add(VLShiftLeftB64(dst=vgpr(Holder(name="ValuC"), 2), shiftHex=0, src=vgpr("ValuC+%u"%srcIdx,2), comment="Rearrange MI out reg"))
       # tmp2 = a.imag * b.real
       cimod.add(VLShiftLeftB64(dst=vgpr(Holder(name="ValuC+2"), 2), shiftHex=0, src=vgpr("ValuC+%u"%(srcIdx+accImOffset),2), comment="Rearrange MI out reg"))
-      itemList[destIdx] = cimod
+      imod.itemList[destIdx] = cimod
 
-  imod = Module("MulAlpha")
-  imod.setItems(itemList)
   return imod
+

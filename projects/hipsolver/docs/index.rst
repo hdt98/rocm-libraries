@@ -14,17 +14,14 @@ marshalling inputs into the backend library and results back to the application.
 hipSOLVER supports rocSOLVER and NVIDIA CUDA cuSOLVER as backends.
 It exports an interface that does not require the client to change, regardless of the chosen backend.
 
-The hipSOLVER public repository is located at `<https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsolver>`_.
-
-The hipSOLVER repository for ROCm 7.0.2 and earlier is located at `<https://github.com/ROCm/hipSOLVER>`_.
+The hipSOLVER public repository is located at `<https://github.com/ROCm/hipSOLVER>`_.
 
 .. grid:: 2
   :gutter: 3
 
   .. grid-item-card:: Install
 
-    * :doc:`Install hipSOLVER <./installation/install>`
-    * :doc:`Build from source <./installation/build>`
+    * :doc:`Installation guide <./installation/install>`
 
   .. grid-item-card:: How to
 
@@ -32,12 +29,11 @@ The hipSOLVER repository for ROCm 7.0.2 and earlier is located at `<https://gith
 
   .. grid-item-card:: Examples
 
-    * `Client samples <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipsolver/clients/samples>`_
+    * `Client samples <https://github.com/ROCm/hipSOLVER/tree/develop/clients/samples>`_
 
   .. grid-item-card:: Reference
 
     * :ref:`api-intro`
-    * :ref:`precision-support`
     * :ref:`library_api`
     * :ref:`library_dense`
     * :ref:`library_sparse`
