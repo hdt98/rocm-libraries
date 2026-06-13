@@ -1,0 +1,102 @@
+name: 2026-05-27-deepseek-v4-amd-pretrain
+kind: experiment
+type: pretraining
+status: scaffolded_source_review
+frameworks:
+  primary: primus
+  backend_candidates:
+    - megatron-LM
+    - torchtitan
+model_family: deepseek-v4
+hardware_target: mi355x
+
+objective: >-
+  Create an AMD MI355X DeepSeek V4 pretraining experiment workspace with editable
+  Primus, TorchTitan, and Megatron-LM WIP snapshots, plus NVIDIA Day-0
+  Miles/Megatron-LM references for source comparison.
+
+branch_sync:
+  branch: sonle5_dsv4_amd_pretrain
+  baseline_before_experiment: d4468c5b3dd072c9034fd02b268e011067850550
+  relation_to_local_main_before_commit: identical
+  synced_at: 2026-05-27
+
+sources:
+  wip:
+    primus:
+      remote: https://github.com/AMD-AGI/Primus.git
+      branch: main
+      commit: 05ec3231288f3932cdef789a06149d26825736ff
+      path: sources/wip/primus
+      local_state: clean_shallow_clone_snapshot_from_remote_branch_head
+      role: amd_training_framework_and_orchestration_surface
+    torchtitan:
+      remote: https://github.com/pytorch/torchtitan.git
+      branch: main
+      commit: 7fcd9beacde733f3ceca4a4da7e2f0518d64f68e
+      path: sources/wip/torchtitan
+      local_state: clean_shallow_clone_snapshot_from_remote_branch_head
+      role: pretraining_backend_candidate_and_reference
+    megatron_lm:
+      remote: https://github.com/NVIDIA/Megatron-LM.git
+      branch: main
+      commit: 873678adafa71702ef7e7a405a7f4a3377dd2727
+      path: sources/wip/megatron-LM
+      local_state: clean_shallow_clone_snapshot_from_remote_branch_head
+      role: megatron_backend_surface_for_dsv4_model_port
+  references:
+    lmsys_day0_rl:
+      url: https://www.lmsys.org/blog/2026-04-25-deepseek-v4/#reinforcement-learning-miles-support
+      role: public_day0_training_feature_and_result_summary
+    miles_roadmap:
+      url: https://github.com/radixark/miles/issues/1046
+      opened: 2026-04-24
+      role: public_deepseek_v4_rl_roadmap_and_launch_shape
+    miles_pr1045:
+      pr: https://github.com/radixark/miles/pull/1045
+      base:
+        remote: https://github.com/radixark/miles.git
+        branch: main
+        commit: c8e85df24a0a7dd96e6b13b7724251c034cd4968
+      head:
+        remote: https://github.com/yueming-yuan/miles.git
+        branch: deepseek-v4
+        commit: 032721cd61bf7164955f084425eb9f315352fd26
+      path: sources/references/miles-deepseek-v4-pr1045
+      role: nvidia_side_miles_dsv4_rl_reference
+    megatron_lm_pr28:
+      pr: https://github.com/radixark/Megatron-LM/pull/28
+      base:
+        remote: https://github.com/radixark/Megatron-LM.git
+        branch: miles-main
+        commit: 23924a0b66f35b31050ce9636477d2ee32148767
+      head:
+        remote: https://github.com/yueming-yuan/Megatron-LM.git
+        branch: deepseek-v4
+        commit: 1c6e5b7bcde0097ebe193b6258115ff3558f69d6
+      merge_ref_commit: d88459d7f80a62f4d4c2ff8ca3f93723d9794695
+      path: sources/references/megatron-lm-deepseek-v4-pr28
+      role: nvidia_side_megatron_dsv4_modeling_reference
+
+runtime:
+  status: not_launched
+  raw_outputs_policy: keep_logs_checkpoints_traces_outside_repo
+
+initial_source_review_focus:
+  - dsv4_model_definition_and_mhc_state_shape
+  - compressed_attention_parallelism_dp_tp_sp_ep_pp_cp
+  - fp8_rollout_bf16_or_fp8_training_precision_boundaries
+  - checkpoint_conversion_and_distributed_optimizer_precision
+  - amd_kernel_replacements_for_tilelang_or_cuda_specific_paths
+
+validation:
+  status: not_run
+  required_before_promotion:
+    - command_shape
+    - node_layout
+    - dependency_shas
+    - completed_iterations
+    - skipped_and_nan_counts
+    - loss_or_health_metric_movement
+    - throughput
+    - checkpoint_or_result_markers

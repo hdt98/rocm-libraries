@@ -1,0 +1,80 @@
+# Copyright (c) 2026 Huawei Technologies Co., Ltd. All Rights Reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+# ---- All project specifications ---- #
+[project]
+name = "torchtitan_npu"
+description = "Ascend End-to-End Large Model Training Adaptation Framework Based on torchtitan"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [
+    { name = "Huawei Hisilicon" },
+]
+keywords = ["pytorch", "training", "llm", "npu", "ascend"]
+dependencies = [
+    "torch",
+    "torch_npu",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://gitcode.com/cann/torchtitan-npu"
+Documentation = "https://gitcode.com/cann/torchtitan-npu/tree/master/docs"
+Issues = "https://gitcode.com/cann/torchtitan-npu/issues"
+Repository = "https://gitcode.com/cann/torchtitan-npu.git"
+
+[project.optional-dependencies]
+testing = [
+    "pytest>=7.0",
+    "pytest-html>=4.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "hypothesis>=6.0",
+]
+dev = [
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "expecttest", # test_tokenizer
+    "pyrefly==0.45.1",
+]
+
+[tool.setuptools.dynamic]
+version = {file = "assets/version.txt"}
+
+[tool.codespell]
+skip = ["*.json"]
+ignore-words-list = ["cann", "nD", "dOut"]
+
+# ---- Explicit project build information ---- #
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = [""]
+include = ["torchtitan_npu*"]
+exclude = ["CI*", "test_reports*", "cloudcache*", "third_party*"]
+
+[tool.pytest.ini_options]
+addopts = ["--showlocals", "-v", "--tb=short", "--import-mode=importlib"]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "nightly: heavy-weight validation reserved for nightly or dedicated multi-card environments",
+    "smoke: integration/e2e smoke coverage for NPU features and training paths",
+]
+
+[tool.pyrefly]
+project-excludes = ["**/tests/**", "CI", "torchtitan_npu/ops/triton"]
+ignore-missing-imports = ["torchao.*", "torchft"]  # optional dependencies
+search-path = ["../pytorch"]  # local built pytorch
+replace-imports-with-any = ["torch_npu", "torch.npu"]
+
+[tool.usort]
+known_first_party = ["torchtitan_npu", "tests"]

@@ -1,0 +1,8 @@
+remote: https://github.com/AMD-AGI/Primus.git
+branch: main
+commit: 05ec3231288f3932cdef789a06149d26825736ff
+local_state: clean_shallow_clone_snapshot_from_remote_branch_head
+refreshed_at: 2026-05-27
+notes:
+  - Primary AMD training framework surface for the DSv4 pretraining port.
+  - No nested Git metadata is retained in the vendored tree.

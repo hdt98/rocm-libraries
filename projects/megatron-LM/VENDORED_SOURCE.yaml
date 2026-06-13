@@ -1,0 +1,9 @@
+remote: https://github.com/NVIDIA/Megatron-LM.git
+branch: main
+commit: 873678adafa71702ef7e7a405a7f4a3377dd2727
+local_state: clean_shallow_clone_snapshot_from_remote_branch_head
+refreshed_at: 2026-05-27
+notes:
+  - Megatron backend surface for DSv4 model and distributed training port work.
+  - Compare against the DSv4 PR reference in sources/references/megatron-lm-deepseek-v4-pr28.
+  - No nested Git metadata is retained in the vendored tree.
